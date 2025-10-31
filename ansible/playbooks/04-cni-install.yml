@@ -39,16 +39,64 @@
   failed_when: false
   changed_when: false
 
-- name: Calico CNI 설치 (VXLAN mode, BGP 비활성화)
+- name: Calico ConfigMap 생성 (VXLAN 전용)
   shell: |
-    # Calico VXLAN 모드 설치 (BGP 포트 불필요)
-    kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.4/manifests/calico-vxlan.yaml
-    
-    # 또는 기본 매니페스트 + 설정 변경
-    # kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.4/manifests/calico.yaml
-    # kubectl patch installation default --type=json -p='[{"op": "replace", "path": "/spec/calicoNetwork/bgp", "value": "Disabled"}]' -n tigera-operator || true
+    kubectl apply -f - <<EOF
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: calico-config
+      namespace: kube-system
+    data:
+      calico_backend: vxlan
+      veth_mtu: "0"
+      cni_network_config: |-
+        {
+          "name": "k8s-pod-network",
+          "cniVersion": "0.3.1",
+          "plugins": [
+            {
+              "type": "calico",
+              "log_level": "info",
+              "datastore_type": "kubernetes",
+              "nodename": "__KUBERNETES_NODE_NAME__",
+              "mtu": __CNI_MTU__,
+              "ipam": {"type": "calico-ipam"},
+              "policy": {"type": "k8s"},
+              "kubernetes": {"kubeconfig": "__KUBECONFIG_FILEPATH__"}
+            },
+            {"type": "portmap", "snat": true, "capabilities": {"portMappings": true}},
+            {"type": "bandwidth", "capabilities": {"bandwidth": true}}
+          ]
+        }
+    EOF
+  when: calico_check.rc != 0
+
+- name: Calico CNI 설치 (기본 매니페스트)
+  shell: |
+    # 기본 매니페스트 설치
+    kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.4/manifests/calico.yaml
   when: calico_check.rc != 0
   register: calico_install
+
+- name: Calico DaemonSet 환경변수 패치 (VXLAN 강제)
+  shell: |
+    # BGP 비활성화, VXLAN 활성화
+    kubectl set env daemonset/calico-node -n kube-system \
+      CLUSTER_TYPE=k8s \
+      CALICO_IPV4POOL_IPIP=Never \
+      CALICO_IPV4POOL_VXLAN=Always \
+      CALICO_IPV6POOL_VXLAN=Never
+    
+    echo "✅ Calico VXLAN 모드로 패치 완료"
+  when: calico_install.changed
+  register: calico_patch
+
+- name: Calico Pod 재시작 (환경변수 적용)
+  shell: |
+    kubectl delete pods -n kube-system -l k8s-app=calico-node
+    echo "⏳ Calico Pod 재생성 중..."
+  when: calico_patch.changed
 
 - name: Calico DaemonSet에 NotReady toleration 추가 (순환 참조 해결)
   shell: |
