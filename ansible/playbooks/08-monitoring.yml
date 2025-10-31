@@ -16,14 +16,21 @@
   register: prometheus_check
   changed_when: false
 
-- name: Prometheus + Grafana 설치
+- name: Prometheus + Grafana 설치 (리소스 최적화)
   command: >
     helm install prometheus prometheus-community/kube-prometheus-stack
     --namespace {{ monitoring_namespace }}
-    --set prometheus.prometheusSpec.retention={{ prometheus_retention }}
+    --set prometheus.prometheusSpec.retention.time=7d
+    --set prometheus.prometheusSpec.retention.size=80%
+    --set prometheus.prometheusSpec.resources.requests.cpu=1000m
+    --set prometheus.prometheusSpec.resources.requests.memory=2Gi
+    --set prometheus.prometheusSpec.resources.limits.memory=4Gi
+    --set prometheus.prometheusSpec.storageSpec.volumeClaimTemplate.spec.resources.requests.storage=50Gi
     --set grafana.adminPassword={{ grafana_admin_password }}
-    --set prometheus.prometheusSpec.resources.requests.cpu=200m
-    --set prometheus.prometheusSpec.resources.requests.memory=512Mi
+    --set grafana.resources.requests.cpu=500m
+    --set grafana.resources.requests.memory=512Mi
+    --set alertmanager.alertmanagerSpec.resources.requests.cpu=250m
+    --set alertmanager.alertmanagerSpec.resources.requests.memory=256Mi
   when: "'prometheus' not in prometheus_check.stdout"
 
 - name: Prometheus Pod 대기
