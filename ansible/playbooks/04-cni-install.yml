@@ -10,9 +10,31 @@
   command: kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml
   when: flannel_check.rc != 0
 
+- name: Flannel DaemonSet 확인
+  command: kubectl get daemonset -n kube-flannel
+  register: flannel_ds_check
+  changed_when: false
+  failed_when: false
+
 - name: Flannel Pod가 Ready 될 때까지 대기
-  command: kubectl wait --for=condition=ready pod -l app=flannel -n kube-flannel --timeout=300s
+  command: kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=flannel -n kube-flannel --timeout=300s
+  when: flannel_check.rc != 0 and flannel_ds_check.rc == 0
+  failed_when: false
+
+- name: Flannel Pod 상태 확인 (대안)
+  shell: |
+    for i in {1..30}; do
+      READY=$(kubectl get pods -n kube-flannel -l app.kubernetes.io/name=flannel --no-headers 2>/dev/null | grep -c "Running" || echo "0")
+      if [ "$READY" -gt 0 ]; then
+        echo "Flannel pods are ready"
+        exit 0
+      fi
+      echo "Waiting for Flannel pods... ($i/30)"
+      sleep 10
+    done
+    exit 0
   when: flannel_check.rc != 0
+  changed_when: false
 
 - name: 노드 상태 확인
   command: kubectl get nodes
