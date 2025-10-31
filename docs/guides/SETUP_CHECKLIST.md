@@ -83,11 +83,11 @@ aws configure
 aws sts get-caller-identity
 ```
 
-### 🔴 P0: SSH 키 생성
+### 🔴 P0: SSH 키 생성 (백업용, 선택)
 
 ```bash
-# SSH 키 생성
-- [ ] SSH 키 페어 생성
+# SSH 키 생성 (선택적, 백업 접속용)
+- [ ] SSH 키 페어 생성 (선택)
 
 ssh-keygen -t rsa -b 4096 -f ~/.ssh/sesacthon -C "sesacthon-k8s"
 
@@ -95,8 +95,32 @@ ssh-keygen -t rsa -b 4096 -f ~/.ssh/sesacthon -C "sesacthon-k8s"
 # ~/.ssh/sesacthon (private key)
 # ~/.ssh/sesacthon.pub (public key)
 
-# terraform.tfvars 수정
+# terraform.tfvars 수정 (Session Manager 사용 시 선택)
 # public_key_path = "~/.ssh/sesacthon.pub"
+
+# ⭐ Session Manager 사용 시 SSH 키 없어도 됨!
+```
+
+### 🔴 P0: AWS Session Manager Plugin 설치
+
+```bash
+# Session Manager Plugin 설치 (SSH 키 대체)
+- [ ] Session Manager Plugin 설치
+
+# macOS
+brew install --cask session-manager-plugin
+
+# Linux
+curl "https://s3.amazonaws.com/session-manager-downloads/plugin/latest/ubuntu_64bit/session-manager-plugin.deb" -o "session-manager-plugin.deb"
+sudo dpkg -i session-manager-plugin.deb
+
+# Windows
+# https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html
+
+# 확인
+session-manager-plugin
+
+# ✅ 이제 SSH 키 없이 EC2 접속 가능!
 ```
 
 ### 🔴 P0: GitHub Repository 준비
@@ -232,19 +256,22 @@ pip install -r requirements.txt
 
 ```bash
 - [ ] S3 버킷 생성 (Terraform State 저장)
-- [ ] DynamoDB 테이블 생성 (State Lock)
+- [ ] DynamoDB 테이블 생성 (State Lock - 동시 실행 방지)
 
-# S3 버킷
+# S3 버킷 (terraform.tfstate 저장용)
 aws s3api create-bucket \
   --bucket sesacthon-terraform-state \
   --region ap-northeast-2 \
   --create-bucket-configuration LocationConstraint=ap-northeast-2
 
+# Versioning 활성화 (중요!)
 aws s3api put-bucket-versioning \
   --bucket sesacthon-terraform-state \
   --versioning-configuration Status=Enabled
 
-# DynamoDB 테이블
+# DynamoDB 테이블 (Terraform Lock용)
+# 용도: 동시 terraform apply 방지
+# 비용: ~$0 (월 수백 건)
 aws dynamodb create-table \
   --table-name terraform-state-lock \
   --attribute-definitions AttributeName=LockID,AttributeType=S \
@@ -255,6 +282,8 @@ aws dynamodb create-table \
 # 확인
 aws s3 ls | grep terraform-state
 aws dynamodb list-tables | grep terraform-state-lock
+
+# ✅ DynamoDB 덕분에 팀원과 동시 작업 가능!
 ```
 
 ### 🔴 P0: terraform.tfvars 설정
@@ -267,8 +296,12 @@ vim terraform.tfvars
 
 # 필수 수정 항목:
 aws_region = "ap-northeast-2"
-allowed_ssh_cidr = "YOUR_IP/32"  # ⚠️ 본인 IP로 변경!
-public_key_path = "~/.ssh/sesacthon.pub"
+allowed_ssh_cidr = "YOUR_IP/32"  # ⚠️ 본인 IP로 변경 (또는 0.0.0.0/0)
+public_key_path = "~/.ssh/sesacthon.pub"  # (선택, 백업용)
+
+# ⭐ Session Manager 사용 시:
+# - allowed_ssh_cidr은 보안상 특정 IP 권장
+# - public_key_path는 비상 접속용으로 설정
 ```
 
 ### 🔴 P0: Terraform 실행
@@ -318,14 +351,28 @@ cat ../ansible/inventory/hosts.ini
 ### 🔴 P0: 연결 테스트
 
 ```bash
-- [ ] EC2 부팅 대기 (2-3분)
-- [ ] SSH 연결 테스트
+- [ ] EC2 부팅 및 SSM Agent 등록 대기 (3-5분)
+- [ ] Session Manager 또는 SSH 연결 테스트
 
-sleep 180  # 3분 대기
+sleep 300  # 5분 대기 (SSM Agent 등록 시간 포함)
+
+# Session Manager로 접속 테스트 (권장)
+MASTER_ID=$(aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=k8s-master" "Name=instance-state-name,Values=running" \
+  --query "Reservations[].Instances[].InstanceId" \
+  --output text \
+  --region ap-northeast-2)
+
+aws ssm start-session --target $MASTER_ID --region ap-northeast-2
+
+# 접속 성공 후 종료: exit
+
+# 또는 SSH로 접속 (백업)
+# ssh -i ~/.ssh/sesacthon ubuntu@$(terraform output -raw master_public_ip)
 
 cd ../ansible
 
-# Ping 테스트
+# Ansible Ping 테스트
 ansible all -i inventory/hosts.ini -m ping
 
 # ✅ 모든 노드 SUCCESS 확인
@@ -358,11 +405,20 @@ ansible-playbook -i inventory/hosts.ini site.yml
 ### 🔴 P0: 클러스터 확인
 
 ```bash
-- [ ] Master SSH 접속
+- [ ] Master 접속
 - [ ] kubectl get nodes 확인
 
-# Master 접속
-ssh ubuntu@$(cd ../terraform && terraform output -raw master_public_ip)
+# Session Manager로 Master 접속 (권장)
+MASTER_ID=$(aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=k8s-master" \
+  --query "Reservations[].Instances[].InstanceId" \
+  --output text \
+  --region ap-northeast-2)
+
+aws ssm start-session --target $MASTER_ID --region ap-northeast-2
+
+# 또는 SSH (백업)
+# ssh -i ~/.ssh/sesacthon ubuntu@$(cd ../terraform && terraform output -raw master_public_ip)
 
 # 노드 확인
 kubectl get nodes -o wide
@@ -377,6 +433,9 @@ kubectl get nodes -o wide
 kubectl get pods -A
 
 # ✅ 모든 Pod Running 확인
+
+# Session Manager 종료
+exit
 ```
 
 ---
@@ -947,6 +1006,39 @@ Pod CrashLoopBackOff → kubectl describe pod
 
 ## 🔧 유용한 명령어
 
+### Session Manager 빠른 접속
+
+```bash
+# scripts/connect.sh 생성
+cat <<'EOF' > scripts/connect.sh
+#!/bin/bash
+
+NODE_NAME=${1:-master}
+
+echo "🔍 $NODE_NAME 인스턴스 검색 중..."
+INSTANCE_ID=$(aws ec2 describe-instances \
+  --filters "Name=tag:Name,Values=k8s-$NODE_NAME" "Name=instance-state-name,Values=running" \
+  --query "Reservations[].Instances[].InstanceId" \
+  --output text \
+  --region ap-northeast-2)
+
+if [ -z "$INSTANCE_ID" ]; then
+  echo "❌ $NODE_NAME 인스턴스를 찾을 수 없습니다."
+  exit 1
+fi
+
+echo "🔗 $NODE_NAME ($INSTANCE_ID) 접속 중..."
+aws ssm start-session --target $INSTANCE_ID --region ap-northeast-2
+EOF
+
+chmod +x scripts/connect.sh
+
+# 사용법:
+# ./scripts/connect.sh master    # Master 접속
+# ./scripts/connect.sh worker-1  # Worker 1 접속
+# ./scripts/connect.sh worker-2  # Worker 2 접속
+```
+
 ### 전체 상태 확인
 
 ```bash
@@ -976,6 +1068,9 @@ kubectl get pvc -A
 EOF
 
 chmod +x check-status.sh
+
+# Master에서 실행
+# Session Manager로 접속 후:
 ./check-status.sh
 ```
 
@@ -1001,6 +1096,11 @@ chmod +x check-status.sh
 ✅ RabbitMQ Message Broker
 ✅ Prometheus + Grafana
 ✅ 5개 마이크로서비스 (준비)
+✅ AWS Session Manager (SSH 키 불필요!)
+
+접속 방법:
+# 어떤 PC에서든 (AWS 자격증명만 있으면)
+./scripts/connect.sh master
 
 다음 단계:
 → 각 서비스 코드 작성
@@ -1008,6 +1108,21 @@ chmod +x check-status.sh
 
 비용: $105/월
 ```
+
+---
+
+## 📚 참고 문서
+
+### Session Manager 상세
+
+**[Session Manager 가이드](session-manager-guide.md)** - SSH 키 없이 접속
+
+**핵심:**
+- ✅ SSH 키 관리 불필요
+- ✅ 어떤 PC에서든 접속 가능
+- ✅ IAM으로 팀원 관리
+- ✅ 접속 로그 자동 기록
+- ✅ 비용 $0
 
 ---
 
