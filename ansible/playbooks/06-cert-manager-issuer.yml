@@ -1,7 +1,36 @@
 # Cert-manager ClusterIssuer 설정 (Let's Encrypt)
 ---
-- name: Wait for cert-manager to be ready
-  command: kubectl wait --for=condition=available --timeout=300s deployment/cert-manager -n cert-manager
+- name: Wait for cert-manager deployments to be ready
+  command: kubectl wait --for=condition=available --timeout=300s deployment/{{ item }} -n cert-manager
+  loop:
+    - cert-manager
+    - cert-manager-webhook
+    - cert-manager-cainjector
+  changed_when: false
+
+- name: Wait for cert-manager webhook service
+  shell: |
+    for i in {1..30}; do
+      if kubectl get svc cert-manager-webhook -n cert-manager &>/dev/null; then
+        echo "Webhook service ready"
+        exit 0
+      fi
+      echo "Waiting for webhook service... ($i/30)"
+      sleep 5
+    done
+  changed_when: false
+
+- name: Wait for cert-manager webhook endpoints
+  shell: |
+    for i in {1..30}; do
+      ENDPOINTS=$(kubectl get endpoints cert-manager-webhook -n cert-manager -o jsonpath='{.subsets[*].addresses[*].ip}' 2>/dev/null)
+      if [ -n "$ENDPOINTS" ]; then
+        echo "Webhook endpoints ready: $ENDPOINTS"
+        exit 0
+      fi
+      echo "Waiting for webhook endpoints... ($i/30)"
+      sleep 5
+    done
   changed_when: false
 
 - name: Create Let's Encrypt ClusterIssuer (Production)
