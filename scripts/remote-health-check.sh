@@ -179,7 +179,11 @@ echo "5️⃣  CrashLoopBackOff Pod 확인"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 if kubectl get pods -A >/dev/null 2>&1; then
-  CRASH_PODS=$(kubectl get pods -A 2>/dev/null | grep -c "CrashLoopBackOff" || echo "0")
+  CRASH_PODS=$(kubectl get pods -A 2>/dev/null | grep "CrashLoopBackOff" | wc -l | tr -d ' ')
+  if [ -z "$CRASH_PODS" ]; then
+    CRASH_PODS=0
+  fi
+  
   if [ "$CRASH_PODS" -eq 0 ]; then
     check_pass "CrashLoopBackOff Pod: 없음"
   else
