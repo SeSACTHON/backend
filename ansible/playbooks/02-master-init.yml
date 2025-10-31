@@ -5,15 +5,39 @@
     path: /etc/kubernetes/admin.conf
   register: kubeadm_init_stat
 
-- name: kubeadm init 실행
+# Pre-flight 체크
+- name: Swap 비활성화 확인 (kubeadm 필수)
+  command: swapon -s
+  register: swap_check
+  changed_when: false
+  failed_when: swap_check.stdout != ""
+
+- name: containerd 실행 확인
+  command: systemctl is-active containerd
+  register: containerd_check
+  changed_when: false
+  failed_when: containerd_check.stdout != "active"
+
+- name: CRI 소켓 존재 확인
+  stat:
+    path: /run/containerd/containerd.sock
+  register: cri_socket
+  failed_when: not cri_socket.stat.exists
+
+- name: kubeadm init 실행 (검증된 설정)
   command: >
     kubeadm init
     --pod-network-cidr={{ pod_network_cidr }}
     --service-cidr={{ service_cidr }}
     --apiserver-advertise-address={{ private_ip }}
     --node-name={{ inventory_hostname }}
+    --cri-socket=unix:///run/containerd/containerd.sock
+    --upload-certs
+    --v=5
   register: kubeadm_init_output
   when: not kubeadm_init_stat.stat.exists
+  async: 600
+  poll: 10
 
 - name: .kube 디렉토리 생성
   file:
