@@ -55,6 +55,28 @@ resource "aws_route53_record" "grafana" {
   records = [aws_eip.master.public_ip]
 }
 
+# A 레코드: www.yourdomain.com → Master Public IP
+resource "aws_route53_record" "www" {
+  count = var.domain_name != "" ? 1 : 0
+  
+  zone_id = data.aws_route53_zone.main[0].zone_id
+  name    = "www.${var.domain_name}"
+  type    = "A"
+  ttl     = 300
+  records = [aws_eip.master.public_ip]
+}
+
+# Apex 도메인 (growbin.app) → Master Public IP
+resource "aws_route53_record" "apex" {
+  count = var.domain_name != "" ? 1 : 0
+  
+  zone_id = data.aws_route53_zone.main[0].zone_id
+  name    = var.domain_name
+  type    = "A"
+  ttl     = 300
+  records = [aws_eip.master.public_ip]
+}
+
 # Wildcard A 레코드 (선택사항)
 # *.yourdomain.com → Master Public IP
 resource "aws_route53_record" "wildcard" {
