@@ -126,15 +126,61 @@
   shell: |
     # 기본 Calico 매니페스트 적용
     kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.4/manifests/calico.yaml
-    
-    # eBPF 비활성화 확인 (나중에 적용)
-    # kubectl patch felixconfiguration default --type merge --patch '{"spec":{"bpfEnabled":false}}' 2>/dev/null || true
   when: calico_check.rc != 0
   register: calico_install
 
-- name: Calico 설치 대기 (30초)
+- name: Calico DaemonSet에 NotReady toleration 추가 (순환 참조 해결)
+  shell: |
+    # 현재 tolerations 확인
+    CURRENT_TOLERATIONS=$(kubectl get daemonset calico-node -n kube-system -o jsonpath='{.spec.template.spec.tolerations}')
+    
+    # NotReady toleration이 없으면 추가
+    if ! echo "$CURRENT_TOLERATIONS" | grep -q "node.kubernetes.io/not-ready"; then
+      kubectl patch daemonset calico-node -n kube-system --type=json -p='[
+        {
+          "op": "add",
+          "path": "/spec/template/spec/tolerations/-",
+          "value": {
+            "key": "node.kubernetes.io/not-ready",
+            "operator": "Exists"
+          }
+        }
+      ]'
+      echo "✅ NotReady toleration 추가됨"
+    else
+      echo "✅ NotReady toleration 이미 있음"
+    fi
+  when: calico_install.changed
+  changed_when: false
+
+- name: calico-kube-controllers에 NotReady toleration 추가
+  shell: |
+    # 현재 tolerations 확인
+    CURRENT_TOLERATIONS=$(kubectl get deployment calico-kube-controllers -n kube-system -o jsonpath='{.spec.template.spec.tolerations}' 2>/dev/null || echo "")
+    
+    # NotReady toleration이 없으면 추가
+    if ! echo "$CURRENT_TOLERATIONS" | grep -q "node.kubernetes.io/not-ready"; then
+      kubectl patch deployment calico-kube-controllers -n kube-system --type=json -p='[
+        {
+          "op": "add",
+          "path": "/spec/template/spec/tolerations/-",
+          "value": {
+            "key": "node.kubernetes.io/not-ready",
+            "operator": "Exists"
+          }
+        }
+      ]'
+      echo "✅ NotReady toleration 추가됨"
+    else
+      echo "✅ NotReady toleration 이미 있음"
+    fi
+  when: calico_install.changed
+  changed_when: false
+  failed_when: false
+
+- name: Calico 설치 대기 (10초)
   pause:
-    seconds: 30
+    seconds: 10
   when: calico_install.changed
 
 - name: Calico Node DaemonSet 대기
