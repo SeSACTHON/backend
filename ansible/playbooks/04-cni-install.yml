@@ -1,32 +1,37 @@
 # CNI 플러그인 설치 (Calico - 안정적)
-# kube-proxy는 kubeadm init이 자동 설치
+# kube-proxy는 kubeadm init phase addon으로 이미 설치됨
 ---
-- name: kube-proxy 상태 확인
+- name: kube-proxy DaemonSet 확인
   command: kubectl get daemonset -n kube-system kube-proxy
   register: kubeproxy_check
   changed_when: false
-  retries: 5
-  delay: 10
-  until: kubeproxy_check.rc == 0
+  failed_when: false
+
+- name: kube-proxy 상태 출력
+  debug:
+    msg: "{{ 'kube-proxy DaemonSet 존재: ✅' if kubeproxy_check.rc == 0 else 'kube-proxy DaemonSet 없음: ⚠️' }}"
 
 - name: kube-proxy Pod Ready 대기
   shell: |
-    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
+    for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30; do
       DESIRED=$(kubectl get daemonset kube-proxy -n kube-system -o jsonpath='{.status.desiredNumberScheduled}' 2>/dev/null || echo "0")
       READY=$(kubectl get daemonset kube-proxy -n kube-system -o jsonpath='{.status.numberReady}' 2>/dev/null || echo "0")
       
-      echo "kube-proxy 상태: $READY/$DESIRED Ready (attempt $i/20)"
+      echo "kube-proxy 상태: $READY/$DESIRED Ready (attempt $i/30)"
       
       if [ "$DESIRED" -gt 0 ] && [ "$READY" -eq "$DESIRED" ]; then
-        echo "✅ kube-proxy Ready!"
+        echo "✅ kube-proxy 모든 노드 Ready!"
+        kubectl get pods -n kube-system -l k8s-app=kube-proxy -o wide
         exit 0
       fi
       
       sleep 10
     done
     echo "⚠️ kube-proxy 일부 준비 안 됨, 계속 진행"
+    kubectl get pods -n kube-system -l k8s-app=kube-proxy -o wide || true
     exit 0
   changed_when: false
+  when: kubeproxy_check.rc == 0
 
 - name: Calico 설치 여부 확인
   command: kubectl get deployment -n kube-system calico-kube-controllers

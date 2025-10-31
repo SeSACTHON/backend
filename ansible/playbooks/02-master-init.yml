@@ -36,6 +36,7 @@
         --node-name={{ inventory_hostname }}
         --cri-socket=unix:///run/containerd/containerd.sock
         --upload-certs
+        --skip-phases=addon/kube-proxy
         --v=5
       register: kubeadm_init_output
       when: not kubeadm_init_stat.stat.exists
@@ -120,6 +121,25 @@
   delay: 10
   become_user: "{{ kubectl_user }}"
   changed_when: false
+
+- name: kubeadm으로 kube-proxy 설치 (addon phase)
+  shell: |
+    # API 서버 완전 준비 후 kube-proxy 설치
+    # kubeadm이 올바른 ConfigMap을 자동 생성
+    kubeadm init phase addon kube-proxy \
+      --kubeconfig /etc/kubernetes/admin.conf \
+      --apiserver-advertise-address={{ private_ip }} \
+      --pod-network-cidr={{ pod_network_cidr }}
+  register: kubeproxy_phase
+  retries: 5
+  delay: 10
+  until: kubeproxy_phase.rc == 0
+  when: not kubeadm_init_stat.stat.exists
+
+- name: kube-proxy phase 결과
+  debug:
+    msg: "{{ kubeproxy_phase.stdout_lines }}"
+  when: kubeproxy_phase is defined and kubeproxy_phase.stdout_lines is defined
 
 - name: kubeadm join 명령어 추출
   shell: kubeadm token create --print-join-command
