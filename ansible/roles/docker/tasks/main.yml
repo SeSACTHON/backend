@@ -42,12 +42,16 @@
   args:
     creates: /etc/containerd/config.toml
 
-- name: containerd SystemdCgroup 활성화
-  lineinfile:
-    path: /etc/containerd/config.toml
-    regexp: '^\s*SystemdCgroup\s*=\s*false'
-    line: '            SystemdCgroup = true'
-    backrefs: yes
+- name: containerd 설정 파일 수정 (CRI 활성화)
+  shell: |
+    # SystemdCgroup 활성화
+    sed -i 's/SystemdCgroup = false/SystemdCgroup = true/' /etc/containerd/config.toml
+    
+    # disabled_plugins에서 cri 제거 (있다면)
+    sed -i 's/^disabled_plugins = \["cri"\]/#disabled_plugins = ["cri"]/' /etc/containerd/config.toml
+    
+    # sandbox_image를 pause로 변경 (Kubernetes 호환)
+    sed -i 's|sandbox_image = .*|sandbox_image = "registry.k8s.io/pause:3.9"|' /etc/containerd/config.toml
 
 - name: containerd 재시작
   systemd:
