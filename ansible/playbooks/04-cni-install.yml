@@ -39,10 +39,14 @@
   failed_when: false
   changed_when: false
 
-- name: Calico CNI 설치 (iptables mode, eBPF 비활성화)
+- name: Calico CNI 설치 (VXLAN mode, BGP 비활성화)
   shell: |
-    # 기본 Calico 매니페스트 적용
-    kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.4/manifests/calico.yaml
+    # Calico VXLAN 모드 설치 (BGP 포트 불필요)
+    kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.4/manifests/calico-vxlan.yaml
+    
+    # 또는 기본 매니페스트 + 설정 변경
+    # kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.4/manifests/calico.yaml
+    # kubectl patch installation default --type=json -p='[{"op": "replace", "path": "/spec/calicoNetwork/bgp", "value": "Disabled"}]' -n tigera-operator || true
   when: calico_check.rc != 0
   register: calico_install
 
