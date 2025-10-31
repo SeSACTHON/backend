@@ -35,8 +35,36 @@
   when: calico_check.rc != 0
   changed_when: false
 
+- name: 모든 Worker가 클러스터에 등록될 때까지 대기
+  shell: |
+    EXPECTED_WORKERS=2
+    
+    for i in {1..30}; do
+      # 전체 Worker 노드 수 (Role이 없는 노드)
+      WORKER_COUNT=$(kubectl get nodes --no-headers 2>/dev/null | grep -v "control-plane" | wc -l)
+      
+      echo "Worker 등록 상태: $WORKER_COUNT/$EXPECTED_WORKERS (attempt $i/30)"
+      
+      if [ "$WORKER_COUNT" -ge "$EXPECTED_WORKERS" ]; then
+        echo "✅ 모든 Worker 등록됨!"
+        kubectl get nodes
+        exit 0
+      fi
+      
+      sleep 10
+    done
+    
+    echo "❌ Timeout: Worker 노드가 등록되지 않음"
+    kubectl get nodes
+    exit 1
+  register: workers_joined
+  changed_when: false
+  failed_when: workers_joined.rc != 0
+
 - name: 모든 노드가 Ready 상태가 될 때까지 대기
   shell: |
+    EXPECTED_TOTAL_NODES=3  # 1 Master + 2 Workers
+    
     for i in {1..60}; do
       # 전체 노드 수
       TOTAL_NODES=$(kubectl get nodes --no-headers 2>/dev/null | wc -l)
@@ -45,22 +73,29 @@
       
       echo "노드 상태: $READY_NODES/$TOTAL_NODES Ready (attempt $i/60)"
       
-      if [ "$TOTAL_NODES" -eq 3 ] && [ "$READY_NODES" -eq 3 ]; then
+      if [ "$TOTAL_NODES" -eq "$EXPECTED_TOTAL_NODES" ] && [ "$READY_NODES" -eq "$EXPECTED_TOTAL_NODES" ]; then
         echo "✅ 모든 노드 Ready!"
-        kubectl get nodes
+        kubectl get nodes -o wide
         exit 0
       fi
       
       sleep 10
     done
     
-    echo "⚠️ Timeout: 일부 노드가 Ready 상태가 아닙니다"
-    kubectl get nodes
+    echo "❌ Timeout: 일부 노드가 Ready 상태가 아닙니다"
+    echo ""
+    echo "현재 노드 상태:"
+    kubectl get nodes -o wide
+    echo ""
+    echo "NotReady 노드 상세 정보:"
+    kubectl get nodes --no-headers | grep -v "Ready" | awk '{print $1}' | while read node; do
+      echo "=== $node ==="
+      kubectl describe node $node | grep -A 10 "Conditions:"
+    done
     exit 1
   register: nodes_ready
   changed_when: false
-  retries: 1
-  delay: 0
+  failed_when: nodes_ready.rc != 0
 
 - name: 노드 상태 최종 확인
   command: kubectl get nodes
