@@ -26,8 +26,6 @@
   shell: |
     swapoff -a
     sed -i '/ swap / s/^/#/' /etc/fstab
-  args:
-    warn: false
 
 - name: 커널 모듈 로드
   modprobe:
