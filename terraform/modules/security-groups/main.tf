@@ -48,8 +48,32 @@ resource "aws_security_group" "master" {
     self        = true
   }
   
-  # Kubelet API, kube-scheduler, kube-controller-manager
-  # Worker SG는 별도 rule로 추가 (순환 참조 방지)
+  # Kubelet API (self)
+  ingress {
+    description = "Kubelet API self"
+    from_port   = 10250
+    to_port     = 10250
+    protocol    = "tcp"
+    self        = true
+  }
+  
+  # kube-scheduler
+  ingress {
+    description = "kube-scheduler"
+    from_port   = 10259
+    to_port     = 10259
+    protocol    = "tcp"
+    self        = true
+  }
+  
+  # kube-controller-manager
+  ingress {
+    description = "kube-controller-manager"
+    from_port   = 10257
+    to_port     = 10257
+    protocol    = "tcp"
+    self        = true
+  }
   
   # NodePort Services (선택)
   ingress {
@@ -97,6 +121,15 @@ resource "aws_security_group" "worker" {
     from_port   = 0
     to_port     = 0
     protocol    = "-1"
+    self        = true
+  }
+  
+  # kube-proxy health check
+  ingress {
+    description = "kube-proxy health"
+    from_port   = 10256
+    to_port     = 10256
+    protocol    = "tcp"
     self        = true
   }
   
