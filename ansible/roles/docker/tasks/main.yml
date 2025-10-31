@@ -53,12 +53,34 @@
     # sandbox_image를 pause로 변경 (Kubernetes 호환)
     sed -i 's|sandbox_image = .*|sandbox_image = "registry.k8s.io/pause:3.9"|' /etc/containerd/config.toml
 
-- name: containerd 재시작
+- name: containerd 재시작 및 상태 확인
   systemd:
     name: containerd
     state: restarted
     enabled: yes
     daemon_reload: yes
+
+- name: containerd 완전 시작 대기
+  pause:
+    seconds: 5
+
+- name: containerd 상태 확인
+  command: systemctl is-active containerd
+  register: containerd_status
+  changed_when: false
+  failed_when: containerd_status.stdout != "active"
+
+- name: CRI 소켓 확인
+  stat:
+    path: /run/containerd/containerd.sock
+  register: cri_socket
+  failed_when: not cri_socket.stat.exists
+
+- name: crictl 작동 확인
+  command: crictl info
+  register: crictl_check
+  changed_when: false
+  failed_when: crictl_check.rc != 0
 
 - name: containerd 상태 확인
   systemd:
