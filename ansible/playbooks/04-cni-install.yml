@@ -124,32 +124,11 @@
 
 - name: Calico CNI 설치 (iptables mode, eBPF 비활성화)
   shell: |
-    kubectl apply -f - <<EOF
-    # Calico v3.26.4 설치 (간소화, eBPF 비활성화)
-    ---
-    apiVersion: v1
-    kind: Namespace
-    metadata:
-      name: kube-system
-    ---
-    apiVersion: v1
-    kind: ServiceAccount
-    metadata:
-      name: calico-cni-plugin
-      namespace: kube-system
-    ---
-    apiVersion: v1
-    kind: ServiceAccount
-    metadata:
-      name: calico-node
-      namespace: kube-system
-    EOF
-    
     # 기본 Calico 매니페스트 적용
     kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.4/manifests/calico.yaml
     
-    # eBPF 비활성화 확인
-    kubectl patch felixconfiguration default --type merge --patch '{"spec":{"bpfEnabled":false}}' 2>/dev/null || true
+    # eBPF 비활성화 확인 (나중에 적용)
+    # kubectl patch felixconfiguration default --type merge --patch '{"spec":{"bpfEnabled":false}}' 2>/dev/null || true
   when: calico_check.rc != 0
   register: calico_install
 
