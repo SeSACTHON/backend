@@ -47,6 +47,27 @@
   debug:
     msg: "Swap 상태: {{ 'OFF ✅' if swap_status.stdout == '' else 'ON ⚠️ - 재확인 필요' }}"
 
+# CNI 디렉토리 정리 (Calico init 실패 방지)
+- name: 이전 CNI 설정 정리
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/cni/net.d
+    - /var/lib/cni
+    - /opt/cni/bin
+  ignore_errors: yes
+
+- name: CNI 디렉토리 생성
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /etc/cni/net.d
+    - /var/lib/cni
+    - /opt/cni/bin
+
 - name: 커널 모듈 로드
   modprobe:
     name: "{{ item }}"
