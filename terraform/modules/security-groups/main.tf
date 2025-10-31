@@ -118,6 +118,17 @@ resource "aws_security_group" "worker" {
 
 # 순환 참조 방지를 위한 별도 Rule 생성
 
+# Worker -> Master API Server (6443)
+resource "aws_security_group_rule" "worker_to_master_api" {
+  type                     = "ingress"
+  from_port                = 6443
+  to_port                  = 6443
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.master.id
+  source_security_group_id = aws_security_group.worker.id
+  description              = "Kubernetes API from worker"
+}
+
 # Master -> Worker Rules
 resource "aws_security_group_rule" "master_to_worker_kubelet" {
   type                     = "ingress"
