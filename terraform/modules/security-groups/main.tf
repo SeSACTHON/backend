@@ -49,13 +49,7 @@ resource "aws_security_group" "master" {
   }
   
   # Kubelet API, kube-scheduler, kube-controller-manager
-  ingress {
-    description     = "Kubelet API"
-    from_port       = 10250
-    to_port         = 10252
-    protocol        = "tcp"
-    security_groups = [aws_security_group.worker.id]
-  }
+  # Worker SG는 별도 rule로 추가 (순환 참조 방지)
   
   # NodePort Services (선택)
   ingress {
@@ -94,23 +88,8 @@ resource "aws_security_group" "worker" {
     cidr_blocks = [var.allowed_ssh_cidr]
   }
   
-  # Kubelet API
-  ingress {
-    description     = "Kubelet API from master"
-    from_port       = 10250
-    to_port         = 10250
-    protocol        = "tcp"
-    security_groups = [aws_security_group.master.id]
-  }
-  
-  # NodePort Services
-  ingress {
-    description     = "NodePort from master"
-    from_port       = 30000
-    to_port         = 32767
-    protocol        = "tcp"
-    security_groups = [aws_security_group.master.id]
-  }
+  # Kubelet API, NodePort
+  # Master SG는 별도 rule로 추가 (순환 참조 방지)
   
   # Worker 간 통신 (Pod network)
   ingress {
@@ -121,14 +100,7 @@ resource "aws_security_group" "worker" {
     self        = true
   }
   
-  # Master to Worker
-  ingress {
-    description     = "Master to worker"
-    from_port       = 0
-    to_port         = 0
-    protocol        = "-1"
-    security_groups = [aws_security_group.master.id]
-  }
+  # Master to Worker (별도 rule로)
   
   # Egress all
   egress {
@@ -142,5 +114,49 @@ resource "aws_security_group" "worker" {
   tags = {
     Name = "${var.environment}-k8s-worker-sg"
   }
+}
+
+# 순환 참조 방지를 위한 별도 Rule 생성
+
+# Master -> Worker Rules
+resource "aws_security_group_rule" "master_to_worker_kubelet" {
+  type                     = "ingress"
+  from_port                = 10250
+  to_port                  = 10252
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.master.id
+  source_security_group_id = aws_security_group.worker.id
+  description              = "Kubelet API from worker"
+}
+
+# Worker -> Master Rules
+resource "aws_security_group_rule" "worker_to_master_kubelet" {
+  type                     = "ingress"
+  from_port                = 10250
+  to_port                  = 10250
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.worker.id
+  source_security_group_id = aws_security_group.master.id
+  description              = "Kubelet API from master"
+}
+
+resource "aws_security_group_rule" "worker_nodeport" {
+  type                     = "ingress"
+  from_port                = 30000
+  to_port                  = 32767
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.worker.id
+  source_security_group_id = aws_security_group.master.id
+  description              = "NodePort from master"
+}
+
+resource "aws_security_group_rule" "master_to_worker_all" {
+  type                     = "ingress"
+  from_port                = 0
+  to_port                  = 0
+  protocol                 = "-1"
+  security_group_id        = aws_security_group.worker.id
+  source_security_group_id = aws_security_group.master.id
+  description              = "All traffic from master"
 }
 
