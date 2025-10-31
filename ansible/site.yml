@@ -25,19 +25,20 @@
   tasks:
     - import_tasks: playbooks/02-master-init.yml
 
+- name: Workers 조인
+  hosts: workers
+  become: yes
+  tasks:
+    - import_tasks: playbooks/03-worker-join.yml
+  # ⚠️ Worker join 실패 시 여기서 중단됨
+
 - name: CNI 플러그인 설치 및 클러스터 검증
   hosts: masters
   become: yes
   become_user: "{{ kubectl_user }}"
   tasks:
     - import_tasks: playbooks/04-cni-install.yml
-  # ⚠️ Worker join 실패 시 여기서 중단됨
-
-- name: Workers 조인
-  hosts: workers
-  become: yes
-  tasks:
-    - import_tasks: playbooks/03-worker-join.yml
+  # ⚠️ 노드 Ready 실패 시 여기서 중단됨
 
 - name: Workers 레이블 지정
   hosts: masters
