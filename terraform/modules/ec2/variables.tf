@@ -28,6 +28,12 @@ variable "key_name" {
   type        = string
 }
 
+variable "iam_instance_profile" {
+  description = "IAM Instance Profile (Session Manager용)"
+  type        = string
+  default     = ""
+}
+
 variable "root_volume_size" {
   description = "루트 볼륨 크기 (GB)"
   type        = number
