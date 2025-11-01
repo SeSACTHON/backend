@@ -48,7 +48,18 @@ output "ssh_commands" {
     master   = "ssh -i ~/.ssh/sesacthon.pem ubuntu@${aws_eip.master.public_ip}"
     worker_1 = "ssh -i ~/.ssh/sesacthon.pem ubuntu@${module.worker_1.public_ip}"
     worker_2 = "ssh -i ~/.ssh/sesacthon.pem ubuntu@${module.worker_2.public_ip}"
+    storage  = "ssh -i ~/.ssh/sesacthon.pem ubuntu@${module.storage.public_ip}"
   }
+}
+
+output "storage_public_ip" {
+  description = "Storage 노드 Public IP"
+  value       = module.storage.public_ip
+}
+
+output "storage_private_ip" {
+  description = "Storage 노드 Private IP"
+  value       = module.storage.private_ip
 }
 
 output "cluster_info" {
@@ -57,10 +68,21 @@ output "cluster_info" {
     vpc_id             = module.vpc.vpc_id
     master_ip          = aws_eip.master.public_ip
     worker_ips         = [module.worker_1.public_ip, module.worker_2.public_ip]
-    total_nodes        = 3
-    total_vcpu         = 6
-    total_memory_gb    = 10
-    estimated_cost_usd = 105
+    storage_ip         = module.storage.public_ip
+    total_nodes        = 4
+    total_vcpu         = 8  # 2+2+2+2
+    total_memory_gb    = 24  # 8+4+4+8
+    estimated_cost_usd = 180
+  }
+}
+
+output "node_roles" {
+  description = "노드별 역할"
+  value = {
+    master   = "Control Plane + Monitoring (t3.large, 8GB)"
+    worker_1 = "Application Pods (t3.medium, 4GB)"
+    worker_2 = "Celery Workers (t3.medium, 4GB)"
+    storage  = "RabbitMQ, PostgreSQL, Redis (t3.large, 8GB)"
   }
 }
 
