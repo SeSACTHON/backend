@@ -14,6 +14,78 @@
 
 ---
 
+## 👨‍💻 의사결정 배경
+
+### 팀 역량 및 도구
+
+**우리가 가진 것:**
+
+```
+1. 클라우드 플랫폼 개발 경험
+   ✅ AWS 인프라 설계 및 구축 경험
+   ✅ Kubernetes 운영 실무 경험
+   ✅ IaC (Terraform/Ansible) 숙련도
+   ✅ 트러블슈팅 능력
+
+2. AI 도구 활용 (Cursor + Claude 4.5 Sonnet)
+   ✅ Terraform 모듈 자동 생성
+   ✅ Ansible Playbook 작성 (75개 작업)
+   ✅ 복잡한 설정 디버깅
+   ✅ 문서화 자동화 (70+ 문서)
+   
+   생산성:
+   - Terraform 작성: 3시간 → 30분
+   - Ansible 작업: 1주일 → 1일
+   - 문서화: 2일 → 4시간
+   → 총 개발 시간: 80% 단축
+
+3. 코드 기반 인프라 관리
+   ✅ Git으로 모든 인프라 버전 관리
+   ✅ 완전 자동화 (./scripts/auto-rebuild.sh)
+   ✅ 재현 가능한 배포 (40-50분)
+   ✅ 코드 리뷰 가능
+```
+
+**이것이 가능한 이유:**
+
+```
+Self-Managed K8s = 복잡도 ↑
+
+하지만,
++ 클라우드 경험
++ AI 도구 (Claude 4.5)
++ IaC 자동화
+━━━━━━━━━━━━━━━━━━━━━
+= 관리 가능한 복잡도
+
+EKS의 편의성 < 우리의 역량
+→ Self-Managed 선택이 합리적!
+```
+
+### 실무 적용 사례
+
+```
+59일간의 문제 해결:
+1. containerd pause image 불일치
+   → AI: 정확한 원인 파악 + 해결책
+   
+2. Calico BGP vs VXLAN
+   → AI: 설정 비교 + VXLAN 패치 생성
+   
+3. DNS 타임아웃
+   → AI: readiness probe 분석 + 수정
+   
+4. ALB Controller 설정
+   → AI: IAM 정책 + Helm values 생성
+
+평균 해결 시간:
+- 전통적 방식: 2-4시간
+- AI 도구 활용: 20-40분
+→ 6배 빠른 문제 해결
+```
+
+---
+
 ## 💰 비용 비교
 
 ### EKS
