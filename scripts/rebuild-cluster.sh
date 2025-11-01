@@ -41,7 +41,7 @@ echo ""
 cd "$TERRAFORM_DIR"
 
 echo "🔧 Terraform 초기화..."
-terraform init -upgrade
+terraform init -migrate-state -upgrade
 echo ""
 
 echo "🔍 현재 인프라 상태 확인..."
@@ -70,7 +70,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 echo "🔧 Terraform 초기화 (재확인)..."
-terraform init -upgrade
+terraform init -migrate-state -upgrade
 echo ""
 
 echo "🚀 Terraform apply 실행..."

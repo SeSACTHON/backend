@@ -10,10 +10,10 @@ echo "🚀 빠른 재구축 시작..."
 echo ""
 
 cd "$PROJECT_ROOT/terraform"
-terraform init -upgrade
+terraform init -migrate-state -upgrade
 terraform destroy -auto-approve
 sleep 30
-terraform init -upgrade
+terraform init -migrate-state -upgrade
 terraform apply -auto-approve
 sleep 60
 terraform output -raw ansible_inventory > ../ansible/inventory/hosts.ini
