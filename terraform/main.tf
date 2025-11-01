@@ -70,18 +70,19 @@ resource "aws_key_pair" "k8s" {
   }
 }
 
-# EC2 Instances - Master
+# EC2 Instances - Master (Control Plane + Monitoring)
 module "master" {
   source = "./modules/ec2"
   
-  instance_name      = "k8s-master"
-  instance_type      = "t3.medium"
-  ami_id             = data.aws_ami.ubuntu.id
-  subnet_id          = module.vpc.public_subnet_ids[0]
-  security_group_ids = [module.security_groups.master_sg_id]
-  key_name           = aws_key_pair.k8s.key_name
+  instance_name         = "k8s-master"
+  instance_type         = "t3.large"  # 8GB (Control Plane + Prometheus)
+  ami_id                = data.aws_ami.ubuntu.id
+  subnet_id             = module.vpc.public_subnet_ids[0]
+  security_group_ids    = [module.security_groups.master_sg_id]
+  key_name              = aws_key_pair.k8s.key_name
+  iam_instance_profile  = aws_iam_instance_profile.k8s.name
   
-  root_volume_size = 30
+  root_volume_size = 80  # Prometheus TSDB
   root_volume_type = "gp3"
   
   user_data = templatefile("${path.module}/user-data/common.sh", {
@@ -89,22 +90,23 @@ module "master" {
   })
   
   tags = {
-    Role = "master"
+    Role = "control-plane"
   }
 }
 
-# EC2 Instances - Worker 1 (CPU intensive)
+# EC2 Instances - Worker 1 (Application Pods - Sync API)
 module "worker_1" {
   source = "./modules/ec2"
   
-  instance_name      = "k8s-worker-1"
-  instance_type      = "t3.medium"
-  ami_id             = data.aws_ami.ubuntu.id
-  subnet_id          = module.vpc.public_subnet_ids[1]
-  security_group_ids = [module.security_groups.worker_sg_id]
-  key_name           = aws_key_pair.k8s.key_name
+  instance_name         = "k8s-worker-1"
+  instance_type         = "t3.medium"  # 4GB (FastAPI Pods)
+  ami_id                = data.aws_ami.ubuntu.id
+  subnet_id             = module.vpc.public_subnet_ids[1]
+  security_group_ids    = [module.security_groups.worker_sg_id]
+  key_name              = aws_key_pair.k8s.key_name
+  iam_instance_profile  = aws_iam_instance_profile.k8s.name
   
-  root_volume_size = 30
+  root_volume_size = 40  # App + Images
   root_volume_type = "gp3"
   
   user_data = templatefile("${path.module}/user-data/common.sh", {
@@ -113,23 +115,23 @@ module "worker_1" {
   
   tags = {
     Role     = "worker"
-    Workload = "cpu"
+    Workload = "application"
   }
 }
 
-# EC2 Instances - Worker 2 (Network intensive)
+# EC2 Instances - Worker 2 (Celery Workers - Async Processing)
 module "worker_2" {
   source = "./modules/ec2"
   
   instance_name         = "k8s-worker-2"
-  instance_type         = "t3.large"  # 2 vCPU, 8GB
+  instance_type         = "t3.medium"  # 4GB (Celery Workers)
   ami_id                = data.aws_ami.ubuntu.id
   subnet_id             = module.vpc.public_subnet_ids[2]
   security_group_ids    = [module.security_groups.worker_sg_id]
   key_name              = aws_key_pair.k8s.key_name
-  iam_instance_profile  = aws_iam_instance_profile.k8s.name  # Session Manager
+  iam_instance_profile  = aws_iam_instance_profile.k8s.name
   
-  root_volume_size = 50  # 워크로드 + 이미지
+  root_volume_size = 40  # Worker images
   root_volume_type = "gp3"
   
   user_data = templatefile("${path.module}/user-data/common.sh", {
@@ -138,7 +140,32 @@ module "worker_2" {
   
   tags = {
     Role     = "worker"
-    Workload = "network"
+    Workload = "async-workers"
+  }
+}
+
+# EC2 Instances - Storage (Stateful Services)
+module "storage" {
+  source = "./modules/ec2"
+  
+  instance_name         = "k8s-storage"
+  instance_type         = "t3.large"  # 8GB (RabbitMQ, PostgreSQL, Redis)
+  ami_id                = data.aws_ami.ubuntu.id
+  subnet_id             = module.vpc.public_subnet_ids[0]  # Same AZ as Master
+  security_group_ids    = [module.security_groups.worker_sg_id]
+  key_name              = aws_key_pair.k8s.key_name
+  iam_instance_profile  = aws_iam_instance_profile.k8s.name
+  
+  root_volume_size = 100  # Stateful data
+  root_volume_type = "gp3"
+  
+  user_data = templatefile("${path.module}/user-data/common.sh", {
+    hostname = "k8s-storage"
+  })
+  
+  tags = {
+    Role     = "worker"
+    Workload = "storage"
   }
 }
 
