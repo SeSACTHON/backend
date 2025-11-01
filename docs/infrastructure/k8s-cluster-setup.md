@@ -152,30 +152,110 @@ Worker Node 2:
 
 ### 네트워크 설정
 
-```
-VPC: 기존 Default VPC 사용 가능
+#### VPC 구성
 
-보안 그룹:
-┌─────────────────────────────────────┐
-│  k8s-master-sg                      │
-├─────────────────────────────────────┤
-│  Inbound:                           │
-│  - 22 (SSH): 본인 IP                │
-│  - 6443 (K8s API): 0.0.0.0/0        │
-│  - 80, 443 (HTTP/S): 0.0.0.0/0      │
-│  - 10250-10252: Worker SG           │
-└─────────────────────────────────────┘
-
-┌─────────────────────────────────────┐
-│  k8s-worker-sg                      │
-├─────────────────────────────────────┤
-│  Inbound:                           │
-│  - 22 (SSH): 본인 IP                │
-│  - 10250 (Kubelet): Master SG       │
-│  - 30000-32767 (NodePort): Master SG│
-│  - All traffic: k8s-worker-sg       │
-└─────────────────────────────────────┘
 ```
+VPC: 10.0.0.0/16
+├─ Public Subnet A: 10.0.1.0/24 (ap-northeast-2a)
+├─ Public Subnet B: 10.0.2.0/24 (ap-northeast-2b)
+└─ Public Subnet C: 10.0.3.0/24 (ap-northeast-2c)
+
+Internet Gateway: igw-xxxxx
+Route Table: 0.0.0.0/0 → IGW
+```
+
+#### 보안 그룹 (Security Groups)
+
+```mermaid
+graph TB
+    subgraph Internet["🌐 인터넷"]
+        Users["사용자
+Any IP"]
+        Admin["관리자
+본인 IP"]
+    end
+    
+    subgraph VPC["VPC 10.0.0.0/16"]
+        subgraph MasterSG["Master Security Group"]
+            Master["Master Node
+10.0.1.x"]
+        end
+        
+        subgraph WorkerSG["Worker Security Group"]
+            Worker1["Worker-1
+10.0.2.x"]
+            Worker2["Worker-2
+10.0.2.x"]
+            Storage["Storage
+10.0.2.x"]
+        end
+    end
+    
+    Admin -->|"SSH (22)"| Master
+    Admin -->|"SSH (22)"| Worker1
+    Admin -->|"SSH (22)"| Worker2
+    Admin -->|"SSH (22)"| Storage
+    
+    Users -->|"HTTPS (443) ALB"| Master
+    Users -->|"HTTP (80) ALB"| Master
+    
+    Master <-->|"6443 (API Server)"| Worker1
+    Master <-->|"6443"| Worker2
+    Master <-->|"6443"| Storage
+    
+    Master <-->|"10250 (Kubelet)"| Worker1
+    Master <-->|"10250"| Worker2
+    Master <-->|"10250"| Storage
+    
+    Master <-->|"2379-2380 (etcd)"| Master
+    
+    Worker1 <-->|"All Traffic (Self)"| Worker1
+    Worker1 <-->|"4789 UDP (VXLAN)"| Worker2
+    Worker1 <-->|"4789 UDP"| Storage
+    Worker1 <-->|"4789 UDP"| Master
+    
+    Worker2 <-->|"All Traffic (Self)"| Worker2
+    Worker2 <-->|"4789 UDP"| Storage
+    Worker2 <-->|"4789 UDP"| Master
+    
+    Storage <-->|"All Traffic (Self)"| Storage
+    Storage <-->|"4789 UDP"| Master
+    
+    style Internet fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
+    style VPC fill:#f1f8e9,stroke:#33691e,stroke-width:3px
+    style MasterSG fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style WorkerSG fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    style Master fill:#ffe0b2,stroke:#e65100,stroke-width:2px
+    style Worker1 fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style Worker2 fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style Storage fill:#f8bbd0,stroke:#c2185b,stroke-width:2px
+```
+
+#### Master Security Group 상세
+
+| 방향 | 프로토콜 | 포트 | 소스 | 목적 |
+|------|---------|------|------|------|
+| Inbound | TCP | 22 | 본인 IP | SSH 접속 |
+| Inbound | TCP | 6443 | 0.0.0.0/0 | Kubernetes API Server |
+| Inbound | TCP | 2379-2380 | Self | etcd server client API |
+| Inbound | TCP | 10250 | Worker SG | Kubelet API |
+| Inbound | TCP | 10251 | Self | kube-scheduler |
+| Inbound | TCP | 10252 | Self | kube-controller-manager |
+| Inbound | TCP | 80 | ALB SG | HTTP (Ingress) |
+| Inbound | TCP | 443 | ALB SG | HTTPS (Ingress) |
+| Inbound | UDP | 4789 | Master SG, Worker SG | Calico VXLAN |
+| Outbound | All | All | 0.0.0.0/0 | 모든 아웃바운드 |
+
+#### Worker Security Group 상세
+
+| 방향 | 프로토콜 | 포트 | 소스 | 목적 |
+|------|---------|------|------|------|
+| Inbound | TCP | 22 | 본인 IP | SSH 접속 |
+| Inbound | TCP | 10250 | Master SG | Kubelet API |
+| Inbound | TCP | 30000-32767 | Master SG | NodePort Services |
+| Inbound | All | All | Worker SG (Self) | Pod 간 통신 |
+| Inbound | UDP | 4789 | Master SG, Worker SG | Calico VXLAN |
+| Outbound | All | All | 0.0.0.0/0 | 모든 아웃바운드 |
 
 ---
 
