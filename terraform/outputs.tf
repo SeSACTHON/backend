@@ -99,3 +99,12 @@ output "dns_records" {
   } : null
 }
 
+
+output "s3_bucket_info" {
+  description = "S3 이미지 버킷 정보"
+  value = {
+    bucket_name = aws_s3_bucket.images.id
+    bucket_arn  = aws_s3_bucket.images.arn
+    region      = var.aws_region
+  }
+}
