@@ -62,34 +62,36 @@ kubectl port-forward svc/argocd-server -n argocd 8080:443
 ### AWS (Terraform)
 
 ```
-✅ VPC
-✅ Subnets ×3
+✅ VPC (10.0.0.0/16)
+✅ Subnets ×3 (Public)
 ✅ Internet Gateway
 ✅ Route Tables
 ✅ Security Groups ×2
-✅ EC2 Instances ×3
-✅ EBS Volumes ×3
-✅ Elastic IP ×1
+✅ EC2 Instances ×4 (Master, Worker-1, Worker-2, Storage)
+✅ EBS Volumes ×4
+✅ S3 Bucket (이미지 저장)
+✅ ACM Certificate (*.growbin.app)
+✅ IAM Instance Profile
 
-비용: $91/월
+비용: $185/월
 ```
 
 ### Kubernetes (Ansible)
 
 ```
-✅ Docker
+✅ containerd
 ✅ kubeadm, kubelet, kubectl
 ✅ Control Plane (Master)
-✅ Worker Nodes ×2
-✅ Flannel CNI
-✅ Nginx Ingress
+✅ Worker Nodes ×3
+✅ Calico VXLAN CNI
+✅ AWS Load Balancer Controller
 ✅ Cert-manager
 ✅ Metrics Server
 ✅ ArgoCD
-✅ RabbitMQ
+✅ RabbitMQ HA (3-node)
 ✅ Prometheus + Grafana
 
-총 Pod: 약 30개
+총 Pod: 약 40개
 ```
 
 ---
@@ -131,7 +133,7 @@ kubectl get pods -n messaging
 
 ---
 
-**총 36개 IaC 파일**  
-**구축 시간**: 35분  
-**비용**: $105/월
+**총 40+ IaC 파일**  
+**구축 시간**: 40-50분 (자동화)  
+**비용**: $185/월
 
