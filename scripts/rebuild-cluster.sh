@@ -49,29 +49,71 @@ echo "📋 현재 인프라 리소스 확인"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# 현재 리소스 목록 출력
-terraform state list 2>/dev/null || echo "State 파일 없음 (새 배포)"
-echo ""
-
-# 리소스 개수 확인
-RESOURCE_COUNT=$(terraform state list 2>/dev/null | wc -l | tr -d ' ')
-echo "📊 현재 리소스 개수: $RESOURCE_COUNT"
-echo ""
-
-if [ "$RESOURCE_COUNT" -gt 0 ]; then
-  echo "삭제될 리소스:"
-  terraform state list | grep -E "module\.(master|worker|storage)|aws_eip|aws_s3_bucket" || true
+# Terraform state 파일 존재 확인
+if ! terraform state list >/dev/null 2>&1; then
+  echo "ℹ️  State 파일 없음 (새 배포)"
+  echo "   기존 인프라가 없습니다. 바로 생성 단계로 진행합니다."
+  echo ""
+else
+  # 리소스 개수 확인
+  RESOURCE_COUNT=$(terraform state list 2>/dev/null | wc -l | tr -d ' ')
+  echo "📊 현재 리소스 개수: $RESOURCE_COUNT"
   echo ""
   
-  if [ "$AUTO_MODE" != "true" ]; then
-    read -p "⚠️  위 리소스들을 삭제하시겠습니까? (yes/no): " CONFIRM_DELETE
-    if [ "$CONFIRM_DELETE" != "yes" ]; then
-      echo "❌ 삭제가 취소되었습니다."
-      exit 0
+  if [ "$RESOURCE_COUNT" -gt 0 ]; then
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "🔍 삭제될 주요 리소스 확인"
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo ""
+    
+    # EC2 인스턴스 확인
+    echo "💻 EC2 인스턴스:"
+    terraform state list 2>/dev/null | grep -E "module\.(master|worker_1|worker_2|storage)\.aws_instance" || echo "  (없음)"
+    echo ""
+    
+    # Elastic IP 확인
+    echo "🌐 Elastic IP:"
+    terraform state list 2>/dev/null | grep -E "aws_eip\." || echo "  (없음)"
+    echo ""
+    
+    # S3 버킷 확인
+    echo "🪣 S3 버킷:"
+    terraform state list 2>/dev/null | grep -E "aws_s3_bucket|module\..*s3" || echo "  (없음)"
+    echo ""
+    
+    # VPC 리소스 확인
+    echo "🔒 VPC 리소스 (Security Groups, Subnets, etc.):"
+    VPC_RESOURCES=$(terraform state list 2>/dev/null | grep -E "module\.(vpc|security_groups)" | wc -l | tr -d ' ')
+    echo "  VPC 관련 리소스: $VPC_RESOURCES개"
+    echo ""
+    
+    # 전체 리소스 요약
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "📋 전체 리소스 목록 (일부):"
+    terraform state list 2>/dev/null | head -20
+    if [ "$RESOURCE_COUNT" -gt 20 ]; then
+      echo "  ... 및 $((RESOURCE_COUNT - 20))개 추가 리소스"
     fi
+    echo ""
+    
+    # 삭제 확인
+    if [ "$AUTO_MODE" != "true" ]; then
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      read -p "⚠️  위 리소스들을 삭제하시겠습니까? (yes/no): " CONFIRM_DELETE
+      if [ "$CONFIRM_DELETE" != "yes" ]; then
+        echo "❌ 삭제가 취소되었습니다."
+        exit 0
+      fi
+    else
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      echo "🤖 자동 모드: 5초 후 삭제 시작..."
+      echo "   Ctrl+C를 눌러 취소할 수 있습니다."
+      sleep 5
+    fi
+    echo ""
   else
-    echo "🤖 자동 모드: 5초 후 삭제 시작..."
-    sleep 5
+    echo "ℹ️  리소스가 없습니다. 바로 생성 단계로 진행합니다."
+    echo ""
   fi
 fi
 
