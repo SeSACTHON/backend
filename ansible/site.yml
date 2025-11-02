@@ -76,6 +76,13 @@
   roles:
     - argocd
 
+- name: Monitoring 설치 (Prometheus Operator - ServiceMonitor CRD 제공)
+  hosts: masters
+  become: yes
+  become_user: "{{ kubectl_user }}"
+  tasks:
+    - import_tasks: playbooks/08-monitoring.yml
+
 - name: "RabbitMQ 설치 (Tier 3: Message Queue)"
   hosts: masters
   become: yes
@@ -89,13 +96,6 @@
   become_user: "{{ kubectl_user }}"
   roles:
     - redis
-
-- name: Monitoring 설치
-  hosts: masters
-  become: yes
-  become_user: "{{ kubectl_user }}"
-  tasks:
-    - import_tasks: playbooks/08-monitoring.yml
 
 - name: Ingress 리소스 생성 (ALB 자동 생성)
   hosts: masters

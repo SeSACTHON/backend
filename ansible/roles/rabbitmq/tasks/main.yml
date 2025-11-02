@@ -46,7 +46,7 @@
     --set clustering.addressType=hostname
     --set clustering.rebalance=true
     --set metrics.enabled=true
-    --set metrics.serviceMonitor.enabled=false
+    --set metrics.serviceMonitor.enabled=true
   when: "'rabbitmq' not in rabbitmq_check.stdout"
 
 - name: RabbitMQ Pod 대기

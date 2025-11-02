@@ -60,60 +60,14 @@
     exit 0
   changed_when: false
 
-- name: Create Let's Encrypt ClusterIssuer (Production) - with retry
-  shell: |
-    cat <<EOF | kubectl apply -f -
-    apiVersion: cert-manager.io/v1
-    kind: ClusterIssuer
-    metadata:
-      name: letsencrypt-prod
-    spec:
-      acme:
-        server: https://acme-v02.api.letsencrypt.org/directory
-        email: {{ letsencrypt_email }}
-        privateKeySecretRef:
-          name: letsencrypt-prod
-        solvers:
-        - http01:
-            ingress:
-              class: nginx
-    EOF
-  register: letsencrypt_prod
-  retries: 5
-  delay: 30
-  until: letsencrypt_prod.rc == 0
-  changed_when: "'created' in letsencrypt_prod.stdout or 'configured' in letsencrypt_prod.stdout"
+# ⚠️ Let's Encrypt ClusterIssuer 제거
+# 이유: ALB에서 AWS ACM 인증서를 사용하므로 불필요
+# Cert-manager는 Kubernetes 내부 인증서 관리용으로만 유지
 
-- name: Create Let's Encrypt ClusterIssuer (Staging for testing) - with retry
-  shell: |
-    cat <<EOF | kubectl apply -f -
-    apiVersion: cert-manager.io/v1
-    kind: ClusterIssuer
-    metadata:
-      name: letsencrypt-staging
-    spec:
-      acme:
-        server: https://acme-staging-v02.api.letsencrypt.org/directory
-        email: {{ letsencrypt_email }}
-        privateKeySecretRef:
-          name: letsencrypt-staging
-        solvers:
-        - http01:
-            ingress:
-              class: nginx
-    EOF
-  register: letsencrypt_staging
-  retries: 5
-  delay: 30
-  until: letsencrypt_staging.rc == 0
-  changed_when: "'created' in letsencrypt_staging.stdout or 'configured' in letsencrypt_staging.stdout"
-
-- name: ClusterIssuer 확인
-  command: kubectl get clusterissuer
-  register: issuers
-  changed_when: false
-
-- name: ClusterIssuer 목록 출력
+- name: Cert-manager 준비 완료 확인
   debug:
-    msg: "{{ issuers.stdout_lines }}"
+    msg:
+      - "✅ Cert-manager 설치 완료"
+      - "📝 SSL/TLS는 AWS ACM으로 처리됨 (ALB에서 사용)"
+      - "🔧 Cert-manager는 내부 인증서 관리용으로 대기 중"
 

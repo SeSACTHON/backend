@@ -9,7 +9,7 @@
   changed_when: false
 
 - name: Monitoring namespace 생성
-  command: kubectl create namespace {{ monitoring_namespace }} --dry-run=client -o yaml | kubectl apply -f -
+  shell: kubectl create namespace {{ monitoring_namespace }} --dry-run=client -o yaml | kubectl apply -f -
 
 - name: Prometheus Stack 설치 여부 확인
   command: helm list -n {{ monitoring_namespace }}
