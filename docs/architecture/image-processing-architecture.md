@@ -1,17 +1,18 @@
-# 🏗️ 이미지 처리 아키텍처 설계
+# 🏗️ 이미지 처리 아키텍처
 
-> **AI 기반 쓰레기 분류 서비스의 백엔드 아키텍처**  
-> **날짜**: 2025-10-30  
-> **버전**: 1.0
+> **4-Tier 기반 AI 쓰레기 분류 파이프라인**  
+> **RabbitMQ (Task Queue) + Redis (Cache & State)**  
+> **날짜**: 2025-10-31  
+> **상태**: ✅ 프로덕션 준비
 
 ## 📋 목차
 
 1. [시스템 개요](#시스템-개요)
-2. [전체 아키텍처](#전체-아키텍처)
-3. [핵심 컴포넌트](#핵심-컴포넌트)
+2. [4-Tier 아키텍처](#4-tier-아키텍처)
+3. [Celery 이중 연결](#celery-이중-연결)
 4. [데이터 흐름](#데이터-흐름)
-5. [최적화 전략](#최적화-전략)
-6. [확장성 고려사항](#확장성-고려사항)
+5. [Redis 캐싱 전략](#redis-캐싱-전략)
+6. [최적화](#최적화)
 
 ---
 
@@ -21,484 +22,737 @@
 
 ```
 사용자가 쓰레기 사진을 찍으면:
-1. AI 비전 모델이 재질/형태/혼합 여부 분석
+1. GPT-4o Vision이 재질/형태/혼합 여부 분석
 2. LLM이 "어떻게, 왜 그렇게 버려야 하는지" 설명
 3. 위치 기반으로 가장 가까운 재활용 수거함 추천
-```
 
-### 예상 부하
-
-```
-동시 접속자: 100-500명
-이미지 크기: 2-5MB
-처리 시간: 5-10초
-일일 요청: 10,000-50,000건
+핵심:
+✅ 응답 시간: 3-5초 (캐시 히트 시 1초)
+✅ AI 비용 절감: 70% (Image Hash Cache)
+✅ 동시 처리: 100-500명
 ```
 
 ---
 
-## 🏗️ 전체 아키텍처
+## 🏗️ 4-Tier 아키텍처
+
+### Image Processing in 4-Tier
 
 ```mermaid
 graph TB
-    subgraph Client["📱 클라이언트 계층"]
-        FE["Frontend<br/>(React Native/Flutter)<br/>- 카메라 촬영<br/>- Progress Bar<br/>- 결과 표시"]
+    subgraph Client["Client Layer"]
+        User["사용자
+Mobile App"]
     end
     
-    subgraph CDN["🌐 CDN & 로드밸런서"]
-        CF["CloudFront<br/>- SSL Termination<br/>- Lambda@Edge<br/>- Gzip/Brotli"]
-        ALB["AWS ALB<br/>- Health Check<br/>- Round Robin<br/>- Auto Scaling"]
+    subgraph AWS["AWS Services"]
+        Route53["Route53"]
+        ALB["ALB
+L7 Routing"]
+        S3["S3
+Pre-signed URL
+Image Storage"]
     end
     
-    subgraph Backend["⚡ 백엔드 서버 (Stateless)"]
-        API1["FastAPI #1<br/>(ECS Task)"]
-        API2["FastAPI #2<br/>(ECS Task)"]
-        API3["FastAPI #3<br/>(ECS Task)"]
-        APIN["FastAPI #N<br/>(Auto Scale)"]
+    subgraph Tier1["Tier 1: Control Plane"]
+        CP["Master
+Orchestration"]
     end
     
-    subgraph Data["💾 데이터 저장소"]
-        Redis["Redis Cluster<br/>(ElastiCache)<br/>- Job Queue<br/>- 진행률 저장<br/>- 결과 캐싱"]
-        DB[("PostgreSQL RDS<br/>- 사용자 정보<br/>- 분석 이력<br/>- 위치 데이터")]
+    subgraph Tier2["Tier 2: Data Plane"]
+        API["waste-service x2
+FastAPI Sync API
+ 
+1. Job ID 생성
+2. S3 URL 발급
+3. Task 발행"]
+        
+        Worker["AI Workers x3
+Celery Async
+ 
+1. 이미지 다운로드
+2. Hash 계산
+3. GPT-4o Vision
+4. 결과 저장"]
     end
     
-    subgraph Workers["🔄 비동기 처리"]
-        Celery["Celery Workers<br/>(ECS Fargate Auto Scaling)<br/>Min: 2, Max: 20<br/><br/>📊 파이프라인:<br/>10% - 이미지 다운로드<br/>20% - 해시 계산<br/>30% - 캐시 확인<br/>40% - 전처리<br/>50-60% - AI 비전<br/>70-80% - LLM 피드백<br/>90% - 위치 검색<br/>100% - 저장 완료"]
+    subgraph Tier3["Tier 3: Message Queue"]
+        RMQ["RabbitMQ HA x3
+ 
+q.ai Queue
+ 
+Task 전달
+일회성 메시지"]
     end
     
-    subgraph External["🌍 외부 서비스"]
-        S3["S3 Bucket<br/>(이미지 저장)<br/>Lifecycle: 30일"]
-        AI["외부 AI API<br/>- Roboflow<br/>- HuggingFace<br/>- OpenAI<br/>- Claude"]
-        Map["Kakao Map API<br/>- 수거함 검색<br/>- 네비게이션"]
+    subgraph Tier4["Tier 4: Persistence"]
+        Redis["Redis
+ 
+DB 1: Image Hash Cache
+DB 2: Job Progress
+ 
+반복 조회 가능"]
+        
+        DB["PostgreSQL
+ 
+Final Results
+User History"]
     end
     
-    FE -->|HTTPS| CF
-    CF --> ALB
-    ALB -->|트래픽 분산| API1
-    ALB --> API2
-    ALB --> API3
-    ALB --> APIN
+    subgraph External["External"]
+        OpenAI["OpenAI
+GPT-4o Vision"]
+    end
     
-    API1 --> Redis
-    API2 --> Redis
-    API3 --> Redis
-    APIN --> Redis
+    User --> Route53
+    Route53 --> ALB
+    ALB --> API
     
-    API1 --> DB
-    API2 --> DB
-    API3 --> DB
-    APIN --> DB
+    User --> S3
     
-    Redis -->|Bull Queue| Celery
+    API -->|"1. publish task"| RMQ
+    RMQ -->|"2. consume task"| Worker
+    Worker -->|"3. ACK (삭제)"| RMQ
     
-    Celery --> S3
-    Celery --> AI
-    Celery --> Map
-    Celery --> Redis
+    Worker -->|"4. update progress
+0.5초마다 덮어쓰기"| Redis
+    Worker -->|"5. check cache
+반복 조회"| Redis
     
-    style FE fill:#cce5ff,stroke:#007bff,stroke-width:4px,color:#000
-    style CF fill:#ffe0b3,stroke:#fd7e14,stroke-width:3px,color:#000
-    style ALB fill:#ffe0b3,stroke:#fd7e14,stroke-width:3px,color:#000
-    style API1 fill:#d1f2eb,stroke:#28a745,stroke-width:2px,color:#000
-    style API2 fill:#d1f2eb,stroke:#28a745,stroke-width:2px,color:#000
-    style API3 fill:#d1f2eb,stroke:#28a745,stroke-width:2px,color:#000
-    style APIN fill:#d1f2eb,stroke:#28a745,stroke-width:2px,color:#000
-    style Redis fill:#ffd1d1,stroke:#dc3545,stroke-width:3px,color:#000
-    style DB fill:#ccf5f0,stroke:#20c997,stroke-width:3px,color:#000
-    style Celery fill:#e6d5ff,stroke:#8844ff,stroke-width:3px,color:#000
-    style S3 fill:#fff4dd,stroke:#ffc107,stroke-width:2px,color:#000
-    style AI fill:#ffe0f0,stroke:#e83e8c,stroke-width:2px,color:#000
-    style Map fill:#d1f2eb,stroke:#20c997,stroke-width:2px,color:#000
+    API -->|"6. get progress
+0.5초마다 조회"| Redis
+    
+    Worker --> S3
+    Worker --> OpenAI
+    Worker --> DB
+    
+    style Client fill:#0d47a1,color:#fff,stroke:#01579b,stroke-width:3px
+    style AWS fill:#e65100,color:#fff,stroke:#bf360c,stroke-width:3px
+    style Tier1 fill:#1565c0,color:#fff,stroke:#0d47a1,stroke-width:4px
+    style Tier2 fill:#2e7d32,color:#fff,stroke:#1b5e20,stroke-width:4px
+    style Tier3 fill:#f57c00,color:#fff,stroke:#e65100,stroke-width:4px
+    style Tier4 fill:#c2185b,color:#fff,stroke:#880e4f,stroke-width:4px
+    style API fill:#81c784,color:#000,stroke:#66bb6a,stroke-width:2px
+    style Worker fill:#a5d6a7,color:#000,stroke:#81c784,stroke-width:2px
+    style RMQ fill:#ffb74d,color:#000,stroke:#ffa726,stroke-width:2px
+    style Redis fill:#f48fb1,color:#000,stroke:#ec407a,stroke-width:2px
+    style DB fill:#f8bbd0,color:#000,stroke:#f48fb1,stroke-width:2px
 ```
 
 ---
 
-## 🔧 핵심 컴포넌트
+## 🔄 Celery 이중 연결 구조
 
-### 1. FastAPI Backend (Stateless)
+### RabbitMQ + Redis 동시 사용
 
 ```python
-# main.py
-from fastapi import FastAPI, BackgroundTasks
-from app.tasks import process_waste_image
+from celery import Celery
 
-app = FastAPI()
+# Celery는 두 개의 독립적인 연결 유지
+app = Celery('waste_processor',
+    # Tier 3: Message Queue (Task 전달)
+    broker='amqp://admin:password@rabbitmq.messaging:5672//',
+    
+    # Tier 4: Storage (결과 및 상태 저장)
+    result_backend='redis://redis.default:6379/0'
+)
 
-@router.post("/api/v1/waste/analyze")
-async def create_analysis(background_tasks: BackgroundTasks):
-    """
-    역할:
-    1. Job ID 생성
-    2. S3 Presigned URL 발급 (클라이언트가 직접 업로드)
-    3. Redis에 Job 초기 상태 저장
-    4. 즉시 응답 (0.1초 이내)
-    """
+# 역할 분리:
+# RabbitMQ (broker): Task를 Producer → Consumer 전달
+# Redis (result_backend): Task 결과 및 진행률 저장
+```
+
+### Tier 3: RabbitMQ (Message Queue)
+
+```
+역할: Task 전달 (일회성 메시지)
+
+특성:
+✅ Producer가 Task 발행
+✅ Queue에 메시지 저장
+✅ Consumer가 consume
+✅ ACK 후 메시지 삭제
+✅ 한 번만 전달 (Exactly Once)
+
+사용:
+└─ Task 전달용
+   - API → Worker로 작업 요청
+   - Priority, Routing 지원
+   - Delivery Guarantee
+```
+
+### Tier 4: Redis (Persistence - Cache & State)
+
+```
+역할: 상태 저장 (반복 조회 가능)
+
+특성:
+✅ Key-Value Store
+✅ Random Access (특정 key 직접 조회)
+✅ Overwrite 가능 (최신 값으로 업데이트)
+✅ 여러 번 읽어도 데이터 유지
+✅ TTL 자동 만료
+
+사용:
+├─ DB 0: Celery Result Backend
+├─ DB 1: Image Hash Cache ⭐⭐⭐⭐⭐
+├─ DB 2: Job Progress Tracking ⭐⭐⭐⭐
+└─ DB 3: Session Store
+```
+
+---
+
+## 📊 데이터 흐름
+
+### 전체 시퀀스 (4-Tier)
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant App as Mobile App
+    participant API as Tier 2 Sync<br/>waste-service
+    participant MQ as Tier 3 MQ<br/>RabbitMQ q.ai
+    participant Worker as Tier 2 Async<br/>AI Worker
+    participant Redis as Tier 4 Cache<br/>Redis DB1,DB2
+    participant DB as Tier 4 DB<br/>PostgreSQL
+    participant S3
+    participant AI as OpenAI API
+    
+    User->>App: [1] 쓰레기 사진 촬영
+    
+    App->>API: [2] POST /api/v1/waste/analyze
+    API->>API: Job ID 생성
+    API->>App: S3 Pre-signed URL
+    
+    App->>S3: [3] 이미지 직접 업로드
+    
+    App->>API: [4] POST /upload-complete/{job_id}
+    
+    Note over API: Tier 2 Data Plane<br/>비즈니스 로직
+    API->>MQ: [5] Publish q.ai<br/>ai.analyze
+    Note over MQ: Tier 3 Middleware<br/>메시지 전달 (일회성)
+    
+    MQ->>Worker: [6] Consume task
+    Worker->>MQ: ACK (메시지 삭제)
+    
+    activate Worker
+    Note over Worker: Tier 2 Data Plane<br/>비동기 처리
+    
+    Worker->>Redis: [7] 10% 이미지 다운로드 중
+    Note over Redis: Tier 4 Persistence<br/>DB 2: Progress
+    
+    Worker->>S3: 이미지 다운로드
+    Worker->>Worker: Hash 계산 (pHash)
+    
+    Worker->>Redis: [8] 캐시 확인<br/>cache:hash:{phash}
+    Note over Redis: Tier 4 Persistence<br/>DB 1: Image Cache
+    
+    alt Cache Hit 70%
+        Redis-->>Worker: 캐시된 결과
+        Worker->>Redis: 100% 완료
+        Worker-->>App: 즉시 응답 1초
+    else Cache Miss 30%
+        Worker->>Redis: 30% 전처리 중
+        Worker->>Redis: 50% AI 분석 중
+        
+        Worker->>AI: GPT-4o Vision API
+        AI-->>Worker: 분류 결과
+        
+        Worker->>Redis: 70% 피드백 생성 중
+        Worker->>Redis: 90% 위치 검색 중
+        
+        Worker->>DB: 최종 결과 저장
+        Note over DB: Tier 4 Persistence<br/>영구 저장
+        
+        Worker->>Redis: 캐싱 7일<br/>cache:hash:{phash}
+        Worker->>Redis: 100% 완료
+    end
+    deactivate Worker
+    
+    loop Polling 0.5초마다
+        App->>API: [9] GET /status/{job_id}
+        API->>Redis: 진행률 조회 (반복)
+        Note over Redis: Tier 4<br/>같은 Key 반복 조회 가능!
+        Redis-->>App: progress: 80%
+    end
+    
+    App->>API: [10] GET /result/{job_id}
+    API->>Redis: 최종 결과 조회
+    Redis-->>App: result
+    
+    App->>User: 결과 표시
+```
+
+---
+
+## 🐰 RabbitMQ 역할 (Tier 3)
+
+### Task 전달만!
+
+```python
+# Producer (waste-service, Tier 2)
+from celery import current_app
+
+@app.post("/upload-complete/{job_id}")
+async def upload_complete(job_id: str):
+    # RabbitMQ에 Task 발행
+    current_app.send_task(
+        'tasks.analyze_image',
+        args=[job_id],
+        queue='q.ai',
+        routing_key='ai.analyze',
+        priority=10
+    )
+    # → RabbitMQ q.ai에 메시지 추가
+    # → Worker가 consume할 때까지 대기
+    
+    return {"status": "queued"}
+
+# Consumer (AI Worker, Tier 2)
+@celery_app.task(bind=True, queue='q.ai')
+def analyze_image(self, job_id):
+    # RabbitMQ에서 메시지 받음
+    # (여기서 메시지는 큐에서 제거됨)
+    
+    # 실제 처리...
+    
+    # 완료 후 RabbitMQ에 ACK
+    # → 메시지 완전 삭제
+    return result
+
+# RabbitMQ 역할:
+# ✅ Producer → Consumer 메시지 전달
+# ✅ 한 번 전달하면 끝
+# ❌ 진행률 저장 못 함 (메시지 삭제되니까)
+```
+
+---
+
+## 💾 Redis 역할 (Tier 4)
+
+### 1. Image Hash Cache (DB 1) ⭐⭐⭐⭐⭐
+
+**가장 중요! AI 비용 70% 절감**
+
+```python
+import imagehash
+from PIL import Image
+import redis
+
+redis_cache = redis.Redis(host='redis.default', port=6379, db=1)
+
+@celery_app.task
+def analyze_image(job_id):
+    # 1. 이미지 다운로드
+    image_path = download_from_s3(f"{job_id}.jpg")
+    
+    # 2. Perceptual Hash 계산
+    img = Image.open(image_path)
+    phash = str(imagehash.phash(img, hash_size=16))
+    
+    # 3. 캐시 확인 (Redis DB 1)
+    cache_key = f"cache:image:hash:{phash}"
+    cached = redis_cache.get(cache_key)
+    
+    if cached:
+        # 캐시 히트! AI API 호출 스킵!
+        print("✅ 캐시 히트! AI 비용 절감!")
+        return json.loads(cached)
+    
+    # 4. 캐시 미스 → AI 분석
+    result = await analyze_with_gpt4o_vision(image_path)
+    
+    # 5. 결과 캐싱 (7일)
+    redis_cache.setex(
+        cache_key,
+        86400 * 7,  # 7일
+        json.dumps(result)
+    )
+    
+    return result
+
+# 효과:
+# - 같은 쓰레기 사진 (콜라캔, 우유팩 등)
+# - 10,000 요청 중 7,000 캐시 히트
+# - AI API 호출: 3,000회만 (70% 절감!)
+# - 비용 절감: $100/월 이상
+```
+
+### 2. Job Progress Tracking (DB 2) ⭐⭐⭐⭐
+
+**0.5초마다 반복 조회**
+
+```python
+redis_progress = redis.Redis(host='redis.default', port=6379, db=2)
+
+# Worker (진행률 업데이트)
+def analyze_image(job_id):
+    # 10% - 다운로드
+    update_progress(job_id, 10, "이미지 다운로드 중...")
+    download_image()
+    
+    # 30% - 해시 계산
+    update_progress(job_id, 30, "캐시 확인 중...")
+    calculate_hash()
+    
+    # 50% - AI 분석
+    update_progress(job_id, 50, "AI 분석 중...")
+    analyze_with_ai()
+    
+    # 100% - 완료
+    update_progress(job_id, 100, "완료!")
+
+def update_progress(job_id, progress, message):
+    # Redis에 진행률 저장 (Overwrite)
+    redis_progress.setex(
+        f"job:{job_id}:progress",
+        3600,  # 1시간 TTL
+        json.dumps({
+            "progress": progress,
+            "message": message,
+            "updated_at": datetime.now().isoformat()
+        })
+    )
+
+# API (진행률 조회)
+@app.get("/status/{job_id}")
+async def get_status(job_id: str):
+    # Redis에서 조회 (0.5초마다 반복!)
+    progress = await redis_progress.get(f"job:{job_id}:progress")
+    
+    # ✅ 같은 Key를 무한 반복 조회 가능
+    # ✅ 메시지 삭제 안 됨
+    # ✅ 여러 API 서버에서 동시 조회
+    
+    return json.loads(progress)
+
+# RabbitMQ로는 불가능한 이유:
+# ❌ consume하면 메시지 삭제됨
+# ❌ 0.5초마다 새 메시지 발행? (비효율)
+# ❌ Random access 불가
+```
+
+### 3. Celery Result Backend (DB 0) ⭐⭐⭐
+
+**Celery 표준**
+
+```python
+# Celery 설정
+result_backend = 'redis://redis.default:6379/0'
+
+# Worker (자동 저장)
+@app.task
+def analyze_image(job_id):
+    return {"waste_type": "PET", "confidence": 0.95}
+    # Celery가 자동으로 Redis DB 0에 저장
+    # celery-task-meta-{task_id} = {...}
+
+# API (결과 조회)
+task = analyze_image.apply_async(args=[job_id])
+result = task.get(timeout=10)  # Redis에서 조회
+# task.state  → 'SUCCESS'
+# task.result → {"waste_type": "PET", ...}
+```
+
+### 4. Session Store (DB 3) ⭐⭐
+
+```python
+redis_session = redis.Redis(host='redis.default', port=6379, db=3)
+
+# Refresh Token 저장
+redis_session.setex(
+    f"session:{user_id}:refresh",
+    86400 * 30,  # 30일
+    refresh_token
+)
+
+# OAuth State (CSRF 방지)
+redis_session.setex(
+    f"oauth:state:{state}",
+    600,  # 10분
+    json.dumps(user_data)
+)
+```
+
+---
+
+## 🔄 완전한 데이터 흐름
+
+### 코드 예시
+
+```python
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Tier 2: FastAPI (waste-service)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+@app.post("/api/v1/waste/analyze")
+async def create_analysis():
     job_id = str(uuid.uuid4())
     
-    # S3 Presigned URL (5분 유효)
-    upload_url = s3_client.generate_presigned_url(
+    # S3 Pre-signed URL
+    upload_url = s3.generate_presigned_url(
         'put_object',
-        Params={
-            'Bucket': 'waste-images',
-            'Key': f'{job_id}.jpg',
-            'ContentType': 'image/jpeg'
-        },
+        Params={'Bucket': 'images', 'Key': f'{job_id}.jpg'},
         ExpiresIn=300
     )
     
-    # Redis 초기 상태
-    await redis.setex(
+    # Redis DB 2: 초기 진행률
+    await redis_progress.setex(
         f"job:{job_id}:progress",
         3600,
         json.dumps({"progress": 0, "status": "pending"})
     )
     
-    return {
-        "job_id": job_id,
-        "upload_url": upload_url,
-        "status_url": f"/api/v1/waste/status/{job_id}"
-    }
+    return {"job_id": job_id, "upload_url": upload_url}
 
-@router.post("/api/v1/waste/upload-complete/{job_id}")
-async def upload_complete(job_id: str, background_tasks: BackgroundTasks):
-    """
-    S3 업로드 완료 알림 → Celery Task 시작
-    """
-    background_tasks.add_task(process_waste_image, job_id)
+@app.post("/upload-complete/{job_id}")
+async def upload_complete(job_id: str):
+    # RabbitMQ (Tier 3)에 Task 발행
+    celery_app.send_task(
+        'tasks.analyze_image',
+        args=[job_id],
+        queue='q.ai',
+        routing_key='ai.analyze'
+    )
+    # → RabbitMQ q.ai에 메시지 추가
+    
     return {"status": "processing"}
 
-@router.get("/api/v1/waste/status/{job_id}")
+@app.get("/status/{job_id}")
 async def get_status(job_id: str):
-    """
-    진행률 조회 (Polling)
-    - 0.5초마다 호출됨
-    - 어느 FastAPI 인스턴스로 와도 동일한 응답
-    """
-    progress_data = await redis.get(f"job:{job_id}:progress")
+    # Redis DB 2에서 진행률 조회 (0.5초마다 반복)
+    progress = await redis_progress.get(f"job:{job_id}:progress")
+    return json.loads(progress)
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Tier 2: Celery Worker (AI Worker)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+celery_app = Celery(
+    broker='amqp://admin:password@rabbitmq.messaging:5672//',  # Tier 3
+    result_backend='redis://redis.default:6379/0'  # Tier 4
+)
+
+@celery_app.task(bind=True, queue='q.ai')
+def analyze_image(self, job_id):
+    # [RabbitMQ에서 메시지 받음 → ACK → 메시지 삭제]
     
-    if not progress_data:
-        raise HTTPException(404, "Job not found")
+    # 10% - 다운로드
+    update_progress(job_id, 10, "다운로드 중...")
+    image_path = download_from_s3(f"{job_id}.jpg")
     
-    data = json.loads(progress_data)
+    # 20% - Hash 계산
+    update_progress(job_id, 20, "캐시 확인 중...")
+    img = Image.open(image_path)
+    phash = str(imagehash.phash(img, hash_size=16))
     
-    return {
-        "job_id": job_id,
-        "progress": data["progress"],
-        "message": data["message"],
-        "result": data.get("result") if data["progress"] == 100 else None
-    }
-```
+    # 캐시 확인 (Redis DB 1)
+    cache_key = f"cache:image:hash:{phash}"
+    cached = redis_cache.get(cache_key)
+    
+    if cached:
+        update_progress(job_id, 100, "캐시 히트!")
+        return json.loads(cached)
+    
+    # 50% - AI 분석
+    update_progress(job_id, 50, "AI 분석 중...")
+    result = gpt4o_vision_api(image_path)
+    
+    # 70% - 피드백 생성
+    update_progress(job_id, 70, "피드백 생성 중...")
+    feedback = generate_feedback(result)
+    
+    # 90% - DB 저장
+    update_progress(job_id, 90, "저장 중...")
+    save_to_db(job_id, result)
+    
+    # 결과 캐싱 (Redis DB 1, 7일)
+    final_result = {"waste_type": result, "feedback": feedback}
+    redis_cache.setex(cache_key, 86400 * 7, json.dumps(final_result))
+    
+    # 100% - 완료
+    update_progress(job_id, 100, "완료!")
+    
+    return final_result  # → Redis DB 0 (result_backend)
 
-### 2. Celery Worker (비동기 처리)
-
-```python
-# tasks.py
-from celery import Celery
-import imagehash
-from PIL import Image
-
-celery_app = Celery('waste_processor', broker='redis://redis:6379/0')
-
-@celery_app.task(bind=True)
-def process_waste_image(self, job_id: str):
-    """
-    이미지 처리 파이프라인
-    각 단계마다 Redis에 진행률 업데이트
-    """
-    try:
-        # 10% - S3에서 이미지 다운로드
-        update_progress(job_id, 10, "이미지 다운로드 중...")
-        image_path = download_from_s3(f"{job_id}.jpg")
-        
-        # 20% - 이미지 해시 계산 (중복 감지)
-        update_progress(job_id, 20, "캐시 확인 중...")
-        img_hash = calculate_image_hash(image_path)
-        
-        # 캐시 확인 (동일 이미지는 AI 호출 스킵)
-        cached_result = redis.get(f"cache:hash:{img_hash}")
-        if cached_result:
-            update_progress(job_id, 100, "캐시에서 결과 로드!")
-            save_result(job_id, json.loads(cached_result))
-            return
-        
-        # 30% - 전처리
-        update_progress(job_id, 30, "이미지 전처리 중...")
-        processed_image = preprocess_image(image_path)
-        
-        # 50% - AI 비전 호출
-        update_progress(job_id, 50, "AI 비전 분석 중...")
-        vision_result = call_roboflow_api(processed_image)
-        
-        # 70% - LLM 피드백
-        update_progress(job_id, 70, "AI 피드백 생성 중...")
-        feedback = generate_llm_feedback(vision_result)
-        
-        # 90% - 위치 검색
-        update_progress(job_id, 90, "근처 수거함 검색 중...")
-        nearby_bins = find_nearby_bins(vision_result, user_location)
-        
-        # 결과 저장 및 캐싱
-        final_result = {
-            "waste_type": vision_result["class"],
-            "confidence": vision_result["confidence"],
-            "feedback": feedback,
-            "nearby_bins": nearby_bins
-        }
-        
-        # 7일간 캐싱 (같은 이미지는 재사용)
-        redis.setex(f"cache:hash:{img_hash}", 86400 * 7, json.dumps(final_result))
-        
-        # 100% - 완료
-        update_progress(job_id, 100, "분석 완료!")
-        save_result(job_id, final_result)
-        
-    except Exception as e:
-        update_progress(job_id, -1, f"오류: {str(e)}")
-        raise
-
-def update_progress(job_id: str, progress: int, message: str):
-    """Redis에 진행률 저장"""
-    redis.setex(
+def update_progress(job_id, progress, message):
+    # Redis DB 2에 진행률 저장 (Overwrite)
+    redis_progress.setex(
         f"job:{job_id}:progress",
         3600,
-        json.dumps({
-            "progress": progress,
-            "message": message,
-            "updated_at": datetime.utcnow().isoformat()
-        })
+        json.dumps({"progress": progress, "message": message})
     )
-
-def calculate_image_hash(image_path: str) -> str:
-    """Perceptual Hash (유사 이미지 감지)"""
-    image = Image.open(image_path)
-    return str(imagehash.phash(image, hash_size=16))
-```
-
-### 3. Redis (상태 관리 & 캐싱)
-
-```
-Redis 데이터 구조:
-
-# 1. Job 진행률
-Key: job:{job_id}:progress
-Value: {
-  "progress": 50,
-  "message": "AI 분석 중...",
-  "updated_at": "2025-10-30T10:30:45"
-}
-TTL: 3600초 (1시간)
-
-# 2. Job 결과
-Key: job:{job_id}:result
-Value: {
-  "waste_type": "플라스틱 - PET",
-  "confidence": 0.95,
-  "feedback": "깨끗이 세척 후 라벨 제거",
-  "nearby_bins": [...]
-}
-TTL: 86400초 (24시간)
-
-# 3. 이미지 해시 캐싱 (중복 방지)
-Key: cache:hash:{hash}
-Value: {완전한 분석 결과}
-TTL: 604800초 (7일)
-
-캐시 히트율 목표: 70% 이상
-→ AI API 비용 70% 절감!
 ```
 
 ---
 
-## 🔄 데이터 흐름
+## 💡 Redis 캐싱 전략 (Tier 4)
 
-### 전체 시퀀스
-
-```mermaid
-sequenceDiagram
-    actor User as 👤 사용자
-    participant FE as Frontend
-    participant BE as Backend
-    participant S3 as S3 Bucket
-    participant Redis as Redis
-    participant CW as Celery Worker
-    participant AI as AI API
-    
-    User->>FE: [1] 쓰레기 사진 촬영
-    FE->>BE: [2] POST /api/v1/waste/analyze
-    BE->>BE: [3] Job ID 생성
-    BE->>FE: S3 Presigned URL 반환 (0.1초)
-    
-    FE->>S3: [4] 이미지 직접 업로드 (2초)
-    FE->>BE: [5] POST /waste/upload-complete/{job_id}
-    BE->>Redis: [6] Celery Task 큐에 추가
-    
-    Note over FE,BE: [7] Frontend 폴링 시작 (0.5초마다)
-    
-    activate CW
-    Redis->>CW: [8] Task 수신
-    CW->>Redis: 10% - 이미지 다운로드
-    FE->>BE: GET /status
-    BE->>Redis: 진행률 조회
-    Redis-->>BE: 10%
-    BE-->>FE: progress: 10%
-    
-    CW->>Redis: 20% - 해시 계산 & 캐시 확인
-    CW->>Redis: 30% - 전처리
-    
-    FE->>BE: GET /status
-    BE->>Redis: 진행률 조회
-    Redis-->>BE: 30%
-    BE-->>FE: progress: 30%
-    
-    CW->>AI: 50% - AI 비전 분석
-    AI-->>CW: 분석 결과
-    CW->>Redis: 진행률 업데이트
-    
-    CW->>AI: 70% - LLM 피드백
-    AI-->>CW: 피드백 생성
-    
-    FE->>BE: GET /status
-    BE->>Redis: 진행률 조회
-    Redis-->>BE: 70%
-    BE-->>FE: progress: 70%
-    
-    CW->>AI: 90% - 위치 검색
-    AI-->>CW: 수거함 목록
-    CW->>Redis: 100% - 결과 저장 & 캐싱
-    deactivate CW
-    
-    FE->>BE: [9] GET /status
-    BE->>Redis: 진행률 조회
-    Redis-->>BE: 100% + result
-    BE-->>FE: progress: 100%, result: {...}
-    
-    FE->>User: [10] 결과 표시
-```
-
----
-
-## ⚡ 최적화 전략
-
-### 1. 이미지 해시 기반 캐싱 (핵심!)
+### Image Hash Cache (핵심!)
 
 ```python
-def calculate_image_hash(image_path: str) -> str:
+# Perceptual Hash (pHash)
+def calculate_image_hash(image_path):
     """
-    Perceptual Hash (pHash):
-    - 동일한 이미지 → 동일한 해시
-    - 약간의 변형 (회전, 크기) → 동일한 해시
-    - 완전히 다른 이미지 → 다른 해시
+    동일/유사 이미지 감지:
+    - 정확히 같은 사진 → 같은 해시
+    - 약간 회전/크기 변경 → 같은 해시
+    - 완전히 다른 사진 → 다른 해시
     """
-    image = Image.open(image_path)
-    img_hash = imagehash.phash(image, hash_size=16)
-    return str(img_hash)
+    img = Image.open(image_path)
+    return str(imagehash.phash(img, hash_size=16))
 
-# 사용 예시
-hash1 = calculate_hash("콜라캔_정면.jpg")    # "a1b2c3d4e5f6"
-hash2 = calculate_hash("콜라캔_측면.jpg")    # "a1b2c3d4e5f6" (거의 동일)
-hash3 = calculate_hash("사이다캔.jpg")       # "z9y8x7w6v5u4" (다름)
+# 예시:
+hash1 = phash("콜라캔_정면.jpg")     # "a1b2c3d4e5f6g7h8"
+hash2 = phash("콜라캔_측면.jpg")     # "a1b2c3d4e5f6g7h8" (거의 동일!)
+hash3 = phash("사이다캔.jpg")        # "z9y8x7w6v5u4t3s2" (다름)
 
-# 캐시 히트 예상
-cached = redis.get(f"cache:hash:{hash1}")
-if cached:
-    # AI 호출 스킵! 비용 절감!
-    return json.loads(cached)
-```
+# 캐시 전략:
+cache_key = f"cache:image:hash:{hash1}"
+cached_result = redis.get(cache_key)
 
-**효과:**
-- ✅ AI API 비용 70% 절감
-- ✅ 응답 속도 10배 향상 (0.5초)
-- ✅ 서버 부하 감소
+if cached_result:
+    # 캐시 히트!
+    # - AI API 호출 스킵
+    # - 응답 시간: 1초
+    # - 비용: $0
+    return json.loads(cached_result)
 
-### 2. Celery Worker Auto Scaling
+# 캐시 미스
+result = call_ai_api()  # 3-5초, 비용 $0.01
+redis.setex(cache_key, 86400 * 7, json.dumps(result))
 
-```yaml
-# ECS Task Definition
-AutoScalingTarget:
-  MinCapacity: 2
-  MaxCapacity: 20
-  
-ScalingPolicy:
-  TargetTrackingScaling:
-    TargetValue: 70  # CPU 70% 유지
-    ScaleInCooldown: 60
-    ScaleOutCooldown: 30
-
-# 시나리오
-시간대별 자동 조절:
-- 오전 6시: Worker 2개
-- 오후 12시 (피크): Worker 15개
-- 오후 9시: Worker 8개
-- 자정: Worker 2개
-```
-
-### 3. CloudFront CDN 활용
-
-```yaml
-# Lambda@Edge 이미지 최적화
-Event: viewer-request
-Function:
-  - 이미지 리사이징 (최대 1024x1024)
-  - WebP 변환 (용량 30% 감소)
-  - 압축 (Brotli > Gzip)
-
-효과:
-- 업로드 시간 50% 단축
-- 대역폭 비용 절감
-- 모바일 네트워크 친화적
+# 효과:
+# 월 10,000 요청 × 70% 캐시 히트 = 7,000회 절감
+# 비용 절감: 7,000 × $0.01 = $70/월
 ```
 
 ---
 
-## 📈 확장성 고려사항
+## 📊 Redis DB별 데이터 구조
 
-### 수평 확장 (Horizontal Scaling)
+```python
+# Redis 6개 DB 활용
 
-```
-현재 구조는 완전한 Stateless 설계:
-- FastAPI: 무제한 확장 가능
-- Celery Worker: 무제한 확장 가능
-- Redis: Cluster Mode로 확장
-- PostgreSQL: Read Replica 추가
+# DB 0: Celery Result Backend (Celery 자동 관리)
+celery-task-meta-{task_id} = {
+    "status": "SUCCESS",
+    "result": {...},
+    "traceback": null,
+    "children": []
+}
+TTL: task_result_expires (default 24h)
 
-1,000명 동시 접속 대응:
-- FastAPI: 10+ instances
-- Celery Worker: 50+ instances
-- Redis: 6-node cluster
-- RDS: Multi-AZ + Read Replica 3개
-```
+# DB 1: Image Hash Cache ⭐⭐⭐⭐⭐
+cache:image:hash:{phash} = {
+    "waste_type": "PET 플라스틱",
+    "confidence": 0.95,
+    "feedback": "깨끗이 세척 후 라벨 제거...",
+    "analyzed_at": "2025-10-31T10:30:00"
+}
+TTL: 604800초 (7일)
+예상 크기: 1KB × 10,000 = 10MB
+캐시 히트율: 70%+
 
-### 비용 최적화
+# DB 2: Job Progress Tracking ⭐⭐⭐⭐
+job:{job_id}:progress = {
+    "progress": 50,
+    "message": "AI 분석 중...",
+    "stage": "ai_vision",
+    "updated_at": "2025-10-31T10:30:45"
+}
+TTL: 3600초 (1시간)
+업데이트 빈도: 10-15회/job
+조회 빈도: 20-30회/job (0.5초마다)
 
-```
-현재 설정 (월 1만 요청):
-- ECS Fargate: $50
-- ElastiCache Redis: $15
-- RDS PostgreSQL: $30
-- S3 + CloudFront: $10
-- AI API (캐싱 70%): $15
-합계: ~$120/월
+# DB 3: Session Store ⭐⭐
+session:{user_id}:refresh_token = "eyJhbGc..."
+TTL: 2592000초 (30일)
 
-확장 시 (월 10만 요청):
-- ECS Fargate (Auto Scaling): $200
-- ElastiCache Redis: $50
-- RDS PostgreSQL: $100
-- S3 + CloudFront: $30
-- AI API (캐싱 70%): $150
-합계: ~$530/월
+oauth:state:{state} = {"user_id": 123, "provider": "kakao"}
+TTL: 600초 (10분)
+
+# DB 4: Rate Limiting ⭐
+ratelimit:ip:{ip}:{endpoint} = 15  # 요청 횟수
+TTL: 60초 (1분)
 ```
 
 ---
 
-## 📚 관련 문서
+## 🎯 최적화 효과
 
-- [Polling vs WebSocket 비교](polling-vs-websocket.md)
-- [배포 가이드](../deployment/full-guide.md)
-- [Docker 사용법](../deployment/docker.md)
+### Image Hash Cache 효과
+
+```
+시나리오: 월 10,000 이미지 분석 요청
+
+캐시 없이:
+├─ AI API 호출: 10,000회
+├─ 평균 비용: $0.01/요청
+├─ 총 비용: $100/월
+└─ 평균 응답: 5초
+
+Image Hash Cache (70% 히트):
+├─ AI API 호출: 3,000회 (70% 절감!)
+├─ 캐시 히트: 7,000회
+├─ AI 비용: $30/월
+├─ Redis 비용: ~$5/월
+├─ 총 비용: $35/월
+├─ 절감: $65/월 (65%!)
+└─ 평균 응답: 2.2초 (캐시 1초 + AI 5초)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Image Hash Cache = 가장 중요한 최적화!
+```
 
 ---
 
-**작성일**: 2025-10-30  
-**버전**: 1.0  
-**상태**: ✅ 승인됨
+## 🎯 결론
 
+### RabbitMQ vs Redis 역할
+
+```
+Tier 3: RabbitMQ (Message Queue)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ Task 전달 (일회성)
+✅ Producer → Consumer
+✅ Consume 후 메시지 삭제
+✅ Priority, Routing
+✅ Delivery Guarantee
+
+사용:
+└─ Task Queue (비동기 작업 요청)
+
+❌ Progress Tracking 불가
+   - 메시지 삭제됨
+   - 반복 조회 불가
+   - Random access 불가
+
+Tier 4: Redis (Persistence - Cache & State)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅ 상태 저장 (반복 조회 가능)
+✅ Key-Value (Random access)
+✅ Overwrite 가능
+✅ 여러 번 읽기 가능
+✅ TTL 자동 관리
+
+사용:
+├─ DB 0: Celery Result Backend
+├─ DB 1: Image Hash Cache ⭐⭐⭐⭐⭐ (70% 절감!)
+├─ DB 2: Job Progress Tracking ⭐⭐⭐⭐
+└─ DB 3: Session Store
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Celery 연결:
+✅ broker = RabbitMQ (Task 전달)
+✅ result_backend = Redis (결과 및 상태 저장)
+
+두 개 모두 필요!
+```
+
+---
+
+**image-processing-architecture.md가 올바른 구조로 재작성되었습니다!** ✅
+
+**가장 중요한 것: Redis DB 1 (Image Hash Cache) - AI 비용 70% 절감!** 💰
