@@ -1,6 +1,6 @@
 # 📚 AI Waste Coach Backend - 문서
 
-> **4-Node Kubernetes 클러스터 배포 문서**  
+> **4-Tier Kubernetes 클러스터 배포 문서**  
 > **Instagram + Robin Storage 패턴 적용**
 
 ---
@@ -58,7 +58,7 @@ cd /Users/mango/workspace/SeSACTHON/backend
 
 ## 🏗️ 최종 아키텍처
 
-### 4-Node Cluster
+### 4-Tier Cluster
 
 ```
 Master (t3.large, 8GB) - $60/월
@@ -182,7 +182,7 @@ SeSACTHON/backend/
 ```
 Phase 1: Infrastructure ✅ (완료)
 - Terraform
-- 4-node cluster
+- 4-Tier cluster
 - VPC, Security Groups
 
 Phase 2: Platform ✅ (완료)
@@ -206,5 +206,5 @@ Phase 4: GitOps ⏳ (대기)
 
 **문서 버전**: 2.0  
 **최종 업데이트**: 2025-10-31  
-**아키텍처**: 4-Node Instagram-style
+**아키텍처**: 4-Tier Instagram-style
 

@@ -2,7 +2,7 @@
 
 > **프로젝트의 모든 주요 기술 결정을 한눈에**  
 > **날짜**: 2025-10-31  
-> **최종 업데이트**: 4-Node Architecture
+> **최종 업데이트**: 4-Tier Architecture
 
 ## 📊 최종 결정 요약
 
@@ -12,7 +12,7 @@ mindmap
 Backend))
     인프라
       ✅ Self-Managed K8s
-      kubeadm 4-node
+      kubeadm 4-Tier
       Terraform + Ansible
       비용 $180/월
     
@@ -57,7 +57,7 @@ Backend))
 ✅ 학습 경험 (59일간 실전 디버깅)
 ✅ AI 도구 활용 (Cursor + Claude 4.5)
 ✅ IaC 완전 자동화 (Terraform + Ansible)
-✅ 4-Node 구성 (Instagram + Robin 패턴)
+✅ 4-Tier 구성 (Instagram + Robin 패턴)
 
 의사결정 배경:
 ✅ 9개월 엔터프라이즈 클라우드 플랫폼 개발 경험
@@ -69,10 +69,10 @@ Backend))
 검토: docs/architecture/design-reviews/
 ```
 
-### 결정 #2: **4-Node Cluster Architecture** ✅
+### 결정 #2: **4-Tier Cluster Architecture** ✅
 
 ```
-결정: 1M + 3W (4-Node, 역할 분리)
+결정: 1M + 3W (4-Tier, 역할 분리)
 기각: 3-Node 혼재 구성
 
 최종 구성:
@@ -382,7 +382,7 @@ GitOps:
 ### 최종 아키텍처
 
 - [Why Self-Managed K8s](why-self-managed-k8s.md) - 선택 배경 ⭐⭐⭐⭐⭐
-- [4-Node 배포 아키텍처](deployment-architecture-4node.md) - 전체 시스템
+- [4-Tier 배포 아키텍처](deployment-architecture-4node.md) - 전체 시스템
 - [최종 K8s 아키텍처](final-k8s-architecture.md) - GitOps 파이프라인
 - [Task Queue 설계](task-queue-design.md) - RabbitMQ + Celery
 
@@ -397,7 +397,7 @@ Phase 1: 의사결정 (3일)
 └─ 팀 역량 평가
 
 Phase 2: 설계 (2일)
-├─ 4-Node 아키텍처 설계
+├─ 4-Tier 아키텍처 설계
 ├─ 네트워킹 설계 (VPC, ALB)
 └─ Task Queue 설계
 
@@ -419,5 +419,5 @@ Phase 4: 테스트 & 안정화
 ---
 
 **최종 업데이트**: 2025-10-31  
-**버전**: 2.0 (4-Node Architecture)  
+**버전**: 2.0 (4-Tier Architecture)  
 **상태**: ✅ 프로덕션 배포 완료

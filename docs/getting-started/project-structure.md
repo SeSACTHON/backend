@@ -1,6 +1,6 @@
 # 📁 프로젝트 구조
 
-> **4-Node Kubernetes 클러스터 구조**  
+> **4-Tier Kubernetes 클러스터 구조**  
 > **업데이트**: 2025-10-31
 
 ## 📂 전체 구조
@@ -11,7 +11,7 @@ SeSACTHON/backend/
 ├── DEPLOYMENT_GUIDE.md                # 배포 가이드 ⭐
 │
 ├── 📁 terraform/ (Infrastructure as Code)
-│   ├── main.tf                        # 메인 설정 (4-node)
+│   ├── main.tf                        # 메인 설정 (4-Tier)
 │   ├── variables.tf                   # 변수 정의
 │   ├── outputs.tf                     # Output 값
 │   ├── backend.tf                     # S3 Backend
@@ -135,7 +135,7 @@ VPC:
 - Internet Gateway
 - Route Table
 
-EC2 (4-node):
+EC2 (4-Tier):
 - Master: t3.large (8GB)
 - Worker-1: t3.medium (4GB) - Application
 - Worker-2: t3.medium (4GB) - Celery
@@ -277,5 +277,5 @@ Pod IP:
 
 **작성일**: 2025-10-31  
 **버전**: 2.0  
-**구조**: 4-Node Cluster
+**구조**: 4-Tier Cluster
 
