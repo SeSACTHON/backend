@@ -70,12 +70,14 @@ resource "aws_key_pair" "k8s" {
   }
 }
 
-# EC2 Instances - Master (Control Plane + Monitoring)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Tier 1: Control Plane (Orchestration)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 module "master" {
   source = "./modules/ec2"
   
   instance_name         = "k8s-master"
-  instance_type         = "t3.large"  # 8GB (Control Plane + Prometheus)
+  instance_type         = "t3.large"  # 8GB (kube-apiserver, etcd, Prometheus)
   ami_id                = data.aws_ami.ubuntu.id
   subnet_id             = module.vpc.public_subnet_ids[0]
   security_group_ids    = [module.security_groups.master_sg_id]
@@ -144,12 +146,16 @@ module "worker_2" {
   }
 }
 
-# EC2 Instances - Storage (Stateful Services)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Tier 3 + 4: Message Queue + Persistence (동일 노드)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Tier 3: RabbitMQ HA × 3 (Message Queue Middleware)
+# Tier 4: PostgreSQL + Redis (Persistence Storage)
 module "storage" {
   source = "./modules/ec2"
   
   instance_name         = "k8s-storage"
-  instance_type         = "t3.large"  # 8GB (RabbitMQ, PostgreSQL, Redis)
+  instance_type         = "t3.large"  # 8GB (Tier 3: RabbitMQ HA, Tier 4: PostgreSQL, Redis)
   ami_id                = data.aws_ami.ubuntu.id
   subnet_id             = module.vpc.public_subnet_ids[0]  # Same AZ as Master
   security_group_ids    = [module.security_groups.worker_sg_id]

@@ -77,12 +77,23 @@ output "cluster_info" {
 }
 
 output "node_roles" {
-  description = "노드별 역할"
+  description = "노드별 역할 (4-Tier Layered Architecture)"
   value = {
-    master   = "Control Plane + Monitoring (t3.large, 8GB)"
-    worker_1 = "Application Pods (t3.medium, 4GB)"
-    worker_2 = "Celery Workers (t3.medium, 4GB)"
-    storage  = "RabbitMQ, PostgreSQL, Redis (t3.large, 8GB)"
+    master   = "Tier 1: Control Plane (kube-apiserver, etcd, Prometheus, ArgoCD) - t3.large, 8GB"
+    worker_1 = "Tier 2: Data Plane Sync API (auth, users, locations) - t3.medium, 4GB"
+    worker_2 = "Tier 2: Data Plane Async (waste, AI Workers, Batch Workers) - t3.medium, 4GB"
+    storage  = "Tier 3+4: MQ (RabbitMQ HA ×3) + Storage (PostgreSQL, Redis) - t3.large, 8GB"
+  }
+}
+
+output "tier_architecture" {
+  description = "4-Tier Layered Architecture"
+  value = {
+    tier_1 = "Control Plane (Orchestration) - Master"
+    tier_2 = "Data Plane (Business Logic, Sync + Async) - Worker-1 + Worker-2"
+    tier_3 = "Message Queue (Middleware, RabbitMQ HA) - Storage"
+    tier_4 = "Persistence (PostgreSQL + Redis Cache) - Storage"
+    note   = "Storage 노드 = Tier 3 (MQ) + Tier 4 (DB) 논리적 분리"
   }
 }
 
