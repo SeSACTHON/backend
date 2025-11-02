@@ -35,11 +35,11 @@ graph TD
     Recycling -.->|분석 결과| Waste
     Locations -.->|사용자 위치| Users
     
-    style Waste fill:#ffe1e1,stroke:#ff3333,stroke-width:3px
-    style Recycling fill:#ffe1f5,stroke:#ff66cc,stroke-width:3px
-    style Auth fill:#e1f5ff,stroke:#0066cc
-    style Users fill:#e1ffe1,stroke:#00cc66
-    style Locations fill:#fff4e1,stroke:#ff9900
+    style Waste fill:#ffd1d1,stroke:#ff3333,stroke-width:3px
+    style Recycling fill:#e6d5ff,stroke:#ff66cc,stroke-width:3px
+    style Auth fill:#cce5ff,stroke:#0066cc
+    style Users fill:#d1f2eb,stroke:#00cc66
+    style Locations fill:#ffe0b3,stroke:#ff9900
 ```
 
 ### 도메인별 특성
@@ -71,7 +71,7 @@ graph TB
     Single --> DB[(PostgreSQL)]
     Single --> Redis[(Redis)]
     
-    style Single fill:#ffe1e1,stroke:#ff3333
+    style Single fill:#ffd1d1,stroke:#ff3333
 ```
 
 **장점:**
@@ -125,12 +125,12 @@ graph TB
     Waste --> Redis
     Recycling --> Redis
     
-    style Gateway fill:#fff4e1,stroke:#ff9900,stroke-width:3px
-    style Waste fill:#ffe1e1,stroke:#ff3333,stroke-width:3px
-    style Recycling fill:#ffe1f5,stroke:#ff66cc
-    style Auth fill:#e1f5ff,stroke:#0066cc
-    style Users fill:#e1ffe1,stroke:#00cc66
-    style Locations fill:#fff0e1,stroke:#ffaa00
+    style Gateway fill:#ffe0b3,stroke:#ff9900,stroke-width:3px
+    style Waste fill:#ffd1d1,stroke:#ff3333,stroke-width:3px
+    style Recycling fill:#e6d5ff,stroke:#ff66cc
+    style Auth fill:#cce5ff,stroke:#0066cc
+    style Users fill:#d1f2eb,stroke:#00cc66
+    style Locations fill:#ffe0b3,stroke:#ffaa00
 ```
 
 #### docker-compose.yml 구조
@@ -290,12 +290,12 @@ graph TB
     Task3 --> ElastiCache
     Task4 --> ElastiCache
     
-    style LB fill:#fff4e1,stroke:#ff9900,stroke-width:3px
-    style Waste1 fill:#ffe1e1,stroke:#ff3333
-    style Waste2 fill:#ffe1e1,stroke:#ff3333
-    style Waste3 fill:#ffe1e1,stroke:#ff3333
-    style Recycling1 fill:#ffe1f5,stroke:#ff66cc
-    style Recycling2 fill:#ffe1f5,stroke:#ff66cc
+    style LB fill:#ffe0b3,stroke:#ff9900,stroke-width:3px
+    style Waste1 fill:#ffd1d1,stroke:#ff3333
+    style Waste2 fill:#ffd1d1,stroke:#ff3333
+    style Waste3 fill:#ffd1d1,stroke:#ff3333
+    style Recycling1 fill:#e6d5ff,stroke:#ff66cc
+    style Recycling2 fill:#e6d5ff,stroke:#ff66cc
 ```
 
 **장점:**
@@ -352,8 +352,8 @@ graph TB
     
     WasteHPA -.->|Auto Scale| WasteDep
     
-    style IG fill:#fff4e1,stroke:#ff9900,stroke-width:3px
-    style WasteDep fill:#ffe1e1,stroke:#ff3333,stroke-width:3px
+    style IG fill:#ffe0b3,stroke:#ff9900,stroke-width:3px
+    style WasteDep fill:#ffd1d1,stroke:#ff3333,stroke-width:3px
 ```
 
 **장점:**
@@ -438,12 +438,12 @@ graph TB
     Locations --> DB
     Locations --> Map
     
-    style Gateway fill:#fff4e1,stroke:#ff9900,stroke-width:3px
-    style Waste fill:#ffe1e1,stroke:#ff3333,stroke-width:3px
-    style Recycling fill:#ffe1f5,stroke:#ff66cc,stroke-width:2px
-    style Auth fill:#e1f5ff,stroke:#0066cc
-    style Users fill:#e1ffe1,stroke:#00cc66
-    style Locations fill:#fff0e1,stroke:#ffaa00
+    style Gateway fill:#ffe0b3,stroke:#ff9900,stroke-width:3px
+    style Waste fill:#ffd1d1,stroke:#ff3333,stroke-width:3px
+    style Recycling fill:#e6d5ff,stroke:#ff66cc,stroke-width:2px
+    style Auth fill:#cce5ff,stroke:#0066cc
+    style Users fill:#d1f2eb,stroke:#00cc66
+    style Locations fill:#ffe0b3,stroke:#ffaa00
 ```
 
 #### 프로젝트 구조
@@ -679,9 +679,9 @@ graph TB
     SQS --> WasteWorker
     SQS --> RecyclingWorker
     
-    style APIGW fill:#fff4e1,stroke:#ff9900,stroke-width:3px
-    style WasteLambda fill:#ffe1e1,stroke:#ff3333
-    style WasteWorker fill:#ffe1e1,stroke:#ff3333
+    style APIGW fill:#ffe0b3,stroke:#ff9900,stroke-width:3px
+    style WasteLambda fill:#ffd1d1,stroke:#ff3333
+    style WasteWorker fill:#ffd1d1,stroke:#ff3333
 ```
 
 **장점:**
@@ -775,20 +775,20 @@ graph TB
     R1 --> DB
     L1 --> DB
     
-    style Traefik fill:#fff4e1,stroke:#ff9900,stroke-width:3px
-    style W1 fill:#ffe1e1,stroke:#ff3333,stroke-width:2px
-    style W2 fill:#ffe1e1,stroke:#ff3333,stroke-width:2px
-    style W3 fill:#ffe1e1,stroke:#ff3333,stroke-width:2px
+    style Traefik fill:#ffe0b3,stroke:#ff9900,stroke-width:3px
+    style W1 fill:#ffd1d1,stroke:#ff3333,stroke-width:2px
+    style W2 fill:#ffd1d1,stroke:#ff3333,stroke-width:2px
+    style W3 fill:#ffd1d1,stroke:#ff3333,stroke-width:2px
     style WW1 fill:#ffcccc,stroke:#ff3333
     style WW2 fill:#ffcccc,stroke:#ff3333
     style WW3 fill:#ffcccc,stroke:#ff3333
     style WW4 fill:#ffcccc,stroke:#ff3333
     style WW5 fill:#ffcccc,stroke:#ff3333
-    style R1 fill:#ffe1f5,stroke:#ff66cc
-    style R2 fill:#ffe1f5,stroke:#ff66cc
-    style A1 fill:#e1f5ff,stroke:#0066cc
-    style U1 fill:#e1ffe1,stroke:#00cc66
-    style L1 fill:#fff0e1,stroke:#ffaa00
+    style R1 fill:#e6d5ff,stroke:#ff66cc
+    style R2 fill:#e6d5ff,stroke:#ff66cc
+    style A1 fill:#cce5ff,stroke:#0066cc
+    style U1 fill:#d1f2eb,stroke:#00cc66
+    style L1 fill:#ffe0b3,stroke:#ffaa00
 ```
 
 ---
@@ -939,9 +939,9 @@ flowchart LR
     C -.->|정식 서비스| C
     D -.->|대규모 확장| D
     
-    style A fill:#e1ffe1,stroke:#00cc66,stroke-width:3px
-    style B fill:#fff4e1,stroke:#ff9900
-    style C fill:#e1f5ff,stroke:#0066cc
+    style A fill:#d1f2eb,stroke:#00cc66,stroke-width:3px
+    style B fill:#ffe0b3,stroke:#ff9900
+    style C fill:#cce5ff,stroke:#0066cc
     style D fill:#f0e1ff,stroke:#9933ff
 ```
 

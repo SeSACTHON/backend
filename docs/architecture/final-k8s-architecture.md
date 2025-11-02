@@ -124,10 +124,10 @@ graph TB
     style GHA fill:#ffd1d1,stroke:#dc3545,stroke-width:3px,color:#000
     style Users fill:#cce5ff,stroke:#007bff,stroke-width:4px
     style ALB fill:#ff9900,stroke:#ff6600,stroke-width:4px
-    style Master fill:#e3f2fd,stroke:#0d47a1,stroke-width:3px
-    style Worker1 fill:#f1f8e9,stroke:#33691e,stroke-width:2px
-    style Worker2 fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style Storage fill:#fce4ec,stroke:#880e4f,stroke-width:3px
+    style Master fill:#cce5ff,stroke:#0d47a1,stroke-width:3px
+    style Worker1 fill:#d1f2eb,stroke:#33691e,stroke-width:2px
+    style Worker2 fill:#ffe0b3,stroke:#f57f17,stroke-width:2px
+    style Storage fill:#ffd1d1,stroke:#880e4f,stroke-width:3px
     style ArgoCD fill:#e6d5ff,stroke:#8844ff,stroke-width:3px
     style RabbitMQ fill:#ffe0b3,stroke:#fd7e14,stroke-width:3px
     style WasteAPI fill:#ffd1d1,stroke:#dc3545,stroke-width:2px,color:#000

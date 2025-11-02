@@ -71,12 +71,12 @@ graph TB
     Argo -.->|지속 모니터링| Helm
     Argo -.->|Drift 감지| K8s
     
-    style Developer fill:#e1f5ff,stroke:#0066cc
-    style Code fill:#fff4e1,stroke:#ff9900
-    style Helm fill:#e1ffe1,stroke:#00cc66,stroke-width:3px
+    style Developer fill:#cce5ff,stroke:#0066cc
+    style Code fill:#ffe0b3,stroke:#ff9900
+    style Helm fill:#d1f2eb,stroke:#00cc66,stroke-width:3px
     style Argo fill:#f0e1ff,stroke:#9933ff,stroke-width:3px
-    style K8s fill:#ffe1e1,stroke:#ff3333
-    style ECR fill:#fff0e1,stroke:#ffaa00
+    style K8s fill:#ffd1d1,stroke:#ff3333
+    style ECR fill:#ffe0b3,stroke:#ffaa00
 ```
 
 ### 구성 요소
@@ -527,9 +527,9 @@ graph TB
     Demo --> Result[해커톤 성공]
     Presentation --> Result
     
-    style DC fill:#e1ffe1,stroke:#00cc66,stroke-width:4px
-    style EKS fill:#e1f5ff,stroke:#0066cc,stroke-width:2px
-    style Result fill:#fff4e1,stroke:#ff9900,stroke-width:3px
+    style DC fill:#d1f2eb,stroke:#00cc66,stroke-width:4px
+    style EKS fill:#cce5ff,stroke:#0066cc,stroke-width:2px
+    style Result fill:#ffe0b3,stroke:#ff9900,stroke-width:3px
 ```
 
 **전략:**

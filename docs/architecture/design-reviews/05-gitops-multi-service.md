@@ -23,10 +23,10 @@ flowchart LR
     B --> C[전체 테스트]
     C --> D[전체 배포]
     
-    style A fill:#e1f5ff
-    style B fill:#ffe1e1,stroke:#ff3333,stroke-width:3px
-    style C fill:#ffe1e1,stroke:#ff3333,stroke-width:3px
-    style D fill:#ffe1e1,stroke:#ff3333,stroke-width:3px
+    style A fill:#cce5ff
+    style B fill:#ffd1d1,stroke:#ff3333,stroke-width:3px
+    style C fill:#ffd1d1,stroke:#ff3333,stroke-width:3px
+    style D fill:#ffd1d1,stroke:#ff3333,stroke-width:3px
 ```
 
 **문제:**
@@ -84,12 +84,12 @@ flowchart TD
     
     Deploy -->|9. 적용| EC2[EC2 Server<br/>Docker Compose]
     
-    style Dev fill:#e1f5ff
-    style Git fill:#fff4e1,stroke:#ff9900,stroke-width:3px
-    style Detect fill:#e1ffe1,stroke:#00cc66
-    style Build fill:#ffe1e1,stroke:#ff3333
+    style Dev fill:#cce5ff
+    style Git fill:#ffe0b3,stroke:#ff9900,stroke-width:3px
+    style Detect fill:#d1f2eb,stroke:#00cc66
+    style Build fill:#ffd1d1,stroke:#ff3333
     style Registry fill:#f0e1ff,stroke:#9933ff
-    style Deploy fill:#e1ffe1,stroke:#00cc66
+    style Deploy fill:#d1f2eb,stroke:#00cc66
 ```
 
 ---

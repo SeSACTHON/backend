@@ -40,10 +40,10 @@ graph TB
     Worker1 -->|publish| Storage
     Worker2 -->|consume| Storage
     
-    style Master fill:#e3f2fd,stroke:#0d47a1,stroke-width:3px
-    style Worker1 fill:#f1f8e9,stroke:#33691e,stroke-width:2px
-    style Worker2 fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style Storage fill:#fce4ec,stroke:#880e4f,stroke-width:3px
+    style Master fill:#cce5ff,stroke:#0d47a1,stroke-width:3px
+    style Worker1 fill:#d1f2eb,stroke:#33691e,stroke-width:2px
+    style Worker2 fill:#ffe0b3,stroke:#f57f17,stroke-width:2px
+    style Storage fill:#ffd1d1,stroke:#880e4f,stroke-width:3px
     
     subgraph Services["서비스 분산"]
         Heavy[Heavy Workload<br/>waste, recycling]
@@ -221,14 +221,14 @@ Any IP"]
     Storage <-->|"All Traffic (Self)"| Storage
     Storage <-->|"4789 UDP"| Master
     
-    style Internet fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
-    style VPC fill:#f1f8e9,stroke:#33691e,stroke-width:3px
-    style MasterSG fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style WorkerSG fill:#fce4ec,stroke:#880e4f,stroke-width:2px
-    style Master fill:#ffe0b2,stroke:#e65100,stroke-width:2px
-    style Worker1 fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style Worker2 fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style Storage fill:#f8bbd0,stroke:#c2185b,stroke-width:2px
+    style Internet fill:#cce5ff,stroke:#0d47a1,stroke-width:2px
+    style VPC fill:#d1f2eb,stroke:#33691e,stroke-width:3px
+    style MasterSG fill:#ffe0b3,stroke:#f57f17,stroke-width:2px
+    style WorkerSG fill:#ffd1d1,stroke:#880e4f,stroke-width:2px
+    style Master fill:#ffe0b3,stroke:#e65100,stroke-width:2px
+    style Worker1 fill:#d1f2eb,stroke:#2e7d32,stroke-width:2px
+    style Worker2 fill:#d1f2eb,stroke:#2e7d32,stroke-width:2px
+    style Storage fill:#ffd1d1,stroke:#c2185b,stroke-width:2px
 ```
 
 #### Master Security Group 상세

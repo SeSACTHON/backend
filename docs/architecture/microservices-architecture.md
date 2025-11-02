@@ -57,10 +57,10 @@ Kakao Map"]
     W2 --> W3
     W3 --> W4
     
-    style Auth fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
-    style Users fill:#f1f8e9,stroke:#33691e,stroke-width:2px
-    style Waste fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style Locations fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    style Auth fill:#cce5ff,stroke:#0d47a1,stroke-width:2px
+    style Users fill:#d1f2eb,stroke:#33691e,stroke-width:2px
+    style Waste fill:#ffe0b3,stroke:#f57f17,stroke-width:2px
+    style Locations fill:#ffd1d1,stroke:#880e4f,stroke-width:2px
 ```
 
 ---
@@ -148,9 +148,9 @@ GPT-4o Vision"]
     
     style ALB fill:#ff9900,stroke:#ff6600,stroke-width:3px
     style Master fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
-    style Worker1 fill:#f1f8e9,stroke:#33691e,stroke-width:2px
-    style Worker2 fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style Storage fill:#fce4ec,stroke:#880e4f,stroke-width:2px
+    style Worker1 fill:#d1f2eb,stroke:#33691e,stroke-width:2px
+    style Worker2 fill:#ffe0b3,stroke:#f57f17,stroke-width:2px
+    style Storage fill:#ffd1d1,stroke:#880e4f,stroke-width:2px
 ```
 
 ---
@@ -373,8 +373,8 @@ graph LR
     AIW -.->|Update| Waste
     BatchW -.->|Update| Waste
     
-    style Sync fill:#e3f2fd,stroke:#0d47a1,stroke-width:2px
-    style Async fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style Sync fill:#cce5ff,stroke:#0d47a1,stroke-width:2px
+    style Async fill:#ffe0b3,stroke:#f57f17,stroke-width:2px
     style RMQ fill:#ffe0b3,stroke:#fd7e14,stroke-width:3px
 ```
 

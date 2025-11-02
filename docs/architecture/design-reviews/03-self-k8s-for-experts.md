@@ -38,9 +38,9 @@ graph LR
     Total1 -.->|절감| Diff[$43/월<br/>20% 저렴]
     Total2 -.-> Diff
     
-    style E1 fill:#ffe1e1,stroke:#ff3333,stroke-width:3px
-    style S1 fill:#e1ffe1,stroke:#00cc66,stroke-width:3px
-    style Diff fill:#fff4e1,stroke:#ff9900,stroke-width:3px
+    style E1 fill:#ffd1d1,stroke:#ff3333,stroke-width:3px
+    style S1 fill:#d1f2eb,stroke:#00cc66,stroke-width:3px
+    style Diff fill:#ffe0b3,stroke:#ff9900,stroke-width:3px
 ```
 
 ### 상세 비용표
@@ -115,7 +115,7 @@ graph TB
     Master --> Klipper
     Master --> LocalPath
     
-    style Master fill:#e1ffe1,stroke:#00cc66,stroke-width:3px
+    style Master fill:#d1f2eb,stroke:#00cc66,stroke-width:3px
 ```
 
 ### k3s 비용
@@ -281,8 +281,8 @@ flowchart TD
     C3 --> D
     C4 --> D
     
-    style A fill:#e1f5ff,stroke:#0066cc,stroke-width:3px
-    style D fill:#e1ffe1,stroke:#00cc66,stroke-width:3px
+    style A fill:#cce5ff,stroke:#0066cc,stroke-width:3px
+    style D fill:#d1f2eb,stroke:#00cc66,stroke-width:3px
 ```
 
 ### k3s vs 일반 K8s

@@ -41,8 +41,8 @@ graph TB
         Master -.->|직접 관리| W3
     end
     
-    style EKSC fill:#fff4e1,stroke:#ff9900,stroke-width:3px
-    style Master fill:#ffe1e1,stroke:#ff3333,stroke-width:3px
+    style EKSC fill:#ffe0b3,stroke:#ff9900,stroke-width:3px
+    style Master fill:#ffd1d1,stroke:#ff3333,stroke-width:3px
 ```
 
 ### 주요 도구
@@ -131,8 +131,8 @@ flowchart TD
     C1 --> D1[✅ 자동 업데이트<br/>✅ 자동 백업<br/>✅ HA 보장]
     C2 --> D2[배포 YAML 작성<br/>모니터링 설정]
     
-    style C1 fill:#e1ffe1,stroke:#00cc66
-    style C2 fill:#fff4e1,stroke:#ff9900
+    style C1 fill:#d1f2eb,stroke:#00cc66
+    style C2 fill:#ffe0b3,stroke:#ff9900
 ```
 
 **관리 항목:**
@@ -154,9 +154,9 @@ flowchart TD
     D1 --> E[🔧 장애 발생 시<br/>직접 복구 필요]
     D2 --> E
     
-    style C1 fill:#ffe1e1,stroke:#ff3333
-    style C2 fill:#ffe1e1,stroke:#ff3333
-    style E fill:#ffe1e1,stroke:#ff3333,stroke-width:3px
+    style C1 fill:#ffd1d1,stroke:#ff3333
+    style C2 fill:#ffd1d1,stroke:#ff3333
+    style E fill:#ffd1d1,stroke:#ff3333,stroke-width:3px
 ```
 
 **관리 항목 (모두 직접):**
@@ -329,7 +329,7 @@ graph LR
     Master -.->|간단한 관리| W1
     Master -.->|간단한 관리| W2
     
-    style Master fill:#e1ffe1,stroke:#00cc66,stroke-width:2px
+    style Master fill:#d1f2eb,stroke:#00cc66,stroke-width:2px
 ```
 
 ### k3s 설치 (5분!)
@@ -390,9 +390,9 @@ graph TD
     E -->|+인건비| E1[$146 + $1,000<br/>= $1,146/월]
     F -->|+인건비| F1[$189 + $200<br/>= $389/월]
     
-    style C fill:#e1ffe1,stroke:#00cc66,stroke-width:3px
-    style C1 fill:#e1ffe1,stroke:#00cc66,stroke-width:3px
-    style F1 fill:#fff4e1,stroke:#ff9900
+    style C fill:#d1f2eb,stroke:#00cc66,stroke-width:3px
+    style C1 fill:#d1f2eb,stroke:#00cc66,stroke-width:3px
+    style F1 fill:#ffe0b3,stroke:#ff9900
 ```
 
 ### 복잡도 비교 (10점 만점)
@@ -518,7 +518,7 @@ graph LR
         Manager -.-> W3
     end
     
-    style Manager fill:#e1ffe1,stroke:#00cc66
+    style Manager fill:#d1f2eb,stroke:#00cc66
 ```
 
 **특징:**
@@ -577,10 +577,10 @@ flowchart TD
     
     H -->|대규모 확장| I[Kubernetes<br/>프로덕션급]
     
-    style B fill:#e1ffe1,stroke:#00cc66,stroke-width:4px
-    style D fill:#e1ffe1,stroke:#00cc66
-    style E fill:#fff4e1,stroke:#ff9900
-    style F fill:#e1f5ff,stroke:#0066cc
+    style B fill:#d1f2eb,stroke:#00cc66,stroke-width:4px
+    style D fill:#d1f2eb,stroke:#00cc66
+    style E fill:#ffe0b3,stroke:#ff9900
+    style F fill:#cce5ff,stroke:#0066cc
     style G fill:#f0e1ff,stroke:#9933ff
 ```
 

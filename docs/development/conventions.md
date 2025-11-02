@@ -800,15 +800,15 @@ flowchart LR
     H -->|Yes| I[✅ 머지 가능]
     H -->|No| J[❌ 수정 필요]
     
-    style A fill:#e1f5ff
-    style B fill:#ffe1e1
-    style C fill:#ffe1e1
-    style D fill:#ffe1e1
-    style E fill:#ffe1e1
-    style F fill:#fff4e1
-    style G fill:#fff4e1
-    style I fill:#e1ffe1
-    style J fill:#ffe1e1
+    style A fill:#cce5ff
+    style B fill:#ffd1d1
+    style C fill:#ffd1d1
+    style D fill:#ffd1d1
+    style E fill:#ffd1d1
+    style F fill:#ffe0b3
+    style G fill:#ffe0b3
+    style I fill:#d1f2eb
+    style J fill:#ffd1d1
 ```
 
 **검사 항목:**

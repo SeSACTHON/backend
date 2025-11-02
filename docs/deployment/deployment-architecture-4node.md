@@ -59,16 +59,16 @@ graph TB
     Worker1 -.->|Queue| Storage
     Worker2 -.->|Queue| Storage
     
-    style User fill:#e1f5ff,stroke:#01579b,stroke-width:3px
-    style DNS fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    style IGW fill:#fff3e0,stroke:#e65100,stroke-width:3px
-    style ALB fill:#fce4ec,stroke:#880e4f,stroke-width:3px
-    style ACM fill:#e8f5e9,stroke:#1b5e20,stroke-width:2px
-    style S3 fill:#e0f2f1,stroke:#004d40,stroke-width:2px
-    style Master fill:#e3f2fd,stroke:#0d47a1,stroke-width:3px
-    style Worker1 fill:#f1f8e9,stroke:#33691e,stroke-width:2px
-    style Worker2 fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style Storage fill:#fce4ec,stroke:#880e4f,stroke-width:3px
+    style User fill:#cce5ff,stroke:#01579b,stroke-width:3px
+    style DNS fill:#e6d5ff,stroke:#4a148c,stroke-width:2px
+    style IGW fill:#ffe0b3,stroke:#e65100,stroke-width:3px
+    style ALB fill:#ffd1d1,stroke:#880e4f,stroke-width:3px
+    style ACM fill:#d1f2eb,stroke:#1b5e20,stroke-width:2px
+    style S3 fill:#ccf5f0,stroke:#004d40,stroke-width:2px
+    style Master fill:#cce5ff,stroke:#0d47a1,stroke-width:3px
+    style Worker1 fill:#d1f2eb,stroke:#33691e,stroke-width:2px
+    style Worker2 fill:#ffe0b3,stroke:#f57f17,stroke-width:2px
+    style Storage fill:#ffd1d1,stroke:#880e4f,stroke-width:3px
 ```
 
 ---
@@ -107,10 +107,10 @@ graph LR
     CP -.->|Manage| Async
     CP -.->|Manage| Queue
     
-    style Master fill:#e3f2fd,stroke:#0d47a1,stroke-width:3px
-    style Worker1 fill:#f1f8e9,stroke:#33691e,stroke-width:3px
-    style Worker2 fill:#fff9c4,stroke:#f57f17,stroke-width:3px
-    style Storage fill:#fce4ec,stroke:#880e4f,stroke-width:3px
+    style Master fill:#cce5ff,stroke:#0d47a1,stroke-width:3px
+    style Worker1 fill:#d1f2eb,stroke:#33691e,stroke-width:3px
+    style Worker2 fill:#ffe0b3,stroke:#f57f17,stroke-width:3px
+    style Storage fill:#ffd1d1,stroke:#880e4f,stroke-width:3px
 ```
 
 ### 리소스 요약
@@ -157,16 +157,16 @@ graph TB
     ALB -->|/api/v1/recycling| Recycling
     ALB -->|/api/v1/locations| Locations
     
-    style Browser fill:#e1f5ff,stroke:#01579b,stroke-width:2px
-    style R53 fill:#f3e5f5,stroke:#4a148c,stroke-width:2px
-    style ALB fill:#fce4ec,stroke:#880e4f,stroke-width:4px
-    style ArgoCD fill:#e8eaf6,stroke:#3f51b5,stroke-width:2px
-    style Grafana fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    style Auth fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
-    style Users fill:#e0f2f1,stroke:#00695c,stroke-width:2px
-    style Waste fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
+    style Browser fill:#cce5ff,stroke:#01579b,stroke-width:2px
+    style R53 fill:#e6d5ff,stroke:#4a148c,stroke-width:2px
+    style ALB fill:#ffd1d1,stroke:#880e4f,stroke-width:4px
+    style ArgoCD fill:#e6d5ff,stroke:#3f51b5,stroke-width:2px
+    style Grafana fill:#ffe0b3,stroke:#e65100,stroke-width:2px
+    style Auth fill:#d1f2eb,stroke:#2e7d32,stroke-width:2px
+    style Users fill:#ccf5f0,stroke:#00695c,stroke-width:2px
+    style Waste fill:#e6d5ff,stroke:#6a1b9a,stroke-width:2px
     style Recycling fill:#fce4ec,stroke:#c2185b,stroke-width:2px
-    style Locations fill:#fff9c4,stroke:#f57f17,stroke-width:2px
+    style Locations fill:#ffe0b3,stroke:#f57f17,stroke-width:2px
 ```
 
 ### 라우팅 규칙
@@ -253,15 +253,15 @@ graph TB
     CeleryAI -->|Download| S3
     
     style Web fill:#e1f5ff,stroke:#01579b,stroke-width:3px
-    style ALB fill:#fce4ec,stroke:#880e4f,stroke-width:4px
-    style Auth fill:#e8f5e9,stroke:#2e7d32,stroke-width:2px
-    style Users fill:#e0f2f1,stroke:#00695c,stroke-width:2px
-    style Waste fill:#f3e5f5,stroke:#6a1b9a,stroke-width:2px
-    style RMQ fill:#fff3e0,stroke:#e65100,stroke-width:3px
-    style CeleryAI fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style PG fill:#e8eaf6,stroke:#3f51b5,stroke-width:2px
-    style Redis fill:#ffebee,stroke:#c62828,stroke-width:2px
-    style S3 fill:#e0f2f1,stroke:#004d40,stroke-width:2px
+    style ALB fill:#ffd1d1,stroke:#880e4f,stroke-width:4px
+    style Auth fill:#d1f2eb,stroke:#2e7d32,stroke-width:2px
+    style Users fill:#ccf5f0,stroke:#00695c,stroke-width:2px
+    style Waste fill:#e6d5ff,stroke:#6a1b9a,stroke-width:2px
+    style RMQ fill:#ffe0b3,stroke:#e65100,stroke-width:3px
+    style CeleryAI fill:#ffe0b3,stroke:#f57f17,stroke-width:2px
+    style PG fill:#e6d5ff,stroke:#3f51b5,stroke-width:2px
+    style Redis fill:#ffd1d1,stroke:#c62828,stroke-width:2px
+    style S3 fill:#ccf5f0,stroke:#004d40,stroke-width:2px
 ```
 
 ---
@@ -381,11 +381,11 @@ graph TB
     RMQ1 -.->|Cluster| RMQ2
     RMQ2 -.->|Cluster| RMQ3
     
-    style RMQ1 fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    style RMQ2 fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    style RMQ3 fill:#fff3e0,stroke:#e65100,stroke-width:2px
-    style PG fill:#e8eaf6,stroke:#3f51b5,stroke-width:2px
-    style Redis_Pod fill:#ffebee,stroke:#c62828,stroke-width:2px
+    style RMQ1 fill:#ffe0b3,stroke:#e65100,stroke-width:2px
+    style RMQ2 fill:#ffe0b3,stroke:#e65100,stroke-width:2px
+    style RMQ3 fill:#ffe0b3,stroke:#e65100,stroke-width:2px
+    style PG fill:#e6d5ff,stroke:#3f51b5,stroke-width:2px
+    style Redis_Pod fill:#ffd1d1,stroke:#c62828,stroke-width:2px
 ```
 
 ### RabbitMQ 큐 설계

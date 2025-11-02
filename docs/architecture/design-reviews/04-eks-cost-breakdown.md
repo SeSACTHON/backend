@@ -45,11 +45,11 @@ graph TB
         Prom[Prometheus<br/>$0<br/>오픈소스]
     end
     
-    style CP fill:#ffe1e1,stroke:#ff3333
-    style N1 fill:#fff4e1,stroke:#ff9900
-    style N2 fill:#fff0e1,stroke:#ffaa00
-    style ECR fill:#e1f5ff,stroke:#0066cc
-    style ALB fill:#e1ffe1,stroke:#00cc66
+    style CP fill:#ffd1d1,stroke:#ff3333
+    style N1 fill:#ffe0b3,stroke:#ff9900
+    style N2 fill:#ffe0b3,stroke:#ffaa00
+    style ECR fill:#cce5ff,stroke:#0066cc
+    style ALB fill:#d1f2eb,stroke:#00cc66
     style Argo fill:#f0e1ff,stroke:#9933ff
 ```
 
@@ -437,11 +437,11 @@ flowchart LR
     D -->|안정| E[EKS 사용<br/>$136/월]
     D -->|불안| F[Docker 복귀<br/>$60/월]
     
-    style A fill:#e1f5ff,stroke:#0066cc
-    style B fill:#e1ffe1,stroke:#00cc66
-    style C fill:#fff4e1,stroke:#ff9900
+    style A fill:#cce5ff,stroke:#0066cc
+    style B fill:#d1f2eb,stroke:#00cc66
+    style C fill:#ffe0b3,stroke:#ff9900
     style E fill:#f0e1ff,stroke:#9933ff,stroke-width:3px
-    style F fill:#e1ffe1,stroke:#00cc66
+    style F fill:#d1f2eb,stroke:#00cc66
 ```
 
 **전략:**

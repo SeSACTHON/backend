@@ -64,19 +64,19 @@ flowchart TD
     P -->|Yes| Q[✅ PR 머지 가능]
     P -->|No| R[❌ 수정 필요]
     
-    style A fill:#e1f5ff
-    style C fill:#e1ffe1
-    style D fill:#e1ffe1
-    style E fill:#e1ffe1
-    style F fill:#e1ffe1
-    style H fill:#e1ffe1
-    style K fill:#fff4e1
-    style L fill:#ffe1e1
-    style M fill:#ffe1e1
-    style N fill:#ffe1e1
-    style O fill:#ffe1e1
-    style Q fill:#e1ffe1
-    style R fill:#ffe1e1
+    style A fill:#cce5ff
+    style C fill:#d1f2eb
+    style D fill:#d1f2eb
+    style E fill:#d1f2eb
+    style F fill:#d1f2eb
+    style H fill:#d1f2eb
+    style K fill:#ffe0b3
+    style L fill:#ffd1d1
+    style M fill:#ffd1d1
+    style N fill:#ffd1d1
+    style O fill:#ffd1d1
+    style Q fill:#d1f2eb
+    style R fill:#ffd1d1
 ```
 
 ---

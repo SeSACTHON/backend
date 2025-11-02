@@ -528,9 +528,9 @@ flowchart TD
     L -->|Yes| M[ECS 유지]
     L -->|No| N[K8s 검토]
     
-    style A fill:#ffe1e1,stroke:#ff3333
-    style E fill:#e1ffe1,stroke:#00cc66
-    style M fill:#e1ffe1,stroke:#00cc66
+    style A fill:#ffd1d1,stroke:#ff3333
+    style E fill:#d1f2eb,stroke:#00cc66
+    style M fill:#d1f2eb,stroke:#00cc66
 ```
 
 ### 비용 최적화
