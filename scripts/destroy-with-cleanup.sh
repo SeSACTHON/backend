@@ -165,22 +165,55 @@ if [ -f "terraform.tfstate" ] || [ -d ".terraform" ]; then
             for sg in $SG_IDS; do
                 SG_NAME=$(aws ec2 describe-security-groups --group-ids "$sg" --region "$AWS_REGION" \
                     --query 'SecurityGroups[0].GroupName' --output text 2>/dev/null || echo "?")
-                echo "  - 삭제: $sg ($SG_NAME)"
+                echo "  - 삭제 시도: $sg ($SG_NAME)"
                 
-                # 보안 그룹 규칙 먼저 삭제 (종속 관계)
-                aws ec2 describe-security-group-rules \
-                    --group-ids "$sg" \
-                    --region "$AWS_REGION" \
-                    --query 'SecurityGroupRules[?IsEgress==`false`].SecurityGroupRuleId' \
-                    --output text 2>/dev/null | \
-                    while read rule_id; do
-                        [ -n "$rule_id" ] && aws ec2 revoke-security-group-ingress \
-                            --group-id "$sg" \
-                            --security-group-rule-ids "$rule_id" \
-                            --region "$AWS_REGION" 2>/dev/null || true
-                    done || true
-                
-                aws ec2 delete-security-group --group-id "$sg" --region "$AWS_REGION" 2>/dev/null || true
+                # 보안 그룹 직접 삭제 시도 (AWS가 자동으로 규칙 정리)
+                if aws ec2 delete-security-group --group-id "$sg" --region "$AWS_REGION" 2>/dev/null; then
+                    echo "    ✅ 삭제 성공"
+                else
+                    # 실패 시 규칙 수동 정리 후 재시도
+                    echo "    ⚠️  직접 삭제 실패, 규칙 정리 중..."
+                    
+                    # Ingress 규칙 삭제
+                    INGRESS_RULES=$(aws ec2 describe-security-group-rules \
+                        --group-ids "$sg" \
+                        --region "$AWS_REGION" \
+                        --query 'SecurityGroupRules[?IsEgress==`false`].SecurityGroupRuleId' \
+                        --output text 2>/dev/null || echo "")
+                    
+                    if [ -n "$INGRESS_RULES" ]; then
+                        for rule_id in $INGRESS_RULES; do
+                            aws ec2 revoke-security-group-ingress \
+                                --group-id "$sg" \
+                                --security-group-rule-ids "$rule_id" \
+                                --region "$AWS_REGION" 2>/dev/null || true
+                        done
+                    fi
+                    
+                    # Egress 규칙 삭제
+                    EGRESS_RULES=$(aws ec2 describe-security-group-rules \
+                        --group-ids "$sg" \
+                        --region "$AWS_REGION" \
+                        --query 'SecurityGroupRules[?IsEgress==`true`].SecurityGroupRuleId' \
+                        --output text 2>/dev/null || echo "")
+                    
+                    if [ -n "$EGRESS_RULES" ]; then
+                        for rule_id in $EGRESS_RULES; do
+                            aws ec2 revoke-security-group-egress \
+                                --group-id "$sg" \
+                                --security-group-rule-ids "$rule_id" \
+                                --region "$AWS_REGION" 2>/dev/null || true
+                        done
+                    fi
+                    
+                    # 재시도
+                    sleep 2
+                    if aws ec2 delete-security-group --group-id "$sg" --region "$AWS_REGION" 2>/dev/null; then
+                        echo "    ✅ 규칙 정리 후 삭제 성공"
+                    else
+                        echo "    ❌ 삭제 실패 (다른 리소스가 사용 중일 수 있음)"
+                    fi
+                fi
             done
         else
             echo "  ✅ Kubernetes 보안 그룹 없음"

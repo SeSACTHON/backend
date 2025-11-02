@@ -196,8 +196,15 @@ if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "" ]; then
   if [ -n "$SG_IDS" ]; then
     echo "⚠️  Kubernetes 생성 보안 그룹 발견 (자동 삭제):"
     for sg in $SG_IDS; do
-      echo "  - 삭제: $sg"
-      aws ec2 delete-security-group --group-id "$sg" --region "$AWS_REGION" 2>/dev/null || true
+      echo "  - 삭제 시도: $sg"
+      if aws ec2 delete-security-group --group-id "$sg" --region "$AWS_REGION" 2>/dev/null; then
+        echo "    ✅ 삭제 성공"
+      else
+        echo "    ⚠️  직접 삭제 실패 (규칙 정리 후 재시도...)"
+        # 규칙 정리 시도
+        sleep 1
+        aws ec2 delete-security-group --group-id "$sg" --region "$AWS_REGION" 2>/dev/null || true
+      fi
     done
     echo ""
   fi
