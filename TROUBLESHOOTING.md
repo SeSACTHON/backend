@@ -12,7 +12,8 @@
 2. [RabbitMQ Namespace 생성 실패](#2-rabbitmq-namespace-생성-실패)
 3. [Prometheus Retention 설정 오류](#3-prometheus-retention-설정-오류)
 4. [Prometheus Pod 대기 타이밍 문제](#4-prometheus-pod-대기-타이밍-문제)
-5. [RabbitMQ PVC 바인딩 실패](#5-rabbitmq-pvc-바인딩-실패)
+5. [RabbitMQ PVC 바인딩 실패 - StorageClass 없음](#5-rabbitmq-pvc-바인딩-실패---storageclass-없음)
+6. [PVC Provisioning 실패 - IAM 권한 부족](#6-pvc-provisioning-실패---iam-권한-부족)
 
 ---
 
@@ -406,6 +407,205 @@ kubectl get pods -n kube-system | grep ebs-csi
 
 ---
 
+## 6. PVC Provisioning 실패 - IAM 권한 부족
+
+### 🐛 문제
+
+**에러 메시지**:
+```
+Warning  ProvisioningFailed  
+failed to provision volume with StorageClass "gp3": 
+rpc error: code = Internal desc = Could not create volume "pvc-xxx": 
+could not create volume in EC2: UnauthorizedOperation: 
+You are not authorized to perform this operation. 
+User: arn:aws:sts::721622471953:assumed-role/prod-k8s-ec2-ssm-role/i-xxx 
+is not authorized to perform: ec2:CreateVolume on resource: arn:aws:ec2:ap-northeast-2:721622471953:volume/* 
+because no identity-based policy allows the ec2:CreateVolume action.
+```
+
+**PVC 상태**:
+```bash
+kubectl get pvc -A
+# NAMESPACE    NAME                 STATUS    
+# messaging    data-rabbitmq-0      Pending (20Gi, gp3)
+# monitoring   prometheus-xxx-0     Pending (50Gi, gp3)
+```
+
+**발생 시점**: Terraform apply 후 RabbitMQ, Prometheus 설치 시
+
+### 🔍 원인 분석
+
+**IAM Role에 EBS 권한 없음**:
+
+현재 IAM Role (`prod-k8s-ec2-ssm-role`):
+```json
+{
+  "Policies": [
+    "AmazonSSMManagedInstanceCore",      // ✅ SSM 권한만
+    "CloudWatchAgentServerPolicy"        // ✅ CloudWatch 권한만
+  ]
+}
+```
+
+**EBS CSI Driver의 동작**:
+1. PVC 생성 요청 감지
+2. EC2 인스턴스의 IAM Role 사용
+3. AWS API 호출: `ec2:CreateVolume`
+4. ❌ **UnauthorizedOperation** - 권한 없음!
+
+**EBS CSI Driver가 필요한 권한**:
+- `ec2:CreateVolume` ⭐ (볼륨 생성)
+- `ec2:DeleteVolume` (볼륨 삭제)
+- `ec2:AttachVolume` (Pod에 연결)
+- `ec2:DetachVolume` (Pod에서 분리)
+- `ec2:DescribeVolumes` (볼륨 정보)
+- `ec2:CreateTags` (태그 생성)
+- 기타 EBS 관련 권한
+
+### ✅ 해결
+
+**커밋**: `6b48c4d` - fix: Add EBS CSI Driver IAM permissions for dynamic volume provisioning
+
+**파일**: `terraform/iam.tf`
+
+**추가된 IAM Policy**:
+```hcl
+resource "aws_iam_role_policy" "ebs_csi_driver" {
+  name = "${var.environment}-k8s-ebs-csi-driver-policy"
+  role = aws_iam_role.ec2_ssm_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "ec2:CreateVolume",           # PVC 생성
+          "ec2:DeleteVolume",           # PVC 삭제
+          "ec2:AttachVolume",           # Pod 마운트
+          "ec2:DetachVolume",           # Pod 언마운트
+          "ec2:DescribeVolumes",        # 볼륨 조회
+          "ec2:DescribeVolumeStatus",   # 상태 확인
+          "ec2:DescribeVolumeAttribute",# 속성 확인
+          "ec2:CreateSnapshot",         # 스냅샷 생성
+          "ec2:DeleteSnapshot",         # 스냅샷 삭제
+          "ec2:DescribeSnapshots",      # 스냅샷 조회
+          "ec2:DescribeSnapshotAttribute",
+          "ec2:ModifyVolume",           # 볼륨 확장
+          "ec2:DescribeVolumesModifications",
+          "ec2:CreateTags",             # 태그 추가
+          "ec2:DescribeTags",           # 태그 조회
+          "ec2:DescribeInstances"       # 인스턴스 정보
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+```
+
+**적용 명령**:
+```bash
+cd /Users/mango/workspace/SeSACTHON/backend/terraform
+terraform apply -auto-approve
+```
+
+### 📊 적용 후 과정
+
+**Timeline**:
+```
+T+0s   : terraform apply 완료
+T+30s  : IAM 권한 AWS 서비스 전파
+T+60s  : EC2 Instance Metadata 갱신
+T+90s  : EBS CSI Controller가 새 credentials 획득
+T+120s : PVC 재시도 → 성공! → Bound ✅
+```
+
+**확인 방법**:
+```bash
+# 1. IAM 권한 확인 (Master 노드)
+aws sts get-caller-identity
+
+# 2. EBS 권한 테스트
+aws ec2 describe-volumes --region ap-northeast-2 --max-results 1
+
+# 3. PVC 상태 실시간 확인
+kubectl get pvc -A -w
+
+# 4. EBS CSI Controller 로그 확인
+kubectl logs -n kube-system -l app=ebs-csi-controller --tail=50
+```
+
+**빠른 적용**:
+```bash
+# EBS CSI Controller 재시작 (즉시 새 credentials 적용)
+kubectl rollout restart deployment ebs-csi-controller -n kube-system
+```
+
+### 💡 핵심 교훈
+
+#### Self-Managed Kubernetes의 IAM 관리
+
+**EKS**:
+- ✅ IRSA (IAM Roles for Service Accounts) 사용
+- ✅ Pod별 세분화된 권한
+- ✅ EBS CSI Driver에 자동 권한 부여
+
+**Self-Managed**:
+- ❌ IRSA 없음 (직접 구현 필요)
+- ❌ 모든 Pod가 EC2 Instance IAM Role 공유
+- ❌ EBS CSI Driver 권한 직접 추가 필요 ⭐
+
+#### IAM 권한 설계 원칙
+
+**최소 권한 원칙**:
+```
+❌ Administrator Access (너무 광범위)
+✅ 필요한 ec2:* 권한만 명시적 부여
+✅ Resource: "*" (EBS의 경우 불가피)
+```
+
+**필수 CSI Driver 권한**:
+- EBS CSI Driver → ec2:CreateVolume 등
+- EFS CSI Driver → elasticfilesystem:CreateFileSystem 등
+- FSx CSI Driver → fsx:CreateFileSystem 등
+
+#### 실전 체크리스트
+
+Self-Managed K8s에서 CSI Driver 사용 전:
+
+- [ ] CSI Driver 설치
+- [ ] StorageClass 생성
+- [ ] **IAM 권한 확인** ⭐ (중요!)
+- [ ] 테스트 PVC 생성
+- [ ] PVC Events 확인
+- [ ] 실제 StatefulSet 배포
+
+**순서**: CSI Driver → IAM 권한 → StorageClass → 테스트 → 프로덕션
+
+### 🔧 검증 명령어
+
+```bash
+# IAM 권한 전파 확인 (Master 노드)
+curl -s http://169.254.169.254/latest/meta-data/iam/security-credentials/prod-k8s-ec2-ssm-role | jq .Expiration
+
+# EBS 권한 테스트
+aws ec2 describe-volumes --region ap-northeast-2 --max-results 1
+
+# PVC 생성 성공 확인
+kubectl get pvc -A
+
+# EBS 볼륨 실제 생성 확인 (AWS CLI)
+aws ec2 describe-volumes \
+  --filters "Name=tag:kubernetes.io/created-for/pvc/name,Values=data-rabbitmq-0" \
+  --region ap-northeast-2
+
+# PVC → PV → EBS 볼륨 매핑 확인
+kubectl get pv
+```
+
+---
+
 ## 📊 해결 요약
 
 | 문제 | 원인 | 해결 | 커밋 |
@@ -415,6 +615,7 @@ kubectl get pods -n kube-system | grep ebs-csi
 | Prometheus retention 오류 | map 대신 string 필요 | 설정 형식 수정 | `b8d4f44` |
 | Prometheus Pod 타이밍 | 리소스 생성 전 wait 실행 | 다단계 대기 로직 | `df7c3da` |
 | RabbitMQ PVC 바인딩 실패 | StorageClass 없음 | EBS CSI Driver 설치 | `80a7f9c` |
+| PVC Provisioning 실패 | IAM 권한 부족 | EBS CSI 권한 추가 | `6b48c4d` |
 
 ---
 
@@ -452,7 +653,20 @@ kubectl get pods -n kube-system | grep ebs-csi
 ---
 
 **마지막 업데이트**: 2025-11-02  
-**총 해결 문제**: 5개  
-**총 커밋**: 5개  
+**총 해결 문제**: 6개  
+**총 커밋**: 6개  
 **상태**: ✅ 모든 문제 해결 완료
+
+---
+
+## ⚡ 빠른 참조
+
+### 문제별 핵심 포인트
+
+1. **Terraform**: `-chdir` 옵션 사용 또는 명시적 `cd`
+2. **Ansible**: 파이프 사용 시 `shell` 모듈 필수
+3. **Prometheus**: `retention`은 문자열, `retentionSize`는 절대값
+4. **Operator 패턴**: 충분한 대기 시간 + 다단계 검증
+5. **StorageClass**: Self-Managed는 CSI Driver 수동 설치 필수
+6. **IAM 권한**: EBS CSI Driver에 ec2:CreateVolume 등 권한 추가
 
