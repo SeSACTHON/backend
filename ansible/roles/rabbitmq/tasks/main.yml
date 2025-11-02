@@ -50,8 +50,38 @@
     --set metrics.serviceMonitor.enabled=true
   when: "'rabbitmq' not in rabbitmq_check.stdout"
 
-- name: RabbitMQ Pod 대기
-  command: kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=rabbitmq -n {{ rabbitmq_namespace }} --timeout=300s
+- name: RabbitMQ StatefulSet 생성 대기 (60초)
+  shell: |
+    echo "⏳ RabbitMQ StatefulSet 생성 대기..."
+    sleep 60
+  changed_when: false
+
+- name: RabbitMQ Pod 생성 확인
+  shell: |
+    for i in {1..30}; do
+      POD_COUNT=$(kubectl get pods -n {{ rabbitmq_namespace }} -l app.kubernetes.io/name=rabbitmq --no-headers 2>/dev/null | wc -l)
+      if [ "$POD_COUNT" -gt 0 ]; then
+        echo "✅ RabbitMQ Pod 생성됨 ($POD_COUNT개)"
+        exit 0
+      fi
+      echo "대기 중... ($i/30)"
+      sleep 10
+    done
+  changed_when: false
+
+- name: RabbitMQ Pod Ready 대기
+  command: kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=rabbitmq -n {{ rabbitmq_namespace }} --timeout=600s
+  ignore_errors: yes
+  register: rabbitmq_wait
+
+- name: RabbitMQ Pod 상태 확인
+  command: kubectl get pods -n {{ rabbitmq_namespace }}
+  register: rabbitmq_pods
+  changed_when: false
+
+- name: RabbitMQ Pod 상태 출력
+  debug:
+    msg: "{{ rabbitmq_pods.stdout_lines }}"
 
 - name: RabbitMQ Cluster 상태 확인
   shell: |
@@ -59,6 +89,7 @@
   register: rabbitmq_cluster
   failed_when: false
   changed_when: false
+  when: rabbitmq_wait is succeeded
 
 - name: RabbitMQ 접속 정보
   debug:
