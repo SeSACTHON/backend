@@ -83,12 +83,19 @@
   roles:
     - argocd
 
-- name: RabbitMQ 설치
+- name: RabbitMQ 설치 (Tier 3: Message Queue)
   hosts: masters
   become: yes
   become_user: "{{ kubectl_user }}"
   roles:
     - rabbitmq
+
+- name: Redis 설치 (Tier 4: Persistence - Cache & State)
+  hosts: masters
+  become: yes
+  become_user: "{{ kubectl_user }}"
+  roles:
+    - redis
 
 - name: Monitoring 설치
   hosts: masters
