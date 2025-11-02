@@ -7,6 +7,7 @@
 ## 📊 최종 결정 요약
 
 ```mermaid
+%%{init: {'theme':'base', 'themeVariables': { 'primaryColor':'#cce5ff', 'primaryTextColor':'#000', 'primaryBorderColor':'#007bff', 'lineColor':'#007bff', 'secondaryColor':'#d1f2eb', 'tertiaryColor':'#ffe0b3', 'mainBkg':'#ffffff', 'nodeBorder':'#333333'}}}%%
 mindmap
   root((AI Waste Coach
 Backend))
