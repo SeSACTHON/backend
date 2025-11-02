@@ -155,10 +155,12 @@ External APIs:
 - [설계 검토 과정](docs/architecture/design-reviews/) - 01-07
 
 #### 🏗️ [인프라](docs/infrastructure/)
-- [VPC 네트워크 설계](docs/infrastructure/vpc-network-design.md)
-- [K8s 클러스터 구축](docs/infrastructure/k8s-cluster-setup.md)
-- [IaC 구성](docs/infrastructure/iac-terraform-ansible.md)
-- [CNI 비교](docs/infrastructure/cni-comparison.md)
+- [VPC 네트워크 설계](docs/infrastructure/vpc-network-design.md) - Security Groups, Subnets
+- [K8s 클러스터 구축](docs/infrastructure/k8s-cluster-setup.md) - kubeadm 설치
+- [IaC 구성](docs/infrastructure/iac-terraform-ansible.md) - Terraform + Ansible
+- [CNI 비교](docs/infrastructure/cni-comparison.md) - Calico vs Flannel
+- [Redis 구성](docs/infrastructure/redis-configuration.md) - Tier 4, Cache & State ⭐
+- [RabbitMQ HA](docs/infrastructure/rabbitmq-ha-setup.md) - Tier 3, Message Queue ⭐
 
 #### 🎯 [가이드](docs/guides/)
 - [구축 체크리스트](docs/guides/SETUP_CHECKLIST.md)
