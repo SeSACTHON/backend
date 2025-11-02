@@ -34,6 +34,51 @@ fi
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "0️⃣ Kubernetes 리소스 정리 (VPC 삭제 문제 방지)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# Kubernetes 클러스터 접근 가능 여부 확인
+if kubectl cluster-info &>/dev/null; then
+  echo "📋 Kubernetes 클러스터에 연결됨"
+  echo ""
+  
+  echo "🧹 Kubernetes 리소스 정리 중..."
+  
+  # 1. Ingress 삭제 (ALB 및 보안 그룹 제거)
+  echo "  - Ingress 삭제..."
+  kubectl delete ingress --all -A 2>/dev/null || echo "    (Ingress 없음)"
+  
+  # 2. LoadBalancer 타입 Service 삭제
+  echo "  - LoadBalancer Service 삭제..."
+  kubectl get svc -A -o json 2>/dev/null | jq -r '.items[] | select(.spec.type=="LoadBalancer") | "\(.metadata.namespace)/\(.metadata.name)"' 2>/dev/null | \
+    while read ns name; do
+      kubectl delete svc "$name" -n "$ns" 2>/dev/null || true
+    done || echo "    (LoadBalancer Service 없음)"
+  
+  # 3. PVC 삭제 (EBS 볼륨 제거)
+  echo "  - PVC 삭제..."
+  kubectl delete pvc --all -A 2>/dev/null || echo "    (PVC 없음)"
+  
+  # 4. Helm Release 삭제
+  echo "  - Helm Release 삭제..."
+  helm uninstall kube-prometheus-stack -n monitoring 2>/dev/null || true
+  helm uninstall rabbitmq -n messaging 2>/dev/null || true
+  helm uninstall argocd -n argocd 2>/dev/null || true
+  helm uninstall aws-load-balancer-controller -n kube-system 2>/dev/null || true
+  
+  echo ""
+  echo "⏳ Kubernetes 리소스 정리 대기 (30초)..."
+  sleep 30
+  echo ""
+else
+  echo "ℹ️  Kubernetes 클러스터에 연결할 수 없습니다."
+  echo "   (클러스터가 없거나 접근 권한 없음)"
+  echo "   Kubernetes 리소스 정리를 건너뜁니다."
+  echo ""
+fi
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "1️⃣ Terraform Destroy - 기존 인프라 삭제"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
@@ -117,11 +162,82 @@ else
   fi
 fi
 
+# Terraform destroy 전에 AWS 리소스 정리 확인
+VPC_ID=$(terraform output -raw vpc_id 2>/dev/null || echo "")
+AWS_REGION=$(terraform output -raw aws_region 2>/dev/null || echo "ap-northeast-2")
+
+if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "" ]; then
+  echo "🔍 Kubernetes가 생성한 AWS 리소스 확인 중..."
+  echo ""
+  
+  # EBS 볼륨 확인
+  VOLUMES=$(aws ec2 describe-volumes \
+    --filters "Name=tag-key,Values=kubernetes.io/created-for/pvc/name" "Name=state,Values=available" \
+    --region "$AWS_REGION" \
+    --query 'Volumes[*].VolumeId' \
+    --output text 2>/dev/null || echo "")
+  
+  if [ -n "$VOLUMES" ]; then
+    echo "⚠️  남은 EBS 볼륨 발견 (자동 삭제):"
+    for vol in $VOLUMES; do
+      echo "  - 삭제: $vol"
+      aws ec2 delete-volume --volume-id "$vol" --region "$AWS_REGION" 2>/dev/null || true
+    done
+    echo ""
+  fi
+  
+  # 보안 그룹 확인 (k8s-* 패턴)
+  SG_IDS=$(aws ec2 describe-security-groups \
+    --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=k8s-*" \
+    --region "$AWS_REGION" \
+    --query 'SecurityGroups[*].GroupId' \
+    --output text 2>/dev/null || echo "")
+  
+  if [ -n "$SG_IDS" ]; then
+    echo "⚠️  Kubernetes 생성 보안 그룹 발견 (자동 삭제):"
+    for sg in $SG_IDS; do
+      echo "  - 삭제: $sg"
+      aws ec2 delete-security-group --group-id "$sg" --region "$AWS_REGION" 2>/dev/null || true
+    done
+    echo ""
+  fi
+  
+  # Load Balancer 확인
+  ALB_ARNS=$(aws elbv2 describe-load-balancers \
+    --region "$AWS_REGION" \
+    --query "LoadBalancers[?VpcId==\`$VPC_ID\`].LoadBalancerArn" \
+    --output text 2>/dev/null || echo "")
+  
+  if [ -n "$ALB_ARNS" ]; then
+    echo "⚠️  남은 Load Balancer 발견 (자동 삭제):"
+    for alb_arn in $ALB_ARNS; do
+      echo "  - 삭제: $alb_arn"
+      aws elbv2 delete-load-balancer --load-balancer-arn "$alb_arn" --region "$AWS_REGION" 2>/dev/null || true
+    done
+    echo "  ⏳ Load Balancer 삭제 대기 (10초)..."
+    sleep 10
+    echo ""
+  fi
+  
+  echo "⏳ AWS 리소스 정리 완료 대기 (30초)..."
+  sleep 30
+  echo ""
+fi
+
 echo "🗑️  Terraform destroy 실행..."
 terraform destroy -auto-approve
 
 if [ $? -ne 0 ]; then
+  echo ""
   echo "❌ Terraform destroy 실패!"
+  echo ""
+  echo "💡 VPC 삭제 장시간 대기 문제인 경우:"
+  echo "   1. ./scripts/destroy-with-cleanup.sh 사용 (수동 정리)"
+  echo "   2. 남은 리소스 확인:"
+  if [ -n "$VPC_ID" ]; then
+    echo "      aws ec2 describe-volumes --region $AWS_REGION"
+    echo "      aws ec2 describe-security-groups --filters Name=vpc-id,Values=$VPC_ID --region $AWS_REGION"
+  fi
   exit 1
 fi
 
