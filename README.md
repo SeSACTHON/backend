@@ -8,141 +8,129 @@
 
 ### 🎯 주요 기능
 
-1. **AI 쓰레기 스캐너**
-   - 사용자가 카메라로 쓰레기를 찍으면 AI 비전 모델이 재질, 형태, 혼합 여부를 분석
+1. **AI 쓰레기 스캐너** (GPT-4o Vision)
+   - 사용자가 카메라로 쓰레기를 찍으면 AI가 재질, 형태, 혼합 여부를 분석
    - 쓰레기 종류 및 분류 방법 제안
 
-2. **위치 기반 재활용 수거함 제안**
-   - 인식된 품목이 재활용 가능 자원일 경우, 가장 가까운 재활용 수거함/제로웨이스트샵 위치 추천
+2. **위치 기반 재활용 수거함 제안** (Kakao Map)
+   - 인식된 품목이 재활용 가능 자원일 경우, 가장 가까운 수거함 추천
    - 지도 기반 네비게이션 연동
 
 3. **LLM 기반 피드백 코칭**
-   - "이물질이 남아있네요. 미지근한 물에 30초 헹구면 깨끗하게 닦을 수 있어요." 등 실용적 피드백
+   - "이물질이 남아있네요. 미지근한 물에 30초 헹구면 깨끗하게 닦을 수 있어요." 등
    - 실제 세척법, 분리요령, 재질별 관리팁 제공
 
-4. **소셜 로그인 (OAuth 2.0)**
+4. **소셜 로그인** (OAuth 2.0)
    - 카카오, 네이버, 구글 간편 로그인 지원
 
 ---
 
 ## 🚀 빠른 시작
 
-### ⚡ 인프라 구축 (35분)
+### ⚡ 인프라 구축 (40-50분)
 
 ```bash
-# Terraform + Ansible 자동화
-./scripts/provision.sh
+# Terraform + Ansible 완전 자동화
+./scripts/auto-rebuild.sh
 
-# 상세: docs/guides/iac-quick-start.md
-```
-
-### 📖 단계별 구축
-
-**[구축 체크리스트](docs/guides/setup-checklist.md)** ← 여기서 시작! ⭐⭐⭐
-
-```
-1. 사전 준비 (30분)
-2. 로컬 환경 (30분)
-3. AWS 인프라 - Terraform (10분)
-4. K8s 클러스터 - Ansible (40분)
-5. ArgoCD & GitOps (20분)
-6. Helm Charts (3시간)
-7. GitHub Actions (1시간)
-8. 서비스 배포 (1시간)
-9. 검증 (1시간)
-
-총: 8-10시간
+# 상세: DEPLOYMENT_GUIDE.md
 ```
 
 ---
 
-## 🏗️ 아키텍처
+## 🏗️ 4-Tier Layered Architecture
 
-### 최종 구성
-
-**[최종 K8s 아키텍처](docs/architecture/final-k8s-architecture.md)** ⭐⭐⭐⭐⭐
+### Software Engineering 관점
 
 ```
-Kubernetes (kubeadm, 1M + 2W, non-HA)
-├─ Master: t3.medium ($30/월)
-├─ Worker 1: t3.medium ($30/월) - CPU 집약
-├─ Worker 2: t3.medium ($30/월) - Network 집약
-└─ Worker 3: t3.small ($15/월) - I/O & API
+Tier 1: Control Plane (Orchestration)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Master (t3.large, 8GB, $60/월)
+├─ kube-apiserver, etcd, scheduler, controller
+├─ Prometheus + Grafana (Monitoring)
+└─ ArgoCD (GitOps)
 
-총 비용: $105/월
-구축 시간: 35분 (자동화)
+관심사: "어떻게 워크로드를 배치하고 관리할 것인가?"
+
+Tier 2: Data Plane (Business Logic)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Worker-1 + Worker-2 (t3.medium ×2, 4GB ×2, $60/월)
+
+Worker-1 (Sync API):
+├─ auth-service ×2 (OAuth, JWT)
+├─ users-service ×1 (프로필, 이력)
+└─ locations-service ×1 (수거함 검색)
+
+Worker-2 (Async Processing):
+├─ waste-service ×2 (이미지 분석 API)
+├─ AI Workers ×3 (GPT-4o Vision)
+└─ Batch Workers ×2 (배치 작업)
+
+관심사: "비즈니스 로직을 어떻게 처리할 것인가?"
+패턴: Reactor (Sync) + Task Queue (Async)
+
+Tier 3: Message Queue (Middleware)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Storage 노드의 RabbitMQ HA ×3
+├─ q.ai (AI Vision, Priority 10)
+├─ q.batch (배치, Priority 1)
+├─ q.api (외부 API, Priority 5)
+├─ q.sched (예약, Priority 3)
+└─ q.dlq (Dead Letter)
+
+관심사: "메시지를 어떻게 안전하게 전달할 것인가?"
+
+Tier 4: Persistence (Storage)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Storage 노드의 Database + Cache
+├─ PostgreSQL (StatefulSet, 50GB)
+├─ Redis (Result Backend + Cache)
+└─ Celery Beat ×1 (스케줄러)
+
+관심사: "데이터를 어떻게 영속적으로 저장할 것인가?"
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+노드: 4개, Tier: 4계층 (논리적 분리)
+비용: $185/월 (EC2 $180 + S3 $5)
 ```
 
-### 핵심 기술
+### 핵심 기술 스택
 
 ```
-GitOps:
-├─ GitHub Actions (CI)
-├─ ArgoCD (CD)
-├─ Helm Charts
-└─ GHCR (무료 레지스트리)
+Infrastructure:
+├─ Kubernetes (kubeadm) - Self-Managed
+├─ Calico VXLAN - CNI
+├─ AWS Load Balancer Controller - L7 Routing
+├─ Terraform - IaC (AWS 리소스)
+└─ Ansible - Configuration (75개 작업)
 
-마이크로서비스 (5개):
-├─ auth-service (OAuth, JWT)
-├─ users-service (프로필, 이력)
-├─ waste-service (이미지 분석)
-├─ recycling-service (LLM 피드백)
-└─ locations-service (수거함 검색)
+Tier 1 (Control Plane):
+├─ Prometheus + Grafana - Monitoring
+└─ ArgoCD - GitOps CD
 
-비동기 처리:
-├─ RabbitMQ (5개 큐)
-└─ Celery Workers (12개)
+Tier 2 (Data Plane):
+├─ FastAPI - Reactor Pattern (Sync)
+├─ Celery Workers - Task Queue (Async)
+└─ S3 Pre-signed URL - Image Upload
 
-통신:
-└─ Short Polling (0.5초)
+Tier 3 (Message Queue):
+└─ RabbitMQ HA (3-node) - Message Broker
+
+Tier 4 (Persistence):
+├─ PostgreSQL - RDBMS
+├─ Redis - Cache + Result Backend
+└─ Celery Beat - Scheduler
+
+Networking:
+├─ Route53 - DNS (growbin.app)
+├─ ALB - L7 Load Balancing
+├─ ACM - SSL/TLS (*.growbin.app)
+└─ Path-based Routing (/api/v1/*)
+
+External APIs:
+├─ GPT-4o Vision - 이미지 분석
+└─ Kakao Map - 위치 검색, OAuth
 ```
-
----
-
-## 🛠️ 기술 스택
-
-### Infrastructure & DevOps
-- **Kubernetes (kubeadm)** - 컨테이너 오케스트레이션 (1M + 2W + non-HA)
-- **Terraform** - AWS 인프라 프로비저닝
-- **Ansible** - K8s 클러스터 자동 설정
-- **ArgoCD** - GitOps CD 엔진
-- **Helm** - K8s 패키지 관리
-- **GitHub Actions** - CI 파이프라인 (서비스별)
-- **GHCR** - 컨테이너 레지스트리 (무료)
-- **Nginx Ingress** - API Gateway
-- **Cert-manager** - SSL 자동화
-
-### Backend
-- **Python 3.11+**
-- **FastAPI** - 고성능 비동기 웹 프레임워크
-- **Uvicorn** - ASGI 서버
-- **Pydantic** - 데이터 검증
-
-### Database
-- **SQLAlchemy** - ORM
-- **Alembic** - DB 마이그레이션
-- **PostgreSQL** - 메인 데이터베이스 (Schema 분리)
-- **Redis** - Result Backend, 캐싱
-
-### Async Processing
-- **Celery** - 비동기 Task Queue
-- **RabbitMQ** - Message Broker (5개 큐: fast, bulk, external, sched, dlq)
-
-### Authentication
-- **python-jose** - JWT 토큰
-- **passlib** - 비밀번호 해싱
-- **OAuth 2.0** - 소셜 로그인 (Kakao, Naver, Google)
-
-### Code Quality
-- **Black** - 코드 포맷터
-- **Flake8** - 린터 (PEP 8)
-- **isort** - Import 정렬
-- **pycodestyle** - PEP 8 검사
-- **pre-commit** - Git hooks
-
-### Testing
-- **pytest** - 테스트 프레임워크
-- **pytest-asyncio** - 비동기 테스트
 
 ---
 
@@ -152,93 +140,91 @@ GitOps:
 
 | 문서 | 설명 | 중요도 |
 |------|------|--------|
-| [**구축 체크리스트**](docs/guides/setup-checklist.md) | 단계별 구축 순서 | ⭐⭐⭐⭐⭐ |
-| [**최종 K8s 아키텍처**](docs/architecture/final-k8s-architecture.md) | 전체 시스템 시각화 | ⭐⭐⭐⭐⭐ |
-| [**K8s 클러스터 구축**](docs/infrastructure/k8s-cluster-setup.md) | 수동 설치 가이드 | ⭐⭐⭐⭐ |
-| [**IaC 구성**](docs/infrastructure/iac-terraform-ansible.md) | Terraform + Ansible | ⭐⭐⭐⭐ |
-| [**GitOps 배포**](docs/deployment/gitops-argocd-helm.md) | ArgoCD + Helm | ⭐⭐⭐⭐ |
-| [**코딩 컨벤션**](docs/development/conventions.md) | 코드 작성 규칙 | ⭐⭐⭐⭐ |
+| [**배포 가이드**](DEPLOYMENT_GUIDE.md) | 4-Tier 클러스터 배포 | ⭐⭐⭐⭐⭐ |
+| [**4-Tier 아키텍처**](docs/architecture/deployment-architecture-4node.md) | Layered Architecture | ⭐⭐⭐⭐⭐ |
+| [**VPC 네트워크**](docs/infrastructure/vpc-network-design.md) | 네트워크 설계 | ⭐⭐⭐⭐ |
+| [**Self-Managed K8s 배경**](docs/architecture/why-self-managed-k8s.md) | 의사결정 | ⭐⭐⭐⭐ |
 
 ### 📖 카테고리별 문서
 
-#### 🎯 [개요](docs/overview/)
-- [프로젝트 최종 요약](docs/overview/project-final-summary.md) - 전체 상태
-- [아키텍처 결정](docs/overview/architecture-decision.md) - 구성 요약
-- [최종 아키텍처](docs/overview/final-architecture.md) - 기술 스택
-
-#### 📖 [가이드](docs/guides/)
-- [구축 체크리스트](docs/guides/setup-checklist.md) - 단계별 구축 ⭐
-- [IaC 빠른 시작](docs/guides/iac-quick-start.md) - 자동화
-- [배포 환경 구축](docs/guides/deployment-setup.md) - GitOps 설정
-
-#### 🚀 [시작하기](docs/getting-started/)
-- [설치 가이드](docs/getting-started/installation.md) - 개발 환경
-- [빠른 시작](docs/getting-started/quickstart.md) - 5분 시작
-- [프로젝트 구조](docs/getting-started/project-structure.md) - 폴더 구조
-
-#### 💻 [개발](docs/development/)
-- [코딩 컨벤션](docs/development/conventions.md) - 네이밍, PEP 8
-- [PEP 8 가이드](docs/development/pep8-guide.md) - Python 표준
-- [Git 워크플로우](docs/development/git-workflow.md) - 브랜치, 커밋
-- [코드 품질 체크리스트](docs/development/code-quality-checklist.md) - PR 전
-
-#### 🚢 [배포](docs/deployment/)
-- [GitOps 배포](docs/deployment/gitops-argocd-helm.md) - ArgoCD + Helm
-- [GHCR 설정](docs/deployment/ghcr-setup.md) - 무료 레지스트리
-- [Docker 배포](docs/deployment/docker.md) - 로컬 개발용
+#### 🏗️ [아키텍처](docs/architecture/)
+- [4-Tier 배포 아키텍처](docs/architecture/deployment-architecture-4node.md) ⭐⭐⭐⭐⭐
+- [Self-Managed K8s 선택 배경](docs/architecture/why-self-managed-k8s.md)
+- [Task Queue 설계](docs/architecture/task-queue-design.md) - Tier 3
+- [Final K8s Architecture](docs/architecture/final-k8s-architecture.md)
+- [설계 검토 과정](docs/architecture/design-reviews/) - 01-07
 
 #### 🏗️ [인프라](docs/infrastructure/)
-- [K8s 클러스터 구축](docs/infrastructure/k8s-cluster-setup.md) - 수동 설치
-- [IaC 구성](docs/infrastructure/iac-terraform-ansible.md) - 자동화
+- [VPC 네트워크 설계](docs/infrastructure/vpc-network-design.md)
+- [K8s 클러스터 구축](docs/infrastructure/k8s-cluster-setup.md)
+- [IaC 구성](docs/infrastructure/iac-terraform-ansible.md)
+- [CNI 비교](docs/infrastructure/cni-comparison.md)
 
-#### 🏛️ [아키텍처](docs/architecture/)
-- [아키텍처 결정 요약](docs/architecture/decision-summary.md) - 전체 요약
-- [최종 K8s 아키텍처](docs/architecture/final-k8s-architecture.md) - 시스템 전체
-- [Task Queue 설계](docs/architecture/task-queue-design.md) - RabbitMQ + Celery
-- [이미지 처리](docs/architecture/image-processing-architecture.md) - 파이프라인
-- [Polling vs WebSocket](docs/architecture/polling-vs-websocket.md) - 통신 방식
-- [의사결정 과정](docs/architecture/decisions/) - 검토 문서
-
-#### 🤝 [기여](docs/contributing/)
-- [기여 방법](docs/contributing/how-to-contribute.md) - 기여 절차
+#### 🎯 [가이드](docs/guides/)
+- [구축 체크리스트](docs/guides/SETUP_CHECKLIST.md)
+- [IaC 빠른 시작](docs/guides/IaC_QUICK_START.md)
+- [Session Manager](docs/guides/session-manager-guide.md)
 
 ---
 
-## 🗺️ 문서 네비게이션
+## 🗺️ 프로젝트 구조
 
-```mermaid
-graph TB
-    Start[README.md<br/>프로젝트 소개] --> Choice{목적}
-    
-    Choice -->|구축| Guide[docs/guides/<br/>구축 가이드]
-    Choice -->|이해| Overview[docs/overview/<br/>프로젝트 개요]
-    Choice -->|개발| Dev[docs/development/<br/>개발 가이드]
-    Choice -->|배포| Deploy[docs/deployment/<br/>배포 가이드]
-    
-    Guide --> G1[setup-checklist.md<br/>⭐ 시작점]
-    G1 --> G2[iac-quick-start.md<br/>자동화]
-    G2 --> G3[deployment-setup.md<br/>GitOps]
-    
-    Overview --> O1[project-final-summary.md<br/>최종 상태]
-    O1 --> O2[final-architecture.md<br/>기술 스택]
-    
-    Dev --> D1[conventions.md<br/>코딩 규칙]
-    
-    Deploy --> Dep1[gitops-argocd-helm.md<br/>ArgoCD + Helm]
-    
-    style Start fill:#cce5ff,stroke:#007bff,stroke-width:4px,color:#000
-    style G1 fill:#ffd1d1,stroke:#dc3545,stroke-width:4px,color:#000
-    style O1 fill:#d1f2eb,stroke:#28a745,stroke-width:3px,color:#000
+```
+SeSACTHON/backend/
+├── README.md (이 파일)
+├── DEPLOYMENT_GUIDE.md (배포 가이드) ⭐
+│
+├── docs/ (70+ 문서)
+│   ├── architecture/ (4-Tier 설계)
+│   ├── infrastructure/ (인프라 구성)
+│   ├── guides/ (실용 가이드)
+│   └── overview/ (프로젝트 요약)
+│
+├── terraform/ (Infrastructure as Code)
+│   ├── main.tf (4개 노드)
+│   ├── vpc.tf, s3.tf, acm.tf
+│   └── modules/
+│
+├── ansible/ (Configuration Management)
+│   ├── site.yml (Master playbook)
+│   ├── playbooks/ (9개)
+│   └── roles/ (RabbitMQ, etc)
+│
+└── scripts/ (Automation, 12개)
+    ├── auto-rebuild.sh (40-50분 자동 배포)
+    ├── connect-ssh.sh
+    └── remote-health-check.sh
 ```
 
 ---
 
-## 🔗 외부 링크
+## 🎯 4-Tier 설계 원칙
 
 - [GitHub Repository](https://github.com/SeSACTHON/backend/)
 - [API 문서 (Swagger)](http://localhost:8000/docs) - 개발 서버 실행 필요
 - [ArgoCD Dashboard](https://argocd.yourdomain.com)
 - [Grafana Dashboard](https://grafana.yourdomain.com)
+
+
+```
+✅ Layered Architecture
+   - 각 계층은 명확한 책임
+   - 상위 → 하위만 의존
+
+✅ Separation of Concerns
+   - Control (Tier 1)
+   - Processing (Tier 2)
+   - Messaging (Tier 3)
+   - Persistence (Tier 4)
+
+✅ Single Responsibility
+   - RabbitMQ: 메시지 전달만 (Tier 3)
+   - PostgreSQL: 데이터 저장만 (Tier 4)
+   
+✅ Kubernetes Standard
+   - Control Plane (표준 용어)
+   - Data Plane (표준 용어)
+```
 
 ---
 
@@ -257,6 +243,6 @@ graph TB
 
 ---
 
-**Last Updated**: 2025-10-30  
-**Version**: 2.0  
+**Last Updated**: 2025-10-31  
+**Version**: 3.0 (4-Tier Layered Architecture)  
 **Team**: SeSACTHON Backend
