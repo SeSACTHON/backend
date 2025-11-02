@@ -103,6 +103,11 @@ echo "3️⃣ Ansible Inventory 생성"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
+# Terraform backend 재확인 (output 실행 전)
+echo "🔧 Terraform backend 확인..."
+terraform init -migrate-state -upgrade -input=false
+echo ""
+
 echo "📝 Ansible inventory 생성 중..."
 terraform output -raw ansible_inventory > "$ANSIBLE_DIR/inventory/hosts.ini"
 
