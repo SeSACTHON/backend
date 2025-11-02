@@ -1,17 +1,17 @@
 # 🐰 RabbitMQ + Celery Task Queue 설계
 
-> **목표**: 한 큐 폭주 방지 + SLO 분리 + 장애 격리  
-> **기반**: RabbitMQ Topic Exchange + Celery Best Practices  
-> **날짜**: 2025-10-30
+> **목표**: 4-Tier 아키텍처 기반 Task Queue  
+> **구성**: RabbitMQ HA (3-node) + 5개 Queue + Celery Workers  
+> **날짜**: 2025-10-31  
+> **상태**: ✅ 프로덕션 배포 완료
 
 ## 📋 목차
 
 1. [설계 원칙](#설계-원칙)
-2. [큐 설계 (5개)](#큐-설계-5개)
-3. [실제 Task 매핑](#실제-task-매핑)
+2. [4-Tier 배치](#4-tier-배치)
+3. [큐 설계 (5개)](#큐-설계-5개)
 4. [Celery 설정](#celery-설정)
-5. [K8s Worker 배치](#k8s-worker-배치)
-6. [운영 가이드](#운영-가이드)
+5. [운영 가이드](#운영-가이드)
 
 ---
 
@@ -21,13 +21,13 @@
 
 ```mermaid
 graph TB
-    A[RabbitMQ + Celery] --> B{설계 목표}
+    A["RabbitMQ + Celery"] --> B{"설계 목표"}
     
-    B --> C1["🛡️ 한 큐 폭주 방지
+    B --> C1["한 큐 폭주 방지
 TTL + max-length + DLX"]
-    B --> C2["⚡ SLO 분리
+    B --> C2["SLO 분리
 짧은 작업 vs 긴 작업"]
-    B --> C3["🔒 장애 격리
+    B --> C3["장애 격리
 외부 API 장애 시 다른 큐 정상"]
     
     C1 --> D["안정적인
@@ -35,31 +35,151 @@ TTL + max-length + DLX"]
     C2 --> D
     C3 --> D
     
-    style A fill:#ffe0b3,stroke:#fd7e14,stroke-width:4px,color:#000
-    style C1 fill:#ffd1d1,stroke:#dc3545,stroke-width:3px,color:#000
-    style C2 fill:#cce5ff,stroke:#007bff,stroke-width:3px,color:#000
-    style C3 fill:#d1f2eb,stroke:#28a745,stroke-width:3px,color:#000
-    style D fill:#e6d5ff,stroke:#8844ff,stroke-width:4px,color:#000
+    style A fill:#1a237e,color:#fff,stroke:#0d47a1,stroke-width:4px
+    style B fill:#1565c0,color:#fff,stroke:#0277bd,stroke-width:3px
+    style C1 fill:#c62828,color:#fff,stroke:#b71c1c,stroke-width:3px
+    style C2 fill:#1565c0,color:#fff,stroke:#0d47a1,stroke-width:3px
+    style C3 fill:#2e7d32,color:#fff,stroke:#1b5e20,stroke-width:3px
+    style D fill:#6a1b9a,color:#fff,stroke:#4a148c,stroke-width:4px
 ```
 
 ### 핵심 전략
 
 ```
-1. 짧은 작업과 긴 작업 분리
-   ✅ 짧은 작업(< 1초): q.fast (prefetch 높게)
-   ✅ 긴 작업(5초+): q.bulk (prefetch=1, 공평성↑)
+1. Queue 분리로 장애 격리
+   ✅ q.ai: AI Vision (GPT-4o)
+   ✅ q.batch: 배치 작업
+   ✅ q.api: 외부 API
+   ✅ q.sched: 예약 작업
+   ✅ q.dlq: Dead Letter
 
-2. 외부 API 격리
-   ✅ 불안정한 외부 API: q.external (재시도 엄격, DLX 필수)
-   ✅ 장애 시 다른 큐 영향 없음
+2. Tier별 Worker 배치
+   ✅ Tier 2 (Worker-1): API Workers
+   ✅ Tier 3 (Worker-2): AI + Batch Workers
+   ✅ Tier 4 (Storage): RabbitMQ HA, Celery Beat
 
-3. 예약 작업 분리
-   ✅ Celery Beat 전용 큐: q.sched
-   ✅ 대규모 예약 트래픽 브로커 보호
+3. HA Cluster (Robin Storage 패턴)
+   ✅ RabbitMQ 3-node (Tier 4)
+   ✅ Quorum Queues
+   ✅ 장애 시 자동 복구
+```
 
-4. DLX(Dead Letter Exchange) 공통
-   ✅ 모든 큐 → q.dlq로 실패 메시지 격리
-   ✅ 수동 재처리 또는 분석용
+---
+
+## 🏗️ 4-Tier 배치
+
+### Tier별 역할
+
+```mermaid
+graph TB
+    subgraph Tier1["Tier 1: Control + Monitoring"]
+        Master["Master
+t3.large 8GB
+ 
+Control Plane
+Prometheus
+Grafana
+ArgoCD"]
+    end
+    
+    subgraph Tier2["Tier 2: Sync API Application"]
+        Worker1["Worker-1
+t3.medium 4GB
+ 
+auth-service x2
+users-service x1
+locations-service x1
+ 
+API Workers x2
+(q.api)"]
+    end
+    
+    subgraph Tier3["Tier 3: Async Workers"]
+        Worker2["Worker-2
+t3.medium 4GB
+ 
+waste-service x2
+ 
+AI Workers x3
+(q.ai, GPT-4o Vision)
+ 
+Batch Workers x2
+(q.batch)"]
+    end
+    
+    subgraph Tier4["Tier 4: Stateful Storage"]
+        Storage["Storage
+t3.large 8GB
+ 
+RabbitMQ HA x3
+(5 Queues)
+ 
+PostgreSQL
+(StatefulSet 50GB)
+ 
+Redis
+(Result Backend)
+ 
+Celery Beat x1
+(Scheduler)"]
+    end
+    
+    Master -.->|manage| Worker1
+    Master -.->|manage| Worker2
+    Master -.->|manage| Storage
+    
+    Worker1 -->|publish tasks| Storage
+    Worker2 -->|consume tasks| Storage
+    
+    style Tier1 fill:#1565c0,color:#fff,stroke:#0d47a1,stroke-width:3px
+    style Tier2 fill:#2e7d32,color:#fff,stroke:#1b5e20,stroke-width:3px
+    style Tier3 fill:#f57f17,color:#fff,stroke:#e65100,stroke-width:3px
+    style Tier4 fill:#c2185b,color:#fff,stroke:#880e4f,stroke-width:3px
+    style Master fill:#42a5f5,color:#000,stroke:#1976d2,stroke-width:2px
+    style Worker1 fill:#66bb6a,color:#000,stroke:#388e3c,stroke-width:2px
+    style Worker2 fill:#ffa726,color:#000,stroke:#f57c00,stroke-width:2px
+    style Storage fill:#ec407a,color:#fff,stroke:#c2185b,stroke-width:2px
+```
+
+### Worker별 Queue 매핑
+
+```
+Tier 2: Worker-1 (Application)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+역할: Sync API + 가벼운 외부 API
+Worker:
+└─ API Workers ×2
+   ├─ Queue: q.api
+   ├─ Pool: gevent
+   ├─ Concurrency: 4
+   └─ Tasks: Kakao Map, OAuth 등
+
+Tier 3: Worker-2 (Async)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+역할: AI 분석 + 배치 작업
+Workers:
+├─ AI Workers ×3
+│  ├─ Queue: q.ai
+│  ├─ Pool: gevent
+│  ├─ Concurrency: 4
+│  └─ Tasks: GPT-4o Vision, 분류, 피드백
+│
+└─ Batch Workers ×2
+   ├─ Queue: q.batch, q.sched
+   ├─ Pool: processes
+   ├─ Concurrency: 4
+   └─ Tasks: 통계, 리포트, 정리
+
+Tier 4: Storage (Stateful)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+역할: Message Broker + Database
+Services:
+├─ RabbitMQ ×3 (HA Cluster)
+│  └─ Queues: q.ai, q.batch, q.api, q.sched, q.dlq
+│
+├─ PostgreSQL (StatefulSet)
+├─ Redis (Result Backend + Cache)
+└─ Celery Beat ×1 (스케줄러)
 ```
 
 ---
@@ -69,13 +189,13 @@ TTL + max-length + DLX"]
 ### 전체 구조
 
 ```mermaid
-graph TB
-    subgraph Producer["FastAPI Services"]
-        API["waste-service
-recycling-service"]
+graph LR
+    subgraph Producer["FastAPI Services Tier 2 & 3"]
+        Waste["waste-service"]
+        Auth["auth-service"]
     end
     
-    subgraph RMQ["RabbitMQ HA Cluster (Storage Node)"]
+    subgraph RMQ["RabbitMQ HA Cluster Tier 4"]
         Exchange["Topic Exchange
 tasks"]
         DLX["Direct Exchange
@@ -83,13 +203,16 @@ dlx"]
         
         Q1["q.ai
 Priority: 10
-AI Vision"]
+AI Vision
+TTL: 300s"]
         Q2["q.batch
 Priority: 1
-배치 작업"]
+배치 작업
+TTL: 3600s"]
         Q3["q.api
 Priority: 5
-외부 API"]
+외부 API
+TTL: 300s"]
         Q4["q.sched
 Priority: 3
 예약 작업"]
@@ -99,128 +222,118 @@ Dead Letter
     end
     
     subgraph Workers["Celery Workers"]
-        W1["AI Workers ×3
-Worker-2
+        W1["AI Workers x3
+Tier 3 Worker-2
 gevent pool"]
-        W2["Batch Workers ×2
-Worker-2
+        W2["Batch Workers x2
+Tier 3 Worker-2
 processes pool"]
-        W3["API Workers ×2
-Worker-1
+        W3["API Workers x2
+Tier 2 Worker-1
 gevent pool"]
     end
     
-    API --> Exchange
-    Exchange -->|*.high.*| Q1
-    Exchange -->|*.low.*| Q2
-    Exchange -->|external.#| Q3
-    Exchange -->|sched.#| Q4
+    Waste --> Exchange
+    Auth --> Exchange
     
-    Q1 -.->|실패/TTL| DLX
-    Q2 -.->|실패/TTL| DLX
-    Q3 -.->|실패/TTL| DLX
-    Q4 -.->|실패/TTL| DLX
+    Exchange -->|"ai.*"| Q1
+    Exchange -->|"batch.*"| Q2
+    Exchange -->|"api.*"| Q3
+    Exchange -->|"sched.*"| Q4
+    
+    Q1 -.->|failure/TTL| DLX
+    Q2 -.->|failure/TTL| DLX
+    Q3 -.->|failure/TTL| DLX
+    Q4 -.->|failure/TTL| DLX
     DLX --> Q5
     
     Q1 --> W1
     Q2 --> W2
     Q3 --> W3
-    Q4 --> W4
+    Q4 --> W2
     
-    style Exchange fill:#ffe0b3,stroke:#fd7e14,stroke-width:4px,color:#000
-    style DLX fill:#ffd1d1,stroke:#dc3545,stroke-width:3px,color:#000
-    style Q1 fill:#cce5ff,stroke:#007bff,stroke-width:3px,color:#000
-    style Q2 fill:#ffe0b3,stroke:#fd7e14,stroke-width:2px,color:#000
-    style Q3 fill:#ffd1d1,stroke:#dc3545,stroke-width:3px,color:#000
-    style Q4 fill:#d1f2eb,stroke:#28a745,stroke-width:2px,color:#000
-    style Q5 fill:#ffb3b3,stroke:#dc3545,stroke-width:4px,color:#000
+    style Exchange fill:#ef6c00,color:#fff,stroke:#e65100,stroke-width:4px
+    style DLX fill:#c62828,color:#fff,stroke:#b71c1c,stroke-width:3px
+    style Q1 fill:#1565c0,color:#fff,stroke:#0d47a1,stroke-width:3px
+    style Q2 fill:#5e35b1,color:#fff,stroke:#4527a0,stroke-width:2px
+    style Q3 fill:#00838f,color:#fff,stroke:#006064,stroke-width:3px
+    style Q4 fill:#2e7d32,color:#fff,stroke:#1b5e20,stroke-width:2px
+    style Q5 fill:#b71c1c,color:#fff,stroke:#7f0000,stroke-width:4px
+    style W1 fill:#42a5f5,color:#000,stroke:#1976d2,stroke-width:2px
+    style W2 fill:#ffa726,color:#000,stroke:#f57c00,stroke-width:2px
+    style W3 fill:#66bb6a,color:#000,stroke:#388e3c,stroke-width:2px
 ```
 
 ---
 
-## 📋 큐별 상세 설계
+## 📋 Queue 상세
 
 ### Queue 1: **q.ai** (AI Vision)
 
 ```yaml
 큐 이름: q.ai
 라우팅 키: ai.*
-목적: AI Vision 분석 (GPT-4o Vision)
+목적: GPT-4o Vision 분석
+배치: Tier 4 (Storage RabbitMQ)
+소비: Tier 3 (Worker-2 AI Workers)
 
 담당 작업:
-├─ 이미지 분석 (GPT-4o Vision API)
-├─ 쓰레기 분류
-├─ LLM 피드백 생성
-└─ 결과 저장
+├─ image.analyze (GPT-4o Vision API)
+├─ classification.identify
+├─ feedback.generate
+└─ result.save
 
-작업 특성:
-├─ 실행 시간: 2-5초
-├─ 중요도: Critical (사용자 대기)
-├─ 네트워크: 높음 (외부 API)
-└─ 실패 영향: 사용자 경험 저하
-
-Worker 프로파일:
-├─ Concurrency: 4 (API Rate Limit)
-├─ Prefetch Multiplier: 2
-├─ Pool: gevent (네트워크 대기)
-└─ Replicas: 3개 (Worker-2)
+Worker 프로파일 (Tier 3):
+├─ Replicas: 3
+├─ Node: Worker-2
+├─ Pool: gevent (네트워크 I/O)
+├─ Concurrency: 4
+└─ Prefetch: 2
 
 정책 (RabbitMQ):
-├─ TTL: 60초 (짧게, 빠른 실패)
-├─ max-length: 5,000 (폭주 방지)
-├─ DLX: dlx Exchange로 이동
-├─ Priority: 지원 (0-10)
-└─ Overflow: reject-publish (길이 초과 시 거부)
+├─ TTL: 300초 (5분)
+├─ max-length: 5,000
+├─ DLX: dlx → q.dlq
+├─ Priority: 10 (highest)
+└─ Type: Quorum Queue (HA)
 
-재시도/타임아웃:
-├─ Task Time Limit: 60초
-├─ Soft Time Limit: 50초
-├─ Max Retries: 3회
-├─ Retry Backoff: 지수 백오프 (1s, 2s, 4s)
-└─ acks_late: False (빠른 ACK)
+재시도:
+├─ Max Retries: 3
+├─ Retry Backoff: True (지수)
+└─ acks_late: True (처리 완료 후 ACK)
 ```
 
-### Queue 2: **q.batch** (배치/긴 작업)
+### Queue 2: **q.batch** (배치 작업)
 
 ```yaml
 큐 이름: q.batch
 라우팅 키: batch.*
 목적: 시간이 걸리는 배치 작업
+배치: Tier 4 (Storage RabbitMQ)
+소비: Tier 3 (Worker-2 Batch Workers)
 
 담당 작업:
-├─ 일일 통계 리포트 생성
-├─ CSV 내보내기
-├─ 대량 데이터 처리
-└─ 분석 이력 집계 (배치)
+├─ analytics.daily (일일 통계)
+├─ report.generate (리포트 생성)
+└─ data.cleanup (데이터 정리)
 
-작업 특성:
-├─ 실행 시간: 10초 ~ 수 분
-├─ 중요도: Medium (배치 처리)
-├─ I/O: DB 집약적
-└─ 실패 영향: 낮음
-
-Worker 프로파일:
+Worker 프로파일 (Tier 3):
+├─ Replicas: 2
+├─ Node: Worker-2
+├─ Pool: processes (CPU 집약)
 ├─ Concurrency: 4
-├─ Prefetch Multiplier: 1 (공평성↑, 헤드오브라인 방지)
-├─ Pool: gevent (I/O 대기)
-└─ Replicas: 2개
+└─ Prefetch: 1 (공평성)
 
-정책 (RabbitMQ):
-├─ TTL: 3600초 (1시간, 넉넉히)
+정책:
+├─ TTL: 3600초 (1시간)
 ├─ max-length: 1,000
-├─ DLX: dlx
-└─ Priority: 낮음 (1-3)
+├─ Priority: 1 (lowest)
+└─ Type: Quorum Queue
 
-재시도/타임아웃:
-├─ Task Time Limit: 600초 (10분)
-├─ Soft Time Limit: 540초
-├─ Max Retries: 2회
-├─ Retry Backoff: True
-└─ acks_late: True (처리 완료 후 ACK)
-
-특이사항:
-⚠️ prefetch=1로 긴 작업이 짧은 작업 굶기지 않도록!
-⚠️ 체크포인팅 권장 (중간 저장)
+재시도:
+├─ Max Retries: 2
+├─ Time Limit: 600초 (10분)
+└─ acks_late: True
 ```
 
 ### Queue 3: **q.api** (외부 API)
@@ -229,85 +342,57 @@ Worker 프로파일:
 큐 이름: q.api
 라우팅 키: api.*
 목적: 외부 API 호출 (Map, OAuth 등)
+배치: Tier 4 (Storage RabbitMQ)
+소비: Tier 2 (Worker-1 API Workers)
 
 담당 작업:
-├─ 지도 API (Kakao Map)
-├─ OAuth 인증 (소셜 로그인)
-└─ 기타 서드파티 연동
+├─ map.search (Kakao Map)
+├─ oauth.verify (소셜 로그인)
+└─ external.call (기타 API)
 
-작업 특성:
-├─ 실행 시간: 2-10초 (API 응답 시간)
-├─ 중요도: Critical/High
-├─ 네트워크: 매우 높음
-├─ 불안정성: 높음 (외부 API 장애 가능)
-└─ 사이드 이펙트: 주의 (중복 호출 비용)
-
-Worker 프로파일:
+Worker 프로파일 (Tier 2):
+├─ Replicas: 2
+├─ Node: Worker-1
+├─ Pool: gevent
 ├─ Concurrency: 4
-├─ Prefetch Multiplier: 2
-├─ Pool: gevent (네트워크 대기)
-└─ Replicas: 2개 (Worker-1)
+└─ Prefetch: 2
 
-정책 (RabbitMQ):
-├─ TTL: 300초 (5분, 필수!)
+정책:
+├─ TTL: 300초
 ├─ max-length: 2,000
-├─ DLX: dlx (필수!)
-└─ Priority: 높음 (7-10)
+├─ Priority: 5
+└─ Type: Quorum Queue
 
-재시도/타임아웃:
-├─ Task Time Limit: 300초 (5분)
-├─ Soft Time Limit: 240초
-├─ Max Retries: 3회 (엄격, 사이드 이펙트 주의)
-├─ Retry Backoff: True (지수 백오프)
-├─ acks_late: True (API 성공 후 ACK)
-└─ 멱등성: 필수! (중복 호출 대비)
-
-특이사항:
-🔴 외부 API 장애 시 이 큐만 영향
-🔴 DLX 필수 (타임아웃/실패 메시지 격리)
-🔴 Rate Limiting 엄격히 적용
+재시도:
+├─ Max Retries: 3
+└─ acks_late: True
 ```
 
-### Queue 4: **q.sched** (예약/주기 작업)
+### Queue 4: **q.sched** (예약 작업)
 
 ```yaml
 큐 이름: q.sched
-라우팅 키: sched.#
+라우팅 키: sched.*
 목적: Celery Beat 예약 작업
+배치: Tier 4 (Storage RabbitMQ)
+소비: Tier 3 (Worker-2 Batch Workers)
+스케줄러: Tier 4 (Storage Celery Beat)
 
 담당 작업:
-├─ 일일 통계 집계 (매일 02:00)
-├─ 캐시 정리 (매시간)
-├─ 오래된 이미지 삭제 (매일 03:00)
-└─ 주간 리포트 (매주 월요일)
+├─ daily.stats (매일 02:00)
+├─ cleanup.cache (매시간)
+└─ cleanup.images (매일 03:00)
 
-작업 특성:
-├─ 실행 시간: 다양 (1초 ~ 10분)
-├─ 중요도: Medium
-├─ 빈도: 주기적 (cron)
-└─ ETA/countdown 사용
-
-Worker 프로파일:
-├─ Concurrency: 4
-├─ Prefetch Multiplier: 1
-├─ Pool: gevent
-└─ Replicas: 1개 (Beat도 1개!)
-
-정책 (RabbitMQ):
+정책:
 ├─ TTL: 3600초
 ├─ max-length: 500
-├─ DLX: dlx
-└─ Priority: 중간 (5)
+├─ Priority: 3
+└─ Type: Quorum Queue
 
-Celery Beat:
-├─ Replicas: 1개 (중복 실행 방지)
-├─ Scheduler: DatabaseScheduler (분산 환경)
-└─ Lock: Redis Lock (HA 시)
-
-특이사항:
-⚠️ Beat는 반드시 1개만 실행!
-⚠️ 대규모 예약은 별도 워크플로 엔진 검토
-⚠️ 예약 트래픽이 브로커 병목 유발 가능
+Celery Beat (Tier 4):
+├─ Replicas: 1 (중복 방지!)
+├─ Node: Storage
+└─ Scheduler: DatabaseScheduler
 ```
 
 ### Queue 5: **q.dlq** (Dead Letter Queue)
@@ -315,666 +400,298 @@ Celery Beat:
 ```yaml
 큐 이름: q.dlq
 라우팅 키: dlq (Direct)
-목적: 실패/만료 메시지 수집 및 분석
+목적: 실패 메시지 수집 및 분석
+배치: Tier 4 (Storage RabbitMQ)
 
 유입 경로:
-├─ q.fast 실패 (3회 재시도 후)
-├─ q.external 타임아웃 (5분 초과)
-├─ q.bulk 실패
-├─ q.sched 실패
-└─ max-length 초과로 reject된 메시지
-
-Worker 프로파일:
-├─ 기본: 소비 안 함 (수동 재처리)
-├─ 선택: 알람 전용 Worker (1개)
-└─ 로그/분석만 수행
+├─ q.ai 실패 (3회 재시도 후)
+├─ q.batch 실패
+├─ q.api 타임아웃
+└─ q.sched 실패
 
 정책:
 ├─ TTL: 없음 (영구 보관)
 ├─ max-length: 10,000
-└─ Overflow: drop-head (오래된 것부터 삭제)
+└─ Overflow: drop-head
 
 모니터링:
-✅ DLQ 길이 모니터링 (Prometheus)
-✅ 길이 > 100 → Slack 알람
-✅ 주기적 분석 (실패 원인 파악)
-```
-
----
-
-## 🎯 실제 Task 매핑
-
-### 우리 프로젝트 Task 목록
-
-| Task 함수명 | 예상 시간 | 외부 의존성 | SLO | 큐 | 라우팅 키 |
-|------------|----------|------------|-----|-----|----------|
-| `download_image` | 0.5초 | S3 | 1초 | q.fast | waste.high.download |
-| `calculate_hash` | 0.3초 | 없음 | 1초 | q.fast | waste.high.hash |
-| `check_cache` | 0.1초 | Redis | 1초 | q.fast | waste.high.cache |
-| `preprocess_image` | 0.8초 | 없음 | 2초 | q.fast | waste.high.preprocess |
-| `save_result` | 0.2초 | DB | 1초 | q.fast | waste.high.save |
-| `ai_vision_classify` | 2-5초 | Roboflow API | 10초 | q.external | external.ai.vision |
-| `llm_generate_feedback` | 3-8초 | OpenAI API | 15초 | q.external | external.llm.feedback |
-| `search_nearby_bins` | 0.5-1초 | Kakao Map API | 5초 | q.external | external.map.location |
-| `save_analytics` | 1-2초 | DB | 없음 | q.bulk | analytics.low.history |
-| `daily_stats_report` | 30-60초 | DB | 없음 | q.sched | sched.daily.stats |
-| `cleanup_old_images` | 10-30초 | S3 | 없음 | q.sched | sched.daily.cleanup |
-
-### 라우팅 키 패턴
-
-```
-패턴: {도메인}.{우선순위}.{작업}
-
-도메인:
-├─ waste: 쓰레기 분석 관련
-├─ recycling: 재활용 정보
-├─ external: 외부 API
-├─ analytics: 통계
-└─ sched: 예약 작업
-
-우선순위:
-├─ high: 사용자 대기, 즉시 처리
-├─ low: 배치, 백그라운드
-└─ (external, sched는 우선순위 없음)
-
-작업:
-├─ download, hash, cache, preprocess, save
-├─ ai.vision, llm.feedback
-└─ stats, cleanup
+✅ DLQ 길이 > 100 → Slack 알람
+✅ Prometheus 메트릭
 ```
 
 ---
 
 ## ⚙️ Celery 설정
 
-### 공통 설정
+### Celery Workers 구성
 
 ```python
-# app/core/celery_config.py
-from kombu import Exchange, Queue
-
-# Exchange 정의
-TASKS_EXCHANGE = Exchange("tasks", type="topic")
-DLX_EXCHANGE = Exchange("dlx", type="direct")
-
-# Queue 정의
-task_queues = (
-    # q.fast: 짧고 긴급한 작업
-    Queue(
-        "q.fast",
-        TASKS_EXCHANGE,
-        routing_key="*.high.*",
-        queue_arguments={
-            "x-dead-letter-exchange": "dlx",
-            "x-dead-letter-routing-key": "dlq",
-            "x-message-ttl": 60_000,  # 60초
-            "x-max-length": 5_000,
-            "x-overflow": "reject-publish",
-            "x-max-priority": 10,
-        },
-    ),
-    
-    # q.bulk: 긴 배치 작업
-    Queue(
-        "q.bulk",
-        TASKS_EXCHANGE,
-        routing_key="*.low.*",
-        queue_arguments={
-            "x-dead-letter-exchange": "dlx",
-            "x-dead-letter-routing-key": "dlq",
-            "x-message-ttl": 3_600_000,  # 1시간
-            "x-max-length": 1_000,
-            "x-overflow": "reject-publish",
-        },
-    ),
-    
-    # q.external: 외부 API (필수 DLX)
-    Queue(
-        "q.external",
-        TASKS_EXCHANGE,
-        routing_key="external.#",
-        queue_arguments={
-            "x-dead-letter-exchange": "dlx",
-            "x-dead-letter-routing-key": "dlq",
-            "x-message-ttl": 300_000,  # 5분 (필수!)
-            "x-max-length": 2_000,
-            "x-overflow": "reject-publish",
-            "x-max-priority": 10,
-        },
-    ),
-    
-    # q.sched: 예약 작업
-    Queue(
-        "q.sched",
-        TASKS_EXCHANGE,
-        routing_key="sched.#",
-        queue_arguments={
-            "x-dead-letter-exchange": "dlx",
-            "x-dead-letter-routing-key": "dlq",
-            "x-message-ttl": 3_600_000,
-            "x-max-length": 500,
-        },
-    ),
-    
-    # q.dlq: Dead Letter Queue
-    Queue("q.dlq", DLX_EXCHANGE, routing_key="dlq"),
-)
-
-# Task 라우팅
-task_routes = {
-    # Fast 작업 (짧고 긴급)
-    "tasks.image.download": {
-        "queue": "q.fast",
-        "routing_key": "waste.high.download",
-        "priority": 10,
-    },
-    "tasks.image.hash": {
-        "queue": "q.fast",
-        "routing_key": "waste.high.hash",
-        "priority": 10,
-    },
-    "tasks.cache.check": {
-        "queue": "q.fast",
-        "routing_key": "waste.high.cache",
-        "priority": 10,
-    },
-    "tasks.image.preprocess": {
-        "queue": "q.fast",
-        "routing_key": "waste.high.preprocess",
-        "priority": 9,
-    },
-    "tasks.result.save": {
-        "queue": "q.fast",
-        "routing_key": "waste.high.save",
-        "priority": 10,
-    },
-    
-    # External API (격리)
-    "tasks.ai.vision": {
-        "queue": "q.external",
-        "routing_key": "external.ai.vision",
-        "priority": 10,
-    },
-    "tasks.llm.feedback": {
-        "queue": "q.external",
-        "routing_key": "external.llm.feedback",
-        "priority": 7,
-    },
-    "tasks.location.search": {
-        "queue": "q.external",
-        "routing_key": "external.map.location",
-        "priority": 5,
-    },
-    
-    # Bulk 작업 (배치)
-    "tasks.analytics.save": {
-        "queue": "q.bulk",
-        "routing_key": "analytics.low.history",
-        "priority": 1,
-    },
-    
-    # Scheduled 작업
-    "tasks.daily.stats": {
-        "queue": "q.sched",
-        "routing_key": "sched.daily.stats",
-    },
-    "tasks.cleanup.images": {
-        "queue": "q.sched",
-        "routing_key": "sched.daily.cleanup",
-    },
-}
-
-# 공통 설정
-broker_url = "amqp://admin:password@rabbitmq.messaging.svc.cluster.local:5672//"
-result_backend = "redis://redis.default.svc.cluster.local:6379/1"
-
-# 공평성 & 안정성
-worker_prefetch_multiplier = 1  # 기본값, Worker별로 override
-task_acks_late = True  # 처리 완료 후 ACK (재시도 안전)
-task_reject_on_worker_lost = True
-task_queue_max_priority = 10
-
-# 재시도 기본값
-task_autoretry_for = (Exception,)
-task_retry_kwargs = {"max_retries": 3}
-task_retry_backoff = True
-task_retry_backoff_max = 60
-```
-
----
-
-## 🖥️ Worker 별 설정
-
-### Fast Worker (q.fast 전용)
-
-```python
-# workers/fast_worker.py
-from celery import Celery
-from app.core.celery_config import *
-
-app = Celery("fast_worker")
-
-app.conf.update(
-    broker_url=broker_url,
-    result_backend=result_backend,
-    task_queues=task_queues,
-    
-    # Fast Queue만 소비
-    task_default_queue="q.fast",
-    worker_queues=["q.fast"],
-    
-    # CPU 최적화
-    worker_pool="processes",  # 멀티프로세싱
-    worker_concurrency=10,    # CPU 코어 활용
-    worker_prefetch_multiplier=4,  # 빠른 소비
-    
-    # 빠른 ACK
-    task_acks_late=False,
-    
-    # 타임아웃
-    task_time_limit=60,
-    task_soft_time_limit=50,
-)
-
-if __name__ == "__main__":
-    app.start()
-```
-
-### External Worker (q.external 전용)
-
-```python
-# workers/external_worker.py
-app = Celery("external_worker")
-
-app.conf.update(
-    broker_url=broker_url,
-    result_backend=result_backend,
-    
-    # External Queue만
-    worker_queues=["q.external"],
-    
-    # 네트워크 최적화
-    worker_pool="gevent",  # 비동기 I/O
-    worker_concurrency=20,  # 네트워크 대기 활용
-    worker_prefetch_multiplier=2,  # 소수 (과부하 방지)
-    
-    # Late ACK (API 성공 후)
-    task_acks_late=True,
-    
-    # 긴 타임아웃
-    task_time_limit=300,  # 5분
-    task_soft_time_limit=240,
-    
-    # 재시도 정책
-    task_autoretry_for=(ConnectionError, TimeoutError),
-    task_retry_kwargs={"max_retries": 3},
-    task_retry_backoff=True,
-    task_retry_backoff_max=120,
-)
-```
-
-### Bulk Worker (q.bulk 전용)
-
-```python
-# workers/bulk_worker.py
-app = Celery("bulk_worker")
-
-app.conf.update(
-    broker_url=broker_url,
-    result_backend=result_backend,
-    
-    worker_queues=["q.bulk"],
-    
-    # I/O 최적화
+# Tier 2: Worker-1 - API Workers
+app_api_worker = Celery("api_worker")
+app_api_worker.conf.update(
+    broker_url="amqp://admin:password@rabbitmq.messaging:5672//",
+    result_backend="redis://redis.default:6379/1",
+    worker_queues=["q.api"],
     worker_pool="gevent",
     worker_concurrency=4,
-    worker_prefetch_multiplier=1,  # ⭐ 공평성! (헤드오브라인 방지)
-    
-    # Late ACK
+    worker_prefetch_multiplier=2,
     task_acks_late=True,
-    
-    # 넉넉한 타임아웃
-    task_time_limit=600,  # 10분
-    task_soft_time_limit=540,
+    task_time_limit=300,
 )
-```
 
-### Scheduled Worker (q.sched 전용)
-
-```python
-# workers/sched_worker.py
-app = Celery("sched_worker")
-
-app.conf.update(
-    broker_url=broker_url,
-    result_backend=result_backend,
-    
-    worker_queues=["q.sched"],
-    
+# Tier 3: Worker-2 - AI Workers
+app_ai_worker = Celery("ai_worker")
+app_ai_worker.conf.update(
+    broker_url="amqp://admin:password@rabbitmq.messaging:5672//",
+    result_backend="redis://redis.default:6379/1",
+    worker_queues=["q.ai"],
     worker_pool="gevent",
     worker_concurrency=4,
-    worker_prefetch_multiplier=1,
-    
+    worker_prefetch_multiplier=2,
+    task_acks_late=True,
+    task_time_limit=300,
+)
+
+# Tier 3: Worker-2 - Batch Workers
+app_batch_worker = Celery("batch_worker")
+app_batch_worker.conf.update(
+    broker_url="amqp://admin:password@rabbitmq.messaging:5672//",
+    result_backend="redis://redis.default:6379/1",
+    worker_queues=["q.batch", "q.sched"],
+    worker_pool="processes",
+    worker_concurrency=4,
+    worker_prefetch_multiplier=1,  # 공평성
     task_acks_late=True,
     task_time_limit=600,
 )
 
-# Celery Beat Schedule
-app.conf.beat_schedule = {
+# Tier 4: Storage - Celery Beat
+app_beat = Celery("beat")
+app_beat.conf.beat_schedule = {
     "daily-stats": {
-        "task": "tasks.daily.stats",
-        "schedule": crontab(hour=2, minute=0),  # 매일 02:00
-        "options": {
-            "queue": "q.sched",
-            "routing_key": "sched.daily.stats",
-        },
+        "task": "tasks.analytics.daily",
+        "schedule": crontab(hour=2, minute=0),
+        "options": {"queue": "q.sched"},
     },
-    "hourly-cache-cleanup": {
+    "hourly-cleanup": {
         "task": "tasks.cleanup.cache",
-        "schedule": crontab(minute=0),  # 매시간
-        "options": {
-            "queue": "q.sched",
-            "routing_key": "sched.hourly.cleanup",
-        },
-    },
-    "daily-image-cleanup": {
-        "task": "tasks.cleanup.images",
-        "schedule": crontab(hour=3, minute=0),  # 매일 03:00
-        "options": {
-            "queue": "q.sched",
-            "routing_key": "sched.daily.cleanup",
-        },
+        "schedule": crontab(minute=0),
+        "options": {"queue": "q.sched"},
     },
 }
 ```
 
 ---
 
-## 🏗️ K8s Worker 배치 (4-Node)
+## 🚀 K8s Deployment
 
-### Deployment 구조
-
-```mermaid
-graph TB
-    subgraph Master["Master (t3.large, 8GB)"]
-        M["Control Plane
-Prometheus
-Grafana
-ArgoCD"]
-    end
-    
-    subgraph Worker1["Worker-1 (t3.medium, 4GB) - Application"]
-        W1["auth-service ×2
-users-service ×1
-locations-service ×1
-API Workers ×2"]
-    end
-    
-    subgraph Worker2["Worker-2 (t3.medium, 4GB) - Async"]
-        W2a["AI Workers ×3
-q.ai (GPT-4o Vision)
-gevent pool"]
-        W2b["Batch Workers ×2
-q.batch
-processes pool"]
-        W2c["waste-service ×2"]
-    end
-    
-    subgraph Storage["Storage (t3.large, 8GB) - Stateful"]
-        S1["RabbitMQ ×3 (HA)
-5 Queues"]
-        S2["PostgreSQL
-StatefulSet"]
-        S3["Redis
-Deployment"]
-        S4["Celery Beat ×1"]
-    end
-    
-    Master -.->|manage| Worker1
-    Master -.->|manage| Worker2
-    Master -.->|manage| Storage
-    
-    W1 -->|tasks| S1
-    W2a -->|consume| S1
-    W2b -->|consume| S1
-    
-    style Master fill:#e3f2fd,stroke:#0d47a1,stroke-width:3px
-    style Worker1 fill:#f1f8e9,stroke:#33691e,stroke-width:2px
-    style Worker2 fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style Storage fill:#fce4ec,stroke:#880e4f,stroke-width:3px
-```
-
-### K8s Deployment YAML
+### AI Worker (Tier 3)
 
 ```yaml
-# k8s/waste/fast-worker-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: fast-worker
+  name: ai-worker
   namespace: waste
 spec:
-  replicas: 5
+  replicas: 3
   selector:
     matchLabels:
-      app: fast-worker
+      app: ai-worker
+      tier: async
   template:
     metadata:
       labels:
-        app: fast-worker
-        queue: fast
+        app: ai-worker
+        tier: async
     spec:
       nodeSelector:
-        workload: cpu  # Worker 1
+        workload: async-workers  # Tier 3: Worker-2
       containers:
       - name: worker
-        image: waste-service:latest
+        image: ghcr.io/your-org/waste-service:latest
         command:
         - celery
         - -A
-        - workers.fast_worker
+        - workers.ai_worker
         - worker
         - --loglevel=info
-        - --queues=q.fast
-        - --concurrency=10
-        - --pool=processes
-        - --prefetch-multiplier=4
+        - --queues=q.ai
+        - --concurrency=4
+        - --pool=gevent
         env:
         - name: CELERY_BROKER_URL
           value: "amqp://admin:password@rabbitmq.messaging:5672//"
         - name: CELERY_RESULT_BACKEND
           value: "redis://redis.default:6379/1"
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: waste-secrets
+              key: openai-api-key
         resources:
           requests:
             cpu: 500m
-            memory: 512Mi
+            memory: 1Gi
           limits:
             cpu: 2000m
-            memory: 1Gi
+            memory: 2Gi
+```
 
----
-# k8s/waste/external-worker-deployment.yaml
+### Batch Worker (Tier 3)
+
+```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: external-ai-worker
+  name: batch-worker
   namespace: waste
 spec:
-  replicas: 3
+  replicas: 2
   template:
     spec:
       nodeSelector:
-        workload: network  # Worker 2
+        workload: async-workers  # Tier 3: Worker-2
       containers:
       - name: worker
         command:
         - celery
         - -A
-        - workers.external_worker
+        - workers.batch_worker
         - worker
         - --loglevel=info
-        - --queues=q.external
-        - --concurrency=20
-        - --pool=gevent
-        - --prefetch-multiplier=2
-        env:
-        - name: AI_VISION_API_URL
-          value: "https://api.roboflow.com/..."
-        - name: OPENAI_API_KEY
-          valueFrom:
-            secretKeyRef:
-              name: llm-secrets
-              key: openai-api-key
+        - --queues=q.batch,q.sched
+        - --concurrency=4
+        - --pool=processes
+        - --prefetch-multiplier=1
         resources:
           requests:
-            cpu: 200m
-            memory: 256Mi
+            cpu: 300m
+            memory: 512Mi
           limits:
             cpu: 1000m
-            memory: 512Mi
+            memory: 1Gi
+```
 
----
-# k8s/analytics/beat-deployment.yaml (⚠️ Replicas: 1)
+### Celery Beat (Tier 4)
+
+```yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: celery-beat
-  namespace: analytics
+  namespace: messaging
 spec:
   replicas: 1  # ⚠️ 반드시 1개!
   template:
     spec:
+      nodeSelector:
+        workload: storage  # Tier 4: Storage
       containers:
       - name: beat
         command:
         - celery
         - -A
-        - workers.sched_worker
+        - workers.batch_worker
         - beat
         - --loglevel=info
-        - --scheduler=celery.beat:PersistentScheduler
+        - --scheduler=django_celery_beat.schedulers:DatabaseScheduler
 ```
 
 ---
 
-## 📊 노드별 리소스 배치
+## 📊 Task 매핑
 
-### 4-Node 구성 ($185/월)
+### 실제 Task 목록
 
-```
-Master (t3.large, $60/월):
-├─ Control Plane (kube-apiserver, etcd, scheduler, controller)
-├─ Prometheus + Grafana
-├─ ArgoCD
-└─ Metrics Server
-
-Worker-1 (t3.medium, $30/월) - Application:
-├─ auth-service ×2
-├─ users-service ×1
-├─ locations-service ×1
-├─ API Workers ×2 (q.api)
-└─ 리소스: CPU 40%, Memory 50%
-
-Worker-2 (t3.medium, $30/월) - Async Workers:
-├─ AI Workers ×3 (q.ai, GPT-4o Vision)
-├─ Batch Workers ×2 (q.batch)
-├─ waste-service ×2
-└─ 리소스: CPU 70%, Memory 60%
-
-Storage (t3.large, $60/월) - Stateful Services:
-├─ RabbitMQ ×3 (HA Cluster, 5 Queues)
-├─ PostgreSQL (StatefulSet, 50GB PVC)
-├─ Redis (Deployment)
-├─ Celery Beat ×1
-└─ 리소스: CPU 50%, Memory 70%
-
-총: $185/월 (EC2 $180 + S3 $5)
-```
+| Task | 시간 | 큐 | Tier | Worker | 라우팅 키 |
+|------|------|-----|------|--------|----------|
+| image.analyze | 2-5초 | q.ai | 3 | AI ×3 | ai.analyze |
+| classification.identify | 1-3초 | q.ai | 3 | AI ×3 | ai.classify |
+| feedback.generate | 3-8초 | q.ai | 3 | AI ×3 | ai.feedback |
+| map.search | 0.5초 | q.api | 2 | API ×2 | api.map.search |
+| oauth.verify | 0.3초 | q.api | 2 | API ×2 | api.oauth |
+| analytics.daily | 30-60초 | q.batch | 3 | Batch ×2 | batch.analytics |
+| report.generate | 60-120초 | q.batch | 3 | Batch ×2 | batch.report |
+| cleanup.cache | 10초 | q.sched | 3 | Batch ×2 | sched.cleanup |
+| cleanup.images | 30초 | q.sched | 3 | Batch ×2 | sched.cleanup.images |
 
 ---
 
-## ✅ 운영 체크리스트
+## 🔍 운영 가이드
 
-### 배포 전 검증
+### 모니터링
 
 ```bash
-# 1. RabbitMQ 큐 생성 확인
-rabbitmqctl list_queues name messages consumers
+# RabbitMQ Management UI
+kubectl port-forward -n messaging svc/rabbitmq 15672:15672
+# http://localhost:15672
 
-# 예상 출력:
-# q.fast         0    5
-# q.bulk         0    2
-# q.external     0    5
-# q.sched        0    1
-# q.dlq          0    0
+# Queue 길이 모니터링
+kubectl exec -n messaging rabbitmq-0 -- \
+  rabbitmqctl list_queues name messages consumers
 
-# 2. Exchange 확인
-rabbitmqctl list_exchanges
-
-# 3. Binding 확인
-rabbitmqctl list_bindings
-
-# 4. Worker 연결 확인
-celery -A workers.fast_worker inspect active_queues
-
-# 5. DLQ 길이 모니터링
-watch -n 5 'rabbitmqctl list_queues name messages | grep dlq'
+# Prometheus 메트릭
+rabbitmq_queue_messages{queue="q.ai"}
+rabbitmq_queue_messages{queue="q.dlq"}
+celery_task_duration_seconds{queue="q.ai"}
 ```
 
-### 운영 모니터링
+### 알람 설정
 
-```python
-# Prometheus 메트릭
-rabbitmq_queue_messages{queue="q.fast"}
-rabbitmq_queue_messages{queue="q.dlq"}  # ⚠️ 증가 시 알람
-celery_task_duration_seconds{queue="q.fast"}
-celery_task_failures_total{queue="q.external"}
+```
+Critical:
+├─ q.dlq 길이 > 100
+├─ q.ai 길이 > 1,000
+└─ RabbitMQ 노드 다운
 
-# 알람 조건:
-- q.dlq 길이 > 100 → Critical
-- q.fast 길이 > 1,000 → Warning
-- q.external 실패율 > 10% → Warning
+Warning:
+├─ q.batch 길이 > 500
+├─ AI Worker 실패율 > 10%
+└─ Task 처리 시간 > 10초
 ```
 
 ---
 
 ## 🎯 핵심 포인트
 
-### 왜 이렇게 설계했는가?
+### 4-Tier 분리의 장점
 
 ```
-1. 헤드오브라인 방지 (공평성)
-   ✅ 긴 작업(q.bulk): prefetch=1
-   ✅ 짧은 작업(q.fast): prefetch=4
-   → 긴 작업이 짧은 작업 굶기지 않음!
+1. 명확한 역할 분리
+   ✅ Tier 1: Control Plane
+   ✅ Tier 2: Sync API (즉시 응답)
+   ✅ Tier 3: Async Workers (백그라운드)
+   ✅ Tier 4: Stateful (데이터 안정성)
 
-2. 브로커 보호
-   ✅ TTL: 메시지 만료 → DLQ 이동
-   ✅ max-length: 큐 길이 제한 → 폭주 방지
-   ✅ overflow: reject-publish → 거부
+2. 독립 스케일링 (Instagram 패턴)
+   ✅ API만 늘리기: Tier 2 확장
+   ✅ AI 처리 늘리기: Tier 3 확장
+   ✅ Storage만 확장: Tier 4 복제
 
 3. 장애 격리
-   ✅ 외부 API 장애 → q.external만 영향
-   ✅ q.fast, q.bulk는 계속 정상 작동
+   ✅ Tier 2 장애 → Tier 3 정상
+   ✅ 외부 API 장애 → q.api만 영향
+   ✅ RabbitMQ HA → 자동 복구
 
-4. 멱등성 (중복 실행 대비)
-   ✅ acks_late=True → 처리 완료 후 ACK
-   ✅ Task는 반드시 멱등하게 설계
-   ✅ 중복 호출되어도 안전
+4. Robin Storage 패턴
+   ✅ Stateful 서비스 격리
+   ✅ 백업 용이
+   ✅ Control Plane 안정성
 ```
 
 ---
 
-## 📚 참고 자료
+## 📚 참고 문서
 
-- [Celery 공식 가이드 - Routing](https://docs.celeryq.dev/en/stable/userguide/routing.html)
-- [RabbitMQ - Dead Letter Exchanges](https://www.rabbitmq.com/dlx.html)
-- [Celery - Task Retry](https://docs.celeryq.dev/en/stable/userguide/tasks.html#retrying)
-- [RabbitMQ - TTL and Expiry](https://www.rabbitmq.com/ttl.html)
+- [4-Tier 배포 아키텍처](deployment-architecture-4node.md)
+- [Final K8s Architecture](final-k8s-architecture.md)
+- [RabbitMQ HA Configuration](../infrastructure/rabbitmq-ha-setup.md)
+- [Celery Best Practices](https://docs.celeryq.dev/)
 
 ---
 
 **작성일**: 2025-10-31  
 **상태**: ✅ 프로덕션 배포 완료  
-**비용**: $185/월 (4-Node + RabbitMQ HA)
-
+**비용**: $185/월 (4-Tier Architecture)  
+**패턴**: Instagram (Worker 분리) + Robin (Storage 격리)

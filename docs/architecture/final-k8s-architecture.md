@@ -1,14 +1,14 @@
 # 🏗️ 최종 Kubernetes 아키텍처
 
-> **AI Waste Coach Backend - 4-Node 프로덕션 인프라**  
+> **AI Waste Coach Backend - 4-Tier 프로덕션 인프라**  
 > **날짜**: 2025-10-31  
 > **상태**: ✅ 프로덕션 배포 완료
 
 ## 📋 목차
 
 1. [전체 아키텍처](#전체-아키텍처)
-2. [4-Node 클러스터 구성](#4-node-클러스터-구성)
-3. [마이크로서비스 배치](#마이크로서비스-배치)
+2. [4-Tier 구성](#4-tier-구성)
+3. [서비스 배치](#서비스-배치)
 4. [Task Queue 구조](#task-queue-구조)
 5. [GitOps 파이프라인](#gitops-파이프라인)
 6. [데이터 흐름](#데이터-흐름)
@@ -19,260 +19,415 @@
 
 ```mermaid
 graph TB
-    subgraph Internet["🌐 인터넷"]
-        Users[사용자<br/>Mobile App]
+    subgraph Internet["Internet Layer"]
+        Users["Users
+Mobile App"]
     end
     
-    subgraph AWS["AWS Cloud"]
-        Route53[Route53<br/>growbin.app]
-        ACM[ACM Certificate<br/>*.growbin.app]
-        ALB[Application Load Balancer<br/>L7 Routing + SSL]
-        S3[S3 Bucket<br/>이미지 저장<br/>Pre-signed URL]
+    subgraph AWS["AWS Cloud Services"]
+        Route53["Route53
+growbin.app"]
+        ALB["Application Load Balancer
+L7 + SSL/TLS"]
+        ACM["ACM Certificate
+*.growbin.app"]
+        S3["S3 Bucket
+Pre-signed URL
+Image Storage"]
     end
     
-    subgraph K8s["Kubernetes Cluster (4-Node, Self-Managed)"]
-        subgraph Master["Master Node (t3.large, 8GB)"]
-            CP[Control Plane<br/>API Server<br/>etcd<br/>Scheduler<br/>Controller]
-            ArgoCD[ArgoCD<br/>GitOps Engine]
-            Prom[Prometheus<br/>Grafana]
+    subgraph K8s["Kubernetes Cluster 4-Tier"]
+        subgraph Tier1["Tier 1: Control + Monitoring"]
+            CP["Control Plane
+• kube-apiserver
+• etcd
+• scheduler
+• controller"]
+            ArgoCD["ArgoCD
+GitOps CD"]
+            Prom["Prometheus
+Grafana"]
         end
         
-        subgraph Worker1["Worker-1 (t3.medium, 4GB) - Application"]
-            AuthSvc[auth-service ×2]
-            UsersSvc[users-service ×1]
-            LocSvc[locations-service ×1]
+        subgraph Tier2["Tier 2: Sync API"]
+            AuthSvc["auth-service x2"]
+            UsersSvc["users-service x1"]
+            LocSvc["locations-service x1"]
         end
         
-        subgraph Worker2["Worker-2 (t3.medium, 4GB) - Async Workers"]
-            CeleryAI[celery-ai-worker ×3<br/>GPT-4o Vision]
-            CeleryBatch[celery-batch-worker ×2]
-            WasteSvc[waste-service ×2]
+        subgraph Tier3["Tier 3: Async Workers"]
+            WasteSvc["waste-service x2"]
+            AIW["AI Workers x3
+GPT-4o Vision"]
+            BatchW["Batch Workers x2"]
         end
         
-        subgraph Storage["Storage Node (t3.large, 8GB) - Stateful"]
-            RabbitMQ[RabbitMQ HA<br/>3-node cluster<br/>5 Queues]
-            DB[(PostgreSQL<br/>StatefulSet)]
-            Redis[(Redis<br/>Result Backend)]
+        subgraph Tier4["Tier 4: Stateful Storage"]
+            RMQ["RabbitMQ HA x3
+5 Queues"]
+            DB["PostgreSQL
+StatefulSet 50GB"]
+            Redis["Redis
+Result Backend"]
+            Beat["Celery Beat x1"]
         end
-        
-        ALBC[AWS Load Balancer<br/>Controller]
     end
     
     subgraph GitHub["GitHub"]
-        Code[Code Repository]
-        Charts[Helm Charts]
-        GHA[GitHub Actions<br/>CI Pipeline]
-        GHCR[GHCR<br/>Container Registry]
+        Code["Code Repo"]
+        Charts["Helm Charts"]
+        GHA["GitHub Actions"]
+        GHCR["GHCR Registry"]
     end
     
-    subgraph External["외부 서비스"]
-        OpenAI[OpenAI API<br/>GPT-4o Vision]
-        KakaoMap[Kakao Map API]
+    subgraph External["External APIs"]
+        OpenAI["OpenAI
+GPT-4o Vision"]
+        KakaoMap["Kakao Map"]
     end
     
     Users --> Route53
     Route53 --> ALB
     ACM -.->|SSL Cert| ALB
-    ALB --> ALBC
+    ALB --> Tier2
+    ALB --> ArgoCD
+    ALB --> Prom
     
-    ALBC -->|/api/v1/auth| AuthSvc
-    ALBC -->|/api/v1/users| UsersSvc
-    ALBC -->|/api/v1/waste| WasteSvc
-    ALBC -->|/argocd| ArgoCD
-    ALBC -->|/grafana| Prom
+    Tier2 -->|publish| Tier4
+    Tier3 -->|consume| Tier4
     
-    WasteSvc --> RabbitMQ
-    CeleryAI --> RabbitMQ
-    CeleryBatch --> RabbitMQ
+    WasteSvc --> S3
+    AIW --> OpenAI
+    LocSvc --> KakaoMap
     
     AuthSvc --> DB
     WasteSvc --> DB
     WasteSvc --> Redis
-    WasteSvc --> S3
-    
-    CeleryAI --> OpenAI
-    LocSvc --> KakaoMap
     
     Code --> GHA
     GHA --> GHCR
     GHA --> Charts
     Charts --> ArgoCD
-    ArgoCD -.->|배포| WasteSvc
+    ArgoCD -.->|deploy| Tier2
+    ArgoCD -.->|deploy| Tier3
     
-    GHCR -.->|Pull Image| WasteSvc
+    GHCR -.->|pull| Tier2
+    GHCR -.->|pull| Tier3
     
-    style Users fill:#cce5ff,stroke:#007bff,stroke-width:4px
-    style ALB fill:#ff9900,stroke:#ff6600,stroke-width:4px
-    style Master fill:#e3f2fd,stroke:#0d47a1,stroke-width:3px
-    style Worker1 fill:#f1f8e9,stroke:#33691e,stroke-width:2px
-    style Worker2 fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style Storage fill:#fce4ec,stroke:#880e4f,stroke-width:3px
-    style ArgoCD fill:#e6d5ff,stroke:#8844ff,stroke-width:3px
-    style RabbitMQ fill:#ffe0b3,stroke:#fd7e14,stroke-width:3px
+    style Internet fill:#0d47a1,color:#fff,stroke:#01579b,stroke-width:3px
+    style AWS fill:#ff6f00,color:#fff,stroke:#e65100,stroke-width:3px
+    style K8s fill:#1565c0,color:#fff,stroke:#0d47a1,stroke-width:4px
+    style Tier1 fill:#1976d2,color:#fff,stroke:#1565c0,stroke-width:3px
+    style Tier2 fill:#388e3c,color:#fff,stroke:#2e7d32,stroke-width:3px
+    style Tier3 fill:#f57c00,color:#fff,stroke:#ef6c00,stroke-width:3px
+    style Tier4 fill:#c2185b,color:#fff,stroke:#ad1457,stroke-width:3px
+    style GitHub fill:#6a1b9a,color:#fff,stroke:#4a148c,stroke-width:2px
+    style External fill:#00838f,color:#fff,stroke:#006064,stroke-width:2px
 ```
 
 ---
 
-## 🖥️ 4-Node 클러스터 구성
+## 🖥️ 4-Tier 구성
 
-### 노드별 역할 (Instagram + Robin Storage 패턴)
+### Tier 1: Control + Monitoring
 
 ```mermaid
 graph TB
-    subgraph Tier1["Tier 1: Control + Monitoring"]
-        Master[Master Node<br/>t3.large, 8GB, 80GB<br/>$60/월<br/><br/>Control Plane:<br/>- kube-apiserver<br/>- etcd<br/>- scheduler<br/>- controller<br/><br/>Monitoring:<br/>- Prometheus<br/>- Grafana<br/>- Metrics Server<br/><br/>GitOps:<br/>- ArgoCD]
+    subgraph Master["Master Node - t3.large 8GB 80GB - $60/month"]
+        CP["Control Plane
+ 
+kube-apiserver
+etcd
+scheduler
+controller-manager"]
+        
+        Monitor["Monitoring
+ 
+Prometheus
+Grafana
+Metrics Server"]
+        
+        GitOps["GitOps
+ 
+ArgoCD x3 pods
+argocd-server
+argocd-repo-server
+argocd-app-controller"]
+        
+        ALBC["AWS LB Controller x1"]
+        CertMgr["cert-manager x3"]
     end
     
-    subgraph Tier2["Tier 2: Sync API (Application)"]
-        Worker1[Worker-1 Node<br/>t3.medium, 4GB, 40GB<br/>$30/월<br/><br/>FastAPI Pods:<br/>- auth-service ×2<br/>- users-service ×1<br/>- locations-service ×1<br/><br/>Pattern:<br/>Reactor (Sync API)]
-    end
+    CP -.->|orchestrate| Monitor
+    CP -.->|orchestrate| GitOps
     
-    subgraph Tier3["Tier 3: Async Workers"]
-        Worker2[Worker-2 Node<br/>t3.medium, 4GB, 40GB<br/>$30/월<br/><br/>Celery Workers:<br/>- AI Worker ×3<br/>- Batch Worker ×2<br/>- waste-service ×2<br/><br/>Pattern:<br/>Task Queue]
-    end
-    
-    subgraph Tier4["Tier 4: Stateful Storage"]
-        Storage[Storage Node<br/>t3.large, 8GB, 100GB<br/>$60/월<br/><br/>Stateful Services:<br/>- RabbitMQ ×3 (HA)<br/>- PostgreSQL<br/>- Redis<br/><br/>Pattern:<br/>Robin Storage]
-    end
-    
-    Master -.->|orchestrate| Worker1
-    Master -.->|orchestrate| Worker2
-    Master -.->|orchestrate| Storage
-    Worker1 -->|publish task| Storage
-    Worker2 -->|consume task| Storage
-    
-    style Master fill:#e3f2fd,stroke:#0d47a1,stroke-width:3px
-    style Worker1 fill:#f1f8e9,stroke:#33691e,stroke-width:2px
-    style Worker2 fill:#fff9c4,stroke:#f57f17,stroke-width:2px
-    style Storage fill:#fce4ec,stroke:#880e4f,stroke-width:3px
+    style Master fill:#1565c0,color:#fff,stroke:#0d47a1,stroke-width:3px
+    style CP fill:#1976d2,color:#fff,stroke:#1565c0,stroke-width:2px
+    style Monitor fill:#42a5f5,color:#000,stroke:#1976d2,stroke-width:2px
+    style GitOps fill:#5c6bc0,color:#fff,stroke:#3f51b5,stroke-width:2px
+    style ALBC fill:#7e57c2,color:#fff,stroke:#673ab7,stroke-width:2px
+    style CertMgr fill:#ab47bc,color:#fff,stroke:#9c27b0,stroke-width:2px
 ```
 
-### 리소스 할당 및 비용
-
+**리소스 할당:**
 ```
-Tier 1: Master (Control + Monitoring)
-├─ Instance: t3.large (2 vCPU, 8GB RAM, 80GB EBS)
-├─ 비용: $60/월
-├─ 사용률:
-│  ├─ Control Plane: 0.5 CPU, 1.5GB
-│  ├─ etcd: 0.2 CPU, 0.5GB
-│  ├─ Prometheus: 0.3 CPU, 1.5GB
-│  ├─ Grafana: 0.2 CPU, 0.5GB
-│  └─ ArgoCD: 0.3 CPU, 1GB
-└─ 여유: 0.5 CPU, 3GB (30%)
+vCPU: 2 cores
+Memory: 8GB
+Disk: 80GB (gp3)
+비용: $60/월
 
-Tier 2: Worker-1 (Application)
-├─ Instance: t3.medium (2 vCPU, 4GB RAM, 40GB EBS)
-├─ 비용: $30/월
-├─ 사용률:
-│  ├─ auth-service ×2: 0.4 CPU, 0.6GB
-│  ├─ users-service ×1: 0.2 CPU, 0.3GB
-│  └─ locations-service ×1: 0.2 CPU, 0.3GB
-└─ 여유: 1.2 CPU, 2.8GB (60%)
+사용률:
+├─ Control Plane: 0.5 CPU, 1.5GB
+├─ etcd: 0.2 CPU, 0.5GB
+├─ Prometheus: 0.3 CPU, 1.5GB
+├─ Grafana: 0.2 CPU, 0.5GB
+└─ ArgoCD: 0.3 CPU, 1GB
 
-Tier 3: Worker-2 (Async)
-├─ Instance: t3.medium (2 vCPU, 4GB RAM, 40GB EBS)
-├─ 비용: $30/월
-├─ 사용률:
-│  ├─ celery-ai-worker ×3: 0.8 CPU, 1.5GB
-│  ├─ celery-batch-worker ×2: 0.4 CPU, 0.8GB
-│  └─ waste-service ×2: 0.4 CPU, 0.6GB
-└─ 여유: 0.4 CPU, 1.1GB (25%)
+여유: 0.5 CPU, 3GB (30%)
+```
 
-Tier 4: Storage (Stateful)
-├─ Instance: t3.large (2 vCPU, 8GB RAM, 100GB EBS)
-├─ 비용: $60/월
-├─ 사용률:
-│  ├─ RabbitMQ ×3: 0.6 CPU, 3GB
-│  ├─ PostgreSQL ×1: 0.5 CPU, 2GB
-│  └─ Redis ×1: 0.2 CPU, 1GB
-└─ 여유: 0.7 CPU, 2GB (25%)
+### Tier 2: Sync API (Application)
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-총 리소스:
-├─ 노드: 4개
-├─ vCPU: 8 cores
-├─ Memory: 24GB
-├─ Storage: 260GB
-└─ 비용: $185/월 (EC2 $180 + S3 $5)
+```mermaid
+graph TB
+    subgraph Worker1["Worker-1 Node - t3.medium 4GB 40GB - $30/month"]
+        Auth["auth-service x2
+ 
+OAuth 2.0
+JWT Token
+FastAPI"]
+        
+        Users["users-service x1
+ 
+Profile
+History
+FastAPI"]
+        
+        Locations["locations-service x1
+ 
+Bin Search
+Kakao Map
+FastAPI"]
+        
+        APIW["API Workers x2
+ 
+q.api
+Kakao Map
+OAuth Verify"]
+    end
+    
+    style Worker1 fill:#2e7d32,color:#fff,stroke:#1b5e20,stroke-width:3px
+    style Auth fill:#4caf50,color:#000,stroke:#388e3c,stroke-width:2px
+    style Users fill:#66bb6a,color:#000,stroke:#4caf50,stroke-width:2px
+    style Locations fill:#81c784,color:#000,stroke:#66bb6a,stroke-width:2px
+    style APIW fill:#a5d6a7,color:#000,stroke:#81c784,stroke-width:2px
+```
+
+**리소스 할당:**
+```
+vCPU: 2 cores
+Memory: 4GB
+Disk: 40GB (gp3)
+비용: $30/월
+
+배치:
+├─ auth-service ×2: 200m CPU, 256Mi
+├─ users-service ×1: 100m CPU, 128Mi
+├─ locations-service ×1: 100m CPU, 128Mi
+└─ API Workers ×2: 200m CPU, 256Mi
+
+여유: 1.2 CPU, 2.8GB (60%)
+패턴: Reactor (Sync, 즉시 응답 <100ms)
+```
+
+### Tier 3: Async Workers
+
+```mermaid
+graph TB
+    subgraph Worker2["Worker-2 Node - t3.medium 4GB 40GB - $30/month"]
+        Waste["waste-service x2
+ 
+Image Analysis API
+FastAPI"]
+        
+        AIWorker["AI Workers x3
+ 
+q.ai
+GPT-4o Vision
+gevent pool
+concurrency: 4"]
+        
+        BatchWorker["Batch Workers x2
+ 
+q.batch, q.sched
+processes pool
+concurrency: 4"]
+    end
+    
+    style Worker2 fill:#f57c00,color:#fff,stroke:#e65100,stroke-width:3px
+    style Waste fill:#ff9800,color:#000,stroke:#f57c00,stroke-width:2px
+    style AIWorker fill:#ffb74d,color:#000,stroke:#ff9800,stroke-width:2px
+    style BatchWorker fill:#ffcc80,color:#000,stroke:#ffb74d,stroke-width:2px
+```
+
+**리소스 할당:**
+```
+vCPU: 2 cores
+Memory: 4GB
+Disk: 40GB (gp3)
+비용: $30/월
+
+배치:
+├─ waste-service ×2: 400m CPU, 512Mi
+├─ AI Workers ×3: 1500m CPU, 3Gi
+└─ Batch Workers ×2: 600m CPU, 1Gi
+
+여유: 0.4 CPU, 1.1GB (25%)
+패턴: Task Queue (Async, 백그라운드)
+```
+
+### Tier 4: Stateful Storage
+
+```mermaid
+graph TB
+    subgraph StorageNode["Storage Node - t3.large 8GB 100GB - $60/month"]
+        RMQ["RabbitMQ HA Cluster
+ 
+3 nodes (quorum)
+5 queues
+20GB x 3 PVC"]
+        
+        DB["PostgreSQL
+ 
+StatefulSet
+50GB PVC
+auth, users, waste schemas"]
+        
+        RedisD["Redis
+ 
+Deployment
+Result Backend
+Cache 7-day TTL"]
+        
+        BeatD["Celery Beat x1
+ 
+Scheduler
+DatabaseScheduler
+Prevent Duplicate"]
+    end
+    
+    RMQ -.->|depends| DB
+    RMQ -.->|depends| RedisD
+    
+    style StorageNode fill:#c2185b,color:#fff,stroke:#880e4f,stroke-width:3px
+    style RMQ fill:#e91e63,color:#fff,stroke:#c2185b,stroke-width:2px
+    style DB fill:#ec407a,color:#fff,stroke:#d81b60,stroke-width:2px
+    style RedisD fill:#f06292,color:#000,stroke:#ec407a,stroke-width:2px
+    style BeatD fill:#f48fb1,color:#000,stroke:#f06292,stroke-width:2px
+```
+
+**리소스 할당:**
+```
+vCPU: 2 cores
+Memory: 8GB
+Disk: 100GB (gp3)
+비용: $60/월
+
+배치:
+├─ RabbitMQ ×3: 600m CPU, 3Gi (HA)
+├─ PostgreSQL: 500m CPU, 2Gi
+├─ Redis: 200m CPU, 1Gi
+└─ Celery Beat: 50m CPU, 128Mi
+
+여유: 0.7 CPU, 2GB (25%)
+패턴: Robin Storage (Stateful 격리)
 ```
 
 ---
 
 ## 🐰 Task Queue 구조
 
-### RabbitMQ + Celery (5개 큐)
+### Queue → Worker 매핑
 
 ```mermaid
 graph LR
-    subgraph Producer["API Services"]
-        Waste[waste-service]
-        Recycling[recycling-service]
+    subgraph Tier4RMQ["Tier 4: RabbitMQ HA"]
+        Q1["q.ai
+Priority: 10
+GPT-4o Vision"]
+        Q2["q.batch
+Priority: 1
+Batch Jobs"]
+        Q3["q.api
+Priority: 5
+External API"]
+        Q4["q.sched
+Priority: 3
+Scheduled"]
+        Q5["q.dlq
+Dead Letter"]
     end
     
-    subgraph RMQ["RabbitMQ HA (Storage Node)"]
-        Exchange[Topic Exchange<br/>'tasks']
-        
-        Q1[q.ai<br/>Priority: 10<br/>AI Vision<br/>TTL: 300s]
-        Q2[q.batch<br/>Priority: 1<br/>배치 작업<br/>TTL: 3600s]
-        Q3[q.api<br/>Priority: 5<br/>외부 API<br/>TTL: 300s]
-        Q4[q.sched<br/>Priority: 3<br/>예약 작업]
-        Q5[q.dlq<br/>Dead Letter<br/>실패 메시지]
+    subgraph Tier3W["Tier 3: Workers"]
+        AI["AI Workers x3
+Worker-2"]
+        Batch["Batch Workers x2
+Worker-2"]
     end
     
-    subgraph Workers["Celery Workers"]
-        W1[AI Worker ×3<br/>Worker-2<br/>gevent pool]
-        W2[Batch Worker ×2<br/>Worker-2<br/>processes pool]
-        W3[API Worker ×2<br/>Worker-1]
+    subgraph Tier2W["Tier 2: Workers"]
+        API["API Workers x2
+Worker-1"]
     end
     
-    Waste --> Exchange
-    Recycling --> Exchange
+    Q1 --> AI
+    Q2 --> Batch
+    Q3 --> API
+    Q4 --> Batch
     
-    Exchange -->|ai.*| Q1
-    Exchange -->|batch.*| Q2
-    Exchange -->|api.*| Q3
-    Exchange -->|sched.*| Q4
+    Q1 -.->|failure| Q5
+    Q2 -.->|failure| Q5
+    Q3 -.->|failure| Q5
+    Q4 -.->|failure| Q5
     
-    Q1 -.->|DLX| Q5
-    Q2 -.->|DLX| Q5
-    Q3 -.->|DLX| Q5
-    
-    Q1 --> W1
-    Q2 --> W2
-    Q3 --> W3
-    Q4 --> W2
-    
-    style Exchange fill:#ffe0b3,stroke:#fd7e14,stroke-width:4px
-    style Q1 fill:#ffd1d1,stroke:#dc3545,stroke-width:3px
-    style Q5 fill:#ffb3b3,stroke:#dc3545,stroke-width:4px
-    style W1 fill:#cce5ff,stroke:#007bff,stroke-width:2px
+    style Tier4RMQ fill:#c2185b,color:#fff,stroke:#880e4f,stroke-width:3px
+    style Tier3W fill:#f57c00,color:#fff,stroke:#e65100,stroke-width:3px
+    style Tier2W fill:#2e7d32,color:#fff,stroke:#1b5e20,stroke-width:3px
+    style Q1 fill:#1565c0,color:#fff,stroke:#0d47a1,stroke-width:2px
+    style Q2 fill:#5e35b1,color:#fff,stroke:#4527a0,stroke-width:2px
+    style Q3 fill:#00838f,color:#fff,stroke:#006064,stroke-width:2px
+    style Q4 fill:#2e7d32,color:#fff,stroke:#1b5e20,stroke-width:2px
+    style Q5 fill:#b71c1c,color:#fff,stroke:#7f0000,stroke-width:3px
+    style AI fill:#ffa726,color:#000,stroke:#f57c00,stroke-width:2px
+    style Batch fill:#ffb74d,color:#000,stroke:#ffa726,stroke-width:2px
+    style API fill:#66bb6a,color:#000,stroke:#4caf50,stroke-width:2px
 ```
 
-### Queue별 작업
+### Queue별 처리
 
 ```
-q.ai (Worker-2, prefetch=2):
+q.ai (Tier 3, AI Workers x3):
 ├─ image.analyze (GPT-4o Vision, 2-5초)
-├─ image.classify (Vision Model, 1-3초)
+├─ classification.identify (1-3초)
+├─ feedback.generate (3-8초)
 └─ 처리량: ~20 req/min
 
-q.batch (Worker-2, prefetch=1):
+q.batch (Tier 3, Batch Workers x2):
 ├─ analytics.daily (30-60초)
 ├─ report.generate (60-120초)
 └─ 처리량: ~2 req/min
 
-q.api (Worker-1, prefetch=4):
+q.api (Tier 2, API Workers x2):
 ├─ map.search (Kakao Map, 0.5초)
 ├─ oauth.verify (소셜 로그인, 0.3초)
 └─ 처리량: ~100 req/min
 
-q.sched (Worker-2):
+q.sched (Tier 3, Batch Workers):
 ├─ cleanup.cache (매시간)
 ├─ backup.database (매일 02:00)
 └─ stats.aggregate (매일 03:00)
 
-q.dlq:
+q.dlq (Tier 4, 모니터링만):
 └─ 실패 메시지 수집 및 재처리
 ```
 
@@ -280,124 +435,64 @@ q.dlq:
 
 ## 🔄 GitOps 파이프라인
 
-### CI/CD 전체 흐름
-
 ```mermaid
 sequenceDiagram
-    actor Dev as 개발자
-    participant GH as GitHub<br/>Repository
+    actor Dev as Developer
+    participant GH as GitHub Repo
     participant GHA as GitHub Actions
-    participant GHCR as GHCR<br/>ghcr.io
-    participant Helm as Helm Charts<br/>(Git)
-    participant Argo as ArgoCD<br/>(Master)
-    participant K8s as Kubernetes
+    participant GHCR as GHCR Registry
+    participant Helm as Helm Charts
+    participant Argo as ArgoCD Tier 1
+    participant K8s as Kubernetes Tier 2-3
     participant ALB as AWS ALB
     
-    Dev->>GH: 1. services/waste/ 수정 & Push
-    GH->>GHA: 2. ci-waste.yml 트리거
+    Dev->>GH: 1. Code Push services/waste/
+    GH->>GHA: 2. Trigger CI
     
     activate GHA
-    GHA->>GHA: 3. Lint (Black, Flake8)
-    GHA->>GHA: 4. Test (pytest)
+    GHA->>GHA: 3. Lint Black Flake8
+    GHA->>GHA: 4. Test pytest
     GHA->>GHA: 5. Docker Build
     GHA->>GHCR: 6. Push waste:sha-abc123
-    GHA->>Helm: 7. values.yaml 업데이트<br/>image.tag: sha-abc123
+    GHA->>Helm: 7. Update values.yaml tag
     deactivate GHA
     
-    Note over Argo: 8. Git 폴링 (3분마다)
+    Note over Argo: 8. Git Poll 3min
     
     activate Argo
-    Argo->>Helm: 9. 변경 감지!
-    Argo->>Argo: 10. Helm Template 렌더링
-    Argo->>Argo: 11. Diff 계산
-    Argo->>K8s: 12. kubectl apply (자동 Sync)
+    Argo->>Helm: 9. Detect Change
+    Argo->>Argo: 10. Helm Template
+    Argo->>Argo: 11. Diff Calculate
+    Argo->>K8s: 12. kubectl apply Auto Sync
     deactivate Argo
     
     activate K8s
     K8s->>GHCR: 13. Pull waste:sha-abc123
-    K8s->>K8s: 14. Rolling Update (무중단)
+    K8s->>K8s: 14. Rolling Update
     K8s->>K8s: 15. Health Check
     K8s->>ALB: 16. Target Registration
     deactivate K8s
     
-    K8s-->>Argo: 17. Sync 완료
-    Argo-->>Dev: 18. Slack 알림: ✅ 배포 성공
-```
-
----
-
-## 🗺️ 마이크로서비스 배치
-
-### Namespace별 서비스
-
-```mermaid
-graph TB
-    subgraph NS1["argocd namespace"]
-        Argo[ArgoCD<br/>GitOps CD<br/>Master Node]
-    end
-    
-    subgraph NS2["auth namespace (Worker-1)"]
-        Auth[auth-service ×2<br/>OAuth, JWT<br/>FastAPI]
-    end
-    
-    subgraph NS3["users namespace (Worker-1)"]
-        Users[users-service ×1<br/>프로필, 이력<br/>FastAPI]
-    end
-    
-    subgraph NS4["waste namespace (Worker-2)"]
-        Waste[waste-service ×2<br/>이미지 분석<br/>FastAPI]
-        AIW[celery-ai-worker ×3<br/>GPT-4o Vision]
-    end
-    
-    subgraph NS5["locations namespace (Worker-1)"]
-        Loc[locations-service ×1<br/>수거함 검색<br/>FastAPI]
-    end
-    
-    subgraph NS6["messaging namespace (Storage)"]
-        RMQ[RabbitMQ ×3<br/>HA Cluster<br/>5 Queues]
-    end
-    
-    subgraph NS7["default namespace (Storage)"]
-        DB[(PostgreSQL<br/>StatefulSet)]
-        Redis[(Redis<br/>Deployment)]
-    end
-    
-    subgraph NS8["monitoring namespace (Master)"]
-        Prom[Prometheus]
-        Graf[Grafana]
-    end
-    
-    Waste --> RMQ
-    AIW --> RMQ
-    
-    Auth --> DB
-    Users --> DB
-    Waste --> DB
-    
-    Waste --> Redis
-    
-    style NS1 fill:#e6d5ff,stroke:#8844ff,stroke-width:2px
-    style NS4 fill:#ffd1d1,stroke:#dc3545,stroke-width:3px
-    style NS6 fill:#ffe0b3,stroke:#fd7e14,stroke-width:3px
-    style NS7 fill:#ccf5f0,stroke:#20c997,stroke-width:3px
+    K8s-->>Argo: 17. Sync Complete
+    Argo-->>Dev: 18. Slack Notification
 ```
 
 ---
 
 ## 📊 데이터 흐름
 
-### 이미지 분석 요청 전체 흐름
+### 이미지 분석 전체 흐름
 
 ```mermaid
 sequenceDiagram
     actor User as 사용자
     participant App as Mobile App
     participant ALB as AWS ALB
-    participant Waste as waste-service<br/>(Worker-2)
-    participant RMQ as RabbitMQ<br/>(Storage)
-    participant AIW as AI Worker<br/>(Worker-2)
-    participant DB as PostgreSQL<br/>(Storage)
-    participant Redis as Redis<br/>(Storage)
+    participant Waste as waste-service Tier 3
+    participant RMQ as RabbitMQ Tier 4
+    participant AIW as AI Worker Tier 3
+    participant DB as PostgreSQL Tier 4
+    participant Redis as Redis Tier 4
     participant S3 as AWS S3
     participant OpenAI as OpenAI API
     
@@ -406,40 +501,115 @@ sequenceDiagram
     ALB->>Waste: 라우팅
     
     Waste->>Waste: Job ID 생성
-    Waste->>App: S3 Presigned URL
+    Waste->>App: S3 Pre-signed URL
     App->>S3: 이미지 직접 업로드
     
     App->>Waste: POST /upload-complete/{job_id}
-    Waste->>RMQ: Publish: q.ai<br/>ai.analyze
+    Waste->>RMQ: Publish q.ai ai.analyze
     
     activate AIW
-    RMQ->>AIW: Consume (Priority 10)
+    RMQ->>AIW: Consume Priority 10
     AIW->>S3: 이미지 다운로드
-    AIW->>AIW: 전처리
     AIW->>Redis: 캐시 확인
     
-    alt 캐시 히트 (70%)
+    alt 캐시 히트 70%
         Redis-->>AIW: 결과 반환
-        AIW-->>App: 즉시 응답 (1초)
-    else 캐시 미스 (30%)
+        AIW->>App: 즉시 응답 1초
+    else 캐시 미스 30%
         AIW->>OpenAI: GPT-4o Vision API
         OpenAI-->>AIW: 분류 결과
         AIW->>DB: 결과 저장
-        AIW->>Redis: 캐싱 (7일)
+        AIW->>Redis: 캐싱 7일
     end
     deactivate AIW
     
-    loop Polling (0.5초마다)
+    loop Polling 0.5초
         App->>Waste: GET /status/{job_id}
         Waste->>Redis: 진행률 조회
         Redis-->>App: progress: 80%
     end
     
     App->>Waste: GET /result/{job_id}
-    Waste->>Redis: 최종 결과 조회
+    Waste->>Redis: 최종 결과
     Redis-->>App: 결과 반환
     
     App->>User: 결과 표시
+```
+
+---
+
+## 🗺️ 서비스 배치
+
+### Namespace별 서비스
+
+```mermaid
+graph TB
+    subgraph T1["Tier 1: Master"]
+        NS_ArgoCD["argocd namespace
+ 
+ArgoCD GitOps CD"]
+        
+        NS_Monitor["monitoring namespace
+ 
+Prometheus
+Grafana"]
+    end
+    
+    subgraph T2["Tier 2: Worker-1"]
+        NS_Auth["auth namespace
+ 
+auth-service x2
+OAuth JWT"]
+        
+        NS_Users["users namespace
+ 
+users-service x1
+Profile History"]
+        
+        NS_Loc["locations namespace
+ 
+locations-service x1
+Bin Search"]
+    end
+    
+    subgraph T3["Tier 3: Worker-2"]
+        NS_Waste["waste namespace
+ 
+waste-service x2
+AI Workers x3
+Batch Workers x2"]
+    end
+    
+    subgraph T4["Tier 4: Storage"]
+        NS_Msg["messaging namespace
+ 
+RabbitMQ x3 HA
+5 Queues"]
+        
+        NS_Default["default namespace
+ 
+PostgreSQL
+Redis
+Celery Beat"]
+    end
+    
+    NS_Waste -->|tasks| NS_Msg
+    NS_Auth --> NS_Default
+    NS_Users --> NS_Default
+    NS_Waste --> NS_Default
+    
+    style T1 fill:#1565c0,color:#fff,stroke:#0d47a1,stroke-width:2px
+    style T2 fill:#2e7d32,color:#fff,stroke:#1b5e20,stroke-width:2px
+    style T3 fill:#f57c00,color:#fff,stroke:#e65100,stroke-width:2px
+    style T4 fill:#c2185b,color:#fff,stroke:#880e4f,stroke-width:2px
+    style NS_ArgoCD fill:#5c6bc0,color:#fff,stroke:#3f51b5,stroke-width:2px
+    style NS_Monitor fill:#7e57c2,color:#fff,stroke:#673ab7,stroke-width:2px
+    style NS_Auth fill:#66bb6a,color:#000,stroke:#4caf50,stroke-width:2px
+    style NS_Users fill:#81c784,color:#000,stroke:#66bb6a,stroke-width:2px
+    style NS_Loc fill:#a5d6a7,color:#000,stroke:#81c784,stroke-width:2px
+    style NS_Waste fill:#ffa726,color:#000,stroke:#f57c00,stroke-width:2px
+    style NS_Msg fill:#ec407a,color:#fff,stroke:#d81b60,stroke-width:2px
+    style NS_Default fill:#f06292,color:#000,stroke:#ec407a,stroke-width:2px
 ```
 
 ---
@@ -450,11 +620,11 @@ sequenceDiagram
 
 ```
 Kubernetes (kubeadm):
-├─ 버전: v1.28
+├─ Version: v1.28
 ├─ CNI: Calico VXLAN (BGP 비활성화)
-├─ 노드: 4개 (1M + 3W)
+├─ Nodes: 4개 (4-Tier)
 ├─ HA: non-HA (단일 Master)
-└─ 패턴: Instagram (Worker 분리) + Robin (Storage 격리)
+└─ 패턴: Instagram + Robin Storage
 
 총 리소스:
 ├─ vCPU: 8 cores
@@ -473,72 +643,85 @@ AWS Load Balancer Controller:
 └─ Target: IP (Pod 직접 연결)
 
 Path Routes:
-├─ /argocd       → argocd-server (Master)
-├─ /grafana      → grafana-service (Master)
-├─ /api/v1/auth  → auth-service (Worker-1)
-├─ /api/v1/users → users-service (Worker-1)
-├─ /api/v1/waste → waste-service (Worker-2)
-└─ /              → default-backend
+├─ /argocd          → argocd-server (Tier 1)
+├─ /grafana         → grafana (Tier 1)
+├─ /api/v1/auth/*   → auth-service (Tier 2)
+├─ /api/v1/users/*  → users-service (Tier 2)
+├─ /api/v1/waste/*  → waste-service (Tier 3)
+├─ /api/v1/locations/* → locations-service (Tier 2)
+└─ /                → default-backend
 ```
 
-### Stateful Services
+### Stateful Services (Tier 4)
 
 ```
-PostgreSQL (Storage Node):
+PostgreSQL:
 ├─ Type: StatefulSet
 ├─ PVC: 50GB EBS gp3
-└─ Schema: 분리 (auth, users, waste)
+├─ Schemas: auth, users, waste
+└─ Backup: etcd 백업 포함
 
-Redis (Storage Node):
+Redis:
 ├─ Type: Deployment
-├─ 용도: Celery Result Backend, Caching
+├─ 용도: Celery Result Backend, Cache
 └─ TTL: 7일
 
-RabbitMQ (Storage Node):
+RabbitMQ:
 ├─ Type: StatefulSet (HA 3-node)
 ├─ PVC: 20GB × 3
-└─ Queues: 5개 (ai, batch, api, sched, dlq)
+├─ Queues: 5개 (Quorum Queue)
+└─ Management UI: 포트 15672
 ```
 
 ---
 
-## 📈 확장 계획
+## 📈 확장 전략
 
-### HPA (Horizontal Pod Autoscaler)
+### Tier별 독립 스케일링
+
+```
+Tier 2 확장 (API 트래픽 증가):
+├─ Worker-1 노드 추가
+├─ auth-service HPA (2 → 5)
+└─ 비용: +$30/월
+
+Tier 3 확장 (AI 처리 증가):
+├─ Worker-2 노드 추가
+├─ AI Workers HPA (3 → 10)
+└─ 비용: +$30/월
+
+Tier 4 확장 (Storage 증가):
+├─ PostgreSQL 읽기 복제본
+├─ Redis Cluster (3-node)
+└─ 비용: +$60/월
+```
+
+### HPA 설정
 
 ```yaml
-# waste-service HPA
+# AI Worker HPA
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: waste-service
+  name: ai-worker
   namespace: waste
 spec:
   scaleTargetRef:
     kind: Deployment
-    name: waste-service
-  minReplicas: 2
+    name: ai-worker
+  minReplicas: 3
   maxReplicas: 10
   metrics:
-  - type: Resource
-    resource:
-      name: cpu
+  - type: External
+    external:
+      metric:
+        name: rabbitmq_queue_messages
+        selector:
+          matchLabels:
+            queue: q.ai
       target:
-        type: Utilization
-        averageUtilization: 70
-```
-
-### Cluster Scaling
-
-```
-노드 추가 시나리오:
-1. Worker-1 복제 → Application 확장
-2. Worker-2 복제 → Async 확장
-3. Storage 복제 → DB 읽기 복제본
-
-Spot Instance 활용:
-├─ t3.medium Spot: $9/월 (70% 할인)
-└─ 비중요 Worker에 적용
+        type: AverageValue
+        averageValue: "10"
 ```
 
 ---
@@ -548,7 +731,7 @@ Spot Instance 활용:
 ### Network Policies
 
 ```yaml
-# Storage Namespace 격리
+# Tier 4 격리 (Robin Storage Pattern)
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -561,13 +744,19 @@ spec:
   policyTypes:
   - Ingress
   ingress:
+  # Tier 2 Worker-1
   - from:
-    - podSelector:
+    - namespaceSelector:
         matchLabels:
-          app: waste-service
-    - podSelector:
+          tier: sync-api
+    ports:
+    - protocol: TCP
+      port: 5672
+  # Tier 3 Worker-2
+  - from:
+    - namespaceSelector:
         matchLabels:
-          app: celery-worker
+          tier: async-workers
     ports:
     - protocol: TCP
       port: 5672
@@ -577,69 +766,116 @@ spec:
 
 ## 📊 모니터링
 
-### Prometheus + Grafana (Master Node)
+### Prometheus Metrics
 
 ```
-Metrics:
-├─ Node: CPU, Memory, Disk, Network
-├─ Pod: 상태, Restart, Ready
-├─ RabbitMQ: Queue 길이, 처리율
-├─ Celery: Task 성공/실패율
-├─ ALB: Request/s, Latency, 5xx
-└─ PostgreSQL: 커넥션, Query 시간
+Tier 1 (Master):
+├─ node_cpu_usage
+├─ node_memory_usage
+├─ etcd_health
+└─ apiserver_latency
 
-Alerts:
-├─ q.dlq 길이 > 100
-├─ Pod CrashLoopBackOff
-├─ Node CPU > 85%
-├─ Disk > 80%
-└─ ALB 5xx > 1%
+Tier 2 (Worker-1):
+├─ pod_cpu_usage{tier="sync-api"}
+├─ pod_memory_usage{tier="sync-api"}
+├─ http_request_duration_seconds
+└─ http_requests_total
+
+Tier 3 (Worker-2):
+├─ celery_task_duration_seconds{queue="q.ai"}
+├─ celery_task_failures_total
+├─ pod_cpu_usage{tier="async-workers"}
+└─ pod_memory_usage{tier="async-workers"}
+
+Tier 4 (Storage):
+├─ rabbitmq_queue_messages{queue="q.ai"}
+├─ rabbitmq_queue_messages{queue="q.dlq"}
+├─ postgresql_connections_active
+├─ redis_memory_used_bytes
+└─ rabbitmq_cluster_status
+```
+
+### Grafana Dashboards
+
+```
+1. Cluster Overview
+   ├─ 4-Tier Node Status
+   ├─ Total Resource Usage
+   └─ Pod Distribution
+
+2. Tier별 Dashboard
+   ├─ Tier 1: Control Plane Health
+   ├─ Tier 2: API Performance
+   ├─ Tier 3: Worker Queue Length
+   └─ Tier 4: Storage Metrics
+
+3. RabbitMQ Dashboard
+   ├─ Queue Lengths (5개)
+   ├─ Consumer Count
+   ├─ Message Rates
+   └─ DLQ Monitoring
 ```
 
 ---
 
 ## 🎯 요약
 
+### 4-Tier Architecture
+
 ```
-4-Node Kubernetes Cluster:
-├─ Self-Managed (kubeadm)
-├─ Calico VXLAN CNI
-├─ AWS ALB Controller
-├─ Instagram + Robin 패턴
-└─ $185/월
+Tier 1: Control + Monitoring (Master, $60)
+└─ Kubernetes Control Plane + Observability
 
-서비스:
-├─ API Services: 6 Pods
-├─ Celery Workers: 7 Pods
-├─ RabbitMQ: 3-node HA
-├─ PostgreSQL: StatefulSet
-└─ Redis: Cache + Result Backend
+Tier 2: Sync API (Worker-1, $30)
+└─ FastAPI Reactor Pattern (즉시 응답)
 
-GitOps:
-├─ ArgoCD (자동 배포)
-├─ GitHub Actions (CI)
-├─ Helm Charts
-└─ GHCR (무료)
+Tier 3: Async Workers (Worker-2, $30)
+└─ Celery Task Queue (백그라운드 처리)
 
-성능:
-├─ 동시 사용자: 100-500명
-├─ 처리 시간: < 5초
-├─ 캐시 히트율: 70%
-└─ 가용성: 99%+
+Tier 4: Stateful Storage (Storage, $60)
+└─ RabbitMQ HA + PostgreSQL + Redis (Robin 패턴)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+총: $185/월, 8 vCPU, 24GB RAM
+패턴: Instagram (분리) + Robin (격리)
+```
+
+### Task Queue
+
+```
+5개 Queue (RabbitMQ HA, Tier 4):
+├─ q.ai (AI Vision, Priority 10)
+├─ q.batch (배치, Priority 1)
+├─ q.api (외부 API, Priority 5)
+├─ q.sched (예약, Priority 3)
+└─ q.dlq (실패 메시지)
+
+7개 Celery Workers:
+├─ Tier 2: API Workers ×2
+├─ Tier 3: AI Workers ×3
+├─ Tier 3: Batch Workers ×2
+└─ Tier 4: Celery Beat ×1
+
+장점:
+✅ Queue 폭주 방지 (TTL + max-length)
+✅ 장애 격리 (Queue별 분리)
+✅ HA 클러스터 (3-node)
+✅ 독립 스케일링 (Tier별)
 ```
 
 ---
 
 ## 📚 관련 문서
 
-- [4-Node 배포 아키텍처](deployment-architecture-4node.md) - 상세 다이어그램
-- [Self-Managed K8s 선택 배경](why-self-managed-k8s.md) - EKS vs kubeadm
-- [VPC 네트워크 설계](../infrastructure/vpc-network-design.md) - 보안 그룹
+- [4-Tier 배포 아키텍처](deployment-architecture-4node.md) - 전체 시스템
 - [Task Queue 설계](task-queue-design.md) - RabbitMQ + Celery
+- [VPC 네트워크 설계](../infrastructure/vpc-network-design.md) - 보안 그룹
+- [배포 가이드](../../DEPLOYMENT_GUIDE.md) - 자동 배포
 
 ---
 
 **작성일**: 2025-10-31  
-**구성**: 4-Node Kubernetes (kubeadm) + ArgoCD + Calico VXLAN + AWS ALB  
+**구성**: 4-Tier Kubernetes + AWS ALB + RabbitMQ HA  
 **총 비용**: $185/월  
-**상태**: ✅ 프로덕션 배포 완료
+**상태**: ✅ 프로덕션 배포 완료  
+**패턴**: Instagram (Worker 분리) + Robin Storage (Stateful 격리)
