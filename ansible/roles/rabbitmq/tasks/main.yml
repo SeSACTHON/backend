@@ -27,15 +27,16 @@
   register: rabbitmq_check
   changed_when: false
 
-- name: RabbitMQ Helm Chart 설치 (HA, Storage 노드)
+- name: RabbitMQ Helm Chart 설치 (Tier 3, HA 3-node, Storage 노드)
   command: >
     helm install rabbitmq bitnami/rabbitmq
     --namespace {{ rabbitmq_namespace }}
     --set auth.username={{ rabbitmq_username }}
     --set auth.password={{ rabbitmq_password }}
-    --set replicaCount=3
+    --set replicaCount={{ rabbitmq_replicas }}
     --set persistence.enabled=true
     --set persistence.size={{ rabbitmq_persistence_size }}
+    --set persistence.storageClass=gp3
     --set resources.requests.cpu=500m
     --set resources.requests.memory=1Gi
     --set resources.limits.cpu=2000m
@@ -43,17 +44,40 @@
     --set nodeSelector.workload=storage
     --set clustering.enabled=true
     --set clustering.addressType=hostname
+    --set clustering.rebalance=true
+    --set metrics.enabled=true
+    --set metrics.serviceMonitor.enabled=true
   when: "'rabbitmq' not in rabbitmq_check.stdout"
 
 - name: RabbitMQ Pod 대기
   command: kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=rabbitmq -n {{ rabbitmq_namespace }} --timeout=300s
 
+- name: RabbitMQ Cluster 상태 확인
+  shell: |
+    kubectl exec -n {{ rabbitmq_namespace }} rabbitmq-0 -- rabbitmqctl cluster_status
+  register: rabbitmq_cluster
+  failed_when: false
+  changed_when: false
+
 - name: RabbitMQ 접속 정보
   debug:
     msg:
-      - "RabbitMQ가 설치되었습니다."
-      - "Management UI: kubectl port-forward -n {{ rabbitmq_namespace }} svc/rabbitmq 15672:15672"
-      - "AMQP: amqp://{{ rabbitmq_username }}:{{ rabbitmq_password }}@rabbitmq.{{ rabbitmq_namespace }}:5672/"
-      - "Username: {{ rabbitmq_username }}"
-      - "Password: {{ rabbitmq_password }}"
+      - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - "✅ RabbitMQ HA Cluster 설치 완료 (Tier 3: Message Queue)"
+      - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - "역할: Task Queue Middleware"
+      - "구성: {{ rabbitmq_replicas }}-node HA Cluster"
+      - "Queues: 5개 (q.ai, q.batch, q.api, q.sched, q.dlq)"
+      - ""
+      - "연결 정보:"
+      - "  AMQP: amqp://{{ rabbitmq_username }}:{{ rabbitmq_password }}@rabbitmq.{{ rabbitmq_namespace }}:5672/"
+      - "  Management UI: kubectl port-forward -n {{ rabbitmq_namespace }} svc/rabbitmq 15672:15672"
+      - "  Username: {{ rabbitmq_username }}"
+      - "  Password: {{ rabbitmq_password }}"
+      - ""
+      - "Storage: {{ rabbitmq_persistence_size }} × {{ rabbitmq_replicas }} nodes"
+      - "Node: Storage (workload=storage)"
+      - ""
+      - "⚠️ RabbitMQ는 메시지 전달만 담당!"
+      - "⚠️ Progress Tracking은 Redis (Tier 4) 사용!"
 
