@@ -20,8 +20,8 @@
   command: >
     helm install prometheus prometheus-community/kube-prometheus-stack
     --namespace {{ monitoring_namespace }}
-    --set prometheus.prometheusSpec.retention.time=7d
-    --set prometheus.prometheusSpec.retention.size=80%
+    --set prometheus.prometheusSpec.retention=7d
+    --set prometheus.prometheusSpec.retentionSize=40GB
     --set prometheus.prometheusSpec.resources.requests.cpu=1000m
     --set prometheus.prometheusSpec.resources.requests.memory=2Gi
     --set prometheus.prometheusSpec.resources.limits.memory=4Gi
