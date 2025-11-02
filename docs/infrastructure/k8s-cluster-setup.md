@@ -444,35 +444,42 @@ kubectl get nodes --show-labels
 ### Phase 4: 필수 Add-ons 설치 (1시간)
 
 ```bash
-# ===== 1. Nginx Ingress Controller (10분) =====
-kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.9.0/deploy/static/provider/cloud/deploy.yaml
+# ===== 1. AWS Load Balancer Controller (15분) =====
 
-# Ingress가 Ready 될 때까지 대기
-kubectl wait --namespace ingress-nginx \
-  --for=condition=ready pod \
-  --selector=app.kubernetes.io/component=controller \
-  --timeout=120s
+# Helm 설치
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
-# ===== 2. Cert-manager (SSL 자동화, 10분) =====
+# CRDs 설치
+kubectl apply -k "github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master"
+
+# Helm repo 추가
+helm repo add eks https://aws.github.io/eks-charts
+helm repo update
+
+# ALB Controller 설치
+helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
+  -n kube-system \
+  --set clusterName=prod-sesacthon \
+  --set region=ap-northeast-2 \
+  --set vpcId=vpc-xxxxx
+
+# ALB Controller Pod 대기
+kubectl wait --for=condition=ready pod \
+  -l app.kubernetes.io/name=aws-load-balancer-controller \
+  -n kube-system \
+  --timeout=300s
+
+# ===== 2. Cert-manager (Certificate 관리, 10분) =====
 kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/v1.13.0/cert-manager.yaml
 
-# Let's Encrypt Issuer 생성
-cat <<EOF | kubectl apply -f -
-apiVersion: cert-manager.io/v1
-kind: ClusterIssuer
-metadata:
-  name: letsencrypt-prod
-spec:
-  acme:
-    server: https://acme-v02.api.letsencrypt.org/directory
-    email: your-email@example.com
-    privateKeySecretRef:
-      name: letsencrypt-prod
-    solvers:
-    - http01:
-        ingress:
-          class: nginx
-EOF
+# ===== 3. ACM Certificate (AWS Console에서 미리 생성) =====
+# AWS Console → Certificate Manager
+# 1. Request certificate
+# 2. Domain: *.growbin.app
+# 3. Validation: DNS (Route53)
+# 4. ARN 메모: arn:aws:acm:ap-northeast-2:xxxxx:certificate/xxxxx
+#
+# cert-manager는 Certificate 리소스 관리용으로만 사용
 
 # ===== 3. Metrics Server (HPA용, 5분) =====
 kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml
@@ -490,26 +497,23 @@ metadata:
   name: argocd-server-ingress
   namespace: argocd
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
-    nginx.ingress.kubernetes.io/ssl-passthrough: "true"
-    nginx.ingress.kubernetes.io/backend-protocol: "HTTPS"
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:xxxxx:certificate/xxxxx
+    alb.ingress.kubernetes.io/backend-protocol: HTTPS
 spec:
-  ingressClassName: nginx
   rules:
-  - host: argocd.yourdomain.com
+  - host: growbin.app
     http:
       paths:
-      - path: /
+      - path: /argocd
         pathType: Prefix
         backend:
           service:
             name: argocd-server
             port:
               number: 443
-  tls:
-  - hosts:
-    - argocd.yourdomain.com
-    secretName: argocd-tls
 EOF
 
 # ArgoCD 초기 비밀번호
@@ -534,24 +538,23 @@ metadata:
   name: grafana-ingress
   namespace: monitoring
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:xxxxx:certificate/xxxxx
+    alb.ingress.kubernetes.io/group.name: growbin-alb
 spec:
-  ingressClassName: nginx
   rules:
-  - host: grafana.yourdomain.com
+  - host: growbin.app
     http:
       paths:
-      - path: /
+      - path: /grafana
         pathType: Prefix
         backend:
           service:
             name: prometheus-grafana
             port:
               number: 80
-  tls:
-  - hosts:
-    - grafana.yourdomain.com
-    secretName: grafana-tls
 EOF
 
 # ✅ Add-ons 설치 완료!

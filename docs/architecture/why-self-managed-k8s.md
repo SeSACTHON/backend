@@ -54,12 +54,12 @@ Self-Managed K8s = 복잡도 ↑
 
 하지만,
 + 클라우드 경험
-+ AI 도구 (Claude 4.5)
++ AI 도구 (Claude 4.5 MAX)
 + IaC 자동화
 ━━━━━━━━━━━━━━━━━━━━━
 = 관리 가능한 복잡도
 
-EKS의 편의성 < 우리의 역량
+EKS의 편의성 < 역량
 → Self-Managed 선택이 합리적!
 ```
 
@@ -141,12 +141,11 @@ Worker Nodes: $120/월 (t3.medium x2 + t3.large x1)
 
 ## 🎓 학습 목적
 
-### 해커톤 + 학습 프로젝트
+### 해커톤
 
 ```
 우리 상황:
-- SeSAC 교육 과정
-- 실전 경험 필요
+- SeSAC 해커톤
 - Kubernetes 깊이 이해 필요
 - 팀 역량 향상
 
@@ -333,7 +332,7 @@ Tier 4: Stateful Storage (Storage)
 기술 역량:
 - Kubernetes 내부 구조 이해
 - 네트워크 디버깅 능력
-- Infrastructure as Code 마스터
+- Infrastructure as Code 활용
 - 프로덕션 운영 경험
 ```
 

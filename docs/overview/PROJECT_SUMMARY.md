@@ -13,7 +13,7 @@ Kubernetes (kubeadm, 1 Master + 2 Worker, non-HA)
 ├─ 도메인별 서버 분리 (5개 마이크로서비스)
 ├─ ArgoCD GitOps 자동 배포
 ├─ Helm Charts 패키지 관리
-├─ Nginx Ingress API Gateway
+├─ AWS ALB Controller (L7 Routing)
 └─ RabbitMQ + Celery 비동기 처리
 ```
 
