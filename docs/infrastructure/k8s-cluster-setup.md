@@ -620,18 +620,17 @@ service:
 
 ingress:
   enabled: true
-  className: nginx
   annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:xxxxx:certificate/xxxxx
+    alb.ingress.kubernetes.io/group.name: growbin-alb
   hosts:
-    - host: api.yourdomain.com
+    - host: growbin.app
       paths:
         - path: /api/v1/waste
           pathType: Prefix
-  tls:
-    - secretName: api-tls
-      hosts:
-        - api.yourdomain.com
 
 # Node Affinity (Worker 1에만 배포)
 nodeSelector:
@@ -1238,9 +1237,9 @@ Namespace: locations
 
 - [ ] AWS EC2 인스턴스 3대 생성
 - [ ] 보안 그룹 설정
-- [ ] k3s Master 설치
-- [ ] k3s Worker 조인
-- [ ] Nginx Ingress 설치
+- [ ] kubeadm Master 초기화
+- [ ] Workers 조인 (3개)
+- [ ] AWS Load Balancer Controller 설치
 - [ ] Cert-manager 설치
 - [ ] ArgoCD 설치
 - [ ] Prometheus + Grafana (선택)
