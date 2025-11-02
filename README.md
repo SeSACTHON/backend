@@ -235,7 +235,7 @@ graph TB
 
 ## 🔗 외부 링크
 
-- [GitHub Repository](https://github.com/your-org/sesacthon-backend)
+- [GitHub Repository](https://github.com/SeSACTHON/backend/)
 - [API 문서 (Swagger)](http://localhost:8000/docs) - 개발 서버 실행 필요
 - [ArgoCD Dashboard](https://argocd.yourdomain.com)
 - [Grafana Dashboard](https://grafana.yourdomain.com)
