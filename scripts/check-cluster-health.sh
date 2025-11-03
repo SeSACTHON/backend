@@ -140,10 +140,18 @@ echo ""
 
        EXPECTED_RELEASES=(
            "kube-prometheus-stack:monitoring"
-           "rabbitmq:messaging"
            "argocd:argocd"
            "aws-load-balancer-controller:kube-system"
        )
+       
+       # RabbitMQ는 Operator로 관리 (Helm Release 없음)
+       RABBITMQ_CR=$(kubectl get rabbitmqcluster rabbitmq -n messaging 2>/dev/null || echo "")
+       if [ -n "$RABBITMQ_CR" ]; then
+           echo "  ✅ RabbitMQ: Operator 관리 (RabbitmqCluster CR)"
+       else
+           echo "  ⚠️  RabbitMQ: RabbitmqCluster CR 없음"
+           ((WARNINGS++))
+       fi
 
 for release_info in "${EXPECTED_RELEASES[@]}"; do
     IFS=':' read -r release_name namespace <<< "$release_info"

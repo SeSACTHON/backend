@@ -1,5 +1,37 @@
 # etcd 백업 설정 (프로덕션 필수)
 ---
+- name: etcd 버전 확인 (etcdctl 다운로드용)
+  shell: kubectl version --short 2>/dev/null | grep Server | awk '{print $3}' || echo "v1.28.0"
+  register: k8s_version
+  changed_when: false
+
+- name: etcdctl 다운로드
+  get_url:
+    url: "https://github.com/etcd-io/etcd/releases/download/v3.5.9/etcd-v3.5.9-linux-amd64.tar.gz"
+    dest: /tmp/etcd.tar.gz
+    mode: '0644'
+
+- name: etcdctl 압축 해제
+  unarchive:
+    src: /tmp/etcd.tar.gz
+    dest: /tmp/
+    remote_src: yes
+
+- name: etcdctl 바이너리 설치
+  copy:
+    src: /tmp/etcd-v3.5.9-linux-amd64/etcdctl
+    dest: /usr/local/bin/etcdctl
+    mode: '0755'
+    remote_src: yes
+
+- name: 임시 파일 정리
+  file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /tmp/etcd.tar.gz
+    - /tmp/etcd-v3.5.9-linux-amd64
+
 - name: etcd 백업 디렉토리 생성
   file:
     path: /var/backups/etcd

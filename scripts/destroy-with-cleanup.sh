@@ -80,13 +80,7 @@ else
         helm uninstall grafana -n monitoring 2>/dev/null || true
     fi
     
-    # RabbitMQ (CRD + Helm 관리)
-    if helm list -n messaging 2>/dev/null | grep -q rabbitmq; then
-        echo "  - RabbitMQ (Helm Release) 삭제 중..."
-        helm uninstall rabbitmq -n messaging 2>/dev/null || true
-    fi
-    
-    # RabbitMQ Cluster CR 직접 삭제 (Helm이 없는 경우)
+    # RabbitMQ (Operator 관리 - RabbitmqCluster CR 삭제)
     if kubectl get rabbitmqcluster rabbitmq -n messaging >/dev/null 2>&1; then
         echo "  - RabbitMQ Cluster CR 삭제 중..."
         kubectl delete rabbitmqcluster rabbitmq -n messaging 2>/dev/null || true

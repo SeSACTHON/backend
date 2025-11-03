@@ -14,6 +14,7 @@
 4. [Prometheus Pod 대기 타이밍 문제](#4-prometheus-pod-대기-타이밍-문제)
 5. [RabbitMQ PVC 바인딩 실패 - StorageClass 없음](#5-rabbitmq-pvc-바인딩-실패---storageclass-없음)
 6. [PVC Provisioning 실패 - IAM 권한 부족](#6-pvc-provisioning-실패---iam-권한-부족)
+7. [VPC 삭제 장시간 대기 - Kubernetes 생성 리소스 미삭제](#7-vpc-삭제-장시간-대기---kubernetes-생성-리소스-미삭제)
 
 ---
 
@@ -606,6 +607,296 @@ kubectl get pv
 
 ---
 
+## 7. VPC 삭제 장시간 대기 - Kubernetes 생성 리소스 미삭제
+
+### 🐛 문제
+
+**증상**:
+```
+module.vpc.aws_vpc.main: Still destroying... [id=vpc-004d44bcda91cd06b, 6m10s elapsed]
+```
+
+**발생 시점**: `terraform destroy` 실행 중 VPC 삭제 단계에서 6분 이상 대기
+
+### 🔍 원인
+
+**Kubernetes가 동적으로 생성한 AWS 리소스**들이 VPC에 남아있어 삭제 불가:
+
+1. **EBS 볼륨 (EBS CSI Driver가 생성)**
+   - Prometheus PVC: 50GB × 3개
+   - RabbitMQ PVC: 20GB × 3개
+   - 총 6개, 210GB
+
+2. **보안 그룹 (ALB Controller가 생성)**
+   - `k8s-growbinalb-*` (Load Balancer용)
+   - `k8s-traffic-sesacthon-*` (Backend용)
+
+**왜 Terraform이 삭제하지 못하나?**
+- Terraform State에 없는 리소스 (Kubernetes가 생성)
+- Terraform은 자신이 생성하지 않은 리소스를 자동 삭제하지 않음
+- VPC는 종속 리소스가 모두 삭제되어야 삭제 가능
+
+### ✅ 해결
+
+**즉시 해결 (이미 terraform destroy 실행 중인 경우)**:
+
+```bash
+# 1. Kubernetes가 생성한 EBS 볼륨 확인 및 삭제
+aws ec2 describe-volumes \
+  --filters "Name=tag:kubernetes.io/created-for/pvc/name,Values=*" \
+  --region ap-northeast-2 \
+  --query 'Volumes[*].[VolumeId,State,Size,Tags[?Key==`kubernetes.io/created-for/pvc/name`].Value|[0]]' \
+  --output table
+
+# 볼륨 ID 복사 후 삭제
+aws ec2 delete-volume --volume-id vol-xxxxx --region ap-northeast-2
+aws ec2 delete-volume --volume-id vol-yyyyy --region ap-northeast-2
+# ... (모든 볼륨 삭제)
+
+# 2. Kubernetes가 생성한 보안 그룹 확인 및 삭제
+aws ec2 describe-security-groups \
+  --filters "Name=vpc-id,Values=vpc-004d44bcda91cd06b" \
+  --region ap-northeast-2 \
+  --query 'SecurityGroups[?GroupName!=`default`].[GroupId,GroupName,Description]' \
+  --output table
+
+# 보안 그룹 ID 복사 후 삭제
+aws ec2 delete-security-group --group-id sg-xxxxx --region ap-northeast-2
+aws ec2 delete-security-group --group-id sg-yyyyy --region ap-northeast-2
+
+# 3. terraform destroy 재시도 또는 대기
+terraform destroy -auto-approve
+```
+
+**올바른 삭제 순서 (향후)**:
+
+```bash
+# 1단계: Kubernetes 리소스 먼저 삭제
+echo "🧹 Kubernetes 리소스 정리..."
+
+# Ingress 삭제 (ALB 및 보안 그룹 제거)
+kubectl delete ingress --all -A
+
+# PVC 삭제 (EBS 볼륨 제거)
+kubectl delete pvc --all -A
+
+# Helm Release 삭제
+helm uninstall kube-prometheus-stack -n monitoring
+helm uninstall rabbitmq -n messaging
+
+# 2단계: AWS 리소스 정리 대기 (중요!)
+echo "⏳ AWS 리소스 정리 대기 중..."
+sleep 60
+
+# 3단계: 수동 생성 리소스 확인
+echo "🔍 남은 리소스 확인..."
+aws ec2 describe-volumes \
+  --filters "Name=tag:kubernetes.io/created-for/pvc/name,Values=*" \
+  --region ap-northeast-2 \
+  --query 'Volumes[*].VolumeId' \
+  --output text
+
+# 4단계: Terraform 인프라 삭제
+echo "🗑️  Terraform 인프라 삭제..."
+cd terraform
+terraform destroy -auto-approve
+```
+
+### 💡 자동화 스크립트
+
+**파일**: `scripts/destroy-with-cleanup.sh` (새로 생성 권장)
+
+```bash
+#!/bin/bash
+set -e
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+TERRAFORM_DIR="$PROJECT_ROOT/terraform"
+
+echo "🧹 Kubernetes 리소스 정리 중..."
+
+# Ingress 삭제 (ALB 제거)
+kubectl delete ingress --all -A || true
+
+# PVC 삭제 (EBS 볼륨 제거)
+kubectl delete pvc --all -A || true
+
+# Monitoring 삭제
+helm uninstall kube-prometheus-stack -n monitoring || true
+
+# RabbitMQ 삭제
+helm uninstall rabbitmq -n messaging || true
+
+echo "⏳ AWS 리소스 정리 대기 (60초)..."
+sleep 60
+
+echo "🔍 남은 Kubernetes 생성 리소스 확인..."
+
+# EBS 볼륨 강제 삭제
+VOLUMES=$(aws ec2 describe-volumes \
+  --filters "Name=tag:kubernetes.io/created-for/pvc/name,Values=*" \
+  --region ap-northeast-2 \
+  --query 'Volumes[*].VolumeId' \
+  --output text)
+
+if [ -n "$VOLUMES" ]; then
+  echo "⚠️  남은 EBS 볼륨 발견, 삭제 중..."
+  for vol in $VOLUMES; do
+    echo "  - 삭제: $vol"
+    aws ec2 delete-volume --volume-id $vol --region ap-northeast-2 || true
+  done
+fi
+
+# 보안 그룹 강제 삭제 (k8s-* 패턴)
+SG_IDS=$(aws ec2 describe-security-groups \
+  --filters "Name=tag:kubernetes.io/cluster/prod-sesacthon,Values=*" \
+  --region ap-northeast-2 \
+  --query 'SecurityGroups[*].GroupId' \
+  --output text)
+
+if [ -n "$SG_IDS" ]; then
+  echo "⚠️  남은 보안 그룹 발견, 삭제 중..."
+  for sg in $SG_IDS; do
+    echo "  - 삭제: $sg"
+    aws ec2 delete-security-group --group-id $sg --region ap-northeast-2 || true
+  done
+fi
+
+echo "🗑️  Terraform 인프라 삭제..."
+cd "$TERRAFORM_DIR"
+terraform destroy -auto-approve
+
+echo "✅ 완전 삭제 완료!"
+```
+
+### 📊 삭제 프로세스
+
+**잘못된 방법 (현재 문제)**:
+```
+1. terraform destroy 실행
+   └─> VPC 삭제 시도
+       └─> ❌ 실패 (EBS 볼륨, 보안 그룹 남아있음)
+           └─> 무한 대기...
+```
+
+**올바른 방법**:
+```
+1. Kubernetes 리소스 삭제
+   ├─> Ingress 삭제 (ALB, 보안 그룹 제거)
+   ├─> PVC 삭제 (EBS 볼륨 제거)
+   └─> Helm Release 삭제
+
+2. AWS 리소스 정리 대기 (60초)
+   └─> AWS API 비동기 처리 완료 대기
+
+3. 잔여 리소스 확인 및 수동 삭제
+   ├─> aws ec2 describe-volumes
+   └─> aws ec2 delete-volume
+
+4. terraform destroy 실행
+   └─> ✅ 성공 (종속 리소스 없음)
+```
+
+### 🔍 리소스 확인 명령어
+
+```bash
+# 1. VPC에 연결된 모든 ENI 확인
+aws ec2 describe-network-interfaces \
+  --filters "Name=vpc-id,Values=vpc-xxxxx" \
+  --region ap-northeast-2
+
+# 2. VPC에 연결된 보안 그룹 확인
+aws ec2 describe-security-groups \
+  --filters "Name=vpc-id,Values=vpc-xxxxx" \
+  --region ap-northeast-2
+
+# 3. Kubernetes가 생성한 EBS 볼륨 확인
+aws ec2 describe-volumes \
+  --filters "Name=tag-key,Values=kubernetes.io/created-for/pvc/name" \
+  --region ap-northeast-2
+
+# 4. VPC에 연결된 로드밸런서 확인
+aws elbv2 describe-load-balancers \
+  --region ap-northeast-2 \
+  --query 'LoadBalancers[?VpcId==`vpc-xxxxx`]'
+
+# 5. NAT Gateway 확인
+aws ec2 describe-nat-gateways \
+  --filter "Name=vpc-id,Values=vpc-xxxxx" \
+  --region ap-northeast-2
+```
+
+### 💡 핵심 교훈
+
+#### Kubernetes와 Terraform의 리소스 관리 차이
+
+**Terraform 관리 리소스**:
+- VPC, Subnet, IGW, Route Table
+- EC2 Instance
+- IAM Role/Policy
+- Security Groups (Terraform으로 생성한 것만)
+
+**Kubernetes 관리 리소스** (Terraform State 밖):
+- EBS 볼륨 (PVC → EBS CSI Driver → CreateVolume)
+- 보안 그룹 (Ingress → ALB Controller → CreateSecurityGroup)
+- Load Balancer (Ingress → ALB Controller → CreateLoadBalancer)
+- ENI (Service type=LoadBalancer)
+
+#### Self-Managed K8s 삭제 체크리스트
+
+삭제 전 필수 확인:
+
+- [ ] 모든 Ingress 삭제 (`kubectl delete ingress --all -A`)
+- [ ] 모든 PVC 삭제 (`kubectl delete pvc --all -A`)
+- [ ] 모든 Service type=LoadBalancer 삭제
+- [ ] Helm Release 삭제
+- [ ] 60초 대기 (AWS 리소스 정리)
+- [ ] 잔여 리소스 확인 (`aws ec2 describe-volumes`, etc.)
+- [ ] Terraform destroy 실행
+
+**순서 엄수**: Kubernetes → 대기 → 확인 → Terraform
+
+### 🎯 예방 방법
+
+#### 1. 삭제 스크립트 사용
+
+```bash
+# destroy.sh 대신 destroy-with-cleanup.sh 사용
+./scripts/destroy-with-cleanup.sh
+```
+
+#### 2. CI/CD Pipeline에 추가
+
+```yaml
+# .github/workflows/destroy.yml
+- name: Clean Kubernetes Resources
+  run: |
+    kubectl delete ingress --all -A
+    kubectl delete pvc --all -A
+    helm uninstall --all -A
+    sleep 60
+
+- name: Terraform Destroy
+  run: terraform destroy -auto-approve
+```
+
+#### 3. Terraform Lifecycle 관리
+
+```hcl
+# 향후 개선: Terraform으로 Helm Release 관리
+resource "helm_release" "rabbitmq" {
+  # ...
+  
+  # Terraform destroy 시 자동 삭제
+  lifecycle {
+    prevent_destroy = false
+  }
+}
+```
+
+---
+
 ## 📊 해결 요약
 
 | 문제 | 원인 | 해결 | 커밋 |
@@ -616,6 +907,7 @@ kubectl get pv
 | Prometheus Pod 타이밍 | 리소스 생성 전 wait 실행 | 다단계 대기 로직 | `df7c3da` |
 | RabbitMQ PVC 바인딩 실패 | StorageClass 없음 | EBS CSI Driver 설치 | `80a7f9c` |
 | PVC Provisioning 실패 | IAM 권한 부족 | EBS CSI 권한 추가 | `6b48c4d` |
+| **VPC 삭제 장시간 대기** | **Kubernetes 생성 리소스 미삭제** | **수동 리소스 정리 후 destroy** | **수동 해결** |
 
 ---
 
@@ -653,8 +945,8 @@ kubectl get pv
 ---
 
 **마지막 업데이트**: 2025-11-02  
-**총 해결 문제**: 6개  
-**총 커밋**: 6개  
+**총 해결 문제**: 7개  
+**총 커밋**: 6개 (1개 수동 해결)  
 **상태**: ✅ 모든 문제 해결 완료
 
 ---
@@ -669,4 +961,5 @@ kubectl get pv
 4. **Operator 패턴**: 충분한 대기 시간 + 다단계 검증
 5. **StorageClass**: Self-Managed는 CSI Driver 수동 설치 필수
 6. **IAM 권한**: EBS CSI Driver에 ec2:CreateVolume 등 권한 추가
+7. **VPC 삭제**: Kubernetes 리소스 먼저 삭제 → 대기 → Terraform destroy
 
