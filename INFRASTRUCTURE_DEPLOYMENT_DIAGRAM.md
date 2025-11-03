@@ -114,26 +114,41 @@ graph LR
 ### Phase 3: Kubernetes 클러스터 구축 (Ansible)
 
 ```mermaid
-graph TB
-    A[OS 설정] --> B[Container Runtime]
-    B --> C[Kubernetes 패키지]
-    C --> D[Master 초기화]
-    D --> E[Worker 조인]
-    E --> F[CNI 설치]
-    F --> G[노드 레이블]
+graph LR
+    subgraph "1. 기반 설정"
+        A[OS 설정] --> B[Container Runtime]
+        B --> C[Kubernetes 패키지]
+    end
     
-    G --> H[Add-ons]
-    H --> I[Cert-manager]
-    H --> J[EBS CSI Driver]
-    H --> K[ALB Controller]
+    subgraph "2. 클러스터 구성"
+        C --> D[Master 초기화]
+        D --> E[Worker 조인]
+        E --> F[CNI 설치]
+        F --> G[노드 레이블]
+    end
     
-    K --> L[Application Stack]
-    L --> M[ArgoCD]
-    L --> N[Prometheus]
-    L --> O[RabbitMQ Operator]
-    O --> P[RabbitmqCluster CR]
-    P --> Q[RabbitMQ Pod]
-    L --> R[Redis]
+    subgraph "3. 인프라 Add-ons"
+        G --> H1[Cert-manager]
+        G --> H2[EBS CSI Driver]
+        G --> H3[ALB Controller]
+    end
+    
+    subgraph "4. 애플리케이션 Stack"
+        H1 --> I[ArgoCD]
+        H2 --> J[Prometheus]
+        H3 --> K1[RabbitMQ Operator]
+        K1 --> K2[RabbitmqCluster CR]
+        K2 --> K3[RabbitMQ Pod]
+        H3 --> L[Redis]
+    end
+    
+    style A fill:#e1f5ff
+    style D fill:#fff4e6
+    style H1 fill:#e8f5e9
+    style H2 fill:#e8f5e9
+    style H3 fill:#e8f5e9
+    style K2 fill:#fff9c4
+    style K3 fill:#fff9c4
 ```
 
 ## RabbitMQ 배포 상세 (순수 Operator 방식)
