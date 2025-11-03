@@ -1,387 +1,272 @@
 #!/bin/bash
-# Kubernetes 클러스터 안정성 점검 스크립트
-# Master 노드에서 실행
+# Kubernetes 클러스터 상태 점검 스크립트
+# auto-rebuild.sh 실행 후 클러스터가 의도대로 생성되었는지 확인
+
+set -e
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🔍 Kubernetes 클러스터 안정성 점검"
+echo "🔍 Kubernetes 클러스터 상태 점검"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# Color codes
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
-
-score=0
-max_score=0
-
-check_pass() {
-  echo -e "${GREEN}✅ PASS${NC}: $1"
-  score=$((score + 1))
-  max_score=$((max_score + 1))
-}
-
-check_fail() {
-  echo -e "${RED}❌ FAIL${NC}: $1"
-  max_score=$((max_score + 1))
-}
-
-check_warn() {
-  echo -e "${YELLOW}⚠️  WARN${NC}: $1"
-  max_score=$((max_score + 1))
-}
-
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "1️⃣  시스템 리소스"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-# 메모리 체크
-MEM_AVAILABLE=$(free -m | awk 'NR==2 {print $7}')
-if [ "$MEM_AVAILABLE" -gt 2000 ]; then
-  check_pass "메모리 여유: ${MEM_AVAILABLE}MB"
-elif [ "$MEM_AVAILABLE" -gt 1000 ]; then
-  check_warn "메모리 부족 가능성: ${MEM_AVAILABLE}MB"
-else
-  check_fail "메모리 부족: ${MEM_AVAILABLE}MB"
-fi
-
-# Swap 체크
-if [ "$(swapon -s)" == "" ]; then
-  check_pass "Swap 비활성화"
-else
-  check_fail "Swap 활성화됨"
-fi
-
-# 디스크 체크
-DISK_USAGE=$(df -h /var/lib/etcd 2>/dev/null | awk 'NR==2 {print $5}' | sed 's/%//')
-if [ -z "$DISK_USAGE" ]; then
-  DISK_USAGE=$(df -h / | awk 'NR==2 {print $5}' | sed 's/%//')
-fi
-if [ "$DISK_USAGE" -lt 80 ]; then
-  check_pass "디스크 사용량: ${DISK_USAGE}%"
-else
-  check_warn "디스크 사용량 높음: ${DISK_USAGE}%"
-fi
-
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "2️⃣  containerd 설정"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-# containerd 실행
-if systemctl is-active containerd >/dev/null 2>&1; then
-  check_pass "containerd 실행 중"
-else
-  check_fail "containerd 중지됨"
-fi
-
-# pause image 확인
-PAUSE_IMAGE=$(grep "sandbox_image" /etc/containerd/config.toml | grep -o 'registry.k8s.io/pause:[0-9.]*' | head -1)
-if [ "$PAUSE_IMAGE" == "registry.k8s.io/pause:3.9" ]; then
-  check_pass "pause image: $PAUSE_IMAGE"
-else
-  check_fail "pause image 불일치: $PAUSE_IMAGE (expected 3.9)"
-fi
-
-# SystemdCgroup 확인
-if grep -q "SystemdCgroup = true" /etc/containerd/config.toml; then
-  check_pass "SystemdCgroup 활성화"
-else
-  check_fail "SystemdCgroup 비활성화"
-fi
-
-# CRI 소켓
-if [ -S /run/containerd/containerd.sock ]; then
-  check_pass "CRI 소켓 존재"
-else
-  check_fail "CRI 소켓 없음"
-fi
-
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "3️⃣  Control Plane 컴포넌트"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-# crictl로 컨테이너 상태 확인
-for component in etcd kube-apiserver kube-controller-manager kube-scheduler; do
-  STATE=$(sudo crictl ps -a | grep "$component" | head -1 | awk '{print $4}')
-  if [ "$STATE" == "Running" ]; then
-    check_pass "$component: Running"
-  elif [ "$STATE" == "Exited" ]; then
-    check_fail "$component: Exited (죽어있음!)"
-  else
-    check_warn "$component: $STATE"
-  fi
-done
-
-# API 서버 응답 확인
-if kubectl get --raw /healthz >/dev/null 2>&1; then
-  check_pass "API 서버 응답 정상"
-else
-  check_fail "API 서버 응답 없음"
-fi
-
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "4️⃣  노드 상태"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-if command -v kubectl >/dev/null 2>&1 && kubectl get nodes >/dev/null 2>&1; then
-  TOTAL_NODES=$(kubectl get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ')
-  READY_NODES=$(kubectl get nodes --no-headers 2>/dev/null | grep -w "Ready" | wc -l | tr -d ' ')
-  
-  if [ "$TOTAL_NODES" -eq 3 ] && [ "$READY_NODES" -eq 3 ]; then
-    check_pass "노드: $READY_NODES/$TOTAL_NODES Ready"
-  elif [ "$READY_NODES" -gt 0 ]; then
-    check_warn "노드: $READY_NODES/$TOTAL_NODES Ready"
-  else
-    check_fail "노드: $READY_NODES/$TOTAL_NODES Ready"
-  fi
-else
-  check_fail "kubectl 사용 불가 (API 서버 문제)"
-fi
-
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "5️⃣  Pod 재시작 횟수"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-if kubectl get pods -A >/dev/null 2>&1; then
-  echo "재시작 많은 Pod (상위 5개):"
-  kubectl get pods -A --sort-by='.status.containerStatuses[0].restartCount' 2>/dev/null | grep -v "RESTARTS" | tail -5 | while read line; do
-    RESTARTS=$(echo "$line" | awk '{print $5}')
-    NAME=$(echo "$line" | awk '{print $2}')
-    if [ "$RESTARTS" -gt 5 ]; then
-      echo -e "  ${RED}❌${NC} $NAME: $RESTARTS 재시작"
-    elif [ "$RESTARTS" -gt 2 ]; then
-      echo -e "  ${YELLOW}⚠️${NC} $NAME: $RESTARTS 재시작"
-    else
-      echo -e "  ${GREEN}✅${NC} $NAME: $RESTARTS 재시작"
-    fi
-  done
-else
-  echo "  API 서버 접근 불가"
-fi
-
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "6️⃣  네트워크 설정"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-# sysctl 확인
-if [ "$(sysctl -n net.ipv4.ip_forward)" == "1" ]; then
-  check_pass "IP forward 활성화"
-else
-  check_fail "IP forward 비활성화"
-fi
-
-if [ "$(sysctl -n net.bridge.bridge-nf-call-iptables)" == "1" ]; then
-  check_pass "bridge-nf-call-iptables 활성화"
-else
-  check_fail "bridge-nf-call-iptables 비활성화"
-fi
-
-# CNI 설정
-if [ -d /etc/cni/net.d ] && [ "$(ls -A /etc/cni/net.d 2>/dev/null)" ]; then
-  check_pass "CNI 설정 파일 존재"
-  echo "  파일: $(ls /etc/cni/net.d/)"
-elif [ -d /etc/cni/net.d ]; then
-  check_warn "CNI 디렉토리 비어있음"
-else
-  check_fail "CNI 디렉토리 없음"
-fi
-
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "7️⃣  kube-proxy 설정"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-if kubectl get daemonset kube-proxy -n kube-system >/dev/null 2>&1; then
-  DESIRED=$(kubectl get daemonset kube-proxy -n kube-system -o jsonpath='{.status.desiredNumberScheduled}' 2>/dev/null)
-  READY=$(kubectl get daemonset kube-proxy -n kube-system -o jsonpath='{.status.numberReady}' 2>/dev/null)
-  
-  if [ "$DESIRED" -eq "$READY" ] && [ "$READY" -gt 0 ]; then
-    check_pass "kube-proxy: $READY/$DESIRED Ready"
-  else
-    check_warn "kube-proxy: $READY/$DESIRED Ready"
-  fi
-else
-  check_fail "kube-proxy DaemonSet 없음"
-fi
-
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "8️⃣  Calico CNI"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-if kubectl get daemonset calico-node -n kube-system >/dev/null 2>&1; then
-  DESIRED=$(kubectl get daemonset calico-node -n kube-system -o jsonpath='{.status.desiredNumberScheduled}' 2>/dev/null)
-  READY=$(kubectl get daemonset calico-node -n kube-system -o jsonpath='{.status.numberReady}' 2>/dev/null)
-  
-  if [ "$DESIRED" -eq "$READY" ] && [ "$READY" -gt 0 ]; then
-    check_pass "Calico: $READY/$DESIRED Ready"
-  else
-    check_warn "Calico: $READY/$DESIRED Ready"
-  fi
-else
-  check_fail "Calico DaemonSet 없음"
-fi
-
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "9️⃣  CrashLoopBackOff Pod 확인"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-if kubectl get pods -A >/dev/null 2>&1; then
-  CRASH_PODS=$(kubectl get pods -A 2>/dev/null | grep -c "CrashLoopBackOff" || echo "0")
-  if [ "$CRASH_PODS" -eq 0 ]; then
-    check_pass "CrashLoopBackOff Pod: 없음"
-  else
-    check_fail "CrashLoopBackOff Pod: ${CRASH_PODS}개"
+# kubectl 연결 확인
+if ! kubectl cluster-info &>/dev/null; then
+    echo "❌ Kubernetes 클러스터에 연결할 수 없습니다."
     echo ""
-    echo "  CrashLoopBackOff Pod 목록:"
-    kubectl get pods -A 2>/dev/null | grep "CrashLoopBackOff" | while read line; do
-      echo -e "    ${RED}→${NC} $line"
-    done
-  fi
-else
-  echo "  API 서버 접근 불가"
+    echo "💡 Master 노드에 접속하여 확인하세요:"
+    echo "   ./scripts/connect-ssh.sh master"
+    echo ""
+    exit 1
 fi
 
+ERRORS=0
+WARNINGS=0
+
+# 1. 노드 상태 확인
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "1️⃣ 노드 상태"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🔟 Kubernetes 버전 일치성"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
-KUBEADM_VER=$(kubeadm version -o short 2>/dev/null)
-KUBELET_VER=$(kubelet --version 2>/dev/null | awk '{print $2}')
-KUBECTL_VER=$(kubectl version --client -o json 2>/dev/null | grep -o 'v[0-9.]*' | head -1)
+NODES=$(kubectl get nodes --no-headers 2>/dev/null | wc -l | tr -d ' ')
+READY_NODES=$(kubectl get nodes --no-headers 2>/dev/null | grep -c " Ready " || echo "0")
+EXPECTED_NODES=4  # Master, Worker-1, Worker-2, Storage
 
-echo "  kubeadm: $KUBEADM_VER"
-echo "  kubelet: $KUBELET_VER"
-echo "  kubectl: $KUBECTL_VER"
+echo "📊 노드 상태: $READY_NODES / $NODES Ready (예상: $EXPECTED_NODES)"
+kubectl get nodes -o wide
+echo ""
 
-if [ "$KUBEADM_VER" == "$KUBELET_VER" ]; then
-  check_pass "kubeadm-kubelet 버전 일치"
+if [ "$NODES" -ne "$EXPECTED_NODES" ]; then
+    echo "❌ 노드 개수 불일치 (예상: $EXPECTED_NODES, 실제: $NODES)"
+    ((ERRORS++))
+elif [ "$READY_NODES" -ne "$EXPECTED_NODES" ]; then
+    echo "⚠️  일부 노드가 Ready 상태가 아닙니다"
+    ((WARNINGS++))
 else
-  check_fail "버전 불일치: kubeadm=$KUBEADM_VER, kubelet=$KUBELET_VER"
+    echo "✅ 모든 노드 Ready"
 fi
 
+# 노드 레이블 확인
 echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "1️⃣1️⃣  API 서버 안정성 테스트 (30초)"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📋 노드 레이블 확인:"
+STORAGE_LABEL=$(kubectl get nodes k8s-storage --show-labels --no-headers 2>/dev/null | grep -o "workload=storage" || echo "")
+if [ -n "$STORAGE_LABEL" ]; then
+    echo "  ✅ k8s-storage: workload=storage"
+else
+    echo "  ❌ k8s-storage: workload=storage 레이블 없음"
+    ((ERRORS++))
+fi
+echo ""
 
-SUCCESS=0
-FAIL=0
-for i in {1..30}; do
-  if kubectl get --raw /healthz >/dev/null 2>&1; then
-    SUCCESS=$((SUCCESS + 1))
-  else
-    FAIL=$((FAIL + 1))
-  fi
-  sleep 1
+# 2. 시스템 Pod 상태
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "2️⃣ 시스템 Pod 상태 (kube-system)"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+NOT_READY_PODS=$(kubectl get pods -n kube-system --field-selector=status.phase!=Running --no-headers 2>/dev/null | wc -l | tr -d ' ')
+
+if [ "$NOT_READY_PODS" -gt 0 ]; then
+    echo "⚠️  비정상 Pod: $NOT_READY_PODS개"
+    kubectl get pods -n kube-system --field-selector=status.phase!=Running
+    ((WARNINGS++))
+else
+    echo "✅ 모든 시스템 Pod 실행 중"
+fi
+
+# EBS CSI Driver 확인
+EBS_CSI=$(kubectl get pods -n kube-system | grep ebs-csi | grep -c "Running" || echo "0")
+if [ "$EBS_CSI" -ge 2 ]; then
+    echo "✅ EBS CSI Driver: $EBS_CSI개 Pod 실행 중"
+else
+    echo "❌ EBS CSI Driver: Pod 부족 또는 미실행"
+    ((ERRORS++))
+fi
+echo ""
+
+# 3. StorageClass 확인
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "3️⃣ StorageClass 확인"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+GP3_SC=$(kubectl get storageclass gp3 2>/dev/null || echo "")
+if [ -n "$GP3_SC" ]; then
+    echo "✅ gp3 StorageClass 존재"
+    kubectl get storageclass gp3
+else
+    echo "❌ gp3 StorageClass 없음"
+    ((ERRORS++))
+fi
+echo ""
+
+# 4. Helm Release 확인
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "4️⃣ Helm Release 상태"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+EXPECTED_RELEASES=(
+    "kube-prometheus-stack:monitoring"
+    "rabbitmq:messaging"
+    "argocd:argocd"
+    "aws-load-balancer-controller:kube-system"
+)
+
+for release_info in "${EXPECTED_RELEASES[@]}"; do
+    IFS=':' read -r release_name namespace <<< "$release_info"
+    RELEASE_STATUS=$(helm status "$release_name" -n "$namespace" 2>/dev/null | grep "STATUS:" | awk '{print $2}' || echo "not_found")
+    
+    if [ "$RELEASE_STATUS" == "deployed" ]; then
+        echo "  ✅ $release_name ($namespace): deployed"
+    elif [ "$RELEASE_STATUS" == "not_found" ]; then
+        echo "  ❌ $release_name ($namespace): 설치되지 않음"
+        ((ERRORS++))
+    else
+        echo "  ⚠️  $release_name ($namespace): $RELEASE_STATUS"
+        ((WARNINGS++))
+    fi
 done
+echo ""
 
-SUCCESS_RATE=$((SUCCESS * 100 / 30))
-echo "  성공: $SUCCESS/30 (${SUCCESS_RATE}%)"
-echo "  실패: $FAIL/30"
+# 5. 애플리케이션 Pod 상태
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "5️⃣ 애플리케이션 Pod 상태"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
 
-if [ "$SUCCESS_RATE" -ge 90 ]; then
-  check_pass "API 서버 안정성: ${SUCCESS_RATE}%"
-elif [ "$SUCCESS_RATE" -ge 70 ]; then
-  check_warn "API 서버 불안정: ${SUCCESS_RATE}%"
+# RabbitMQ
+RABBITMQ_PODS=$(kubectl get pods -n messaging -l app.kubernetes.io/name=rabbitmq --no-headers 2>/dev/null | grep -c "Running" || echo "0")
+RABBITMQ_EXPECTED=3
+if [ "$RABBITMQ_PODS" -eq "$RABBITMQ_EXPECTED" ]; then
+    echo "✅ RabbitMQ: $RABBITMQ_PODS/$RABBITMQ_EXPECTED Pod 실행 중"
 else
-  check_fail "API 서버 심각한 불안정: ${SUCCESS_RATE}%"
+    echo "⚠️  RabbitMQ: $RABBITMQ_PODS/$RABBITMQ_EXPECTED Pod (예상: $RABBITMQ_EXPECTED)"
+    kubectl get pods -n messaging -l app.kubernetes.io/name=rabbitmq
+    ((WARNINGS++))
 fi
 
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "1️⃣2️⃣  최근 에러 로그 (kubelet)"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-KUBELET_ERRORS=$(sudo journalctl -u kubelet --since "5 minutes ago" --no-pager 2>/dev/null | grep -c "Error\|FATAL" || echo "0")
-if [ "$KUBELET_ERRORS" -lt 10 ]; then
-  check_pass "kubelet 에러: $KUBELET_ERRORS개 (5분 이내)"
-elif [ "$KUBELET_ERRORS" -lt 50 ]; then
-  check_warn "kubelet 에러 다수: $KUBELET_ERRORS개"
+# Redis
+REDIS_PODS=$(kubectl get pods -n default -l app=redis --no-headers 2>/dev/null | grep -c "Running" || echo "0")
+if [ "$REDIS_PODS" -ge 1 ]; then
+    echo "✅ Redis: $REDIS_PODS Pod 실행 중"
 else
-  check_fail "kubelet 에러 과다: $KUBELET_ERRORS개"
+    echo "⚠️  Redis: Pod 실행 중 아님"
+    kubectl get pods -n default -l app=redis 2>/dev/null || true
+    ((WARNINGS++))
 fi
 
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "1️⃣3️⃣  etcd 데이터 무결성"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-if [ -d /var/lib/etcd/member ]; then
-  ETCD_SIZE=$(du -sh /var/lib/etcd 2>/dev/null | awk '{print $1}')
-  echo "  etcd 데이터 크기: $ETCD_SIZE"
-  check_pass "etcd 데이터 존재"
+# Prometheus
+PROM_PODS=$(kubectl get pods -n monitoring -l app.kubernetes.io/name=prometheus --no-headers 2>/dev/null | grep -c "Running" || echo "0")
+if [ "$PROM_PODS" -ge 1 ]; then
+    echo "✅ Prometheus: $PROM_PODS Pod 실행 중"
 else
-  check_warn "etcd 데이터 디렉토리 없음"
+    echo "⚠️  Prometheus: Pod 실행 중 아님"
+    ((WARNINGS++))
 fi
 
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "1️⃣4️⃣  CoreDNS"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-if kubectl get deployment coredns -n kube-system >/dev/null 2>&1; then
-  DESIRED=$(kubectl get deployment coredns -n kube-system -o jsonpath='{.spec.replicas}' 2>/dev/null)
-  READY=$(kubectl get deployment coredns -n kube-system -o jsonpath='{.status.readyReplicas}' 2>/dev/null)
-  
-  if [ "$DESIRED" -eq "$READY" ]; then
-    check_pass "CoreDNS: $READY/$DESIRED Ready"
-  else
-    check_warn "CoreDNS: $READY/$DESIRED Ready"
-  fi
+# ArgoCD
+ARGOCD_PODS=$(kubectl get pods -n argocd --no-headers 2>/dev/null | grep -c "Running" || echo "0")
+if [ "$ARGOCD_PODS" -ge 1 ]; then
+    echo "✅ ArgoCD: $ARGOCD_PODS Pod 실행 중"
 else
-  echo "  CoreDNS 확인 불가"
+    echo "⚠️  ArgoCD: Pod 실행 중 아님"
+    ((WARNINGS++))
+fi
+echo ""
+
+# 6. PVC 상태
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "6️⃣ PVC 상태"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+BOUND_PVC=$(kubectl get pvc -A --no-headers 2>/dev/null | grep -c "Bound" || echo "0")
+PENDING_PVC=$(kubectl get pvc -A --no-headers 2>/dev/null | grep -c "Pending" || echo "0")
+
+if [ "$PENDING_PVC" -gt 0 ]; then
+    echo "⚠️  Pending PVC: $PENDING_PVC개"
+    kubectl get pvc -A | grep Pending
+    ((WARNINGS++))
 fi
 
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "📊 최종 점수"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-PERCENTAGE=$((score * 100 / max_score))
-echo ""
-echo "  점수: $score / $max_score ($PERCENTAGE%)"
+if [ "$BOUND_PVC" -gt 0 ]; then
+    echo "✅ Bound PVC: $BOUND_PVC개"
+fi
 echo ""
 
-if [ "$PERCENTAGE" -ge 90 ]; then
-  echo -e "${GREEN}✅ 클러스터 안정적${NC}"
-  echo "  → Ansible 계속 진행 가능"
-elif [ "$PERCENTAGE" -ge 70 ]; then
-  echo -e "${YELLOW}⚠️  클러스터 불안정${NC}"
-  echo "  → 일부 문제 해결 필요"
+# 7. Service 및 Ingress
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "7️⃣ Service 및 Ingress"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+# LoadBalancer Service
+LB_SVCS=$(kubectl get svc -A -o json 2>/dev/null | jq -r '.items[] | select(.spec.type=="LoadBalancer") | "\(.metadata.namespace)/\(.metadata.name)"' 2>/dev/null || echo "")
+if [ -n "$LB_SVCS" ]; then
+    echo "📋 LoadBalancer Service:"
+    echo "$LB_SVCS" | while read svc; do
+        echo "  - $svc"
+    done
 else
-  echo -e "${RED}❌ 클러스터 심각한 불안정${NC}"
-  echo "  → 재구축 권장"
+    echo "ℹ️  LoadBalancer Service 없음 (정상 - Ingress 사용)"
 fi
 
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "💡 권장 조치"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-
-if [ "$PERCENTAGE" -lt 70 ]; then
-  echo "  1. 전체 재구축:"
-  echo "     ./scripts/rebuild-cluster.sh"
-  echo ""
-  echo "  2. containerd 재시작:"
-  echo "     sudo systemctl restart containerd"
-  echo "     sudo systemctl restart kubelet"
-elif [ "$PERCENTAGE" -lt 90 ]; then
-  echo "  1. 문제 Pod 재시작:"
-  echo "     kubectl delete pods -A --field-selector status.phase=Failed"
-  echo ""
-  echo "  2. API 서버 대기 후 재시도"
+# Ingress
+INGRESS_COUNT=$(kubectl get ingress -A --no-headers 2>/dev/null | wc -l | tr -d ' ')
+if [ "$INGRESS_COUNT" -gt 0 ]; then
+    echo "✅ Ingress: $INGRESS_COUNT개"
+    kubectl get ingress -A
+else
+    echo "ℹ️  Ingress 없음 (아직 생성되지 않음)"
 fi
-
 echo ""
+
+# 8. etcd 상태
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "8️⃣ etcd 상태"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
 
+# Master 노드에서 etcd 상태 확인은 SSH 필요하므로 생략
+echo "ℹ️  etcd 상태는 Master 노드에서 직접 확인 필요"
+echo "   SSH 접속 후: sudo ETCDCTL_API=3 etcdctl endpoint health"
+echo ""
 
+# 9. 요약
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "📊 점검 요약"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+if [ "$ERRORS" -eq 0 ] && [ "$WARNINGS" -eq 0 ]; then
+    echo "✅ 클러스터 상태 양호!"
+    echo ""
+    echo "📋 주요 정보:"
+    echo "  - 노드: $READY_NODES/$NODES Ready"
+    echo "  - Helm Release: 모두 deployed"
+    echo "  - 시스템 Pod: 정상"
+    echo ""
+    echo "🔗 접속 정보:"
+    ARGOCD_PASSWORD=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" 2>/dev/null | base64 -d || echo "N/A")
+    echo "  - ArgoCD: https://$(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo 'N/A'):8080"
+    echo "    Username: admin"
+    echo "    Password: $ARGOCD_PASSWORD"
+    echo ""
+    exit 0
+elif [ "$ERRORS" -eq 0 ]; then
+    echo "⚠️  경고 $WARNINGS개 (치명적 오류 없음)"
+    echo ""
+    echo "💡 권장 사항:"
+    echo "   - 위의 경고 항목 확인"
+    echo "   - Pod 로그 확인: kubectl logs <pod-name> -n <namespace>"
+    exit 0
+else
+    echo "❌ 오류 $ERRORS개, 경고 $WARNINGS개"
+    echo ""
+    echo "💡 다음 단계:"
+    echo "   1. 오류 항목 확인"
+    echo "   2. Pod 이벤트 확인: kubectl describe pod <pod-name> -n <namespace>"
+    echo "   3. 로그 확인: kubectl logs <pod-name> -n <namespace>"
+    exit 1
+fi
