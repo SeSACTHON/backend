@@ -60,6 +60,14 @@ if kubectl cluster-info &>/dev/null; then
   echo "  - PVC 삭제..."
   kubectl delete pvc --all -A 2>/dev/null || echo "    (PVC 없음)"
   
+  # 3-1. PV 삭제 (Released 상태의 PV 정리)
+  echo "  - PV 삭제 (Released 상태)..."
+  kubectl get pv -o json 2>/dev/null | jq -r '.items[] | select(.status.phase=="Released" or .status.phase=="Failed") | .metadata.name' 2>/dev/null | \
+    while read pv_name; do
+      echo "    - 삭제: $pv_name"
+      kubectl delete pv "$pv_name" 2>/dev/null || true
+    done || echo "    (Released PV 없음)"
+  
   # 4. Helm Release 삭제
   echo "  - Helm Release 삭제..."
   helm uninstall kube-prometheus-stack -n monitoring 2>/dev/null || true
