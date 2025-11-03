@@ -87,12 +87,23 @@ jobs:
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
 
+      - name: Dockerfile 확인
+        id: dockerfile-check
+        run: |
+          if [ ! -f Dockerfile ]; then
+            echo "⚠️ Dockerfile 없음 - 빌드 스킵"
+            echo "skip=true" >> $GITHUB_OUTPUT
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Docker 이미지 빌드 및 푸시
+        if: steps.dockerfile-check.outputs.skip == 'false'
         uses: docker/build-push-action@v5
         with:
           context: .
           file: ./Dockerfile
-          push: ${{ needs.detect-changes.outputs.code == 'true' || needs.detect-changes.outputs.docker == 'true' }}
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
