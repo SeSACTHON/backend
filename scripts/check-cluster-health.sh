@@ -138,12 +138,20 @@ echo "4️⃣ Helm Release 상태"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-EXPECTED_RELEASES=(
-    "kube-prometheus-stack:monitoring"
-    "rabbitmq:messaging"
-    "argocd:argocd"
-    "aws-load-balancer-controller:kube-system"
-)
+       EXPECTED_RELEASES=(
+           "kube-prometheus-stack:monitoring"
+           "argocd:argocd"
+           "aws-load-balancer-controller:kube-system"
+       )
+       
+       # RabbitMQ는 Operator로 관리 (Helm Release 없음)
+       RABBITMQ_CR=$(kubectl get rabbitmqcluster rabbitmq -n messaging 2>/dev/null || echo "")
+       if [ -n "$RABBITMQ_CR" ]; then
+           echo "  ✅ RabbitMQ: Operator 관리 (RabbitmqCluster CR)"
+       else
+           echo "  ⚠️  RabbitMQ: RabbitmqCluster CR 없음"
+           ((WARNINGS++))
+       fi
 
 for release_info in "${EXPECTED_RELEASES[@]}"; do
     IFS=':' read -r release_name namespace <<< "$release_info"
@@ -167,16 +175,16 @@ echo "5️⃣ 애플리케이션 Pod 상태"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# RabbitMQ
-RABBITMQ_PODS=$(kubectl get pods -n messaging -l app.kubernetes.io/name=rabbitmq --no-headers 2>/dev/null | grep -c "Running" || echo "0")
-RABBITMQ_EXPECTED=3
-if [ "$RABBITMQ_PODS" -eq "$RABBITMQ_EXPECTED" ]; then
-    echo "✅ RabbitMQ: $RABBITMQ_PODS/$RABBITMQ_EXPECTED Pod 실행 중"
-else
-    echo "⚠️  RabbitMQ: $RABBITMQ_PODS/$RABBITMQ_EXPECTED Pod (예상: $RABBITMQ_EXPECTED)"
-    kubectl get pods -n messaging -l app.kubernetes.io/name=rabbitmq
-    ((WARNINGS++))
-fi
+       # RabbitMQ (Operator 관리 - 단일 Pod)
+       RABBITMQ_PODS=$(kubectl get pods -n messaging -l rabbitmq.com/cluster=rabbitmq --no-headers 2>/dev/null | grep -c "Running" || echo "0")
+       RABBITMQ_EXPECTED=1
+       if [ "$RABBITMQ_PODS" -eq "$RABBITMQ_EXPECTED" ]; then
+           echo "✅ RabbitMQ: $RABBITMQ_PODS/$RABBITMQ_EXPECTED Pod 실행 중 (Operator 관리)"
+       else
+           echo "⚠️  RabbitMQ: $RABBITMQ_PODS/$RABBITMQ_EXPECTED Pod (예상: $RABBITMQ_EXPECTED, Operator 관리)"
+           kubectl get pods -n messaging -l rabbitmq.com/cluster=rabbitmq 2>/dev/null || kubectl get pods -n messaging
+           ((WARNINGS++))
+       fi
 
 # Redis
 REDIS_PODS=$(kubectl get pods -n default -l app=redis --no-headers 2>/dev/null | grep -c "Running" || echo "0")
