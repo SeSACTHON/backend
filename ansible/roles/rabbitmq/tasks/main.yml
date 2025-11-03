@@ -1,210 +1,81 @@
-# RabbitMQ 설치 (Cluster Operator - 공식)
+# RabbitMQ 설치 (Helm)
 ---
+- name: Helm 설치 여부 확인
+  command: which helm
+  register: helm_check
+  failed_when: false
+  changed_when: false
+
+- name: Helm 설치
+  shell: |
+    curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  when: helm_check.rc != 0
+
+- name: Bitnami Helm repository 추가
+  command: helm repo add bitnami https://charts.bitnami.com/bitnami
+  changed_when: false
+
+- name: Helm repository 업데이트
+  command: helm repo update
+  changed_when: false
+
 - name: RabbitMQ namespace 생성
   shell: kubectl create namespace {{ rabbitmq_namespace }} --dry-run=client -o yaml | kubectl apply -f -
 
-- name: RabbitMQ Operator 설치 여부 확인
-  command: kubectl get crd rabbitmqclusters.rabbitmq.com 2>/dev/null || echo "not_found"
-  register: rabbitmq_crd_check
+- name: RabbitMQ 설치 여부 확인
+  command: helm list -n {{ rabbitmq_namespace }}
+  register: rabbitmq_check
   changed_when: false
-  failed_when: false
 
-- name: RabbitMQ Cluster Operator 설치
-  when: "'not_found' in rabbitmq_crd_check.stdout"
-  block:
-    - name: RabbitMQ Cluster Operator CRD 설치
-      shell: |
-        kubectl apply -f https://github.com/rabbitmq/cluster-operator/releases/latest/download/cluster-operator.yml
-      register: operator_install
-      changed_when: "'created' in operator_install.stdout or 'configured' in operator_install.stdout"
-    
-    - name: RabbitMQ Cluster Operator 배포 대기
-      shell: |
-        echo "⏳ RabbitMQ Cluster Operator 배포 대기..."
-        for i in {1..60}; do
-          if kubectl get deployment rabbitmq-cluster-operator -n rabbitmq-system >/dev/null 2>&1; then
-            if kubectl wait --for=condition=available deployment/rabbitmq-cluster-operator -n rabbitmq-system --timeout=300s 2>/dev/null; then
-              echo "✅ RabbitMQ Cluster Operator 준비 완료"
-              exit 0
-            fi
-          fi
-          echo "대기 중... ($i/60)"
-          sleep 5
-        done
-        echo "⚠️  Operator 배포 시간 초과 (계속 진행)"
-      changed_when: false
-      failed_when: false
+- name: RabbitMQ Helm Chart 설치 (Tier 3, HA 3-node, Storage 노드)
+  command: >
+    helm install rabbitmq bitnami/rabbitmq
+    --namespace {{ rabbitmq_namespace }}
+    --set auth.username={{ rabbitmq_username }}
+    --set auth.password={{ rabbitmq_password }}
+    --set replicaCount={{ rabbitmq_replicas }}
+    --set image.tag=3.13-debian-12
+    --set persistence.enabled=true
+    --set persistence.size={{ rabbitmq_persistence_size }}
+    --set persistence.storageClass=gp3
+    --set resources.requests.cpu=500m
+    --set resources.requests.memory=1Gi
+    --set resources.limits.cpu=2000m
+    --set resources.limits.memory=2Gi
+    --set nodeSelector.workload=storage
+    --set clustering.enabled=true
+    --set clustering.addressType=hostname
+    --set clustering.rebalance=true
+    --set metrics.enabled=true
+    --set metrics.serviceMonitor.enabled=true
+  when: "'rabbitmq' not in rabbitmq_check.stdout"
 
-- name: RabbitMQ Cluster 배포 여부 확인
-  command: kubectl get rabbitmqcluster rabbitmq -n {{ rabbitmq_namespace }} 2>/dev/null || echo "not_found"
-  register: rabbitmq_cluster_check
+- name: RabbitMQ StatefulSet 생성 대기 (60초)
+  shell: |
+    echo "⏳ RabbitMQ StatefulSet 생성 대기..."
+    sleep 60
   changed_when: false
-  failed_when: false
 
-- name: RabbitMQ Cluster 배포 (공식 이미지 사용)
-  when: "'not_found' in rabbitmq_cluster_check.stdout"
-  block:
-    - name: RabbitMQ Cluster 리소스 생성
-      shell: |
-        cat <<EOF | kubectl apply -f -
-        apiVersion: rabbitmq.com/v1beta1
-        kind: RabbitmqCluster
-        metadata:
-          name: rabbitmq
-          namespace: {{ rabbitmq_namespace }}
-        spec:
-          replicas: {{ rabbitmq_replicas }}
-          image: rabbitmq:3.13-management
-          persistence:
-            storageClassName: gp3
-            storage: {{ rabbitmq_persistence_size }}
-          resources:
-            requests:
-              cpu: 500m
-              memory: 1Gi
-            limits:
-              cpu: 2000m
-              memory: 2Gi
-          affinity:
-            nodeAffinity:
-              # Storage 노드에만 배치
-              requiredDuringSchedulingIgnoredDuringExecution:
-                nodeSelectorTerms:
-                - matchExpressions:
-                  - key: workload
-                    operator: In
-                    values:
-                    - storage
-          service:
-            type: ClusterIP
-          rabbitmq:
-            additionalConfig: |
-              # Enable Management Plugin
-              management.tcp.port = 15672
-              management.tcp.ip = 0.0.0.0
-              
-          defaultUser:
-            tags: administrator
-            secretReference:
-              name: rabbitmq-default-user
-        EOF
-      register: cluster_create
-      changed_when: "'created' in cluster_create.stdout or 'configured' in cluster_create.stdout"
-    
-    - name: RabbitMQ 기본 사용자 Secret 생성
-      shell: |
-        cat <<EOF | kubectl apply -f -
-        apiVersion: v1
-        kind: Secret
-        metadata:
-          name: rabbitmq-default-user
-          namespace: {{ rabbitmq_namespace }}
-        type: Opaque
-        stringData:
-          username: {{ rabbitmq_username }}
-          password: {{ rabbitmq_password }}
-        EOF
-      register: secret_create
-      changed_when: "'created' in secret_create.stdout or 'configured' in secret_create.stdout"
-    
-    - name: RabbitMQ Cluster 배포 대기
-      shell: |
-        echo "⏳ RabbitMQ Cluster 배포 대기..."
-        sleep 30
-        for i in {1..60}; do
-          READY=$(kubectl get rabbitmqcluster rabbitmq -n {{ rabbitmq_namespace }} -o jsonpath='{.status.conditions[?(@.type=="AllReplicasReady")].status}' 2>/dev/null || echo "")
-          if [ "$READY" == "True" ]; then
-            echo "✅ RabbitMQ Cluster 준비 완료"
-            exit 0
-          fi
-          echo "대기 중... ($i/60)"
-          sleep 10
-        done
-        echo "⚠️  Cluster 배포 시간 초과 (상태 확인 필요)"
-      changed_when: false
-      failed_when: false
+- name: RabbitMQ Pod 생성 확인
+  shell: |
+    for i in {1..30}; do
+      POD_COUNT=$(kubectl get pods -n {{ rabbitmq_namespace }} -l app.kubernetes.io/name=rabbitmq --no-headers 2>/dev/null | wc -l)
+      if [ "$POD_COUNT" -gt 0 ]; then
+        echo "✅ RabbitMQ Pod 생성됨 ($POD_COUNT개)"
+        exit 0
+      fi
+      echo "대기 중... ($i/30)"
+      sleep 10
+    done
+  changed_when: false
 
 - name: RabbitMQ Pod Ready 대기
   command: kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=rabbitmq -n {{ rabbitmq_namespace }} --timeout=600s
   ignore_errors: yes
   register: rabbitmq_wait
 
-- name: RabbitMQ Pod 문제 확인 및 로그 출력
-  when: rabbitmq_wait.rc != 0
-  block:
-    - name: RabbitMQ Pod 상태 확인 (모든 레이블 시도)
-      shell: |
-        echo "=== Pod 확인 (app.kubernetes.io/name=rabbitmq) ==="
-        kubectl get pods -n {{ rabbitmq_namespace }} -l app.kubernetes.io/name=rabbitmq || echo "없음"
-        echo ""
-        echo "=== Pod 확인 (app.kubernetes.io/part-of=rabbitmq) ==="
-        kubectl get pods -n {{ rabbitmq_namespace }} -l app.kubernetes.io/part-of=rabbitmq || echo "없음"
-        echo ""
-        echo "=== Pod 확인 (rabbitmq.com/cluster=rabbitmq) ==="
-        kubectl get pods -n {{ rabbitmq_namespace }} -l rabbitmq.com/cluster=rabbitmq || echo "없음"
-        echo ""
-        echo "=== 모든 Pod (messaging namespace) ==="
-        kubectl get pods -n {{ rabbitmq_namespace }}
-      register: rabbitmq_status
-      changed_when: false
-    
-    - name: RabbitMQ Pod 상태 출력
-      debug:
-        msg: "{{ rabbitmq_status.stdout_lines }}"
-    
-    - name: RabbitMQ Pod 이벤트 확인
-      shell: |
-        # 여러 레이블로 Pod 찾기
-        POD_NAME=$(kubectl get pods -n {{ rabbitmq_namespace }} -l rabbitmq.com/cluster=rabbitmq -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-        if [ -z "$POD_NAME" ]; then
-          POD_NAME=$(kubectl get pods -n {{ rabbitmq_namespace }} -l app.kubernetes.io/name=rabbitmq -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-        fi
-        if [ -z "$POD_NAME" ]; then
-          # 이름 패턴으로 찾기 (rabbitmq-rabbitmq-server-0)
-          POD_NAME=$(kubectl get pods -n {{ rabbitmq_namespace }} -o jsonpath='{.items[?(@.metadata.name=~"rabbitmq.*")].metadata.name}' 2>/dev/null | awk '{print $1}' || echo "")
-        fi
-        
-        if [ -n "$POD_NAME" ]; then
-          echo "=== Pod: $POD_NAME ==="
-          echo "=== Pod 이벤트 ==="
-          kubectl describe pod "$POD_NAME" -n {{ rabbitmq_namespace }} | tail -30
-          echo ""
-          echo "=== 컨테이너 로그 ==="
-          kubectl logs "$POD_NAME" -n {{ rabbitmq_namespace }} --tail=50 2>/dev/null || echo "로그 없음"
-        else
-          echo "Pod를 찾을 수 없습니다"
-          echo ""
-          echo "=== RabbitmqCluster 상태 ==="
-          kubectl get rabbitmqcluster -n {{ rabbitmq_namespace }}
-          echo ""
-          echo "=== RabbitmqCluster 상세 정보 ==="
-          kubectl describe rabbitmqcluster rabbitmq -n {{ rabbitmq_namespace }} | tail -50
-        fi
-      register: rabbitmq_diagnosis
-      changed_when: false
-      failed_when: false
-    
-    - name: RabbitMQ 진단 정보 출력
-      debug:
-        msg: "{{ rabbitmq_diagnosis.stdout_lines }}"
-    
-    - name: RabbitMQ Cluster 상태 확인
-      command: kubectl get rabbitmqcluster rabbitmq -n {{ rabbitmq_namespace }} -o yaml
-      register: rabbitmq_cluster_status
-      changed_when: false
-      failed_when: false
-    
-    - name: RabbitMQ Cluster 상태 출력
-      debug:
-        msg: "{{ rabbitmq_cluster_status.stdout_lines }}"
-
 - name: RabbitMQ Pod 상태 확인
-  shell: |
-    echo "=== 모든 Pod (messaging namespace) ==="
-    kubectl get pods -n {{ rabbitmq_namespace }}
-    echo ""
-    echo "=== RabbitmqCluster 상태 ==="
-    kubectl get rabbitmqcluster -n {{ rabbitmq_namespace }}
+  command: kubectl get pods -n {{ rabbitmq_namespace }}
   register: rabbitmq_pods
   changed_when: false
 
@@ -214,20 +85,7 @@
 
 - name: RabbitMQ Cluster 상태 확인
   shell: |
-    # 여러 레이블로 Pod 찾기
-    POD_NAME=$(kubectl get pods -n {{ rabbitmq_namespace }} -l rabbitmq.com/cluster=rabbitmq -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")
-    if [ -z "$POD_NAME" ]; then
-      POD_NAME=$(kubectl get pods -n {{ rabbitmq_namespace }} -o jsonpath='{.items[?(@.metadata.name=~"rabbitmq.*server.*")].metadata.name}' 2>/dev/null | awk '{print $1}' || echo "")
-    fi
-    
-    if [ -n "$POD_NAME" ]; then
-      echo "Pod: $POD_NAME"
-      kubectl exec -n {{ rabbitmq_namespace }} "$POD_NAME" -- rabbitmqctl cluster_status
-    else
-      echo "⚠️  Pod를 찾을 수 없습니다"
-      echo "RabbitmqCluster 상태 확인:"
-      kubectl get rabbitmqcluster rabbitmq -n {{ rabbitmq_namespace }} -o yaml | grep -A 20 "status:"
-    fi
+    kubectl exec -n {{ rabbitmq_namespace }} rabbitmq-0 -- rabbitmqctl cluster_status
   register: rabbitmq_cluster
   failed_when: false
   changed_when: false
@@ -237,23 +95,21 @@
   debug:
     msg:
       - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      - "✅ RabbitMQ 설치 완료 (Tier 3: Message Queue)"
+      - "✅ RabbitMQ HA Cluster 설치 완료 (Tier 3: Message Queue)"
       - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-      - "방식: RabbitMQ Cluster Operator (공식)"
-      - "이미지: rabbitmq:3.13-management (공식 Docker Hub)"
       - "역할: Task Queue Middleware"
-      - "구성: 단일 인스턴스 ({{ rabbitmq_replicas }} Pod)"
+      - "구성: {{ rabbitmq_replicas }}-node HA Cluster"
       - "Queues: 5개 (q.ai, q.batch, q.api, q.sched, q.dlq)"
       - ""
       - "연결 정보:"
-      - "  AMQP: amqp://{{ rabbitmq_username }}:{{ rabbitmq_password }}@rabbitmq.{{ rabbitmq_namespace }}.svc.cluster.local:5672/"
+      - "  AMQP: amqp://{{ rabbitmq_username }}:{{ rabbitmq_password }}@rabbitmq.{{ rabbitmq_namespace }}:5672/"
       - "  Management UI: kubectl port-forward -n {{ rabbitmq_namespace }} svc/rabbitmq 15672:15672"
       - "  Username: {{ rabbitmq_username }}"
       - "  Password: {{ rabbitmq_password }}"
       - ""
-      - "Storage: {{ rabbitmq_persistence_size }}"
+      - "Storage: {{ rabbitmq_persistence_size }} × {{ rabbitmq_replicas }} nodes"
       - "Node: Storage (workload=storage)"
       - ""
       - "⚠️ RabbitMQ는 메시지 전달만 담당!"
       - "⚠️ Progress Tracking은 Redis (Tier 4) 사용!"
-      - "📌 HA 구성은 향후 개발 진척에 따라 보강 예정"
+
