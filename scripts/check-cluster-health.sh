@@ -1,26 +1,58 @@
 #!/bin/bash
-# Kubernetes 클러스터 상태 점검 스크립트
-# auto-rebuild.sh 실행 후 클러스터가 의도대로 생성되었는지 확인
+# Kubernetes 클러스터 상태 점검 스크립트 (원격)
+# Master 노드에 SSH로 접속하여 클러스터 상태 확인
+# 로컬 환경을 깨끗하게 유지하기 위해 원격 점검
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+TERRAFORM_DIR="$PROJECT_ROOT/terraform"
+
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🔍 Kubernetes 클러스터 상태 점검"
+echo "🔍 Kubernetes 클러스터 상태 점검 (원격)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
+
+# Terraform에서 Master IP 가져오기
+cd "$TERRAFORM_DIR"
+MASTER_IP=$(terraform output -raw master_public_ip 2>/dev/null || echo "")
+
+if [ -z "$MASTER_IP" ]; then
+    echo "❌ Master IP를 가져올 수 없습니다."
+    echo "   Terraform output을 확인하세요: terraform output master_public_ip"
+    exit 1
+fi
+
+# SSH 키 경로 확인
+SSH_KEY="${HOME}/.ssh/sesacthon"
+if [ ! -f "$SSH_KEY" ]; then
+    SSH_KEY="${HOME}/.ssh/id_rsa"
+    if [ ! -f "$SSH_KEY" ]; then
+        echo "❌ SSH 키를 찾을 수 없습니다."
+        echo "   $HOME/.ssh/sesacthon 또는 $HOME/.ssh/id_rsa 필요"
+        exit 1
+    fi
+fi
+
+echo "📋 Master 노드: $MASTER_IP"
+echo "🔑 SSH 키: $SSH_KEY"
+echo ""
+echo "🔌 Master 노드에 연결 중..."
+echo ""
+
+# Master 노드에서 전체 점검 실행
+ssh -i "$SSH_KEY" -o StrictHostKeyChecking=no ubuntu@$MASTER_IP 'bash -s' << 'REMOTE_CHECK'
+set -e
+
+ERRORS=0
+WARNINGS=0
 
 # kubectl 연결 확인
 if ! kubectl cluster-info &>/dev/null; then
     echo "❌ Kubernetes 클러스터에 연결할 수 없습니다."
-    echo ""
-    echo "💡 Master 노드에 접속하여 확인하세요:"
-    echo "   ./scripts/connect-ssh.sh master"
-    echo ""
     exit 1
 fi
-
-ERRORS=0
-WARNINGS=0
 
 # 1. 노드 상태 확인
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -228,9 +260,13 @@ echo "8️⃣ etcd 상태"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-# Master 노드에서 etcd 상태 확인은 SSH 필요하므로 생략
-echo "ℹ️  etcd 상태는 Master 노드에서 직접 확인 필요"
-echo "   SSH 접속 후: sudo ETCDCTL_API=3 etcdctl endpoint health"
+ETCD_HEALTH=$(sudo ETCDCTL_API=3 etcdctl endpoint health --endpoints=https://127.0.0.1:2379 --cacert=/etc/etcd/pki/ca.crt --cert=/etc/etcd/pki/apiserver-etcd-client.crt --key=/etc/etcd/pki/apiserver-etcd-client.key 2>/dev/null || echo "error")
+if echo "$ETCD_HEALTH" | grep -q "is healthy"; then
+    echo "✅ etcd: healthy"
+else
+    echo "⚠️  etcd: 상태 확인 불가 또는 비정상"
+    ((WARNINGS++))
+fi
 echo ""
 
 # 9. 요약
@@ -238,6 +274,9 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo "📊 점검 요약"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
+
+ARGOCD_PASSWORD=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" 2>/dev/null | base64 -d || echo "N/A")
+ARGOCD_HOSTNAME=$(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "N/A")
 
 if [ "$ERRORS" -eq 0 ] && [ "$WARNINGS" -eq 0 ]; then
     echo "✅ 클러스터 상태 양호!"
@@ -248,8 +287,7 @@ if [ "$ERRORS" -eq 0 ] && [ "$WARNINGS" -eq 0 ]; then
     echo "  - 시스템 Pod: 정상"
     echo ""
     echo "🔗 접속 정보:"
-    ARGOCD_PASSWORD=$(kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath="{.data.password}" 2>/dev/null | base64 -d || echo "N/A")
-    echo "  - ArgoCD: https://$(kubectl get svc argocd-server -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo 'N/A'):8080"
+    echo "  - ArgoCD: https://${ARGOCD_HOSTNAME}:8080"
     echo "    Username: admin"
     echo "    Password: $ARGOCD_PASSWORD"
     echo ""
@@ -270,3 +308,22 @@ else
     echo "   3. 로그 확인: kubectl logs <pod-name> -n <namespace>"
     exit 1
 fi
+
+REMOTE_CHECK
+
+# SSH 실행 결과 확인
+EXIT_CODE=$?
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "✅ 원격 점검 완료"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""
+
+if [ $EXIT_CODE -eq 0 ]; then
+    echo "✅ 클러스터 점검이 성공적으로 완료되었습니다."
+else
+    echo "⚠️  일부 문제가 발견되었습니다. 위의 결과를 확인하세요."
+fi
+
+exit $EXIT_CODE
