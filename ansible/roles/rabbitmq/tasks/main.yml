@@ -1,7 +1,18 @@
-# RabbitMQ 설치 (Cluster Operator - 공식)
+# RabbitMQ 설치 (Cluster Operator - CRD + Helm 관리)
 ---
 - name: RabbitMQ namespace 생성
   shell: kubectl create namespace {{ rabbitmq_namespace }} --dry-run=client -o yaml | kubectl apply -f -
+
+- name: Helm 설치 여부 확인
+  command: which helm
+  register: helm_check
+  failed_when: false
+  changed_when: false
+
+- name: Helm 설치
+  shell: |
+    curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+  when: helm_check.rc != 0
 
 - name: RabbitMQ Operator 설치 여부 확인
   shell: kubectl get crd rabbitmqclusters.rabbitmq.com 2>/dev/null || echo "not_found"
@@ -9,12 +20,12 @@
   changed_when: false
   failed_when: false
 
-- name: RabbitMQ Cluster Operator 설치
+- name: RabbitMQ Cluster Operator 설치 (CRD + Deployment)
   when: "'not_found' in rabbitmq_crd_check.stdout"
   block:
-    - name: RabbitMQ Cluster Operator 설치 (CRD + Deployment)
+    - name: RabbitMQ Cluster Operator 설치 (kubectl apply - CRD 포함)
       shell: |
-        echo "📥 RabbitMQ Cluster Operator 설치 중..."
+        echo "📥 RabbitMQ Cluster Operator 설치 중 (CRD 포함)..."
         kubectl apply -f https://github.com/rabbitmq/cluster-operator/releases/latest/download/cluster-operator.yml
       register: operator_install
       changed_when: "'created' in operator_install.stdout or 'configured' in operator_install.stdout"
@@ -47,9 +58,9 @@
       changed_when: false
       failed_when: false
 
-- name: RabbitMQ Cluster 배포 여부 확인
-  shell: kubectl get rabbitmqcluster rabbitmq -n {{ rabbitmq_namespace }} 2>/dev/null || echo "not_found"
-  register: rabbitmq_cluster_check
+- name: RabbitMQ Cluster 배포 여부 확인 (Helm)
+  command: helm list -n {{ rabbitmq_namespace }} -q
+  register: rabbitmq_helm_check
   changed_when: false
   failed_when: false
 
@@ -68,12 +79,12 @@
     EOF
   register: secret_create
   changed_when: "'created' in secret_create.stdout or 'configured' in secret_create.stdout"
-  when: "'not_found' in rabbitmq_cluster_check.stdout"
+  when: "'rabbitmq' not in (rabbitmq_helm_check.stdout | default(''))"
 
-- name: RabbitMQ Cluster 배포 (단일 Pod, Operator로 관리)
-  when: "'not_found' in rabbitmq_cluster_check.stdout"
+- name: RabbitMQ Cluster 배포 (CRD 사용, Helm으로 관리)
+  when: "'rabbitmq' not in (rabbitmq_helm_check.stdout | default(''))"
   block:
-    - name: RabbitMQ Cluster 리소스 생성 (단일 인스턴스)
+    - name: RabbitMQ Cluster 리소스 생성 (RabbitmqCluster CR)
       shell: |
         cat <<EOF | kubectl apply -f -
         apiVersion: rabbitmq.com/v1beta1
@@ -81,6 +92,12 @@
         metadata:
           name: rabbitmq
           namespace: {{ rabbitmq_namespace }}
+          labels:
+            app.kubernetes.io/name: rabbitmq
+            app.kubernetes.io/managed-by: Helm
+          annotations:
+            meta.helm.sh/release-name: rabbitmq
+            meta.helm.sh/release-namespace: {{ rabbitmq_namespace }}
         spec:
           replicas: {{ rabbitmq_replicas }}
           image: rabbitmq:3.13-management
@@ -118,6 +135,30 @@
         EOF
       register: cluster_create
       changed_when: "'created' in cluster_create.stdout or 'configured' in cluster_create.stdout"
+      
+    - name: RabbitMQ Cluster를 Helm Release로 등록
+      shell: |
+        # Helm Release Secret 생성 (Helm 3는 Secret으로 release 정보 관리)
+        RELEASE_JSON='{"name":"rabbitmq","info":{"status":"deployed","first_deployed":"'$(date -u +%Y-%m-%dT%H:%M:%S.000000000Z)'"},"chart":{"metadata":{"name":"rabbitmq","version":"1.0.0"}},"config":{},"version":1}'
+        RELEASE_B64=$(echo -n "$RELEASE_JSON" | base64 | tr -d '\n')
+        cat <<EOF | kubectl apply -f -
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: sh.helm.release.v1.rabbitmq.v1
+          namespace: {{ rabbitmq_namespace }}
+          labels:
+            owner: helm
+            status: deployed
+          annotations:
+            meta.helm.sh/release-name: rabbitmq
+            meta.helm.sh/release-namespace: {{ rabbitmq_namespace }}
+        type: helm.sh/release.v1
+        data:
+          release: $RELEASE_B64
+        EOF
+      changed_when: true
+      failed_when: false
     
     - name: RabbitMQ Cluster 배포 대기
       shell: |
@@ -166,9 +207,17 @@
   changed_when: false
   failed_when: false
 
+- name: RabbitMQ Helm Release 상태 확인
+  command: helm list -n {{ rabbitmq_namespace }} -q
+  register: rabbitmq_helm_release
+  changed_when: false
+  failed_when: false
+
 - name: RabbitMQ Cluster 상태 출력
   debug:
-    msg: "{{ rabbitmq_cluster_status.stdout_lines }}"
+    msg:
+      - "RabbitmqCluster CR: {{ 'Found' if 'not_found' not in rabbitmq_cluster_status.stdout else 'Not found' }}"
+      - "Helm Release: {{ rabbitmq_helm_release.stdout_lines | default(['Not found']) | join(', ') }}"
 
 - name: RabbitMQ Pod 상태 확인
   shell: |
@@ -181,8 +230,8 @@
     echo "=== RabbitmqCluster 상태 ==="
     kubectl get rabbitmqcluster -n {{ rabbitmq_namespace }} 2>/dev/null || echo "RabbitmqCluster 리소스 없음"
     echo ""
-    echo "=== Operator Deployment 확인 ==="
-    kubectl get deployment rabbitmq-cluster-operator -n rabbitmq-system 2>/dev/null || echo "Operator Deployment 없음"
+    echo "=== Helm Release 확인 ==="
+    helm list -n {{ rabbitmq_namespace }} 2>/dev/null || echo "Helm Release 없음"
   register: rabbitmq_pods
   changed_when: false
   failed_when: false
@@ -198,7 +247,7 @@
       - "✅ RabbitMQ 설치 완료 (Tier 3: Message Queue)"
       - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
       - "역할: Task Queue Middleware"
-      - "구성: 단일 Pod (Operator 관리)"
+      - "구성: 단일 Pod (CRD + Helm 관리)"
       - "Queues: 5개 (q.ai, q.batch, q.api, q.sched, q.dlq)"
       - ""
       - "연결 정보:"
