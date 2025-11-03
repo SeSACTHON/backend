@@ -75,6 +75,22 @@ if kubectl cluster-info &>/dev/null; then
   helm uninstall argocd -n argocd 2>/dev/null || true
   helm uninstall aws-load-balancer-controller -n kube-system 2>/dev/null || true
   
+  # 4-1. Helm으로 관리되지 않는 리소스 정리
+  echo "  - Deployment 및 StatefulSet 삭제..."
+  kubectl delete deployment --all -A --ignore-not-found=true 2>/dev/null || true
+  kubectl delete statefulset --all -A --ignore-not-found=true 2>/dev/null || true
+  
+  echo "  - ConfigMap 및 Secret 정리 (시스템 제외)..."
+  # 시스템 ConfigMap/Secret은 유지, 애플리케이션 것만 삭제
+  kubectl delete configmap -n messaging --all --ignore-not-found=true 2>/dev/null || true
+  kubectl delete configmap -n default --all --ignore-not-found=true 2>/dev/null || true
+  kubectl delete secret -n messaging --all --ignore-not-found=true 2>/dev/null || true
+  kubectl delete secret -n default --all --ignore-not-found=true 2>/dev/null || true
+  
+  echo "  - Service 정리 (시스템 제외)..."
+  kubectl delete svc -n messaging --all --ignore-not-found=true 2>/dev/null || true
+  kubectl delete svc -n default --all --ignore-not-found=true 2>/dev/null || true
+  
   echo ""
   echo "⏳ Kubernetes 리소스 정리 대기 (30초)..."
   sleep 30
