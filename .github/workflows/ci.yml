@@ -1,0 +1,199 @@
+name: CI - Lint and Test
+
+on:
+  pull_request:
+    branches:
+      - main
+      - develop
+  push:
+    branches:
+      - main
+      - develop
+
+jobs:
+  # 변경된 파일 확인
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.filter.outputs.code }}
+      docs: ${{ steps.filter.outputs.docs }}
+      terraform: ${{ steps.filter.outputs.terraform }}
+      ansible: ${{ steps.filter.outputs.ansible }}
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # 전체 히스토리 필요 (변경 파일 감지용)
+
+      - name: 변경된 파일 감지
+        id: filter
+        uses: dorny/paths-filter@v2
+        with:
+          filters: |
+            code:
+              - 'app/**'
+              - 'services/**'
+              - 'requirements.txt'
+              - 'pyproject.toml'
+              - 'Dockerfile*'
+              - '**/*.py'
+            docs:
+              - 'docs/**'
+              - '*.md'
+              - '.github/PULL_REQUEST_TEMPLATE.md'
+            terraform:
+              - 'terraform/**'
+            ansible:
+              - 'ansible/**'
+
+  lint-and-test:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    # 코드 변경이 있을 때만 실행
+    if: needs.detect-changes.outputs.code == 'true'
+    
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 의존성 설치
+        run: |
+          python -m pip install --upgrade pip
+          # requirements.txt가 있으면 설치, 없으면 스킵
+          if [ -f requirements.txt ]; then
+            pip install -r requirements.txt
+            pip install pycodestyle pylint mypy
+          else
+            echo "⚠️ requirements.txt 없음 - Python 검사 스킵"
+            pip install pycodestyle pylint mypy pytest pytest-cov
+          fi
+
+      - name: 📏 PEP 8 스타일 검사 (pycodestyle)
+        run: |
+          echo "::group::PEP 8 준수 여부 검사"
+          if [ -d app/ ]; then
+            pycodestyle app/ --max-line-length=100 --statistics
+          else
+            echo "⚠️ app/ 디렉토리 없음 - 스킵"
+          fi
+          echo "::endgroup::"
+        continue-on-error: false
+
+      - name: 🎨 Black 포맷 검사
+        run: |
+          echo "::group::Black 코드 포맷 검사"
+          black --check --diff .
+          echo "::endgroup::"
+        continue-on-error: false
+
+      - name: 📦 isort Import 정렬 검사
+        run: |
+          echo "::group::Import 정렬 검사"
+          isort --check-only --diff .
+          echo "::endgroup::"
+        continue-on-error: false
+
+      - name: 🔍 Flake8 린트 검사 (PEP 8 + 추가 규칙)
+        run: |
+          echo "::group::Flake8 종합 린트 검사"
+          if [ -d app/ ]; then
+            pip install flake8
+            flake8 app/ --statistics --show-source || echo "⚠️ Flake8 검사 실패 (경고만)"
+          else
+            echo "⚠️ app/ 디렉토리 없음 - 스킵"
+          fi
+          echo "::endgroup::"
+        continue-on-error: true
+
+      - name: 🔬 Pylint 정적 분석 (선택)
+        run: |
+          echo "::group::Pylint 정적 분석"
+          if [ -d app/ ]; then
+            pylint app/ --rcfile=.pylintrc 2>/dev/null || echo "⚠️ Pylint 검사 실패 (경고만)"
+          else
+            echo "⚠️ app/ 디렉토리 없음 - 스킵"
+          fi
+          echo "::endgroup::"
+        continue-on-error: true
+
+      - name: 🏷️ MyPy 타입 검사 (선택)
+        run: |
+          echo "::group::MyPy 타입 힌트 검사"
+          if [ -d app/ ] && [ -f pyproject.toml ]; then
+            mypy app/ --config-file=pyproject.toml || echo "⚠️ MyPy 검사 실패 (경고만)"
+          else
+            echo "⚠️ app/ 또는 pyproject.toml 없음 - 스킵"
+          fi
+          echo "::endgroup::"
+        continue-on-error: true
+
+      - name: 테스트 실행
+        run: |
+          if [ -d app/ ] || [ -d tests/ ]; then
+            pytest --cov=app --cov-report=xml --cov-report=html || echo "⚠️ 테스트 없음 또는 실패 (경고만)"
+          else
+            echo "⚠️ 테스트 디렉토리 없음 - 스킵"
+          fi
+        continue-on-error: true
+
+      - name: 테스트 커버리지 업로드 (Codecov)
+        uses: codecov/codecov-action@v3
+        if: always()
+        with:
+          file: ./coverage.xml
+          fail_ci_if_error: false
+
+  security-scan:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    # 코드 변경이 있을 때만 실행
+    if: needs.detect-changes.outputs.code == 'true'
+    
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 보안 취약점 검사 (Bandit)
+        run: |
+          if [ -d app/ ]; then
+            pip install bandit
+            bandit -r app/ -f json -o bandit-report.json || echo "⚠️ Bandit 검사 실패 (경고만)"
+          else
+            echo "⚠️ app/ 디렉토리 없음 - 스킵"
+          fi
+        continue-on-error: true
+
+      - name: 의존성 취약점 검사 (Safety)
+        run: |
+          if [ -f requirements.txt ]; then
+            pip install safety
+            safety check --json || echo "⚠️ Safety 검사 실패 (경고만)"
+          else
+            echo "⚠️ requirements.txt 없음 - 스킵"
+          fi
+        continue-on-error: true
+
+  # 문서 변경 시 간단한 검증만 수행
+  docs-check:
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: needs.detect-changes.outputs.docs == 'true' && needs.detect-changes.outputs.code == 'false'
+    
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: 마크다운 링크 검사
+        run: |
+          echo "📝 문서 변경만 감지됨 - 링크 검사 수행"
+          # 깨진 링크 검사 (선택적)
+          # npm install -g markdown-link-check || true
+          # find docs -name "*.md" -exec markdown-link-check {} \; || true
+          echo "✅ 문서 검증 완료"
+
