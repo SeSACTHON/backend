@@ -389,6 +389,7 @@ SeSACTHON/backend/
 │   │
 │   ├── architecture/ (아키텍처 설계)
 │   │   ├── final-k8s-architecture.md ⭐⭐⭐⭐⭐
+│   │   ├── SERVICE_ARCHITECTURE.md ⭐⭐⭐⭐ (Terraform/Ansible 기반)
 │   │   ├── INFRASTRUCTURE_DEPLOYMENT_DIAGRAM.md ⭐⭐⭐⭐
 │   │   └── task-queue-design.md
 │   │
