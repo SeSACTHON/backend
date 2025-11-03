@@ -1,0 +1,128 @@
+name: CI/CD - Auth Service
+
+on:
+  pull_request:
+    paths:
+      - 'services/auth/**'
+      - 'shared/**'
+      - '.github/workflows/ci-build-auth.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'services/auth/**'
+      - 'shared/**'
+
+env:
+  SERVICE_NAME: auth
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/auth-service
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 3.11 설정
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: 의존성 설치
+        run: |
+          cd services/${{ env.SERVICE_NAME }}
+          pip install -r requirements.txt
+          pip install pycodestyle black isort flake8 pytest
+
+      - name: 📏 PEP 8 검사
+        run: |
+          cd services/${{ env.SERVICE_NAME }}
+          pycodestyle app/ --max-line-length=100
+
+      - name: 🎨 Black & isort 검사
+        run: |
+          cd services/${{ env.SERVICE_NAME }}
+          black --check app/
+          isort --check-only app/
+
+      - name: 🔍 Flake8
+        run: |
+          cd services/${{ env.SERVICE_NAME }}
+          flake8 app/
+
+      - name: 🧪 테스트
+        run: |
+          cd services/${{ env.SERVICE_NAME }}
+          pytest tests/ --cov=app
+
+  build-and-push:
+    needs: lint-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: 코드 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Docker Buildx 설정
+        uses: docker/setup-buildx-action@v3
+
+      - name: GitHub Container Registry 로그인
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Docker 이미지 메타데이터
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest
+            type=ref,event=branch
+
+      - name: Docker 이미지 빌드 & 푸시
+        uses: docker/build-push-action@v5
+        with:
+          context: ./services/${{ env.SERVICE_NAME }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+      - name: Helm values 업데이트 (GitOps)
+        run: |
+          SHORT_SHA=$(echo ${{ github.sha }} | cut -c1-7)
+          
+          # yq 설치
+          wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          chmod +x /usr/local/bin/yq
+          
+          # Helm values 업데이트
+          yq eval ".image.tag = \"$SHORT_SHA\"" \
+            -i charts/${{ env.SERVICE_NAME }}/values-prod.yaml
+          
+          # Git commit & push
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+          git add charts/${{ env.SERVICE_NAME }}/values-prod.yaml
+          git commit -m "chore: Update ${{ env.SERVICE_NAME }} image to $SHORT_SHA" || exit 0
+          git push
+
+      - name: Slack 알림
+        uses: 8398a7/action-slack@v3
+        if: always()
+        with:
+          status: ${{ job.status }}
+          text: "${{ env.SERVICE_NAME }} 빌드 ${{ job.status }}"
+          webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
