@@ -295,7 +295,7 @@ spec:
           name: fastapi-test-app
 
 ---
-# Service: ClusterIP
+# Service: ClusterIP (내부 통신 전용)
 apiVersion: v1
 kind: Service
 metadata:
@@ -312,29 +312,11 @@ spec:
     targetPort: 8000
     protocol: TCP
     name: http
-
----
-# Service: NodePort (외부 접근용)
-apiVersion: v1
-kind: Service
-metadata:
-  name: fastapi-test-nodeport
-  namespace: default
-  labels:
-    app: fastapi-test
-spec:
-  type: NodePort
-  selector:
-    app: fastapi-test
-  ports:
-  - port: 8000
-    targetPort: 8000
-    nodePort: 30800
-    protocol: TCP
-    name: http
 YAML
 
 echo "✅ FastAPI 테스트 앱 배포 완료"
+echo ""
+echo "⚠️  외부 직접 접근 차단 (ALB를 통한 접근만 허용)"
 EOF
 
 # 2. Pod 상태 확인
@@ -349,12 +331,8 @@ EOF
 echo ""
 echo "3️⃣ Service 정보 확인"
 ssh $MASTER_USER@$MASTER_NODE << 'EOF'
-echo "ClusterIP Service:"
+echo "ClusterIP Service (내부 전용):"
 kubectl get svc fastapi-test -n default
-
-echo ""
-echo "NodePort Service:"
-kubectl get svc fastapi-test-nodeport -n default
 EOF
 
 # 4. 내부 통신 테스트
@@ -394,28 +372,7 @@ echo "6️⃣ 전체 통합 테스트 (/test/all):"
 kubectl exec -n default $POD_NAME -- curl -s http://localhost:8000/test/all
 EOF
 
-# 5. 외부 접근 테스트 (NodePort)
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🌐 외부 접근 테스트 (NodePort)"
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-
-echo "NodePort 접근 URL:"
-echo "  http://$MASTER_NODE:30800/"
-echo "  http://$MASTER_NODE:30800/health"
-echo "  http://$MASTER_NODE:30800/test/all"
-echo ""
-
-echo "외부에서 테스트:"
-curl -s http://$MASTER_NODE:30800/ | head -10
-echo ""
-
-echo "Health Check (외부):"
-curl -s http://$MASTER_NODE:30800/health
-echo ""
-
-# 6. Ingress 리소스 생성 (ALB 통한 접근)
+# 5. Ingress 리소스 생성 (ALB 통한 접근)
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "📡 Ingress 리소스 생성 (ALB)"
@@ -470,11 +427,10 @@ echo ""
 echo "1️⃣ 클러스터 내부 (다른 Pod에서):"
 echo "   curl http://fastapi-test.default.svc.cluster.local:8000/health"
 echo ""
-echo "2️⃣ NodePort (외부):"
-echo "   curl http://$MASTER_NODE:30800/health"
-echo ""
-echo "3️⃣ ALB/Ingress (외부, 약 3분 후):"
+echo "2️⃣ ALB/Ingress (외부, 약 3분 후):"
 echo "   curl https://growbin.app/api/v1/health"
+echo ""
+echo "⚠️  보안: 외부 직접 접근 차단됨 (ALB를 통한 접근만 허용)"
 echo ""
 echo "【테스트 엔드포인트】"
 echo "   GET /              # API 정보"

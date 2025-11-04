@@ -23,7 +23,7 @@
 - ✅ **데이터베이스 연결**: PostgreSQL 읽기/쓰기
 - ✅ **캐시 연결**: Redis 읽기/쓰기
 - ✅ **메시지 큐 연결**: RabbitMQ 큐 생성/삭제
-- ✅ **외부 접근**: NodePort 및 ALB Ingress
+- ✅ **외부 접근**: ALB Ingress (보안: 직접 접근 차단)
 
 ### 테스트 서버 스펙
 
@@ -44,7 +44,6 @@ graph TB
     subgraph "외부 접근"
         EXT[External Client]
         ALB[AWS ALB]
-        NP[NodePort :30800]
     end
     
     subgraph "Kubernetes Cluster"
@@ -55,7 +54,6 @@ graph TB
         
         subgraph "Services"
             FS[fastapi-test Service<br/>ClusterIP]
-            FNP[fastapi-test-nodeport<br/>NodePort :30800]
         end
         
         subgraph "Storage Node"
@@ -71,15 +69,11 @@ graph TB
     end
     
     EXT -->|HTTPS| ALB
-    EXT -->|HTTP| NP
     ALB -->|path: /api/v1| ING
     ING --> FS
-    NP --> FNP
     
     FS --> FP1
     FS --> FP2
-    FNP --> FP1
-    FNP --> FP2
     
     FP1 -->|postgres.default.svc| PG
     FP1 -->|redis.default.svc| RD
@@ -136,11 +130,10 @@ bash deploy-fastapi-test.sh 52.79.238.50 ubuntu
 **스크립트 동작**:
 1. ConfigMap 생성 (FastAPI 앱 코드 + requirements.txt)
 2. Deployment 생성 (2 replicas)
-3. Service 생성 (ClusterIP + NodePort)
+3. Service 생성 (ClusterIP만, 외부 직접 접근 차단)
 4. Pod 상태 확인 (최대 2분 대기)
 5. 내부 통신 테스트 (6개 엔드포인트)
-6. 외부 접근 테스트 (NodePort)
-7. Ingress 생성 (ALB)
+6. Ingress 생성 (ALB, 외부 접근 유일 경로)
 
 **예상 시간**: 3-5분
 
@@ -209,20 +202,7 @@ spec:
   - port: 8000
     targetPort: 8000
 
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: fastapi-test-nodeport
-  namespace: default
-spec:
-  type: NodePort
-  selector:
-    app: fastapi-test
-  ports:
-  - port: 8000
-    targetPort: 8000
-    nodePort: 30800
+# ⚠️ NodePort Service 제거 (보안: ALB를 통한 접근만 허용)
 EOF
 ```
 
@@ -242,8 +222,7 @@ kubectl get pods -l app=fastapi-test -n default -o wide
 ```bash
 kubectl get svc -l app=fastapi-test -n default
 
-# ClusterIP: 10.x.x.x:8000
-# NodePort:  <NodeIP>:30800
+# ClusterIP: 10.x.x.x:8000 (내부 전용)
 ```
 
 ---
@@ -299,31 +278,9 @@ kubectl exec -n default $POD_NAME -- curl -s http://localhost:8000/test/all
 
 ---
 
-### 2️⃣ 외부 접근 테스트 (NodePort)
+### 2️⃣ 외부 접근 테스트 (ALB + Ingress)
 
-**로컬 머신에서 테스트**:
-```bash
-MASTER_IP="<YOUR_MASTER_IP>"
-
-# Root endpoint
-curl http://$MASTER_IP:30800/
-
-# Health Check
-curl http://$MASTER_IP:30800/health
-
-# 전체 통합 테스트
-curl http://$MASTER_IP:30800/test/all
-```
-
-**브라우저 접근**:
-```
-http://<MASTER_IP>:30800/
-http://<MASTER_IP>:30800/health
-```
-
----
-
-### 3️⃣ 외부 접근 테스트 (ALB + Ingress)
+⚠️ **보안: NodePort를 통한 직접 접근은 차단되었습니다. ALB를 통한 접근만 허용됩니다.**
 
 #### Ingress 생성
 
@@ -535,10 +492,7 @@ ssh ubuntu@52.79.238.50
 kubectl run test --image=curlimages/curl --rm -it --restart=Never -- \
   curl http://fastapi-test.default.svc.cluster.local:8000/test/all
 
-# 3. 외부 테스트 (NodePort)
-curl http://52.79.238.50:30800/test/all
-
-# 4. 외부 테스트 (ALB)
+# 3. 외부 테스트 (ALB만 허용)
 curl https://growbin.app/api/v1/test/all
 ```
 
@@ -555,7 +509,7 @@ curl https://growbin.app/api/v1/test/all
 
 #### PostgreSQL 테스트
 ```bash
-curl http://52.79.238.50:30800/test/postgres
+curl https://growbin.app/api/v1/test/postgres
 ```
 
 **확인 사항**:
@@ -566,7 +520,7 @@ curl http://52.79.238.50:30800/test/postgres
 
 #### Redis 테스트
 ```bash
-curl http://52.79.238.50:30800/test/redis
+curl https://growbin.app/api/v1/test/redis
 ```
 
 **확인 사항**:
@@ -576,7 +530,7 @@ curl http://52.79.238.50:30800/test/redis
 
 #### RabbitMQ 테스트
 ```bash
-curl http://52.79.238.50:30800/test/rabbitmq
+curl https://growbin.app/api/v1/test/rabbitmq
 ```
 
 **확인 사항**:
@@ -589,12 +543,17 @@ curl http://52.79.238.50:30800/test/rabbitmq
 
 ### 시나리오 3: 부하 테스트
 
+⚠️ **주의**: 부하 테스트는 ALB DNS를 사용하거나 클러스터 내부에서 수행해야 합니다.
+
 ```bash
+# ALB DNS 확인
+ALB_DNS=$(kubectl get ingress fastapi-test-ingress -n default -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+
 # Apache Bench (100 요청, 동시성 10)
-ab -n 100 -c 10 http://52.79.238.50:30800/health
+ab -n 100 -c 10 https://growbin.app/api/v1/health
 
 # hey (1000 요청, 동시성 50)
-hey -n 1000 -c 50 http://52.79.238.50:30800/health
+hey -n 1000 -c 50 https://growbin.app/api/v1/health
 ```
 
 **확인 사항**:
@@ -712,24 +671,20 @@ kubectl logs -n messaging -l app.kubernetes.io/name=rabbitmq
 
 ---
 
-### 5. NodePort 접근 불가
+### 5. ALB를 우회한 직접 접근 시도
 
 **증상**:
+Worker 노드의 IP로 직접 접근을 시도하면 연결 실패
+
+**원인**: NodePort Service가 제거되어 외부 직접 접근이 차단됨 (의도된 보안 조치)
+
+**해결**: ALB를 통한 접근만 사용
 ```bash
+# ❌ 직접 접근 불가
 curl http://52.79.238.50:30800/
-# Connection refused or timeout
-```
 
-**원인**: Security Group에서 30800 포트 차단
-
-**해결**:
-```bash
-# AWS CLI로 Security Group 규칙 추가
-aws ec2 authorize-security-group-ingress \
-  --group-id sg-xxxxxxxxx \
-  --protocol tcp \
-  --port 30800 \
-  --cidr 0.0.0.0/0
+# ✅ ALB를 통한 접근만 허용
+curl https://growbin.app/api/v1/health
 ```
 
 ---
@@ -766,7 +721,7 @@ kubectl delete ingress fastapi-test-ingress -n default
 
 # Deployment & Services 삭제
 kubectl delete deployment fastapi-test -n default
-kubectl delete svc fastapi-test fastapi-test-nodeport -n default
+kubectl delete svc fastapi-test -n default
 
 # ConfigMap 삭제
 kubectl delete configmap fastapi-test-app -n default
@@ -795,8 +750,8 @@ kubectl delete ingress fastapi-test-ingress -n default
    - RabbitMQ (메시지 큐)
 
 3. **외부 접근**
-   - NodePort (HTTP)
-   - ALB + Ingress (HTTPS)
+   - ✅ ALB + Ingress (HTTPS) - **권장**
+   - ❌ NodePort (HTTP) - **보안상 차단됨**
 
 4. **고가용성**
    - 2 replicas
