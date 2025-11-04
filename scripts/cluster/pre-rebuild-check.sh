@@ -98,10 +98,19 @@ echo "【3】 Terraform 설정 확인"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-cd terraform
+# 현재 디렉토리 저장
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WORKSPACE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
+TERRAFORM_DIR="$WORKSPACE_DIR/terraform"
+
+# Terraform 디렉토리 확인
+if [ ! -d "$TERRAFORM_DIR" ]; then
+  check_fail "Terraform 디렉토리를 찾을 수 없습니다: $TERRAFORM_DIR"
+  exit 1
+fi
 
 # 리전 확인
-if grep -q 'aws_region = "ap-northeast-2"' terraform.tfvars; then
+if grep -q 'aws_region = "ap-northeast-2"' "$TERRAFORM_DIR/terraform.tfvars" 2>/dev/null; then
   check_pass "Terraform 리전: ap-northeast-2 ✅"
 else
   check_fail "terraform.tfvars의 aws_region이 ap-northeast-2가 아닙니다!"
@@ -111,15 +120,13 @@ fi
 # 노드 모듈 확인
 MODULES=("master" "worker_1" "worker_2" "rabbitmq" "postgresql" "redis" "monitoring")
 for MODULE in "${MODULES[@]}"; do
-  if grep -q "module \"$MODULE\"" main.tf; then
+  if grep -q "module \"$MODULE\"" "$TERRAFORM_DIR/main.tf" 2>/dev/null; then
     check_pass "Terraform 모듈: $MODULE ✅"
   else
     check_fail "Terraform 모듈 누락: $MODULE"
     exit 1
   fi
 done
-
-cd ..
 
 echo ""
 
@@ -132,15 +139,17 @@ echo "【4】 Ansible 설정 확인"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
+ANSIBLE_DIR="$WORKSPACE_DIR/ansible"
+
 # CNI 설정 확인
-if grep -q 'cni_plugin: "calico"' ansible/inventory/group_vars/all.yml; then
+if grep -q 'cni_plugin: "calico"' "$ANSIBLE_DIR/inventory/group_vars/all.yml" 2>/dev/null; then
   check_pass "CNI 플러그인: Calico ✅"
 else
   check_warn "CNI 플러그인이 Calico가 아닙니다!"
 fi
 
 # Pod CIDR 확인
-if grep -q 'pod_network_cidr: "192.168.0.0/16"' ansible/inventory/group_vars/all.yml; then
+if grep -q 'pod_network_cidr: "192.168.0.0/16"' "$ANSIBLE_DIR/inventory/group_vars/all.yml" 2>/dev/null; then
   check_pass "Pod CIDR: 192.168.0.0/16 ✅"
 else
   check_fail "pod_network_cidr이 192.168.0.0/16이 아닙니다!"
@@ -148,14 +157,14 @@ else
 fi
 
 # CNI 플레이북 노드 수 확인
-if grep -q 'EXPECTED_WORKERS=6' ansible/playbooks/04-cni-install.yml; then
+if grep -q 'EXPECTED_WORKERS=6' "$ANSIBLE_DIR/playbooks/04-cni-install.yml" 2>/dev/null; then
   check_pass "CNI 플레이북 Worker 수: 6 ✅"
 else
   check_fail "ansible/playbooks/04-cni-install.yml의 EXPECTED_WORKERS가 6이 아닙니다!"
   exit 1
 fi
 
-if grep -q 'EXPECTED_TOTAL_NODES=7' ansible/playbooks/04-cni-install.yml; then
+if grep -q 'EXPECTED_TOTAL_NODES=7' "$ANSIBLE_DIR/playbooks/04-cni-install.yml" 2>/dev/null; then
   check_pass "CNI 플레이북 Total 노드 수: 7 ✅"
 else
   check_fail "ansible/playbooks/04-cni-install.yml의 EXPECTED_TOTAL_NODES가 7이 아닙니다!"
@@ -165,7 +174,7 @@ fi
 # 노드 레이블 확인
 NODE_LABELS=("k8s-worker-1" "k8s-worker-2" "k8s-rabbitmq" "k8s-postgresql" "k8s-redis" "k8s-monitoring")
 for NODE in "${NODE_LABELS[@]}"; do
-  if grep -q "Label.*$NODE" ansible/site.yml; then
+  if grep -q "Label.*$NODE" "$ANSIBLE_DIR/site.yml" 2>/dev/null; then
     check_pass "노드 레이블 설정: $NODE ✅"
   else
     check_warn "노드 레이블 누락 가능: $NODE"
