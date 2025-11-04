@@ -373,7 +373,7 @@ if [ -z "$POD_NAME" ]; then
     echo ""
     echo "권장 조치:"
     echo "  1. Ansible 플레이북 실행"
-    echo "     cd ansible && ansible-playbook -i inventory/hosts.ini site.yml --tags redis"
+    echo "     cd "$PROJECT_ROOT/ansible" && ansible-playbook -i inventory/hosts.ini site.yml --tags redis"
     echo ""
 else
     POD_STATUS=$(kubectl get pod $POD_NAME -n default -o jsonpath='{.status.phase}')

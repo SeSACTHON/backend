@@ -16,7 +16,7 @@ echo "기존 Pod 삭제 대기..."
 sleep 10
 
 echo "⚠️  이제 Ansible을 재실행하세요:"
-echo "   cd ansible"
+echo "   cd "$PROJECT_ROOT/ansible""
 echo "   ansible-playbook -i inventory/hosts.ini continue-install.yml"
 echo ""
 echo "또는 RabbitMQ만 재설치:"

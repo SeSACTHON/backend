@@ -4,6 +4,10 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
+TERRAFORM_DIR="$PROJECT_ROOT/terraform"
+
 MASTER_IP="${MASTER_IP:-52.79.238.50}"
 SSH_KEY="${SSH_KEY:-~/.ssh/sesacthon}"
 
@@ -71,7 +75,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 
 echo "VPC CIDR 확인..."
-cd ../terraform
+cd "$TERRAFORM_DIR"
 VPC_CIDR=$(terraform output -raw vpc_cidr 2>/dev/null || echo "10.0.0.0/16")
 echo "  VPC CIDR: $VPC_CIDR"
 echo ""
