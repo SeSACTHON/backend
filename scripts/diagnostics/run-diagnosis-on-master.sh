@@ -2,7 +2,7 @@
 # 로컬에서 Master 노드로 진단 스크립트 전송 및 실행
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 cd "$PROJECT_ROOT/terraform"
 MASTER_IP=$(terraform output -raw master_public_ip 2>/dev/null || echo "")

@@ -72,7 +72,7 @@ echo ""
 echo "✅ 클러스터 완전 초기화 완료!"
 echo ""
 echo "📝 다음 단계:"
-echo "   cd ansible"
+echo "   cd "$ANSIBLE_DIR""
 echo "   ansible-playbook -i inventory/hosts.ini site.yml"
 
 

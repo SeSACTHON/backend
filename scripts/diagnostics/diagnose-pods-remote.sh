@@ -2,7 +2,7 @@
 # 로컬에서 Master 노드로 원격 진단 스크립트 실행
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
 # Terraform에서 Master IP 가져오기
 cd "$PROJECT_ROOT/terraform"
