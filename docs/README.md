@@ -383,9 +383,23 @@ Kubernetes Services (NodePort)
 
 ### 🚀 [배포](deployment/)
 
+- **[GitOps ArgoCD Helm](deployment/gitops-argocd-helm.md)** ⭐⭐⭐⭐⭐
+  - GitHub Actions CI 파이프라인
+  - ArgoCD CD 자동 배포
+  - Helm Charts 구조
+  - GHCR 이미지 관리
+  
+- **[배포 환경 구축](deployment/DEPLOYMENT_SETUP.md)** ⭐⭐⭐⭐⭐
+  - 전체 배포 흐름
+  - GitHub Secrets 설정
+  - ArgoCD Applications 등록
+  
+- **[GHCR 설정](deployment/ghcr-setup.md)** ⭐⭐⭐⭐
+  - GitHub Container Registry 설정
+  - GITHUB_TOKEN 인증
+  - 이미지 태그 전략
+  
 - [VPC CNI 마이그레이션](deployment/VPC_CNI_MIGRATION.md)
-- [GitOps ArgoCD Helm](deployment/gitops-argocd-helm.md)
-- [GHCR 설정](deployment/ghcr-setup.md)
 - [배포 전략 비교](plans/DEPLOYMENT_STRATEGIES_COMPARISON.md) ⭐ NEW
 
 ---
@@ -596,34 +610,86 @@ Async Workers (Celery)
 ### GitOps & Monitoring
 
 ```
-GitOps
+GitOps (완료) ✅
 ├─ ArgoCD v2.12.6 (kubectl)
+│   ├─ 설치: Ansible Role (ansible/roles/argocd/)
+│   ├─ 접근: https://growbin.app/argocd
+│   ├─ 인증: admin / kubectl -n argocd get secret
+│   └─ Ingress: ALB + ACM SSL/TLS
+│
+├─ 배포 파이프라인 (설계 완료)
+│   ├─ GitHub Actions (CI)
+│   │   ├─ Lint & Test (PEP 8, pytest)
+│   │   ├─ Docker Build & Push (GHCR)
+│   │   └─ Helm values 업데이트
+│   │
+│   ├─ GitHub Container Registry (GHCR)
+│   │   ├─ 레지스트리: ghcr.io/sesacthon/backend
+│   │   ├─ 인증: GITHUB_TOKEN (자동)
+│   │   ├─ 비용: 무료 (Private 포함)
+│   │   └─ 태그: {sha}, latest, v{version}
+│   │
+│   ├─ Helm Charts (준비 중)
+│   │   ├─ charts/auth/
+│   │   ├─ charts/users/
+│   │   ├─ charts/waste/
+│   │   ├─ charts/recycling/
+│   │   └─ charts/locations/
+│   │
+│   └─ ArgoCD Applications (준비 중)
+│       ├─ Git 모니터링 (3분 폴링)
+│       ├─ Helm 렌더링
+│       ├─ 자동 Sync (automated)
+│       └─ Self-Heal (enabled)
+│
 ├─ Helm v3.12+
-├─ GitHub Actions (CI)
-└─ GHCR (Container Registry)
+│   └─ Charts 기반 배포 관리
+│
+└─ GitHub Actions (CI)
+    ├─ 서비스별 워크플로우
+    │   ├─ ci-build-auth.yml
+    │   ├─ ci-build-users.yml
+    │   ├─ ci-build-waste.yml
+    │   └─ ci-build-recycling.yml
+    │
+    └─ 배포 흐름
+        1. 코드 Push → GitHub
+        2. Lint & Test → GitHub Actions
+        3. Docker Build → GHCR Push
+        4. Helm values 업데이트 → Git Commit
+        5. Git 변경 감지 → ArgoCD
+        6. Helm Diff 계산 → ArgoCD
+        7. Kubernetes 배포 → Rolling Update
+        8. Health Check → 완료
 
-Monitoring
+Monitoring (완료) ✅
 ├─ Prometheus v2.46.0
 │   ├─ CPU: 500m (최적화)
 │   ├─ Memory: 2Gi
 │   ├─ Retention: 7d / 40GB
 │   └─ Storage: 50Gi (gp3)
 ├─ Grafana v10.1.0
+│   ├─ 접근: https://growbin.app/grafana
 │   ├─ CPU: 500m
 │   └─ Memory: 512Mi
 └─ Alertmanager v0.26.0
     ├─ CPU: 250m
     └─ Memory: 256Mi
 
-Load Balancing
+Load Balancing (완료) ✅
 ├─ AWS Application Load Balancer
 │   ├─ Scheme: internet-facing
 │   ├─ Target Type: instance (NodePort)
+│   ├─ SSL/TLS: ACM Certificate
 │   └─ Path-based Routing
+│       ├─ /argocd → ArgoCD (Master Node)
+│       ├─ /grafana → Grafana (Monitoring Node)
+│       └─ /api/v1/* → API Services (Worker Nodes)
 ├─ ACM Certificate
 │   └─ Domain: *.growbin.app
 └─ Route53 DNS
-    └─ A Record (Alias) → ALB
+    ├─ A Record (Alias) → ALB
+    └─ 자동화: Ansible (09-route53-update.yml)
 ```
 
 ---
@@ -829,25 +895,37 @@ Phase 7: 트러블슈팅 (완료)
 │   ├─ macOS TLS 인증서 오류 해결
 │   └─ 종합 트러블슈팅 가이드
 └─ 문서화 완료 (troubleshooting/README.md)
+
+Phase 8: GitOps 배포 파이프라인 (완료)
+├─ ArgoCD v2.12.6 설치 (Ansible 자동화)
+├─ ALB Ingress 연동 (/argocd 경로)
+├─ HTTPS 접근 (https://growbin.app/argocd)
+├─ GitHub Container Registry (GHCR) 통합 준비
+└─ Helm Charts 기반 배포 구조 설계
+    ├─ GitHub Actions (CI) - 빌드 & 테스트
+    ├─ GHCR Push - 컨테이너 이미지 저장
+    ├─ ArgoCD (CD) - Git 모니터링 & 자동 배포
+    └─ Rolling Update - 무중단 배포
 ```
 
 ### 🔄 진행 중
 
 ```
-Phase 8: Application Stack (진행 중)
-├─ FastAPI 마이크로서비스 배포
+Phase 9: Application Stack (진행 중)
+├─ FastAPI 마이크로서비스 배포 준비
 ├─ Celery Workers 구성
-└─ 서비스 간 통신 테스트
+├─ GitHub Actions CI/CD 워크플로우 작성
+└─ ArgoCD Application 매니페스트 작성
 ```
 
 ### ⏳ 계획 중
 
 ```
-Phase 9: GitOps 파이프라인 (계획 중)
-├─ GitHub Actions CI 설정
-├─ Helm Charts 작성
-├─ ArgoCD Application 구성
-└─ 자동 배포 파이프라인
+Phase 10: 고급 배포 전략 (계획 중)
+├─ Canary 배포 (Argo Rollouts)
+├─ Blue-Green 배포
+├─ A/B 테스트 구조
+└─ 자동 롤백 전략
 ```
 
 ---
@@ -864,8 +942,11 @@ Phase 9: GitOps 파이프라인 (계획 중)
 
 ### 배포 전략 ⭐⭐⭐⭐⭐
 
+- **[GitOps 배포 가이드](deployment/gitops-argocd-helm.md)** - ArgoCD + Helm 전체 가이드
+- **[배포 환경 구축](deployment/DEPLOYMENT_SETUP.md)** - GitHub Actions + GHCR + ArgoCD
 - **[배포 전략 비교](plans/DEPLOYMENT_STRATEGIES_COMPARISON.md)** - 블루-그린 vs 카나리
 - **[Argo Rollouts 가이드](plans/CANARY_DEPLOYMENT_CONSIDERATIONS.md)** - 카나리 배포 적용
+- **[GHCR 설정](deployment/ghcr-setup.md)** - GitHub Container Registry 설정
 
 ### 아키텍처 문서 ⭐⭐⭐⭐
 
@@ -976,6 +1057,22 @@ docs/troubleshooting/README.md
 
 ## 🔄 최근 업데이트
 
+### 2025-11-06 (v4.1)
+
+**GitOps 파이프라인 구축 완료:**
+- ✅ ArgoCD v2.12.6 설치 (Ansible 자동화)
+- ✅ ALB Ingress 연동 (https://growbin.app/argocd)
+- ✅ GitHub Container Registry (GHCR) 통합 설계
+- ✅ Helm Charts 기반 배포 구조 완성
+- ✅ GitHub Actions CI 파이프라인 설계
+- ✅ 문서 구조 개선 (클러스터 스펙 코드 블록 수정)
+
+**배포 자동화:**
+- CI: GitHub Actions (Lint → Test → Build → Push GHCR)
+- CD: ArgoCD (Git 모니터링 → Helm Diff → 자동 배포)
+- 무중단 배포: Rolling Update 전략
+- 이미지 관리: GHCR (무료, GITHUB_TOKEN 자동 인증)
+
 ### 2025-11-05 (v4.0)
 
 **주요 변경사항:**
@@ -1006,10 +1103,10 @@ docs/troubleshooting/README.md
 
 ---
 
-**문서 버전**: 0.4  
-**최종 업데이트**: 2025-11-05  
+**문서 버전**: 4.1  
+**최종 업데이트**: 2025-11-06  
 **아키텍처**: 7-Node Self-Managed Kubernetes (Terraform + Ansible)  
-**상태**: ✅ 인프라 구축 완료, 트러블슈팅 완료, 애플리케이션 배포 준비 완료
+**상태**: ✅ 인프라 구축 완료, GitOps 파이프라인 완료, 애플리케이션 배포 준비 완료
 
 ---
 
