@@ -23,37 +23,76 @@
 
 ```bash
 # ArgoCD 네임스페이스의 모든 Pod 확인
-kubectl get pods -n argocd
+ubuntu@k8s-master:~$ kubectl get pods -n argocd
+NAME                                                READY   STATUS    RESTARTS      AGE
+argocd-application-controller-0                     1/1     Running   0             39h
+argocd-applicationset-controller-59dcb85f8c-dwrwk   1/1     Running   0             39h
+argocd-dex-server-7698666d64-2hflw                  1/1     Running   2 (39h ago)   39h
+argocd-notifications-controller-784f76bb54-5dlpt    1/1     Running   0             39h
+argocd-redis-7d8d6c76b6-6wpfr                       1/1     Running   0             39h
+argocd-repo-server-6bfcf8997b-glsq4                 1/1     Running   0             39h
+argocd-server-5bc8b8c979-p5dnz                      1/1     Running   0             38h
 
-# 출력 예시:
-# NAME                                                READY   STATUS    RESTARTS   AGE
-# argocd-application-controller-0                     1/1     Running   0          38h
-# argocd-applicationset-controller-59dcb85f8c-dwrwk   1/1     Running   0          38h
-# argocd-dex-server-7698666d64-2hflw                  1/1     Running   2          38h
-# argocd-notifications-controller-784f76bb54-5dlpt    1/1     Running   0          38h
-# argocd-redis-7d8d6c76b6-6wpfr                       1/1     Running   0          38h
-# argocd-repo-server-6bfcf8997b-glsq4                 1/1     Running   0          38h
-# argocd-server-5bc8b8c979-p5dnz                      1/1     Running   0          36h
 ```
 
 ### Service 확인
 
 ```bash
 # ArgoCD 서비스 확인
-kubectl get svc -n argocd
+ubuntu@k8s-master:~$ kubectl get svc -n argocd
+NAME                                      TYPE        CLUSTER-IP       EXTERNAL-IP   PORT(S)                      AGE
+argocd-applicationset-controller          ClusterIP   10.109.75.57     <none>        7000/TCP,8080/TCP            39h
+argocd-dex-server                         ClusterIP   10.100.65.171    <none>        5556/TCP,5557/TCP,5558/TCP   39h
+argocd-metrics                            ClusterIP   10.108.172.227   <none>        8082/TCP                     39h
+argocd-notifications-controller-metrics   ClusterIP   10.103.185.146   <none>        9001/TCP                     39h
+argocd-redis                              ClusterIP   10.108.99.194    <none>        6379/TCP                     39h
+argocd-repo-server                        ClusterIP   10.99.82.23      <none>        8081/TCP,8084/TCP            39h
+argocd-server                             NodePort    10.107.153.190   <none>        80:30300/TCP,443:30464/TCP   39h
+argocd-server-metrics                     ClusterIP   10.105.7.129     <none>        8083/TCP                     39h
 
 # ArgoCD Server 서비스 타입 확인 (NodePort인지 ClusterIP인지)
-kubectl get svc argocd-server -n argocd -o yaml | grep -A 5 "type:"
+ubuntu@k8s-master:~$ kubectl get svc argocd-server -n argocd -o yaml | grep -A 5 "type:"
+  type: NodePort
+status:
+  loadBalancer: {}
 ```
 
 ### Ingress 확인
 
 ```bash
 # ArgoCD Ingress 확인
-kubectl get ingress -n argocd
+ubuntu@k8s-master:~$ kubectl get ingress -n argocd
+NAME             CLASS   HOSTS         ADDRESS                                                                 PORTS   AGE
+argocd-ingress   alb     growbin.app   k8s-growbinalb-18c99b272a-1896386009.ap-northeast-2.elb.amazonaws.com   80      39h
 
 # Ingress 상세 정보
-kubectl describe ingress argocd-ingress -n argocd
+ubuntu@k8s-master:~$ kubectl describe ingress argocd-ingress -n argocd
+Name:             argocd-ingress
+Labels:           <none>
+Namespace:        argocd
+Address:          k8s-growbinalb-18c99b272a-1896386009.ap-northeast-2.elb.amazonaws.com
+Ingress Class:    alb
+Default backend:  <default>
+Rules:
+  Host         Path  Backends
+  ----         ----  --------
+  growbin.app  
+               /argocd   argocd-server:80 (192.168.230.8:8080)
+Annotations:   alb.ingress.kubernetes.io/backend-protocol: HTTP
+               alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:721622471953:certificate/fed2966c-7f9e-4849-ae20-0592ec04a373
+               alb.ingress.kubernetes.io/group.name: growbin-alb
+               alb.ingress.kubernetes.io/group.order: 10
+               alb.ingress.kubernetes.io/healthcheck-interval-seconds: 15
+               alb.ingress.kubernetes.io/healthcheck-path: /argocd/api/version
+               alb.ingress.kubernetes.io/healthcheck-timeout-seconds: 5
+               alb.ingress.kubernetes.io/healthy-threshold-count: 2
+               alb.ingress.kubernetes.io/listen-ports: [{"HTTP": 80}, {"HTTPS": 443}]
+               alb.ingress.kubernetes.io/scheme: internet-facing
+               alb.ingress.kubernetes.io/ssl-redirect: 443
+               alb.ingress.kubernetes.io/success-codes: 200
+               alb.ingress.kubernetes.io/target-type: instance
+               alb.ingress.kubernetes.io/unhealthy-threshold-count: 2
+Events:        <none>
 ```
 
 ---
@@ -109,10 +148,13 @@ kubectl get svc argocd-server -n argocd
 
 ```bash
 # Ingress 확인
-kubectl get ingress argocd-ingress -n argocd
+ubuntu@k8s-master:~$ kubectl get ingress argocd-ingress -n argocd
+NAME             CLASS   HOSTS         ADDRESS                                                                 PORTS   AGE
+argocd-ingress   alb     growbin.app   k8s-growbinalb-18c99b272a-1896386009.ap-northeast-2.elb.amazonaws.com   80      39h
 
 # ALB DNS 확인
-kubectl get ingress argocd-ingress -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+ubuntu@k8s-master:~$ kubectl get ingress argocd-ingress -n argocd -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+k8s-growbinalb-18c99b272a-1896386009.ap-northeast-2.elb.amazonaws.com
 
 # 브라우저에서 접속
 # https://growbin.app/argocd
@@ -121,7 +163,52 @@ kubectl get ingress argocd-ingress -n argocd -o jsonpath='{.status.loadBalancer.
 **ALB Ingress 설정 확인:**
 
 ```bash
-kubectl get ingress argocd-ingress -n argocd -o yaml
+ubuntu@k8s-master:~$ kubectl get ingress argocd-ingress -n argocd -o yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:721622471953:certificate/fed2966c-7f9e-4849-ae20-0592ec04a373
+    alb.ingress.kubernetes.io/group.name: growbin-alb
+    alb.ingress.kubernetes.io/group.order: "10"
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-path: /argocd/api/version
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/success-codes: "200"
+    alb.ingress.kubernetes.io/target-type: instance
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"networking.k8s.io/v1","kind":"Ingress","metadata":{"annotations":{"alb.ingress.kubernetes.io/backend-protocol":"HTTPS","alb.ingress.kubernetes.io/certificate-arn":"arn:aws:acm:ap-northeast-2:721622471953:certificate/fed2966c-7f9e-4849-ae20-0592ec04a373","alb.ingress.kubernetes.io/group.name":"growbin-alb","alb.ingress.kubernetes.io/group.order":"10","alb.ingress.kubernetes.io/healthcheck-interval-seconds":"15","alb.ingress.kubernetes.io/healthcheck-path":"/argocd/health","alb.ingress.kubernetes.io/healthcheck-timeout-seconds":"5","alb.ingress.kubernetes.io/healthy-threshold-count":"2","alb.ingress.kubernetes.io/listen-ports":"[{\"HTTP\": 80}, {\"HTTPS\": 443}]","alb.ingress.kubernetes.io/scheme":"internet-facing","alb.ingress.kubernetes.io/ssl-redirect":"443","alb.ingress.kubernetes.io/target-type":"instance","alb.ingress.kubernetes.io/unhealthy-threshold-count":"2"},"name":"argocd-ingress","namespace":"argocd"},"spec":{"ingressClassName":"alb","rules":[{"host":"growbin.app","http":{"paths":[{"backend":{"service":{"name":"argocd-server","port":{"number":443}}},"path":"/argocd","pathType":"Prefix"}]}}]}}
+  creationTimestamp: "2025-11-04T13:02:14Z"
+  finalizers:
+  - group.ingress.k8s.aws/growbin-alb
+  generation: 2
+  name: argocd-ingress
+  namespace: argocd
+  resourceVersion: "22868"
+  uid: 3e2ee629-0581-447d-9c5d-0aa870b866dd
+spec:
+  ingressClassName: alb
+  rules:
+  - host: growbin.app
+    http:
+      paths:
+      - backend:
+          service:
+            name: argocd-server
+            port:
+              number: 80
+        path: /argocd
+        pathType: Prefix
+status:
+  loadBalancer:
+    ingress:
+    - hostname: k8s-growbinalb-18c99b272a-1896386009.ap-northeast-2.elb.amazonaws.com
 ```
 
 **주요 annotation:**
