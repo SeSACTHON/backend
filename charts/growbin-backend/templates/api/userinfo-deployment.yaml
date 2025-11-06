@@ -51,15 +51,19 @@ spec:
         livenessProbe:
           httpGet:
             path: /health
-            port: 8000
+            port: http
           initialDelaySeconds: 30
           periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
         readinessProbe:
           httpGet:
             path: /ready
-            port: 8000
-          initialDelaySeconds: 10
+            port: http
+          initialDelaySeconds: 5
           periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
         resources:
           {{- toYaml .Values.api.userinfo.resources | nindent 10 }}
 

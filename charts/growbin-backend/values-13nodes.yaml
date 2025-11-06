@@ -82,6 +82,8 @@ api:
       alb.ingress.kubernetes.io/ssl-redirect: '443'
       alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:721622471953:certificate/fed2966c-7f9e-4849-ae20-0592ec04a373
       alb.ingress.kubernetes.io/load-balancer-name: growbin-api-alb
+      alb.ingress.kubernetes.io/subnets: ${PUBLIC_SUBNETS}  # Terraform output으로 주입
+      alb.ingress.kubernetes.io/security-groups: ${WORKER_SG}  # Terraform output으로 주입
     host: api.growbin.app
   
   # 1. Waste API (메인 폐기물 분석) - 독립 노드
