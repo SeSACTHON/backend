@@ -20,9 +20,9 @@ spec:
         app: waste-api
         component: api
     spec:
-      {{- with .Values.api.common.nodeSelector }}
+      {{- if .Values.api.waste.nodeSelector }}
       nodeSelector:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml .Values.api.waste.nodeSelector | nindent 8 }}
       {{- end }}
       containers:
       - name: api
@@ -48,14 +48,22 @@ spec:
           value: "redis://{{ .Values.externalServices.redis.host }}:{{ .Values.externalServices.redis.port }}/0"
         - name: RABBITMQ_URL
           value: "amqp://{{ .Values.secrets.rabbitmq.username }}:{{ .Values.secrets.rabbitmq.password }}@{{ .Values.externalServices.rabbitmq.host }}:{{ .Values.externalServices.rabbitmq.port }}//"
-        {{- if .Values.api.waste.livenessProbe }}
         livenessProbe:
-          {{- toYaml .Values.api.waste.livenessProbe | nindent 10 }}
-        {{- end }}
-        {{- if .Values.api.waste.readinessProbe }}
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
         readinessProbe:
-          {{- toYaml .Values.api.waste.readinessProbe | nindent 10 }}
-        {{- end }}
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
         resources:
           {{- toYaml .Values.api.waste.resources | nindent 10 }}
 

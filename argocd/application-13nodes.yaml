@@ -15,9 +15,9 @@ spec:
   
   # Source: Helm Chart from Git
   source:
-    repoURL: https://github.com/your-org/SeSACTHON
-    targetRevision: main
-    path: backend/charts/growbin-backend
+    repoURL: https://github.com/SeSACTHON/backend
+    targetRevision: develop
+    path: charts/growbin-backend
     helm:
       valueFiles:
         - values-13nodes.yaml  # 13 노드 전용 values

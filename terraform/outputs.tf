@@ -252,6 +252,16 @@ output "vpc_id" {
   value       = module.vpc.vpc_id
 }
 
+output "public_subnet_ids" {
+  description = "Public Subnet IDs (comma-separated for ALB)"
+  value       = join(",", module.vpc.public_subnet_ids)
+}
+
+output "worker_security_group_id" {
+  description = "Worker Security Group ID for ALB"
+  value       = module.security_groups.worker_sg_id
+}
+
 output "aws_region" {
   description = "AWS Region"
   value       = var.aws_region
