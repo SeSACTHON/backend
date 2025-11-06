@@ -333,4 +333,5 @@ Client → API → S3 업로드 → Worker (GPT-5 Vision)
 ---
 
 **마지막 업데이트**: 2025-11-06  
-**버전**: 1.0.0 (13-Node Architecture)
+**버전**: v0.5.0 (13-Node Microservices Architecture)  
+**상태**: 🔄 개발 중 (Pre-Production)
