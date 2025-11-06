@@ -22,9 +22,9 @@ spec:
         component: api
         domain: userinfo
     spec:
-      {{- with .Values.api.common.nodeSelector }}
+      {{- if .Values.api.userinfo.nodeSelector }}
       nodeSelector:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml .Values.api.userinfo.nodeSelector | nindent 8 }}
       {{- end }}
       containers:
       - name: api

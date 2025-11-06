@@ -22,9 +22,9 @@ spec:
         component: api
         domain: chat
     spec:
-      {{- with .Values.api.common.nodeSelector }}
+      {{- if .Values.api.chatLlm.nodeSelector }}
       nodeSelector:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml .Values.api.chatLlm.nodeSelector | nindent 8 }}
       {{- end }}
       containers:
       - name: api
