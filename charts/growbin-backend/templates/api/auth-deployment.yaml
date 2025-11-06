@@ -22,9 +22,9 @@ spec:
         component: api
         domain: auth
     spec:
-      {{- with .Values.api.common.nodeSelector }}
+      {{- if .Values.api.auth.nodeSelector }}
       nodeSelector:
-        {{- toYaml . | nindent 8 }}
+        {{- toYaml .Values.api.auth.nodeSelector | nindent 8 }}
       {{- end }}
       containers:
       - name: api
@@ -48,14 +48,22 @@ spec:
           value: "postgresql://{{ .Values.secrets.postgresql.username }}:{{ .Values.secrets.postgresql.password }}@{{ .Values.externalServices.postgresql.host }}:{{ .Values.externalServices.postgresql.port }}/{{ .Values.externalServices.postgresql.database }}"
         - name: REDIS_URL
           value: "redis://{{ .Values.externalServices.redis.host }}:{{ .Values.externalServices.redis.port }}/0"
-        {{- if .Values.api.auth.livenessProbe }}
         livenessProbe:
-          {{- toYaml .Values.api.auth.livenessProbe | nindent 10 }}
-        {{- end }}
-        {{- if .Values.api.auth.readinessProbe }}
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
         readinessProbe:
-          {{- toYaml .Values.api.auth.readinessProbe | nindent 10 }}
-        {{- end }}
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
         resources:
           {{- toYaml .Values.api.auth.resources | nindent 10 }}
 
