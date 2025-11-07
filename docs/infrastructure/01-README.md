@@ -8,7 +8,7 @@
 
 ### 네트워크 설계
 
-1. **[VPC 네트워크 설계](03-vpc-network-design.md)** ⭐⭐⭐⭐⭐
+1. **[VPC 네트워크 설계](02-vpc-network-design.md)** ⭐⭐⭐⭐⭐
    - VPC (10.0.0.0/16)
    - 3 Public Subnets
    - Security Groups 전체
@@ -16,18 +16,28 @@
 
 ### Kubernetes 구축
 
-2. **[IaC 구성 (Terraform + Ansible)](04-iac-terraform-ansible.md)** ⭐⭐⭐⭐⭐
+2. **[IaC 구성 (Terraform + Ansible)](03-iac-terraform-ansible.md)** ⭐⭐⭐⭐⭐
    - 자동화 스크립트
    - Terraform 구조
    - Ansible Playbook
    - 40-50분 자동 배포
 
+3. **[IaC 빠른 시작](04-IaC_QUICK_START.md)** ⭐⭐⭐⭐
+   - 단계별 빠른 시작 가이드
+   - 필수 요구사항
+   - 트러블슈팅
+
 ### CNI
 
-3. [CNI 비교 (Calico vs Flannel)](06-cni-comparison.md)
+4. [CNI 비교 (Calico vs Flannel)](05-cni-comparison.md)
    - Flannel → Calico 전환
    - VXLAN vs BGP
    - 성능 비교
+
+### 기타
+
+5. [Redis 설정](06-redis-configuration.md)
+   - Redis 구성 가이드
 
 ---
 

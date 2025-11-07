@@ -224,7 +224,7 @@ EKS:
 
 ---
 
-## 🎯 4-Tier Architecture 진화
+## 🎯 13-Node Microservices Architecture 진화
 
 ### 진화 과정
 
@@ -250,7 +250,7 @@ Prometheus 안정성 확보
 ⚠️ 비용 증가
 ⚠️ 과도한 스펙 (일부)
 
-Phase 3: Instagram 패턴 적용 (4-node) ⭐
+Phase 3: Instagram 패턴 적용 (4-node)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 역할별 노드 분리:
 1. Master (Control + Monitor)
@@ -259,35 +259,52 @@ Phase 3: Instagram 패턴 적용 (4-node) ⭐
 4. Storage (Stateful)
 
 비용: $180/월
+
+Phase 4: 13-Node Microservices (최종) ⭐⭐⭐
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+API 도메인별 분리 + WAL 패턴:
+1. Master (Control Plane)
+2. API × 6 (도메인별 독립)
+3. Worker × 2 (Storage, AI)
+4. Infrastructure × 4 (RabbitMQ, PostgreSQL, Redis, Monitoring)
+
+비용: $238/월 (최적화)
+vCPU: 15 (16 한도 내)
 ```
 
-### 최종 4-Tier
+### 최종 13-Node 아키텍처
 
 ```
-Tier 1: Control + Monitoring (Master)
+Tier 1: Control Plane (Master)
 - kube-apiserver, scheduler, controller
 - etcd
-- Prometheus, Grafana
+- 고가용성 준비
 
-Tier 2: Sync API (Worker-1)
-- FastAPI Pods (Reactor Pattern)
-- 즉시 응답 (<100ms)
-- auth, users, locations
+Tier 2: API Layer (6 nodes)
+- Waste Analysis API
+- Auth API
+- Userinfo API
+- Location API
+- Recycle-Info API
+- Chat-LLM API
+→ 도메인별 독립 스케일링
 
-Tier 3: Async Workers (Worker-2)
-- Celery Workers
-- GPT-4o Vision 분석
-- 백그라운드 처리
+Tier 3: Worker Layer (2 nodes)
+- Storage Worker (S3 업로드)
+- AI Worker (이미지 분석, LLM)
+→ 로컬 SQLite WAL + PostgreSQL 동기화
 
-Tier 4: Stateful Storage (Storage)
-- RabbitMQ (HA 3-node)
-- PostgreSQL
-- Redis
+Tier 4: Infrastructure (4 nodes)
+- RabbitMQ (메시지 큐)
+- PostgreSQL (중앙 DB, 스키마 분리)
+- Redis (캐시/세션)
+- Monitoring (Prometheus + Grafana)
 
 장점:
 ✅ 명확한 역할 분리 (Robin 패턴)
-✅ 독립 스케일링 (Instagram 패턴)
-✅ 비용 최적화 (-$60)
+✅ 도메인별 독립 스케일링
+✅ WAL 패턴으로 성능 최적화
+✅ 비용 최적화 (15 vCPU)
 ✅ 프로덕션 준비
 ```
 
