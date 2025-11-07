@@ -1,9 +1,9 @@
 ---
-# Ecoeco Backend - Domain-based ApplicationSet
+# Growbin Backend - Domain-based ApplicationSet
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: ecoeco-api-services
+  name: growbin-api-services
   namespace: argocd
 spec:
   generators:
@@ -30,13 +30,13 @@ spec:
   
   template:
     metadata:
-      name: 'ecoeco-api-{{domain}}'
+      name: 'growbin-api-{{domain}}'
     spec:
       project: default
       source:
         repoURL: https://github.com/SeSACTHON/backend.git
         targetRevision: HEAD
-        path: charts/ecoeco-backend
+        path: charts/growbin-backend
         helm:
           valueFiles:
             - values-13nodes.yaml

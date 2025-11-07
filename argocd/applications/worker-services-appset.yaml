@@ -1,9 +1,9 @@
 ---
-# Ecoeco Backend - Worker Services ApplicationSet
+# Growbin Backend - Worker Services ApplicationSet
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: ecoeco-worker-services
+  name: growbin-worker-services
   namespace: argocd
 spec:
   generators:
@@ -20,13 +20,13 @@ spec:
   
   template:
     metadata:
-      name: 'ecoeco-worker-{{worker}}'
+      name: 'growbin-worker-{{worker}}'
     spec:
       project: default
       source:
         repoURL: https://github.com/SeSACTHON/backend.git
         targetRevision: HEAD
-        path: charts/ecoeco-backend
+        path: charts/growbin-backend
         helm:
           valueFiles:
             - values-13nodes.yaml

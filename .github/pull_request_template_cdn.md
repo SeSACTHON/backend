@@ -16,7 +16,7 @@ S3 이미지 스토리지에 CloudFront CDN을 추가하여 글로벌 이미지 
 1. **CloudFront Distribution 추가**
    - S3를 Origin으로 하는 CDN 구성
    - Edge Location 캐싱 (24시간 기본, 7일 최대)
-   - images.ecoeco.app 커스텀 도메인
+   - images.growbin.app 커스텀 도메인
 
 2. **Redis Image Hash Cache 제거**
    - pHash 기반 중복 제거 로직 제거
@@ -65,8 +65,8 @@ Redis DB 1 (pHash Cache)
 
 ### After: CloudFront CDN
 ```
-Frontend → CloudFront (https://images.ecoeco.app) → S3 Bucket (OAI)
-Worker → CloudFront (https://images.ecoeco.app) → S3 Bucket (OAI)
+Frontend → CloudFront (https://images.growbin.app) → S3 Bucket (OAI)
+Worker → CloudFront (https://images.growbin.app) → S3 Bucket (OAI)
    ↓
 Redis DB 1 제거 ✅
 ```
@@ -86,14 +86,14 @@ Redis DB 1 제거 ✅
    - S3 보안 접근
    
 ✅ aws_acm_certificate.cdn (us-east-1)
-   - images.ecoeco.app
+   - images.growbin.app
    - DNS 자동 검증
    
 ✅ aws_s3_bucket_policy.images_cdn
    - CloudFront OAI만 접근 허용
    
 ✅ aws_route53_record.cdn
-   - images.ecoeco.app → CloudFront
+   - images.growbin.app → CloudFront
 ```
 
 ---
@@ -137,7 +137,7 @@ provider "aws" {
 ### Environment Variables (추가)
 ```bash
 # Backend API
-CDN_BASE_URL=https://images.ecoeco.app
+CDN_BASE_URL=https://images.growbin.app
 ```
 
 ---
@@ -166,8 +166,8 @@ aws cloudfront get-distribution --id <DISTRIBUTION_ID>
 
 ### 4. DNS 전파 확인
 ```bash
-dig images.ecoeco.app
-curl -I https://images.ecoeco.app
+dig images.growbin.app
+curl -I https://images.growbin.app
 ```
 
 ---
@@ -181,7 +181,7 @@ curl -I https://images.ecoeco.app
 - [ ] S3 Bucket Policy OAI 설정 확인
 
 ### 기능 테스트
-- [ ] images.ecoeco.app DNS 해석
+- [ ] images.growbin.app DNS 해석
 - [ ] HTTPS 접근 (SSL 인증서)
 - [ ] 이미지 업로드 (Presigned URL)
 - [ ] CDN을 통한 이미지 다운로드

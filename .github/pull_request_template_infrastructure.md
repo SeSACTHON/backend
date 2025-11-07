@@ -56,7 +56,7 @@
 
 **해결**:
 ```yaml
-# charts/ecoeco-backend/templates/api/waste-deployment.yaml
+# charts/growbin-backend/templates/api/waste-deployment.yaml
 livenessProbe:
   httpGet:
     path: /health
@@ -110,7 +110,7 @@ readinessProbe:
 
 **문제**: 네임스페이스가 사전 생성되지 않아 Pod 배포 실패
 
-**해결**: `charts/ecoeco-backend/templates/namespaces.yaml` 생성
+**해결**: `charts/growbin-backend/templates/namespaces.yaml` 생성
 ```yaml
 ✅ namespace: api        # API 서비스
 ✅ namespace: workers    # Celery Workers
@@ -129,12 +129,12 @@ readinessProbe:
 # Before
 repoURL: https://github.com/your-org/SeSACTHON  # ❌ 플레이스홀더
 targetRevision: main
-path: backend/charts/ecoeco-backend
+path: backend/charts/growbin-backend
 
 # After
 repoURL: https://github.com/SeSACTHON/backend  # ✅ 정확한 URL
 targetRevision: develop
-path: charts/ecoeco-backend
+path: charts/growbin-backend
 ```
 
 ---
@@ -143,13 +143,13 @@ path: charts/ecoeco-backend
 
 **문제**: Ingress에 ACM 인증서가 설정되지 않아 HTTPS 불가
 
-**해결**: `charts/ecoeco-backend/values-13nodes.yaml` 수정
+**해결**: `charts/growbin-backend/values-13nodes.yaml` 수정
 ```yaml
 api:
   ingress:
     annotations:
       alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:721622471953:certificate/fed2966c-7f9e-4849-ae20-0592ec04a373
-      alb.ingress.kubernetes.io/load-balancer-name: ecoeco-api-alb
+      alb.ingress.kubernetes.io/load-balancer-name: growbin-api-alb
 ```
 
 **추가 작업**: 사용하지 않는 ACM 인증서 삭제 (6e2ae21f)
@@ -257,8 +257,8 @@ kubectl apply -f argocd/application-13nodes.yaml
 
 **Step 5**: DNS 설정 및 검증
 ```bash
-# Route53에 api.ecoeco.app → ALB 레코드 추가
-curl -k https://api.ecoeco.app/api/v1/waste/health
+# Route53에 api.growbin.app → ALB 레코드 추가
+curl -k https://api.growbin.app/api/v1/waste/health
 ```
 
 ---
