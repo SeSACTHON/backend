@@ -2,9 +2,12 @@
 
 **GitOps 기반 완전 자동화 배포 파이프라인**
 
-- **최종 업데이트**: 2025-11-05
+- **최종 업데이트**: 2025-11-07
+- **아키텍처**: 13-Node + Worker Local SQLite WAL
+- **앱 이름**: Eco² (이코에코)
+- **버전**: v0.6.0
 - **상태**: ✅ 프로덕션 준비 완료
-- **배포 전략**: Rolling Update (기본) / Canary (선택 가능)
+- **배포 전략**: Rolling Update (기본) / Canary (Argo Rollouts 도입 시)
 
 ---
 
@@ -1128,7 +1131,9 @@ spec:
 
 ---
 
-**문서 버전**: 2.0  
-**최종 업데이트**: 2025-11-05  
+**문서 버전**: 3.0  
+**최종 업데이트**: 2025-11-07  
+**아키텍처**: 13-Node + Worker Local SQLite WAL  
+**앱 이름**: Eco² (이코에코)  
 **작성자**: Infrastructure Team  
 **상태**: ✅ 프로덕션 준비 완료 (Canary 배포는 Argo Rollouts 도입 후 가능)

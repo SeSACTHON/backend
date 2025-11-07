@@ -2,7 +2,10 @@
 
 > **기준 문서**: [final-k8s-architecture.md](final-k8s-architecture.md)  
 > **배포 도구**: Terraform (IaC) + Ansible (Configuration Management)  
-> **날짜**: 2025-11-03
+> **아키텍처**: 13-Node + Worker Local SQLite WAL  
+> **앱 이름**: Eco² (이코에코)  
+> **버전**: v0.6.0  
+> **날짜**: 2025-11-07
 
 ## 📋 목차
 
@@ -20,14 +23,15 @@
 ```
 SeSACTHON/backend/
 ├── terraform/              # Infrastructure as Code (IaC)
-│   ├── main.tf            # 메인 설정 (VPC, EC2 모듈 호출)
+│   ├── main.tf            # 메인 설정 (13-Node 정의)
 │   ├── modules/
 │   │   ├── vpc/           # VPC 모듈 (서브넷, IGW, Route Table)
-│   │   ├── ec2/           # EC2 모듈 (Master, Workers, Storage)
+│   │   ├── ec2/           # EC2 모듈 (13개 노드)
 │   │   └── security-groups/ # 보안 그룹 모듈
 │   ├── acm.tf             # ACM 인증서
 │   ├── route53.tf         # Route53 DNS
-│   ├── s3.tf              # S3 버킷
+│   ├── s3.tf              # S3 버킷 (이미지 저장)
+│   ├── cloudfront.tf      # CloudFront CDN
 │   ├── iam.tf             # IAM 역할 및 정책
 │   ├── alb-controller-iam.tf # ALB Controller IAM
 │   └── outputs.tf         # Ansible Inventory 자동 생성
@@ -37,6 +41,7 @@ SeSACTHON/backend/
 │   ├── playbooks/         # 단계별 플레이북
 │   │   ├── 02-master-init.yml
 │   │   ├── 03-worker-join.yml
+│   │   ├── 03-1-set-provider-id.yml  # Provider ID 주입 (NEW)
 │   │   ├── 04-cni-install.yml
 │   │   ├── 05-addons.yml
 │   │   ├── 05-1-ebs-csi-driver.yml
@@ -44,7 +49,8 @@ SeSACTHON/backend/
 │   │   ├── 07-alb-controller.yml
 │   │   ├── 07-ingress-resources.yml
 │   │   ├── 08-monitoring.yml
-│   │   └── 09-etcd-backup.yml
+│   │   ├── 09-etcd-backup.yml
+│   │   └── label-nodes.yml          # 13-Node 레이블 (NEW)
 │   ├── roles/             # 재사용 가능한 역할
 │   │   ├── common/        # OS 설정 (Swap, 커널)
 │   │   ├── docker/        # Docker 설치
@@ -57,10 +63,14 @@ SeSACTHON/backend/
 │           └── all.yml    # 공통 변수 (K8s 버전, 도메인 등)
 │
 ├── scripts/               # 자동화 스크립트
-│   ├── auto-rebuild.sh   # 전체 자동화 (cleanup + build)
-│   ├── cleanup.sh        # 리소스 삭제
-│   ├── build-cluster.sh  # 클러스터 구축
-│   └── check-*.sh        # 상태 확인 스크립트
+│   ├── cluster/
+│   │   └── auto-rebuild.sh  # 전체 자동화 (13-Node 지원)
+│   ├── maintenance/
+│   │   └── destroy-with-cleanup.sh  # 완전 삭제 스크립트
+│   ├── utilities/
+│   │   ├── invalidate-cdn-cache.sh  # CDN 캐시 무효화
+│   │   └── request-vcpu-increase.sh # vCPU 한도 증가 요청
+│   └── check-*.sh         # 상태 확인 스크립트
 │
 └── docs/                  # 문서
     ├── architecture/      # 아키텍처 설계
@@ -88,10 +98,19 @@ graph TB
     B --> J[Inventory 생성]
     
     C --> K[VPC, Subnets, IGW]
-    D --> L[Master Node<br/>t3.large]
-    D --> M[Worker-1 Node<br/>t3.medium]
-    D --> N[Worker-2 Node<br/>t3.medium]
-    D --> O[Storage Node<br/>t3.large]
+    D --> L[Master Node<br/>t3a.large]
+    D --> M1[API-Auth<br/>t3a.medium]
+    D --> M2[API-Userinfo<br/>t3a.medium]
+    D --> M3[API-Location<br/>t3a.medium]
+    D --> M4[API-Waste<br/>t3a.medium]
+    D --> M5[API-Recycle-Info<br/>t3a.medium]
+    D --> M6[API-Chat-LLM<br/>t3a.medium]
+    D --> N1[Worker-Storage<br/>t3a.large]
+    D --> N2[Worker-AI<br/>t3a.large]
+    D --> O1[RabbitMQ<br/>t3a.medium]
+    D --> O2[PostgreSQL<br/>t3a.medium]
+    D --> O3[Redis<br/>t3a.medium]
+    D --> O4[Monitoring<br/>t3a.medium]
 ```
 
 **Terraform 출력**:
@@ -123,7 +142,12 @@ graph TB
 
 5. **Workers 조인**
    - Playbook: `03-worker-join.yml`
-   - Worker-1, Worker-2, Storage 노드 조인
+   - 12개 Worker 노드 조인 (API 6개, Worker 2개, Infra 4개)
+
+5-1. **Provider ID 설정**
+   - Playbook: `03-1-set-provider-id.yml`
+   - AWS 인스턴스 ID를 Kubernetes node에 주입
+   - ALB Controller 연동에 필수
 
 6. **CNI 플러그인 설치**
    - Playbook: `04-cni-install.yml`
@@ -131,10 +155,25 @@ graph TB
    - 노드 Ready 상태 확인
 
 7. **노드 레이블 지정**
+   - Playbook: `label-nodes.yml`
    ```yaml
-   - workload=application (Worker-1)
-   - workload=async-workers (Worker-2)
-   - workload=storage (Storage)
+   # Master
+   - node-role.kubernetes.io/master
+   
+   # API 노드 (6개)
+   - workload=api
+   - domain=auth / userinfo / location / waste / recycle-info / chat-llm
+   - instance-type=t3a.medium
+   
+   # Worker 노드 (2개)
+   - workload=worker
+   - domain=storage / ai
+   - instance-type=t3a.large
+   
+   # Infra 노드 (4개)
+   - workload=infrastructure
+   - domain=rabbitmq / postgresql / redis / monitoring
+   - instance-type=t3a.medium
    ```
 
 8. **Add-ons 설치**
@@ -178,91 +217,127 @@ graph TB
 
 ---
 
-## 🎯 서비스 구성
+## 🎯 서비스 구성 (13-Node)
 
-### 마이크로서비스 (5개)
+### API 마이크로서비스 (6개)
 
 > **참고**: [final-k8s-architecture.md](final-k8s-architecture.md) - 마이크로서비스 배치 섹션
 
-#### 1. auth-service
-- **Namespace**: `auth`
+#### 1. auth-api
+- **Namespace**: `api-auth`
 - **Replicas**: 2
-- **Node Selector**: `workload=application` (Worker-1)
+- **Node**: k8s-api-auth (t3a.medium)
 - **기술**: FastAPI, OAuth 2.0, JWT
 - **Path**: `/api/v1/auth`
-- **배포**: ArgoCD + Helm Chart (향후)
 
-#### 2. users-service
-- **Namespace**: `users`
-- **Replicas**: 1
-- **Node Selector**: `workload=application` (Worker-1)
+#### 2. userinfo-api
+- **Namespace**: `api-userinfo`
+- **Replicas**: 2
+- **Node**: k8s-api-userinfo (t3a.medium)
 - **기술**: FastAPI
 - **Path**: `/api/v1/users`
-- **배포**: ArgoCD + Helm Chart (향후)
 
-#### 3. locations-service
-- **Namespace**: `locations`
-- **Replicas**: 1
-- **Node Selector**: `workload=application` (Worker-1)
+#### 3. location-api
+- **Namespace**: `api-location`
+- **Replicas**: 2
+- **Node**: k8s-api-location (t3a.medium)
 - **기술**: FastAPI, Kakao Map API
 - **Path**: `/api/v1/locations`
-- **배포**: ArgoCD + Helm Chart (향후)
 
-#### 4. waste-service
-- **Namespace**: `waste`
+#### 4. waste-api
+- **Namespace**: `api-waste`
 - **Replicas**: 2
-- **Node Selector**: `workload=async-workers` (Worker-2)
-- **기술**: FastAPI, 이미지 분석
+- **Node**: k8s-api-waste (t3a.medium)
+- **기술**: FastAPI, 쓰레기 분석
 - **Path**: `/api/v1/waste`
-- **배포**: ArgoCD + Helm Chart (향후)
 
-#### 5. recycling-service
-- **Namespace**: `recycling`
+#### 5. recycle-info-api
+- **Namespace**: `api-recycle-info`
 - **Replicas**: 2
-- **Node Selector**: `workload=application` (Worker-1)
-- **기술**: FastAPI, LLM 피드백
-- **Path**: `/api/v1/recycling`
-- **배포**: ArgoCD + Helm Chart (향후)
+- **Node**: k8s-api-recycle-info (t3a.medium)
+- **기술**: FastAPI, 재활용 정보
+- **Path**: `/api/v1/recycle-info`
 
-### Celery Workers
+#### 6. chat-llm-api
+- **Namespace**: `api-chat-llm`
+- **Replicas**: 2
+- **Node**: k8s-api-chat-llm (t3a.medium)
+- **기술**: FastAPI, LLM 챗봇
+- **Path**: `/api/v1/chat`
 
-#### Worker-1 (CPU 집약)
-- **Fast Workers**: 5개
-- **큐**: `q.fast`
-- **Namespace**: `waste`
-- **Node**: Worker-1 (`workload=async-workers`)
+### Worker 서비스 (2개) + Worker Local SQLite WAL
 
-#### Worker-2 (Network 집약)
-- **External-AI Workers**: 3개
-- **External-LLM Workers**: 2개
-- **큐**: `q.external`
-- **Namespace**: `waste`, `recycling`
+#### Worker-Storage
+- **Node**: k8s-worker-storage (t3a.large)
+- **Namespace**: `workers`
+- **기능**:
+  - S3 Upload Worker (Celery)
+  - **Worker Local SQLite WAL** (로컬 작업 로그)
+  - PostgreSQL 동기화 (5분 주기)
+- **RabbitMQ 큐**: `q.storage`
+- **PVC**: 50GB (WAL 저장소)
+- **복구**: WAL 기반 자동 복구
 
-#### Worker-3 / Storage (I/O & 스케줄링)
-- **Bulk Workers**: 2개
-- **Celery Beat**: 1개
-- **큐**: `q.bulk`, `q.sched`
-- **Node**: Storage (`workload=storage`)
+#### Worker-AI
+- **Node**: k8s-worker-ai (t3a.large)
+- **Namespace**: `workers`
+- **기능**:
+  - AI Analysis Worker (Celery)
+  - **Worker Local SQLite WAL** (로컬 작업 로그)
+  - PostgreSQL 동기화 (5분 주기)
+- **RabbitMQ 큐**: `q.ai`
+- **PVC**: 50GB (WAL 저장소)
+- **복구**: WAL 기반 자동 복구
 
-### 인프라 서비스
+### 인프라 서비스 (4개)
 
 #### RabbitMQ
+- **Node**: k8s-rabbitmq (t3a.medium)
 - **Namespace**: `messaging`
-- **Replicas**: 1 (Operator 관리)
+- **Replicas**: 1 (향후 HA 3-node)
 - **배포 방식**: Operator (kubectl apply)
-- **Node Selector**: `workload=storage`
 - **Role**: `ansible/roles/rabbitmq/`
 
+#### PostgreSQL
+- **Node**: k8s-postgresql (t3a.medium)
+- **Namespace**: `database`
+- **Replicas**: 1
+- **배포 방식**: StatefulSet
+- **스토리지**: EBS gp3 100GB
+- **기능**: 중앙 DB (Worker WAL 동기화 타겟)
+
 #### Redis
-- **Namespace**: `default`
+- **Node**: k8s-redis (t3a.medium)
+- **Namespace**: `cache`
 - **Replicas**: 1
 - **배포 방식**: kubectl apply
 - **Role**: `ansible/roles/redis/`
+- **기능**: 세션 캐시, API 캐시
 
-#### PostgreSQL
-- **Namespace**: `default`
-- **상태**: 향후 배포 예정
-- **StatefulSet**: 50GB PVC
+#### Monitoring (Prometheus + Grafana)
+- **Node**: k8s-monitoring (t3a.medium)
+- **Namespace**: `monitoring`
+- **배포 방식**: Helm (kube-prometheus-stack)
+- **구성**:
+  - Prometheus Server (메트릭 수집/저장)
+  - Grafana (시각화)
+  - Alertmanager (알림)
+  - Node Exporter (노드 메트릭)
+- **보존 기간**: 30일
+
+### CDN + S3 이미지 저장소
+
+#### CloudFront
+- **Distribution**: E3EIBT2OP59VRA (예시)
+- **Origin**: S3 버킷 (prod-sesacthon-images)
+- **도메인**: images.ecoeco.app (예정)
+- **캐싱**: Edge 캐싱
+
+#### S3 Bucket
+- **Bucket**: prod-sesacthon-images
+- **Region**: ap-northeast-2
+- **Lifecycle**: 90일 후 자동 삭제
+- **CORS**: API 도메인 허용
 
 ---
 
@@ -285,18 +360,19 @@ graph TB
 ### 향후 애플리케이션 배포 방식 (GitOps)
 
 ```
-애플리케이션 서비스 (5개):
-├─ auth-service → ArgoCD Application (Helm Chart)
-├─ users-service → ArgoCD Application (Helm Chart)
-├─ locations-service → ArgoCD Application (Helm Chart)
-├─ waste-service → ArgoCD Application (Helm Chart)
-└─ recycling-service → ArgoCD Application (Helm Chart)
+API 서비스 (6개):
+├─ auth-api → ArgoCD Application (Helm Chart)
+├─ userinfo-api → ArgoCD Application (Helm Chart)
+├─ location-api → ArgoCD Application (Helm Chart)
+├─ waste-api → ArgoCD Application (Helm Chart)
+├─ recycle-info-api → ArgoCD Application (Helm Chart)
+└─ chat-llm-api → ArgoCD Application (Helm Chart)
 
-Celery Workers:
-├─ fast-worker → ArgoCD Application (Helm Chart)
-├─ external-ai-worker → ArgoCD Application (Helm Chart)
-├─ external-llm-worker → ArgoCD Application (Helm Chart)
-└─ bulk-worker → ArgoCD Application (Helm Chart)
+Worker 서비스 (2개):
+├─ storage-worker → ArgoCD Application (Helm Chart)
+│  └─ Worker Local SQLite WAL + PostgreSQL 동기화
+└─ ai-worker → ArgoCD Application (Helm Chart)
+   └─ Worker Local SQLite WAL + PostgreSQL 동기화
 ```
 
 ---
@@ -358,7 +434,10 @@ sequenceDiagram
 
 ---
 
-**작성일**: 2025-11-03  
+**작성일**: 2025-11-07  
+**아키텍처 버전**: 3.0 (13-Node + Worker Local SQLite WAL)  
+**앱 이름**: Eco² (이코에코)  
 **기준 문서**: [final-k8s-architecture.md](final-k8s-architecture.md)  
-**배포 도구**: Terraform + Ansible
+**배포 도구**: Terraform + Ansible  
+**자동화 스크립트**: `scripts/cluster/auto-rebuild.sh`
 

@@ -1,31 +1,35 @@
 # 🏗️ 아키텍처 문서
 
-> **7-Node Kubernetes Cluster Architecture**  
-> **Self-Managed + Terraform + Ansible 완전 자동화**
+> **13-Node Kubernetes Cluster Architecture + Worker Local SQLite WAL**  
+> **Self-Managed + Terraform + Ansible 완전 자동화**  
+> **Eco² (이코에코) - v0.6.0**
 
 ## 🎯 핵심 문서
 
 ### 최종 아키텍처 ⭐
 
 1. **[최종 K8s 아키텍처](final-k8s-architecture.md)** ⭐⭐⭐⭐⭐
-   - 7-Node 클러스터 구조
+   - 13-Node 클러스터 구조
+   - Worker Local SQLite WAL 패턴
    - GitOps 파이프라인
    - 전체 시스템 설계
    
 2. **[서비스 아키텍처](SERVICE_ARCHITECTURE.md)** ⭐⭐⭐⭐⭐
    - Terraform + Ansible 구조
-   - 자동화 배포 프로세스
+   - 13-Node 배포 프로세스
    - 인프라 배포 다이어그램
+   - Worker Local WAL 통합
 
 3. **[CI/CD 파이프라인](CI_CD_PIPELINE.md)** ⭐⭐⭐⭐
    - GitHub Actions + ArgoCD
    - Rolling Update 전략
    - Canary 배포 분석
+   - GHCR 컨테이너 레지스트리
    
 4. **[Self-Managed Kubernetes 선택 배경](why-self-managed-k8s.md)** ⭐⭐⭐⭐
    - EKS vs kubeadm 비교
-   - 비용: $180 vs $253 (29% 절감)
-   - 7-node 진화 과정
+   - 비용 분석
+   - 13-Node 진화 과정
 
 ### 네트워크 & 트래픽
 
@@ -83,28 +87,55 @@
 
 ---
 
-## 🏗️ 4-Tier Architecture
+## 🏗️ 13-Node Architecture (v0.6.0)
+
+### 노드 구성
 
 ```
-Tier 1: Control + Monitoring (Master, t3.large, 8GB)
-  ├─ kube-apiserver, scheduler, controller, etcd
-  └─ Prometheus + Grafana
+Tier 1: Control Plane (1 노드)
+  └─ Master Node (t3a.large, 8GB)
+     ├─ kube-apiserver, scheduler, controller, etcd
+     └─ Cluster 관리
 
-Tier 2: Sync API (Worker-1, t3.medium, 4GB)
-  ├─ auth-service (FastAPI)
-  ├─ users-service
-  └─ locations-service
+Tier 2: API Services (6 노드)
+  ├─ API-Auth (t3a.medium, 4GB) - 인증/인가
+  ├─ API-Userinfo (t3a.medium, 4GB) - 사용자 정보
+  ├─ API-Location (t3a.medium, 4GB) - 위치 서비스
+  ├─ API-Waste (t3a.medium, 4GB) - 쓰레기 분석
+  ├─ API-Recycle-Info (t3a.medium, 4GB) - 재활용 정보
+  └─ API-Chat-LLM (t3a.medium, 4GB) - LLM 챗봇
 
-Tier 3: Async Workers (Worker-2, t3.medium, 4GB)
-  ├─ celery-ai-worker (GPT-4o Vision)
-  ├─ celery-batch-worker
-  └─ celery-api-worker
+Tier 3: Worker Services (2 노드)
+  ├─ Worker-Storage (t3a.large, 8GB)
+  │  ├─ S3 Upload Worker
+  │  ├─ Worker Local SQLite WAL
+  │  └─ PostgreSQL 동기화
+  └─ Worker-AI (t3a.large, 8GB)
+     ├─ AI Analysis Worker
+     ├─ Worker Local SQLite WAL
+     └─ PostgreSQL 동기화
 
-Tier 4: Stateful Storage (Storage, t3.large, 8GB)
-  ├─ RabbitMQ (HA 3-node cluster)
-  ├─ PostgreSQL (StatefulSet)
-  └─ Redis (Deployment)
+Tier 4: Infrastructure (4 노드)
+  ├─ RabbitMQ (t3a.medium, 4GB) - 메시지 브로커
+  ├─ PostgreSQL (t3a.medium, 4GB) - 중앙 DB
+  ├─ Redis (t3a.medium, 4GB) - 캐시
+  └─ Monitoring (t3a.medium, 4GB) - Prometheus + Grafana
 ```
+
+### 주요 특징
+
+#### Worker Local SQLite WAL
+- **패턴**: Robin (Local Write + Async Sync)
+- **로컬 저장소**: SQLite WAL
+- **중앙 DB**: PostgreSQL
+- **동기화**: 배치 동기화 (5분 주기)
+- **복구**: WAL 기반 자동 복구
+
+#### CDN + S3 이미지 캐싱
+- **CDN**: CloudFront
+- **저장소**: S3 버킷 (prod-sesacthon-images)
+- **도메인**: images.ecoeco.app (예정)
+- **캐싱**: CloudFront Edge 캐싱
 
 ---
 
@@ -112,30 +143,63 @@ Tier 4: Stateful Storage (Storage, t3.large, 8GB)
 
 ```
 ✅ kubeadm (Self-Managed) vs EKS
-   → kubeadm 선택 (비용 -29%, 학습)
+   → kubeadm 선택 (비용 절감, 학습 목적, 완전한 제어)
 
 ✅ Calico VXLAN vs Flannel
-   → Calico VXLAN (안정성, 프로덕션 검증)
+   → Calico VXLAN (안정성, 프로덕션 검증, NetworkPolicy)
 
 ✅ ALB vs Nginx Ingress
-   → AWS ALB + ACM (Cloud-native, SSL 자동)
+   → AWS ALB + ACM (Cloud-native, SSL 자동 관리, Route53 통합)
 
-✅ 3-node vs 4-node
-   → 4-node (역할 분리, Instagram 패턴)
+✅ 4-node vs 7-node vs 13-node
+   → 13-node (마이크로서비스 분리, 확장성, 고가용성)
 
 ✅ Path-based vs Host-based routing
-   → Path-based (단일 도메인, API Gateway)
+   → Path-based (단일 도메인, API Gateway 패턴, 비용 절감)
+
+✅ RabbitMQ WAL vs Worker Local WAL
+   → Worker Local SQLite WAL (네트워크 부하 감소, 성능 향상, 로컬 복구)
+
+✅ Redis 이미지 캐싱 vs CDN
+   → CloudFront + S3 (글로벌 캐싱, 낮은 레이턴시, 비용 효율)
+
+✅ Helm vs ArgoCD
+   → 둘 다 사용 (Helm Charts + ArgoCD GitOps)
 ```
+
+---
+
+## 💾 총 리소스
+
+### vCPU 및 메모리
+- **총 vCPU**: 26 vCPU
+  - Master: 2 vCPU
+  - API (6개): 12 vCPU (2 × 6)
+  - Worker (2개): 4 vCPU (2 × 2)
+  - Infra (4개): 8 vCPU (2 × 4)
+  
+- **총 메모리**: 60 GB
+  - Master: 8 GB
+  - API (6개): 24 GB (4 × 6)
+  - Worker (2개): 16 GB (8 × 2)
+  - Infra (4개): 12 GB (3 × 4, Monitoring 제외 모두 t3a.medium에서 4GB로 조정)
+
+### AWS 인스턴스 타입
+- **t3a.large** (2 vCPU, 8GB): Master, Worker-Storage, Worker-AI (총 3개)
+- **t3a.medium** (2 vCPU, 4GB): API 6개 + Infra 4개 (총 10개)
 
 ---
 
 ## 📚 참고 문서
 
 - [VPC 네트워크 설계](../infrastructure/vpc-network-design.md)
-- [구축 체크리스트](../guides/SETUP_CHECKLIST.md)
-- [배포 가이드](../../DEPLOYMENT_GUIDE.md)
+- [Worker WAL 구현 가이드](../guides/WORKER_WAL_IMPLEMENTATION.md)
+- [모니터링 설정](../deployment/MONITORING_SETUP.md)
+- [자동 재구축 가이드](../deployment/AUTO_REBUILD_GUIDE.md)
+- [버전 가이드](../development/VERSION_GUIDE.md)
 
 ---
 
-**최종 업데이트**: 2025-10-31  
-**아키텍처 버전**: 2.0 (4-Node Cluster)
+**최종 업데이트**: 2025-11-07  
+**아키텍처 버전**: 3.0 (13-Node + Worker Local SQLite WAL)  
+**앱 이름**: Eco² (이코에코)
