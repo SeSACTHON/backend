@@ -272,7 +272,7 @@ module "worker_storage" {
   source = "./modules/ec2"
   
   instance_name         = "k8s-worker-storage"
-  instance_type         = "t3.medium"  # 4GB (I/O Bound - Eventlet Pool)
+  instance_type         = "t3.small"  # 2GB (I/O Bound - Eventlet Pool)
   ami_id                = data.aws_ami.ubuntu.id
   subnet_id             = module.vpc.public_subnet_ids[0]
   security_group_ids    = [module.security_groups.worker_sg_id]
@@ -298,7 +298,7 @@ module "worker_ai" {
   source = "./modules/ec2"
   
   instance_name         = "k8s-worker-ai"
-  instance_type         = "t3.medium"  # 4GB (Network Bound - Prefork Pool)
+  instance_type         = "t3.small"  # 2GB (Network Bound - Prefork Pool)
   ami_id                = data.aws_ami.ubuntu.id
   subnet_id             = module.vpc.public_subnet_ids[1]
   security_group_ids    = [module.security_groups.worker_sg_id]
@@ -399,7 +399,7 @@ module "monitoring" {
   source = "./modules/ec2"
   
   instance_name         = "k8s-monitoring"
-  instance_type         = "t3.large"  # 8GB (Prometheus + Grafana) - Upgraded for CPU
+  instance_type         = "t3.medium"  # 4GB (Prometheus + Grafana) - Optimized for 13-node cluster
   ami_id                = data.aws_ami.ubuntu.id
   subnet_id             = module.vpc.public_subnet_ids[1]  # Same AZ as Worker-1
   security_group_ids    = [module.security_groups.worker_sg_id]

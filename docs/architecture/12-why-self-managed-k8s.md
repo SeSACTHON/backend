@@ -101,9 +101,9 @@ EKS의 편의성 < 역량
 
 ```
 Control Plane: $73/월 (고정)
-Worker Nodes: $180/월 (t3.large x3)
+Worker Nodes: $238/월 (13-node 동일 구성)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-총: $253/월
+총: $311/월
 
 장점:
 ✅ 관리형 Control Plane
@@ -117,19 +117,27 @@ Worker Nodes: $180/월 (t3.large x3)
 ⚠️ 커스터마이징 제한
 ```
 
-### Self-Managed (선택)
+### Self-Managed (선택) - 13-Node 최적화
 
 ```
-Control Plane: $60/월 (t3.large Master 포함)
-Worker Nodes: $120/월 (t3.medium x2 + t3.large x1)
+13-Node 구성 (v0.6.0):
+- Master: 1 × t3.large (2 vCPU) = $60
+- API: 6 × t3.micro/small (1 vCPU) = $58
+- Worker: 2 × t3.small (1 vCPU) = $30
+- Infra: 4 × t3.small/medium (1-2 vCPU) = $90
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-총: $180/월
+총: $238/월
+
+vCPU: 15 (16 한도 내)
+메모리: 38GB
 
 장점:
-✅ 비용 절감 (-$73/월, 29% 절감)
+✅ 비용 절감 (-$73/월, 23% 절감)
 ✅ 완전한 제어
 ✅ 깊은 학습 기회
 ✅ 커스터마이징 자유
+✅ 13-Node 마이크로서비스 아키텍처
+✅ WAL 패턴 구현
 
 단점:
 ⚠️ 수동 관리 필요
@@ -322,18 +330,20 @@ Tier 4: Stateful Storage (Storage)
 ### 달성한 것
 
 ```
-✅ 비용 효율: $180/월 (EKS 대비 29% 절감)
-✅ 학습 경험: 59일 실전 디버깅
+✅ 비용 효율: $238/월 (EKS 대비 23% 절감)
+✅ 학습 경험: 13-Node 마이크로서비스 아키텍처 구현
 ✅ 프로덕션급: 모범 사례 적용
 ✅ 확장 가능: 명확한 아키텍처
 ✅ 문서화: 70+ 문서
 ✅ 자동화: 12개 스크립트
+✅ WAL 패턴: Worker Local SQLite + PostgreSQL 동기화
 
 기술 역량:
 - Kubernetes 내부 구조 이해
 - 네트워크 디버깅 능력
 - Infrastructure as Code 활용
 - 프로덕션 운영 경험
+- 마이크로서비스 설계
 ```
 
 ---
@@ -356,5 +366,5 @@ Tier 4: Stateful Storage (Storage)
 
 **작성일**: 2025-10-31  
 **결정**: Self-Managed Kubernetes (kubeadm)  
-**비용**: $180/월 (EKS 대비 -$73/월)
+**비용**: $238/월 (13-Node 최적화, EKS 대비 -$73/월)
 
