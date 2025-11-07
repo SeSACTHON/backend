@@ -82,8 +82,8 @@
 ### 검증 완료 항목
 - [x] Prometheus Pod Running 상태 확인
 - [x] k8s-monitoring 노드 CPU 할당률 81% (여유 19%)
-- [x] ArgoCD 접속 테스트 (https://growbin.app/argocd)
-- [x] Grafana 접속 테스트 (https://growbin.app/grafana)
+- [x] ArgoCD 접속 테스트 (https://ecoeco.app/argocd)
+- [x] Grafana 접속 테스트 (https://ecoeco.app/grafana)
 - [x] ALB Target Health 모두 Healthy 확인
 - [x] Route53 A 레코드 ALB Alias 확인
 - [x] Worker 노드 Provider ID 형식 확인
@@ -221,8 +221,8 @@ aws elbv2 describe-target-health --target-group-arn <TG_ARN>
 ```
 
 ### 접속 URL
-- ✅ https://growbin.app/grafana
-- ✅ https://growbin.app/argocd
+- ✅ https://ecoeco.app/grafana
+- ✅ https://ecoeco.app/argocd
 
 ---
 

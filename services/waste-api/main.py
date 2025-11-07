@@ -32,8 +32,8 @@ async def startup_event():
         lambda: check_postgres(
             host=os.getenv("POSTGRES_HOST", "k8s-postgresql"),
             port=int(os.getenv("POSTGRES_PORT", "5432")),
-            database=os.getenv("POSTGRES_DB", "growbin_waste"),
-            user=os.getenv("POSTGRES_USER", "growbin"),
+            database=os.getenv("POSTGRES_DB", "ecoeco_waste"),
+            user=os.getenv("POSTGRES_USER", "ecoeco"),
             password=os.getenv("POSTGRES_PASSWORD", ""),
         ),
     )
@@ -51,7 +51,7 @@ async def startup_event():
     health_checker.add_readiness_check(
         "storage",
         lambda: check_s3(
-            bucket=os.getenv("S3_BUCKET", "growbin-images"),
+            bucket=os.getenv("S3_BUCKET", "ecoeco-images"),
             region=os.getenv("AWS_REGION", "ap-northeast-2"),
         ),
     )

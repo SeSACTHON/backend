@@ -42,7 +42,7 @@
   delegate_to: localhost
   changed_when: false
 
-- name: "Route53 A 레코드 업데이트 (Apex - growbin.app)"
+- name: "Route53 A 레코드 업데이트 (Apex - ecoeco.app)"
   shell: |
     aws route53 change-resource-record-sets \
       --hosted-zone-id {{ hosted_zone_id_result.stdout }} \
@@ -68,7 +68,7 @@
   delegate_to: localhost
   changed_when: "'PENDING' in apex_record_update.stdout"
 
-- name: "Route53 A 레코드 업데이트 (www.growbin.app)"
+- name: "Route53 A 레코드 업데이트 (www.ecoeco.app)"
   shell: |
     aws route53 change-resource-record-sets \
       --hosted-zone-id {{ hosted_zone_id_result.stdout }} \
@@ -94,7 +94,7 @@
   delegate_to: localhost
   changed_when: "'PENDING' in www_record_update.stdout"
 
-- name: "Route53 A 레코드 업데이트 (api.growbin.app)"
+- name: "Route53 A 레코드 업데이트 (api.ecoeco.app)"
   shell: |
     aws route53 change-resource-record-sets \
       --hosted-zone-id {{ hosted_zone_id_result.stdout }} \
@@ -120,7 +120,7 @@
   delegate_to: localhost
   changed_when: "'PENDING' in api_record_update.stdout"
 
-- name: "Route53 A 레코드 업데이트 (argocd.growbin.app)"
+- name: "Route53 A 레코드 업데이트 (argocd.ecoeco.app)"
   shell: |
     aws route53 change-resource-record-sets \
       --hosted-zone-id {{ hosted_zone_id_result.stdout }} \
@@ -146,7 +146,7 @@
   delegate_to: localhost
   changed_when: "'PENDING' in argocd_record_update.stdout"
 
-- name: "Route53 A 레코드 업데이트 (grafana.growbin.app)"
+- name: "Route53 A 레코드 업데이트 (grafana.ecoeco.app)"
   shell: |
     aws route53 change-resource-record-sets \
       --hosted-zone-id {{ hosted_zone_id_result.stdout }} \

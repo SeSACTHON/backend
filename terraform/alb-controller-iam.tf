@@ -253,7 +253,7 @@ resource "aws_iam_policy" "alb_controller" {
 
 # IAM Role에 ALB Controller Policy 추가
 resource "aws_iam_role_policy_attachment" "alb_controller" {
-  role       = aws_iam_role.ec2_ssm_role.name
+  role       = aws_iam_role.k8s_node.name
   policy_arn = aws_iam_policy.alb_controller.arn
 }
 
