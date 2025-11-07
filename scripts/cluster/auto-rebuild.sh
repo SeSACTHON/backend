@@ -54,234 +54,64 @@ echo ""
 export AUTO_MODE=true
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Step 1: Terraform Destroy
+# Step 1: Terraform Destroy (destroy-with-cleanup.sh 호출)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "1️⃣ Terraform Destroy - 기존 인프라 삭제"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 
-cd "$PROJECT_ROOT/terraform"
-
-echo "🔧 Terraform 초기화..."
-terraform init -migrate-state -upgrade
-echo ""
-
-# 기존 리소스 확인
-if terraform state list >/dev/null 2>&1; then
-    RESOURCE_COUNT=$(terraform state list 2>/dev/null | wc -l | tr -d ' ')
+# destroy-with-cleanup.sh 실행
+if [ -f "$PROJECT_ROOT/scripts/maintenance/destroy-with-cleanup.sh" ]; then
+    echo "🔧 destroy-with-cleanup.sh 실행 중..."
+    echo ""
     
-    if [ "$RESOURCE_COUNT" -gt 0 ]; then
-        echo "📊 현재 리소스 개수: $RESOURCE_COUNT"
+    export AUTO_MODE=true
+    bash "$PROJECT_ROOT/scripts/maintenance/destroy-with-cleanup.sh"
+    
+    CLEANUP_EXIT_CODE=$?
+    
+    if [ $CLEANUP_EXIT_CODE -eq 0 ]; then
         echo ""
-        
-        # VPC ID와 AWS Region 미리 가져오기 (정리용)
-        VPC_ID=$(terraform output -raw vpc_id 2>/dev/null || echo "")
-        AWS_REGION=$(terraform output -raw aws_region 2>/dev/null || echo "ap-northeast-2")
-        export AWS_REGION
-        
-        # 1단계: State에 없는 AWS 리소스 사전 정리
-        if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "" ]; then
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo "1-1. AWS 리소스 사전 정리 (State 외부)"
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo ""
-            echo "📋 VPC ID: $VPC_ID"
-            echo ""
-            
-            # IAM Policy 정리 (State와 충돌 방지)
-            echo "🔐 IAM Policy 정리..."
-            POLICY_ARN=$(aws iam list-policies --scope Local --query "Policies[?PolicyName=='prod-alb-controller-policy'].Arn" --output text 2>/dev/null || echo "")
-            if [ -n "$POLICY_ARN" ]; then
-                echo "  ⚠️  기존 IAM Policy 발견: $POLICY_ARN"
-                # Policy가 Role에 연결되어 있을 수 있으므로 일단 Skip
-                echo "     (Terraform destroy에서 처리됨)"
-            else
-                echo "  ✅ IAM Policy 없음"
-            fi
-            echo ""
-            
-            # Load Balancer 정리 (Terraform이 모르는 ALB)
-            echo "⚖️  Load Balancer 정리..."
-            ALB_ARNS=$(aws elbv2 describe-load-balancers \
-                --region "$AWS_REGION" \
-                --query "LoadBalancers[?VpcId==\`$VPC_ID\`].LoadBalancerArn" \
-                --output text 2>/dev/null || echo "")
-            
-            if [ -n "$ALB_ARNS" ]; then
-                echo "  ⚠️  Kubernetes 생성 Load Balancer 발견:"
-                for alb_arn in $ALB_ARNS; do
-                    ALB_NAME=$(aws elbv2 describe-load-balancers \
-                        --load-balancer-arns "$alb_arn" \
-                        --region "$AWS_REGION" \
-                        --query 'LoadBalancers[0].LoadBalancerName' \
-                        --output text 2>/dev/null || echo "unknown")
-                    echo "     - 삭제: $ALB_NAME"
-                    aws elbv2 delete-load-balancer --load-balancer-arn "$alb_arn" --region "$AWS_REGION" 2>/dev/null || true
-                done
-                echo "  ⏳ ALB 삭제 대기 (30초)..."
-                sleep 30
-            else
-                echo "  ✅ Load Balancer 없음"
-            fi
-            echo ""
-            
-            # Target Groups 정리
-            echo "🎯 Target Groups 정리..."
-            TG_ARNS=$(aws elbv2 describe-target-groups \
-                --region "$AWS_REGION" \
-                --query "TargetGroups[?VpcId==\`$VPC_ID\`].TargetGroupArn" \
-                --output text 2>/dev/null || echo "")
-            
-            if [ -n "$TG_ARNS" ]; then
-                echo "  ⚠️  남은 Target Groups 발견:"
-                for tg_arn in $TG_ARNS; do
-                    echo "     - 삭제: $(basename $tg_arn)"
-                    aws elbv2 delete-target-group --target-group-arn "$tg_arn" --region "$AWS_REGION" 2>/dev/null || true
-                done
-                sleep 5
-            else
-                echo "  ✅ Target Groups 없음"
-            fi
-            echo ""
-            
-            # Security Groups 규칙 정리 (순환 참조 해결)
-            echo "🔒 Security Groups 규칙 정리..."
-            TERRAFORM_SGS=$(aws ec2 describe-security-groups \
-                --filters "Name=vpc-id,Values=$VPC_ID" "Name=group-name,Values=prod-k8s-*" \
-                --region "$AWS_REGION" \
-                --query 'SecurityGroups[*].GroupId' \
-                --output text 2>/dev/null || echo "")
-            
-            if [ -n "$TERRAFORM_SGS" ]; then
-                echo "  ⚠️  Terraform Security Groups 발견, 규칙 정리 중..."
-                for sg in $TERRAFORM_SGS; do
-                    # Ingress 규칙 삭제
-                    INGRESS_RULES=$(aws ec2 describe-security-group-rules \
-                        --group-ids "$sg" \
-                        --region "$AWS_REGION" \
-                        --query 'SecurityGroupRules[?IsEgress==`false`].SecurityGroupRuleId' \
-                        --output text 2>/dev/null || echo "")
-                    
-                    if [ -n "$INGRESS_RULES" ]; then
-                        for rule_id in $INGRESS_RULES; do
-                            aws ec2 revoke-security-group-ingress \
-                                --group-id "$sg" \
-                                --security-group-rule-ids "$rule_id" \
-                                --region "$AWS_REGION" 2>/dev/null || true
-                        done
-                    fi
-                    
-                    # Egress 규칙 삭제
-                    EGRESS_RULES=$(aws ec2 describe-security-group-rules \
-                        --group-ids "$sg" \
-                        --region "$AWS_REGION" \
-                        --query 'SecurityGroupRules[?IsEgress==`true`].SecurityGroupRuleId' \
-                        --output text 2>/dev/null || echo "")
-                    
-                    if [ -n "$EGRESS_RULES" ]; then
-                        for rule_id in $EGRESS_RULES; do
-                            aws ec2 revoke-security-group-egress \
-                                --group-id "$sg" \
-                                --security-group-rule-ids "$rule_id" \
-                                --region "$AWS_REGION" 2>/dev/null || true
-                        done
-                    fi
-                done
-                echo "  ✅ Security Groups 규칙 정리 완료"
-                sleep 5
-            else
-                echo "  ✅ Terraform Security Groups 없음"
-            fi
-            echo ""
-        fi
-        
-        # 2단계: Terraform Destroy 실행
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo "1-2. Terraform Destroy 실행"
-        echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-        echo ""
-        echo "🗑️  Terraform destroy 실행..."
-        
-        set +e  # destroy 실패해도 계속 진행
-        terraform destroy -auto-approve
-        DESTROY_EXIT_CODE=$?
-        set -e
-        
-        if [ $DESTROY_EXIT_CODE -ne 0 ]; then
-            echo ""
-            echo "⚠️  Terraform destroy 실패 (exit code: $DESTROY_EXIT_CODE)"
-            echo "   일부 리소스가 수동으로 import되거나 남아있을 수 있습니다."
-            echo ""
-            
-            # 실패 시 남은 리소스 정리 시도
-            if [ -n "$VPC_ID" ] && [ "$VPC_ID" != "" ]; then
-                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                echo "1-3. 남은 AWS 리소스 강제 정리"
-                echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-                echo ""
-                
-                # S3 Bucket 정리
-                echo "🪣 S3 Bucket 정리..."
-                BUCKETS=$(aws s3api list-buckets --query "Buckets[?starts_with(Name, 'prod-sesacthon')].Name" --output text 2>/dev/null || echo "")
-                if [ -n "$BUCKETS" ]; then
-                    for bucket in $BUCKETS; do
-                        echo "  - 삭제: $bucket"
-                        aws s3 rm "s3://$bucket" --recursive 2>/dev/null || true
-                        aws s3api delete-bucket --bucket "$bucket" --region "$AWS_REGION" 2>/dev/null || true
-                    done
-                else
-                    echo "  ✅ S3 Bucket 없음"
-                fi
-                echo ""
-                
-                # Key Pair 정리
-                echo "🔑 Key Pair 정리..."
-                KEY_NAME="k8s-cluster-key"
-                if aws ec2 describe-key-pairs --key-names "$KEY_NAME" --region "$AWS_REGION" >/dev/null 2>&1; then
-                    echo "  - 삭제: $KEY_NAME"
-                    aws ec2 delete-key-pair --key-name "$KEY_NAME" --region "$AWS_REGION" 2>/dev/null || true
-                else
-                    echo "  ✅ Key Pair 없음"
-                fi
-                echo ""
-                
-                # IAM Policy 정리 (Role detach 후 삭제)
-                echo "🔐 IAM Policy 강제 정리..."
-                POLICY_ARN=$(aws iam list-policies --scope Local --query "Policies[?PolicyName=='prod-alb-controller-policy'].Arn" --output text 2>/dev/null || echo "")
-                if [ -n "$POLICY_ARN" ]; then
-                    echo "  - 발견: $POLICY_ARN"
-                    
-                    # Role에서 detach
-                    ATTACHED_ROLES=$(aws iam list-entities-for-policy --policy-arn "$POLICY_ARN" --entity-filter Role --query 'PolicyRoles[*].RoleName' --output text 2>/dev/null || echo "")
-                    if [ -n "$ATTACHED_ROLES" ]; then
-                        for role in $ATTACHED_ROLES; do
-                            echo "    - Role에서 분리: $role"
-                            aws iam detach-role-policy --role-name "$role" --policy-arn "$POLICY_ARN" 2>/dev/null || true
-                        done
-                    fi
-                    
-                    # Policy 삭제
-                    echo "    - Policy 삭제"
-                    aws iam delete-policy --policy-arn "$POLICY_ARN" 2>/dev/null || true
-                else
-                    echo "  ✅ IAM Policy 없음"
-                fi
-                echo ""
-            fi
-        else
-            echo "✅ 기존 인프라 삭제 완료"
-        fi
-        
-        # AWS 리소스 완전 삭제 대기
-        echo ""
-        echo "⏳ AWS 리소스 완전 삭제 대기 (30초)..."
-        sleep 30
+        echo "✅ 기존 인프라 삭제 완료"
     else
-        echo "ℹ️  삭제할 기존 인프라가 없습니다."
+        echo ""
+        echo "⚠️  destroy-with-cleanup.sh 실패 (exit code: $CLEANUP_EXIT_CODE)"
+        echo "   일부 리소스가 남아있을 수 있습니다."
+        echo "   계속 진행합니다..."
     fi
 else
-    echo "ℹ️  State 파일이 없습니다. 새로운 배포입니다."
+    echo "⚠️  destroy-with-cleanup.sh를 찾을 수 없습니다."
+    echo "   간단한 정리만 수행합니다."
+    echo ""
+    
+    cd "$PROJECT_ROOT/terraform"
+    
+    echo "🔧 Terraform 초기화..."
+    terraform init -migrate-state -upgrade
+    echo ""
+    
+    # 기존 리소스 확인
+    if terraform state list >/dev/null 2>&1; then
+        RESOURCE_COUNT=$(terraform state list 2>/dev/null | wc -l | tr -d ' ')
+        
+        if [ "$RESOURCE_COUNT" -gt 0 ]; then
+            echo "📊 현재 리소스 개수: $RESOURCE_COUNT"
+            echo ""
+            echo "🗑️  Terraform destroy 실행..."
+            
+            set +e
+            terraform destroy -auto-approve
+            set -e
+            
+            echo "⏳ AWS 리소스 완전 삭제 대기 (30초)..."
+            sleep 30
+        else
+            echo "ℹ️  삭제할 기존 인프라가 없습니다."
+        fi
+    else
+        echo "ℹ️  State 파일이 없습니다. 새로운 배포입니다."
+    fi
 fi
 
 echo ""

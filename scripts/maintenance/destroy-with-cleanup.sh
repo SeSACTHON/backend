@@ -575,7 +575,7 @@ JSON
         # 5-5. IAM Policy 강제 정리
         echo "🔐 IAM Policy 강제 정리..."
         POLICY_ARNS=$(aws iam list-policies --scope Local \
-            --query "Policies[?contains(PolicyName, 'alb-controller') || contains(PolicyName, 'ecoeco')].Arn" \
+            --query "Policies[?contains(PolicyName, 'alb-controller') || contains(PolicyName, 'ecoeco') || contains(PolicyName, 's3-presigned-url')].Arn" \
             --output text 2>/dev/null || echo "")
         
         if [ -n "$POLICY_ARNS" ]; then
