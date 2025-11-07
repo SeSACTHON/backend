@@ -54,12 +54,19 @@ data "aws_route53_zone" "main" {
 
 #### DNS 레코드 (Ansible에서 관리)
 - ✅ `growbin.app` → ALB (Apex 도메인)
-- ✅ `www.growbin.app` → ALB
-- ✅ `api.growbin.app` → ALB
-- ✅ `argocd.growbin.app` → ALB
-- ✅ `grafana.growbin.app` → ALB
+  - `/auth` → Auth API
+  - `/my` → My API
+  - `/scan` → Scan API
+  - `/character` → Character API
+  - `/location` → Location API
+  - `/argocd` → ArgoCD
+  - `/grafana` → Grafana
+- ✅ `www.growbin.app` → ALB (선택사항)
+- ✅ `images.growbin.app` → CloudFront (CDN 전용)
 
 **Ansible 위치**: `ansible/playbooks/09-route53-update.yml`
+
+**라우팅 방식**: Path-based routing (단일 도메인 + 경로 구분)
 
 #### ACM 인증서 (ALB용)
 ```hcl
@@ -208,7 +215,7 @@ annotations:
 
 #### API 라우팅 (Phase 1&2)
 ```yaml
-host: api.growbin.app
+host: growbin.app
 paths:
   - path: /auth
     service: auth-api
@@ -221,6 +228,8 @@ paths:
   - path: /location
     service: location-api
 ```
+
+**Path-based routing**: 모든 API가 `growbin.app` 도메인 아래 경로로 구분
 
 #### Health Check
 ```yaml
@@ -327,18 +336,21 @@ kubectl set env daemonset/calico-node -n kube-system \
 ```
 ┌─────────────────────────────────────────────────────┐
 │  1. 사용자 요청                                      │
-│     https://api.growbin.app/auth/login              │
+│     https://growbin.app/auth/login                  │
 └─────────────────────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
 │  2. Route53 DNS 조회                                │
-│     api.growbin.app → ALB DNS (A Record Alias)      │
+│     growbin.app → ALB DNS (A Record Alias)          │
 └─────────────────────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐
 │  3. ALB (Application Load Balancer)                 │
 │     - ACM 인증서로 TLS 종료                         │
-│     - /auth → auth-api Service (NodePort)          │
+│     - Path 기반 라우팅:                             │
+│       /auth → auth-api Service (NodePort)           │
+│       /argocd → argocd-server (NodePort)            │
+│       /grafana → grafana (NodePort)                 │
 │     - Health Check: /health                         │
 └─────────────────────────────────────────────────────┘
                     ↓
@@ -432,9 +444,11 @@ kubectl set env daemonset/calico-node -n kube-system \
 output "dns_records" {
   value = {
     apex_domain = "https://growbin.app"
-    api_url     = "https://api.growbin.app"
-    argocd_url  = "https://argocd.growbin.app"
-    grafana_url = "https://grafana.growbin.app"
+    auth_url    = "https://growbin.app/auth"
+    my_url      = "https://growbin.app/my"
+    scan_url    = "https://growbin.app/scan"
+    argocd_url  = "https://growbin.app/argocd"
+    grafana_url = "https://growbin.app/grafana"
     cdn_url     = "https://images.growbin.app"
   }
 }
@@ -529,13 +543,18 @@ aws elbv2 describe-load-balancers --region ap-northeast-2
 
 ### 2. DNS 전파 확인
 ```bash
-dig api.growbin.app
+dig growbin.app
 dig images.growbin.app
+
+# ALB 연결 확인
+dig growbin.app +short
 ```
 
 ### 3. HTTPS 접속 테스트
 ```bash
-curl -I https://api.growbin.app/auth/health
+curl -I https://growbin.app/auth/health
+curl -I https://growbin.app/argocd
+curl -I https://growbin.app/grafana
 curl -I https://images.growbin.app
 ```
 

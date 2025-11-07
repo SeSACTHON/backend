@@ -72,12 +72,13 @@ graph TB
     subgraph Internet["🌐 Internet"]
         User[User/Browser]
         Route53["`**Route53**
-        eco²app`"]
+        api.growbin.app
+        images.growbin.app`"]
     end
     
     subgraph AWS["☁️ AWS Cloud (ap-northeast-2)"]
         ACM["`**ACM**
-        *.eco²app`"]
+        *.growbin.app`"]
         CF["`**CloudFront**
         S3 Image CDN`"]
         ALB["`**Application LB**
@@ -533,13 +534,13 @@ kubectl get ingress -A
 
 ```bash
 # Waste API Health Check
-curl https://api.eco²app/waste/health
+curl https://api.growbin.app/waste/health
 
 # Auth API Health Check
-curl https://api.eco²app/auth/health
+curl https://api.growbin.app/auth/health
 
 # User API Health Check
-curl https://api.eco²app/user/health
+curl https://api.growbin.app/user/health
 ```
 
 ---
