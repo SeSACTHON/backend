@@ -136,7 +136,7 @@ async def create_analysis():
     upload_url = s3.generate_presigned_url(...)
     
     # CDN URL (다운로드/표시용) - 신규!
-    cdn_url = f"https://images.growbin.app/{job_id}.jpg"
+    cdn_url = f"https://images.ecoeco.app/{job_id}.jpg"
     
     return {
         "job_id": job_id,

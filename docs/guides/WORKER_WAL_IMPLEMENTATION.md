@@ -2,7 +2,7 @@
 
 ## 📊 개요
 
-Growbin Worker에 Robin 패턴을 적용한 로컬 SQLite WAL (Write-Ahead Logging) 구현입니다.
+Ecoeco Worker에 Robin 패턴을 적용한 로컬 SQLite WAL (Write-Ahead Logging) 구현입니다.
 
 ### 아키텍처
 
@@ -25,7 +25,7 @@ Growbin Worker에 Robin 패턴을 적용한 로컬 SQLite WAL (Write-Ahead Loggi
 ├──────────────────────────────────────────────────────┤
 │ 1. RabbitMQ에서 메시지 수신                           │
 │ 2. 로컬 SQLite + WAL에 기록 ⭐                        │
-│    └─ /var/lib/growbin/wal/task_queue.db            │
+│    └─ /var/lib/ecoeco/wal/task_queue.db            │
 │    └─ PRAGMA journal_mode=WAL                        │
 │ 3. 작업 처리 (S3 업로드, AI 추론 등)                  │
 │ 4. 결과를 WAL에 기록                                  │
@@ -75,7 +75,7 @@ Growbin Worker에 Robin 패턴을 적용한 로컬 SQLite WAL (Write-Ahead Loggi
 from app.wal import WALManager
 
 # WAL Manager 초기화
-wal = WALManager(db_path="/var/lib/growbin/wal/task_queue.db")
+wal = WALManager(db_path="/var/lib/ecoeco/wal/task_queue.db")
 
 # 작업 수신 시 기록
 wal.write_task(
@@ -145,7 +145,7 @@ kubectl apply -f k8s/workers/worker-wal-deployments.yaml
 ### 2. Worker Deployment 배포
 
 **특징**:
-- 각 Worker에 전용 PVC 마운트 (`/var/lib/growbin/wal`)
+- 각 Worker에 전용 PVC 마운트 (`/var/lib/ecoeco/wal`)
 - Graceful Shutdown (60초)
 - Liveness/Readiness Probe
 
@@ -162,7 +162,7 @@ kubectl get pvc -l component=wal
 ```yaml
 # Storage Worker
 - name: WAL_DB_PATH
-  value: "/var/lib/growbin/wal/storage_worker.db"
+  value: "/var/lib/ecoeco/wal/storage_worker.db"
 - name: RABBITMQ_URL
   value: "amqp://guest:guest@rabbitmq:5672//"
 - name: REDIS_URL
@@ -172,7 +172,7 @@ kubectl get pvc -l component=wal
 
 # AI Worker
 - name: WAL_DB_PATH
-  value: "/var/lib/growbin/wal/ai_worker.db"
+  value: "/var/lib/ecoeco/wal/ai_worker.db"
 - name: OPENAI_API_KEY
   valueFrom:
     secretKeyRef:
@@ -369,7 +369,7 @@ def update_wal_metrics():
 @worker_ready.connect
 def on_worker_ready(sender, **kwargs):
     # WAL Manager 초기화
-    wal_manager = WALManager(db_path="/var/lib/growbin/wal/storage_worker.db")
+    wal_manager = WALManager(db_path="/var/lib/ecoeco/wal/storage_worker.db")
     
     # 복구 수행
     recovery = WALRecovery(wal_manager)
@@ -395,7 +395,7 @@ kubectl exec -it storage-worker-xyz -- bash
 python3 << EOF
 from app.wal import WALManager, WALRecovery
 
-wal = WALManager("/var/lib/growbin/wal/storage_worker.db")
+wal = WALManager("/var/lib/ecoeco/wal/storage_worker.db")
 recovery = WALRecovery(wal)
 
 # 미완료 작업 조회

@@ -1,7 +1,7 @@
 # RabbitMQ + WAL(Write-Ahead Logging) 아키텍처
 
 분석 일시: 2025-11-06
-시스템: Growbin Celery Workers
+시스템: Ecoeco Celery Workers
 참고: Robin Storage, PostgreSQL WAL, Kafka
 
 ---
@@ -59,7 +59,7 @@ WAL (Write-Ahead Logging)
 ├─────────────────────────────────────────┤
 │ 1. RabbitMQ에서 메시지 수신             │
 │ 2. 로컬 SQLite + WAL에 기록 ⭐          │
-│    └─ /var/lib/growbin/task_queue.db   │
+│    └─ /var/lib/ecoeco/task_queue.db   │
 │    └─ PRAGMA journal_mode=WAL           │
 │ 3. 작업 처리                            │
 │ 4. 완료 후 PostgreSQL 동기화            │
@@ -73,10 +73,10 @@ import sqlite3
 from celery import Celery
 from celery.signals import task_prerun, task_postrun
 
-app = Celery('growbin', broker='amqp://rabbitmq:5672')
+app = Celery('ecoeco', broker='amqp://rabbitmq:5672')
 
 class LocalWALQueue:
-    def __init__(self, db_path="/var/lib/growbin/task_queue.db"):
+    def __init__(self, db_path="/var/lib/ecoeco/task_queue.db"):
         self.conn = sqlite3.connect(
             db_path,
             isolation_level=None,  # Autocommit
@@ -227,13 +227,13 @@ def sync_to_postgres(task_id):
 from celery import Celery
 from kombu import Queue, Exchange
 
-app = Celery('growbin')
+app = Celery('ecoeco')
 
 # RabbitMQ Durable Queue (WAL 기반)
 app.conf.task_queues = [
     Queue(
         'user_input',
-        Exchange('growbin', type='topic', durable=True),
+        Exchange('ecoeco', type='topic', durable=True),
         routing_key='user.input',
         queue_arguments={
             'x-message-ttl': 86400000,  # 24시간 TTL
@@ -243,7 +243,7 @@ app.conf.task_queues = [
     ),
     Queue(
         'vision_analysis',
-        Exchange('growbin', type='topic', durable=True),
+        Exchange('ecoeco', type='topic', durable=True),
         routing_key='vision.analyze',
         durable=True
     ),
@@ -283,7 +283,7 @@ Kafka Topic
   - Consumer Offset으로 재생 가능
 ```
 
-**Growbin에 Kafka 적용 시**:
+**Ecoeco에 Kafka 적용 시**:
 ```python
 # 만약 RabbitMQ → Kafka로 전환한다면
 from kafka import KafkaProducer, KafkaConsumer
@@ -320,7 +320,7 @@ for message in consumer:
 
 ---
 
-## 🎯 3. Growbin 권장 아키텍처
+## 🎯 3. Ecoeco 권장 아키텍처
 
 ### 권장: Pattern A (RabbitMQ + Worker 로컬 WAL)
 
@@ -380,7 +380,7 @@ services:
   rabbitmq:
     image: rabbitmq:3.12-management
     environment:
-      RABBITMQ_DEFAULT_VHOST: growbin
+      RABBITMQ_DEFAULT_VHOST: ecoeco
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq  # ⭐ 영속화
     command: >
@@ -392,10 +392,10 @@ services:
   worker-storage:
     build: ./workers/storage
     volumes:
-      - worker_storage_wal:/var/lib/growbin  # ⭐ WAL 파일 영속화
+      - worker_storage_wal:/var/lib/ecoeco  # ⭐ WAL 파일 영속화
     environment:
-      CELERY_BROKER_URL: amqp://rabbitmq:5672/growbin
-      DATABASE_URL: postgresql://postgres:5432/growbin_waste
+      CELERY_BROKER_URL: amqp://rabbitmq:5672/ecoeco
+      DATABASE_URL: postgresql://postgres:5432/ecoeco_waste
     depends_on:
       - rabbitmq
       - postgresql
@@ -445,7 +445,7 @@ spec:
         image: ghcr.io/sesacthon/worker-storage:latest
         volumeMounts:
         - name: wal-storage
-          mountPath: /var/lib/growbin  # ⭐ WAL 파일 저장
+          mountPath: /var/lib/ecoeco  # ⭐ WAL 파일 저장
       volumes:
       - name: wal-storage
         persistentVolumeClaim:
@@ -511,7 +511,7 @@ class WALRecovery:
 
 # Worker 시작 시 실행
 if __name__ == "__main__":
-    recovery = WALRecovery("/var/lib/growbin/task_queue.db")
+    recovery = WALRecovery("/var/lib/ecoeco/task_queue.db")
     recovery.recover_on_startup()
     
     # Celery Worker 시작
@@ -566,7 +566,7 @@ def benchmark_with_wal():
 
 ## 🎯 6. 최종 권장 구성
 
-### Growbin Worker WAL 아키텍처
+### Ecoeco Worker WAL 아키텍처
 
 ```
 API → RabbitMQ (Durable) → Worker (SQLite WAL) → PostgreSQL

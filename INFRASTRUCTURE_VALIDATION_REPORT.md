@@ -181,7 +181,7 @@ resources:
 
 각 API Deployment 파일:
 ```yaml
-# charts/growbin-backend/templates/api/waste-deployment.yaml
+# charts/ecoeco-backend/templates/api/waste-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 # ... (Deployment만 정의됨)
@@ -336,7 +336,7 @@ alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:ACCOUNT_ID
 **2. ALB 이름 지정 없음**
 ```yaml
 # 권장:
-alb.ingress.kubernetes.io/load-balancer-name: growbin-api-alb
+alb.ingress.kubernetes.io/load-balancer-name: ecoeco-api-alb
 ```
 
 **3. 보안 그룹 미지정**
@@ -431,7 +431,7 @@ alb.ingress.kubernetes.io/healthcheck-path: /health
 ### 1. Service 리소스 추가
 각 API Deployment 템플릿에 Service 리소스 추가:
 ```yaml
-# charts/growbin-backend/templates/api/waste-deployment.yaml
+# charts/ecoeco-backend/templates/api/waste-deployment.yaml
 ---
 apiVersion: v1
 kind: Service
@@ -450,7 +450,7 @@ spec:
 
 ### 2. Namespace 리소스 생성
 ```yaml
-# charts/growbin-backend/templates/namespaces.yaml
+# charts/ecoeco-backend/templates/namespaces.yaml
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -541,8 +541,8 @@ resource "aws_iam_instance_profile" "k8s" {
 - [ ] Namespace 리소스 추가
 - [ ] ConfigMap으로 환경 변수 관리
 - [ ] Secret으로 민감 정보 관리
-- [ ] `helm lint charts/growbin-backend`
-- [ ] `helm template charts/growbin-backend --values charts/growbin-backend/values-13nodes.yaml`
+- [ ] `helm lint charts/ecoeco-backend`
+- [ ] `helm template charts/ecoeco-backend --values charts/ecoeco-backend/values-13nodes.yaml`
 
 ### ArgoCD
 - [ ] repoURL을 실제 GitHub repository로 변경
@@ -550,7 +550,7 @@ resource "aws_iam_instance_profile" "k8s" {
 - [ ] ArgoCD UI에서 Sync 상태 확인
 
 ### ALB Ingress
-- [ ] ACM에서 SSL 인증서 생성 (*.growbin.app)
+- [ ] ACM에서 SSL 인증서 생성 (*.ecoeco.app)
 - [ ] ALB Ingress Controller 설치
 - [ ] Ingress에 certificate-arn 추가
 - [ ] security-groups, subnets annotation 추가

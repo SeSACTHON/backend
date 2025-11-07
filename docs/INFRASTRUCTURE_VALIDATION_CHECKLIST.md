@@ -180,7 +180,7 @@ viewer_certificate {
 }
 
 # Custom Domain
-aliases = ["images.${var.domain_name}"]  # ✅ images.growbin.app
+aliases = ["images.${var.domain_name}"]  # ✅ images.ecoeco.app
 ```
 
 **확인 사항**:
@@ -343,7 +343,7 @@ EXPECTED_TOTAL_NODES=13  # 전체 노드
 - [ ] ACM Certificate 검증 완료
 - [ ] Route53 DNS 레코드 확인
 - [ ] S3 버킷 접근 테스트
-- [ ] CDN URL 접근 테스트 (https://images.growbin.app)
+- [ ] CDN URL 접근 테스트 (https://images.ecoeco.app)
 
 ---
 
@@ -423,7 +423,7 @@ kubectl get pods --all-namespaces
 aws cloudfront list-distributions --query 'DistributionList.Items[0].{ID:Id,Status:Status}'
 
 # 4. DNS 확인
-dig images.growbin.app
+dig images.ecoeco.app
 ```
 
 ---

@@ -7,7 +7,7 @@ Helm Chart 기반 GitOps 배포 파이프라인을 구축했습니다.
 ### 주요 변경사항
 
 #### 1. Helm Chart 구축
-- **Chart 이름**: `growbin-backend`
+- **Chart 이름**: `ecoeco-backend`
 - **6개 API 서비스** Deployment 템플릿
   - waste-api, auth-api, userinfo-api
   - location-api, recycle-info-api, chat-llm-api
@@ -40,7 +40,7 @@ Helm Chart 기반 GitOps 배포 파이프라인을 구축했습니다.
 ## 📦 Helm Chart 구조
 
 ```
-charts/growbin-backend/
+charts/ecoeco-backend/
 ├── Chart.yaml                    # Chart 메타데이터
 ├── values.yaml                   # 기본 values
 ├── values-13nodes.yaml           # 13노드 전용 values
@@ -148,7 +148,7 @@ kubectl apply -f argocd/application-13nodes.yaml
 kubectl port-forward svc/argocd-server -n argocd 8080:443
 
 # Sync 상태 확인
-argocd app get growbin-backend-13nodes
+argocd app get ecoeco-backend-13nodes
 ```
 
 ### 4. 서비스 배포 확인

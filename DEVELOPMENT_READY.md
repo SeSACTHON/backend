@@ -1,11 +1,11 @@
-# Growbin Backend - Complete Development Setup
+# Ecoeco Backend - Complete Development Setup
 
 ## 🎯 완료된 작업
 
 ### ✅ 1. Helm Chart 구조 (6 API + 5 Workers)
 
 ```
-charts/growbin-backend/
+charts/ecoeco-backend/
 ├── Chart.yaml
 ├── values.yaml                    # 전체 설정
 └── templates/

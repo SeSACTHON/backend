@@ -1,4 +1,4 @@
-# Growbin Backend - 13-Node Microservices Architecture
+# Ecoeco Backend - 13-Node Microservices Architecture
 # Values for Helm Chart
 
 global:
@@ -186,10 +186,10 @@ ingress:
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: instance
-    alb.ingress.kubernetes.io/group.name: growbin-alb
+    alb.ingress.kubernetes.io/group.name: ecoeco-alb
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
     alb.ingress.kubernetes.io/ssl-redirect: "443"
-  host: api.growbin.app
+  host: api.ecoeco.app
   paths:
     - path: /api/v1/waste
       pathType: Prefix
@@ -240,19 +240,19 @@ env:
 configMaps:
   app:
     data:
-      APP_NAME: "Growbin"
+      APP_NAME: "Ecoeco"
       API_VERSION: "v1"
 
 # Secrets (placeholder - actual values in sealed-secrets or external secrets)
 secrets:
   database:
-    POSTGRES_USER: "growbin"
+    POSTGRES_USER: "ecoeco"
     POSTGRES_PASSWORD: "REPLACE_ME"
   
   aws:
     AWS_ACCESS_KEY_ID: "REPLACE_ME"
     AWS_SECRET_ACCESS_KEY: "REPLACE_ME"
-    S3_BUCKET: "growbin-images"
+    S3_BUCKET: "ecoeco-images"
   
   openai:
     OPENAI_API_KEY: "REPLACE_ME"

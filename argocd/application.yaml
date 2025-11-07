@@ -1,11 +1,11 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: growbin-backend
+  name: ecoeco-backend
   namespace: argocd
   labels:
-    app.kubernetes.io/name: growbin-backend
-    app.kubernetes.io/part-of: growbin-platform
+    app.kubernetes.io/name: ecoeco-backend
+    app.kubernetes.io/part-of: ecoeco-platform
 spec:
   project: default
   
@@ -13,7 +13,7 @@ spec:
   source:
     repoURL: https://github.com/your-org/SeSACTHON
     targetRevision: main
-    path: backend/charts/growbin-backend
+    path: backend/charts/ecoeco-backend
     helm:
       valueFiles:
         - values.yaml

@@ -1,8 +1,8 @@
-# Growbin 13-Node Monitoring Stack
+# Ecoeco 13-Node Monitoring Stack
 
 ## 📊 개요
 
-Growbin의 13-Node Microservices Architecture를 위한 완전한 모니터링 스택입니다.
+Ecoeco의 13-Node Microservices Architecture를 위한 완전한 모니터링 스택입니다.
 
 ### 아키텍처 구성
 
@@ -123,7 +123,7 @@ Growbin의 13-Node Microservices Architecture를 위한 완전한 모니터링 �
 
 ## 📈 Grafana Dashboard
 
-### Growbin 13-Node Microservices Dashboard
+### Ecoeco 13-Node Microservices Dashboard
 
 **패널 구성**:
 
@@ -245,8 +245,8 @@ kubectl get secret grafana-admin -o jsonpath='{.data.password}' | base64 -d
 
 ## 🎨 대시보드 사용
 
-1. Grafana 로그인 후 `Growbin` 폴더 이동
-2. `Growbin 13-Node Microservices` 대시보드 선택
+1. Grafana 로그인 후 `Ecoeco` 폴더 이동
+2. `Ecoeco 13-Node Microservices` 대시보드 선택
 3. 시간 범위 선택 (기본: 최근 6시간)
 4. 서비스별 메트릭 확인
 

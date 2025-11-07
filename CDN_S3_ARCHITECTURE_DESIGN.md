@@ -412,7 +412,7 @@ resource "aws_route53_record" "cdn" {
 ```bash
 # .env 또는 ConfigMap
 CDN_ENABLED=true
-CDN_BASE_URL=https://images.growbin.app
+CDN_BASE_URL=https://images.ecoeco.app
 CDN_CACHE_TTL=86400
 ```
 

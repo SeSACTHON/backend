@@ -75,7 +75,7 @@ terraform plan
 terraform apply
 
 # CDN 배포 확인
-curl -I https://images.growbin.app/test.jpg
+curl -I https://images.ecoeco.app/test.jpg
 ```
 
 ### 3. 문서 업데이트

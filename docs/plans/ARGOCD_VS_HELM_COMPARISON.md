@@ -84,7 +84,7 @@ argocd app get ai-workers
 argocd app sync ai-workers
 
 # ArgoCD UI에서 확인
-# https://argocd.growbin.app
+# https://argocd.ecoeco.app
 ```
 
 #### 3. 파일 구조 (변경 없음)
@@ -185,7 +185,7 @@ keywords:
   - openai
 maintainers:
   - name: Your Team
-    email: team@growbin.app
+    email: team@ecoeco.app
 ```
 
 #### 3. values.yaml (기본 설정)

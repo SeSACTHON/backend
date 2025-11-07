@@ -8,20 +8,20 @@
 ```
 argocd/
 ├─ applications/
-│  ├─ growbin-backend.yaml           # 통합 Application
+│  ├─ ecoeco-backend.yaml           # 통합 Application
 │  ├─ api-services-appset.yaml       # API 서비스 ApplicationSet
 │  └─ worker-services-appset.yaml    # Worker 서비스 ApplicationSet
 ```
 
 ## 🎯 배포 전략
 
-### 1. 통합 Application (growbin-backend.yaml)
+### 1. 통합 Application (ecoeco-backend.yaml)
 
 **전체 서비스 일괄 배포**
 
 ```yaml
 repoURL: https://github.com/SeSACTHON/backend.git
-path: charts/growbin-backend
+path: charts/ecoeco-backend
 valueFiles:
   - values-13nodes.yaml
 ```
@@ -44,7 +44,7 @@ valueFiles:
 | recycle-info | api | 2 | k8s-api-recycle-info |
 | chat-llm | api | 2 | k8s-api-chat-llm |
 
-**Application 이름**: `growbin-api-{domain}`
+**Application 이름**: `ecoeco-api-{domain}`
 
 ### 3. Worker Services ApplicationSet (worker-services-appset.yaml)
 
@@ -55,7 +55,7 @@ valueFiles:
 | storage | workers | 2 | eventlet | k8s-worker-storage |
 | ai | workers | 2 | prefork | k8s-worker-ai |
 
-**Application 이름**: `growbin-worker-{worker}`
+**Application 이름**: `ecoeco-worker-{worker}`
 
 ## 🚀 배포 방법
 
@@ -63,10 +63,10 @@ valueFiles:
 
 ```bash
 # 1. ArgoCD에 Application 등록
-kubectl apply -f argocd/applications/growbin-backend.yaml
+kubectl apply -f argocd/applications/ecoeco-backend.yaml
 
 # 2. 동기화 상태 확인
-kubectl get application -n argocd growbin-backend
+kubectl get application -n argocd ecoeco-backend
 
 # 3. ArgoCD UI에서 확인
 kubectl port-forward svc/argocd-server -n argocd 8080:443
@@ -83,7 +83,7 @@ kubectl apply -f argocd/applications/api-services-appset.yaml
 kubectl apply -f argocd/applications/worker-services-appset.yaml
 
 # 3. 생성된 Application 확인
-kubectl get applications -n argocd | grep growbin
+kubectl get applications -n argocd | grep ecoeco
 ```
 
 ## 📊 동기화 정책
@@ -174,7 +174,7 @@ worker:
 
 ### 선택 가이드
 
-**통합 배포 (growbin-backend.yaml) 사용 시**:
+**통합 배포 (ecoeco-backend.yaml) 사용 시**:
 - ✅ 모든 서비스 동시 배포
 - ✅ 간단한 관리
 - ✅ 일관된 버전 관리
@@ -186,7 +186,7 @@ worker:
 
 ## 🔗 관련 문서
 
-- [Helm Charts](../charts/growbin-backend/README.md)
+- [Helm Charts](../charts/ecoeco-backend/README.md)
 - [Deployment Guide](../docs/deployment/README.md)
 - [ArgoCD Guide](../docs/guides/ARGOCD_GUIDE.md)
 

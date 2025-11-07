@@ -37,8 +37,8 @@ echo -e "${GREEN}✅ GHCR authenticated${NC}"
 echo ""
 
 # 이미지 이름
-STORAGE_WORKER_IMAGE="$REGISTRY/$ORGANIZATION/growbin-storage-worker:$VERSION"
-AI_WORKER_IMAGE="$REGISTRY/$ORGANIZATION/growbin-ai-worker:$VERSION"
+STORAGE_WORKER_IMAGE="$REGISTRY/$ORGANIZATION/ecoeco-storage-worker:$VERSION"
+AI_WORKER_IMAGE="$REGISTRY/$ORGANIZATION/ecoeco-ai-worker:$VERSION"
 
 # Storage Worker 빌드
 echo -e "${BLUE}📦 Building Storage Worker...${NC}"
@@ -74,7 +74,7 @@ echo ""
 
 # 이미지 크기 확인
 echo -e "${BLUE}📊 Image Sizes:${NC}"
-docker images | grep "growbin-.*-worker" | grep "$VERSION"
+docker images | grep "ecoeco-.*-worker" | grep "$VERSION"
 echo ""
 
 # GHCR 푸시
@@ -96,8 +96,8 @@ if [[ "$VERSION" != "latest" ]]; then
     read -p "Tag as 'latest' as well? (y/N): " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        STORAGE_WORKER_LATEST="$REGISTRY/$ORGANIZATION/growbin-storage-worker:latest"
-        AI_WORKER_LATEST="$REGISTRY/$ORGANIZATION/growbin-ai-worker:latest"
+        STORAGE_WORKER_LATEST="$REGISTRY/$ORGANIZATION/ecoeco-storage-worker:latest"
+        AI_WORKER_LATEST="$REGISTRY/$ORGANIZATION/ecoeco-ai-worker:latest"
         
         docker tag "$STORAGE_WORKER_IMAGE" "$STORAGE_WORKER_LATEST"
         docker tag "$AI_WORKER_IMAGE" "$AI_WORKER_LATEST"

@@ -1,4 +1,4 @@
-# Growbin Backend - 13 Node 구조 최종 정리
+# Ecoeco Backend - 13 Node 구조 최종 정리
 
 ## ✅ 완료된 작업
 
@@ -31,7 +31,7 @@
 
 ### 3. Helm Charts (Application Deployment)
 ```
-✅ charts/growbin-backend/values-13nodes.yaml
+✅ charts/ecoeco-backend/values-13nodes.yaml
    - 13 노드 전용 설정
    - 각 API별 nodeSelector
    - Worker nodeSelector (storage/ai)
@@ -257,7 +257,7 @@ SeSACTHON/backend/
 │   └── playbooks/
 │       └── label-nodes.yml              # ✅ 노드 라벨링
 │
-├── charts/growbin-backend/
+├── charts/ecoeco-backend/
 │   ├── Chart.yaml
 │   ├── values.yaml                      # 기존 values
 │   ├── values-13nodes.yaml              # ✅ 13 노드 전용
@@ -334,7 +334,7 @@ Configuration:
   - ansible/playbooks/label-nodes.yml
 
 Application:
-  - charts/growbin-backend/values-13nodes.yaml
+  - charts/ecoeco-backend/values-13nodes.yaml
   - argocd/application-13nodes.yaml
 ```
 

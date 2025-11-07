@@ -637,7 +637,7 @@ module.vpc.aws_vpc.main: Still destroying... [id=vpc-004d44bcda91cd06b, 6m10s el
    - 총 6개, 210GB
 
 2. **보안 그룹 (ALB Controller가 생성)**
-   - `k8s-growbinalb-*` (Load Balancer용)
+   - `k8s-ecoecoalb-*` (Load Balancer용)
    - `k8s-traffic-sesacthon-*` (Backend용)
 
 **왜 Terraform이 삭제하지 못하나?**
@@ -1435,9 +1435,9 @@ Using last defined value only.
 **Ansible Inventory 파일**:
 ```ini
 [all:vars]
-domain_name = growbin.app
+domain_name = ecoeco.app
 # ... 중간에 다른 설정들 ...
-domain_name = growbin.app  # ← 중복 정의
+domain_name = ecoeco.app  # ← 중복 정의
 ```
 
 **발생 시점**: `terraform output`으로 inventory 생성 시
@@ -1575,7 +1575,7 @@ git checkout <commit-hash> -- ansible/playbooks/07-ingress-resources.yml
 
 **증상**:
 - ALB가 생성되었지만 Target Group에 Instance가 등록되지 않음
-- `https://growbin.app` 접속 시 `503 Service Unavailable` 발생
+- `https://ecoeco.app` 접속 시 `503 Service Unavailable` 발생
 - Ingress의 `ADDRESS` 필드가 비어있음
 
 **에러 메시지**:
@@ -1667,7 +1667,7 @@ aws elbv2 describe-target-health --target-group-arn <TG_ARN>
 
 **증상**:
 ```
-https://growbin.app/argocd
+https://ecoeco.app/argocd
 → 502 Bad Gateway
 ```
 
@@ -1727,7 +1727,7 @@ annotations:
   alb.ingress.kubernetes.io/backend-protocol: HTTP  # ← HTTPS에서 HTTP로
 spec:
   rules:
-  - host: growbin.app
+  - host: ecoeco.app
     http:
       paths:
       - path: /argocd
@@ -1754,9 +1754,9 @@ spec:
 **증상**:
 ```
 Route53:
-  growbin.app → Master Public IP (52.79.238.50) ❌
-  argocd.growbin.app → Master Public IP ❌
-  grafana.growbin.app → Master Public IP ❌
+  ecoeco.app → Master Public IP (52.79.238.50) ❌
+  argocd.ecoeco.app → Master Public IP ❌
+  grafana.ecoeco.app → Master Public IP ❌
 ```
 
 **문제점**:
@@ -1819,8 +1819,8 @@ cd terraform
 terraform apply -auto-approve
 
 # 전파 확인 (최대 60초)
-dig growbin.app +short
-# 출력: k8s-growbin-XXX.ap-northeast-2.elb.amazonaws.com (ALB DNS)
+dig ecoeco.app +short
+# 출력: k8s-ecoeco-XXX.ap-northeast-2.elb.amazonaws.com (ALB DNS)
 ```
 
 **올바른 구조**:
@@ -1828,7 +1828,7 @@ dig growbin.app +short
 인터넷
   ↓
 Route53 (DNS)
-  └─ growbin.app → ALB (Alias 레코드) ✅
+  └─ ecoeco.app → ALB (Alias 레코드) ✅
   ↓
 AWS Application Load Balancer (ALB)
   ├─ ACM 인증서 (SSL/TLS 자동 관리)
@@ -1855,7 +1855,7 @@ Kubernetes Cluster
 **Path-based Routing 장점**:
 - 단일 도메인, 단일 ALB로 여러 서비스 관리
 - 비용 절감 (ALB 1개)
-- SSL/TLS 인증서 1개 (*.growbin.app)
+- SSL/TLS 인증서 1개 (*.ecoeco.app)
 
 ---
 

@@ -194,8 +194,8 @@ export VERSION=v0.6.0
 ./scripts/build-workers.sh
 
 # 빌드되는 이미지:
-# - ghcr.io/$GITHUB_USERNAME/growbin-storage-worker:v0.6.0
-# - ghcr.io/$GITHUB_USERNAME/growbin-ai-worker:v0.6.0
+# - ghcr.io/$GITHUB_USERNAME/ecoeco-storage-worker:v0.6.0
+# - ghcr.io/$GITHUB_USERNAME/ecoeco-ai-worker:v0.6.0
 ```
 
 **건너뛰는 경우**:
@@ -424,8 +424,8 @@ kubectl apply -f k8s/workers/worker-wal-deployments.yaml
 
 1. **도메인 확인**
    ```
-   https://growbin.app
-   https://api.growbin.app
+   https://ecoeco.app
+   https://api.ecoeco.app
    ```
 
 2. **ArgoCD 배포** (GitOps)
@@ -435,7 +435,7 @@ kubectl apply -f k8s/workers/worker-wal-deployments.yaml
 
 3. **애플리케이션 배포** (Helm)
    ```bash
-   kubectl apply -f charts/growbin-backend/
+   kubectl apply -f charts/ecoeco-backend/
    ```
 
 ## 🔗 관련 문서

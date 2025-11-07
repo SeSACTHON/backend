@@ -55,7 +55,7 @@ def on_worker_ready(sender, **kwargs):
     logger.info("Initializing AI Worker WAL Manager...")
 
     # WAL Manager 초기화
-    db_path = os.getenv("WAL_DB_PATH", "/var/lib/growbin/wal/ai_worker.db")
+    db_path = os.getenv("WAL_DB_PATH", "/var/lib/ecoeco/wal/ai_worker.db")
     wal_manager = WALManager(db_path=db_path)
 
     # 통계

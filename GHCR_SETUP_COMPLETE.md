@@ -17,12 +17,12 @@
   - ghcr.io/sesacthon/location-api
   - ghcr.io/sesacthon/recycle-info-api
   - ghcr.io/sesacthon/chat-llm-api
-  - ghcr.io/sesacthon/growbin-backend (Workers)
+  - ghcr.io/sesacthon/ecoeco-backend (Workers)
 ```
 
 ### 3. 업데이트된 파일
 ```
-✅ charts/growbin-backend/values-13nodes.yaml
+✅ charts/ecoeco-backend/values-13nodes.yaml
    - 모든 이미지 경로 업데이트
 
 ✅ .github/workflows/api-deploy.yml

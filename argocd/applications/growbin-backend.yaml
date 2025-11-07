@@ -1,9 +1,9 @@
 ---
-# Growbin Backend - 13-Node Microservices ArgoCD Application
+# Ecoeco Backend - 13-Node Microservices ArgoCD Application
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: growbin-backend
+  name: ecoeco-backend
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -13,7 +13,7 @@ spec:
   source:
     repoURL: https://github.com/SeSACTHON/backend.git
     targetRevision: HEAD
-    path: charts/growbin-backend
+    path: charts/ecoeco-backend
     helm:
       valueFiles:
         - values-13nodes.yaml

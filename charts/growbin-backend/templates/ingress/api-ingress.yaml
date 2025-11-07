@@ -6,7 +6,7 @@ metadata:
   name: api-ingress
   namespace: {{ .Values.namespaces.api }}
   labels:
-    {{- include "growbin-backend.labels" . | nindent 4 }}
+    {{- include "ecoeco-backend.labels" . | nindent 4 }}
   annotations:
     {{- range $key, $value := .Values.api.ingress.annotations }}
     {{ $key }}: {{ $value | quote }}

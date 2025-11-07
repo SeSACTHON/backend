@@ -61,7 +61,7 @@ spec:
         node-role: worker
       containers:
         - name: storage-worker
-          image: ghcr.io/yourorg/growbin-storage-worker:latest
+          image: ghcr.io/yourorg/ecoeco-storage-worker:latest
           command: ["celery", "-A", "workers.storage_worker", "worker", "--loglevel=info"]
           env:
             - name: RABBITMQ_URL
@@ -69,13 +69,13 @@ spec:
             - name: REDIS_URL
               value: "redis://redis:6379/0"
             - name: WAL_DB_PATH
-              value: "/var/lib/growbin/wal/storage_worker.db"
+              value: "/var/lib/ecoeco/wal/storage_worker.db"
             - name: POSTGRES_HOST
               value: "postgresql"
             - name: POSTGRES_PORT
               value: "5432"
             - name: POSTGRES_DB
-              value: "growbin_storage"
+              value: "ecoeco_storage"
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
@@ -99,7 +99,7 @@ spec:
             - name: AWS_REGION
               value: "ap-northeast-2"
             - name: S3_BUCKET
-              value: "growbin-images"
+              value: "ecoeco-images"
           resources:
             requests:
               cpu: 500m
@@ -109,7 +109,7 @@ spec:
               memory: 2Gi
           volumeMounts:
             - name: wal-storage
-              mountPath: /var/lib/growbin/wal
+              mountPath: /var/lib/ecoeco/wal
           livenessProbe:
             exec:
               command:
@@ -166,7 +166,7 @@ spec:
         node-role: worker
       containers:
         - name: ai-worker
-          image: ghcr.io/yourorg/growbin-ai-worker:latest
+          image: ghcr.io/yourorg/ecoeco-ai-worker:latest
           command: ["celery", "-A", "workers.ai_worker", "worker", "--loglevel=info"]
           env:
             - name: RABBITMQ_URL
@@ -174,13 +174,13 @@ spec:
             - name: REDIS_URL
               value: "redis://redis:6379/1"
             - name: WAL_DB_PATH
-              value: "/var/lib/growbin/wal/ai_worker.db"
+              value: "/var/lib/ecoeco/wal/ai_worker.db"
             - name: POSTGRES_HOST
               value: "postgresql"
             - name: POSTGRES_PORT
               value: "5432"
             - name: POSTGRES_DB
-              value: "growbin_ai"
+              value: "ecoeco_ai"
             - name: POSTGRES_USER
               valueFrom:
                 secretKeyRef:
@@ -205,7 +205,7 @@ spec:
               memory: 4Gi
           volumeMounts:
             - name: wal-storage
-              mountPath: /var/lib/growbin/wal
+              mountPath: /var/lib/ecoeco/wal
           livenessProbe:
             exec:
               command:

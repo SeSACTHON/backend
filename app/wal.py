@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 class WALManager:
     """Worker 로컬 SQLite WAL 매니저"""
 
-    def __init__(self, db_path: str = "/var/lib/growbin/wal/task_queue.db"):
+    def __init__(self, db_path: str = "/var/lib/ecoeco/wal/task_queue.db"):
         """
         WAL Manager 초기화
 

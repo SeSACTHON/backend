@@ -1,4 +1,4 @@
-# Growbin Backend - 9 Node Cluster Architecture
+# Ecoeco Backend - 9 Node Cluster Architecture
 
 ## 🏗️ 노드 구성 (명확한 용도별 이름)
 
@@ -141,7 +141,7 @@ AZ: ap-northeast-2a (Master와 동일 AZ)
 AZ: ap-northeast-2b
 워크로드: PostgreSQL 15
 데이터베이스:
-  - growbin (메인 DB)
+  - ecoeco (메인 DB)
   - auth (인증 DB)
   - analytics (분석 DB)
 

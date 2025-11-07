@@ -296,7 +296,7 @@ metadata:
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: instance
-    alb.ingress.kubernetes.io/group.name: growbin-alb
+    alb.ingress.kubernetes.io/group.name: ecoeco-alb
     alb.ingress.kubernetes.io/healthcheck-path: /health
 spec:
   ingressClassName: alb
@@ -331,7 +331,7 @@ ALB_DNS=$(kubectl get ingress fastapi-test-ingress -n default -o jsonpath='{.sta
 curl http://$ALB_DNS/api/v1/health
 
 # 도메인 접근 (Route53 연동 시)
-curl https://growbin.app/api/v1/health
+curl https://ecoeco.app/api/v1/health
 ```
 
 ---
@@ -493,7 +493,7 @@ kubectl run test --image=curlimages/curl --rm -it --restart=Never -- \
   curl http://fastapi-test.default.svc.cluster.local:8000/test/all
 
 # 3. 외부 테스트 (ALB만 허용)
-curl https://growbin.app/api/v1/test/all
+curl https://ecoeco.app/api/v1/test/all
 ```
 
 **성공 기준**:
@@ -509,7 +509,7 @@ curl https://growbin.app/api/v1/test/all
 
 #### PostgreSQL 테스트
 ```bash
-curl https://growbin.app/api/v1/test/postgres
+curl https://ecoeco.app/api/v1/test/postgres
 ```
 
 **확인 사항**:
@@ -520,7 +520,7 @@ curl https://growbin.app/api/v1/test/postgres
 
 #### Redis 테스트
 ```bash
-curl https://growbin.app/api/v1/test/redis
+curl https://ecoeco.app/api/v1/test/redis
 ```
 
 **확인 사항**:
@@ -530,7 +530,7 @@ curl https://growbin.app/api/v1/test/redis
 
 #### RabbitMQ 테스트
 ```bash
-curl https://growbin.app/api/v1/test/rabbitmq
+curl https://ecoeco.app/api/v1/test/rabbitmq
 ```
 
 **확인 사항**:
@@ -550,10 +550,10 @@ curl https://growbin.app/api/v1/test/rabbitmq
 ALB_DNS=$(kubectl get ingress fastapi-test-ingress -n default -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
 
 # Apache Bench (100 요청, 동시성 10)
-ab -n 100 -c 10 https://growbin.app/api/v1/health
+ab -n 100 -c 10 https://ecoeco.app/api/v1/health
 
 # hey (1000 요청, 동시성 50)
-hey -n 1000 -c 50 https://growbin.app/api/v1/health
+hey -n 1000 -c 50 https://ecoeco.app/api/v1/health
 ```
 
 **확인 사항**:
@@ -684,7 +684,7 @@ Worker 노드의 IP로 직접 접근을 시도하면 연결 실패
 curl http://52.79.238.50:30800/
 
 # ✅ ALB를 통한 접근만 허용
-curl https://growbin.app/api/v1/health
+curl https://ecoeco.app/api/v1/health
 ```
 
 ---

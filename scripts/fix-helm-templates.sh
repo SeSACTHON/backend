@@ -8,7 +8,7 @@ API_SERVICES=("auth" "userinfo" "location" "recycle-info" "chat-llm")
 echo "🔧 Fixing API Deployment templates..."
 
 for service in "${API_SERVICES[@]}"; do
-    file="charts/growbin-backend/templates/api/${service}-deployment.yaml"
+    file="charts/ecoeco-backend/templates/api/${service}-deployment.yaml"
     
     if [[ ! -f "$file" ]]; then
         echo "⚠️  File not found: $file"

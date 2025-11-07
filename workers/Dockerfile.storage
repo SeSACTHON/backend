@@ -24,12 +24,12 @@ COPY app/ /app/app/
 COPY workers/ /app/workers/
 
 # WAL 디렉토리 생성
-RUN mkdir -p /var/lib/growbin/wal && \
-    chmod 755 /var/lib/growbin/wal
+RUN mkdir -p /var/lib/ecoeco/wal && \
+    chmod 755 /var/lib/ecoeco/wal
 
 # Non-root 사용자 생성
 RUN useradd -m -u 1000 celery && \
-    chown -R celery:celery /app /var/lib/growbin
+    chown -R celery:celery /app /var/lib/ecoeco
 
 USER celery
 

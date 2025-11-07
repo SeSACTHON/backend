@@ -82,7 +82,7 @@ spec:
             {{- toYaml $config.resources | nindent 12 }}
           volumeMounts:
             - name: wal-storage
-              mountPath: /var/lib/growbin
+              mountPath: /var/lib/ecoeco
       volumes:
         - name: wal-storage
           emptyDir: {}

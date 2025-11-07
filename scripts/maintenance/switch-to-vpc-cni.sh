@@ -109,6 +109,6 @@ echo "     AWS Console → EC2 → Target Groups → 'k8s-...' 선택"
 echo "     → Targets 탭 → Status가 'healthy' 확인"
 echo ""
 echo "  3. 브라우저 테스트:"
-echo "     https://growbin.app/"
+echo "     https://ecoeco.app/"
 echo ""
 

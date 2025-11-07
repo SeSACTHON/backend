@@ -1,4 +1,4 @@
-# Growbin Backend - 13 Node 배포 가이드
+# Ecoeco Backend - 13 Node 배포 가이드
 
 ## 📋 사전 준비
 
@@ -160,7 +160,7 @@ kubectl get nodes --show-labels | grep service
 ### Helm Chart 검증
 ```bash
 # 차트 문법 검증
-cd /Users/mango/workspace/SeSACTHON/backend/charts/growbin-backend
+cd /Users/mango/workspace/SeSACTHON/backend/charts/ecoeco-backend
 
 helm lint .
 
@@ -176,19 +176,19 @@ cat values-13nodes.yaml | grep nodeSelector -A 2
 ### 수동 배포 (테스트)
 ```bash
 # Dry-run (실제 배포 없이 확인)
-helm install growbin-backend . \
+helm install ecoeco-backend . \
   -f values-13nodes.yaml \
   --dry-run --debug
 
 # 실제 배포
-helm install growbin-backend . \
+helm install ecoeco-backend . \
   -f values-13nodes.yaml \
   --namespace api \
   --create-namespace
 
 # 배포 상태 확인
 helm list -n api
-helm get values growbin-backend -n api
+helm get values ecoeco-backend -n api
 
 # Pod 배치 확인
 kubectl get pods -n api -o wide
@@ -233,7 +233,7 @@ kubectl apply -f /Users/mango/workspace/SeSACTHON/backend/argocd/application-13n
 kubectl get applications -n argocd
 
 # NAME                        SYNC STATUS   HEALTH STATUS
-# growbin-backend-13nodes     Synced        Healthy
+# ecoeco-backend-13nodes     Synced        Healthy
 
 # ArgoCD CLI 설치 (선택)
 brew install argocd
@@ -243,10 +243,10 @@ argocd login localhost:8080
 
 # 앱 확인
 argocd app list
-argocd app get growbin-backend-13nodes
+argocd app get ecoeco-backend-13nodes
 
 # 동기화 (수동)
-argocd app sync growbin-backend-13nodes
+argocd app sync ecoeco-backend-13nodes
 ```
 
 ---
@@ -292,12 +292,12 @@ done
 kubectl get ingress -n api
 
 # NAME          CLASS   HOSTS              ADDRESS
-# api-ingress   alb     api.growbin.app    xxx.elb.amazonaws.com
+# api-ingress   alb     api.ecoeco.app    xxx.elb.amazonaws.com
 
 # 외부 접속 테스트
-curl https://api.growbin.app/api/v1/waste/health
-curl https://api.growbin.app/api/v1/auth/health
-curl https://api.growbin.app/api/v1/users/health
+curl https://api.ecoeco.app/api/v1/waste/health
+curl https://api.ecoeco.app/api/v1/auth/health
+curl https://api.ecoeco.app/api/v1/users/health
 ```
 
 ### 4. Worker 동작 확인
@@ -412,13 +412,13 @@ kubectl rollout restart deployment/waste-api -n api
 ### ArgoCD Sync 실패 시
 ```bash
 # 상태 확인
-argocd app get growbin-backend-13nodes
+argocd app get ecoeco-backend-13nodes
 
 # 로그 확인
 kubectl logs -n argocd -l app.kubernetes.io/name=argocd-application-controller
 
 # 수동 Sync
-argocd app sync growbin-backend-13nodes --prune
+argocd app sync ecoeco-backend-13nodes --prune
 ```
 
 ---

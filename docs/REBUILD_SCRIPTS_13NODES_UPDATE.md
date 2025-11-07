@@ -19,7 +19,7 @@
 
 2. **`scripts/maintenance/destroy-with-cleanup.sh`**
    - CloudFront Distribution 정리 추가
-   - Route53 레코드 정리 (images.growbin.app, api.growbin.app)
+   - Route53 레코드 정리 (images.ecoeco.app, api.ecoeco.app)
    - ACM 인증서 정리 (ap-northeast-2, us-east-1)
 
 3. **`scripts/cluster/auto-rebuild.sh`**
@@ -120,8 +120,8 @@ Service CIDR: 10.96.0.0/12
 
 CNI: Calico (VXLAN Always, BGP Disabled)
 Ingress: ALB Ingress Controller
-DNS: Route53 (api.growbin.app)
-CDN: CloudFront (images.growbin.app)
+DNS: Route53 (api.ecoeco.app)
+CDN: CloudFront (images.ecoeco.app)
 ```
 
 ---
@@ -184,14 +184,14 @@ aws cloudfront list-distributions
 ```bash
 # 5. Route53 레코드 정리
 aws route53 list-hosted-zones-by-name
-→ Hosted Zone ID 조회 (growbin.app)
-→ images.growbin.app 레코드 삭제
-→ api.growbin.app 레코드 삭제
+→ Hosted Zone ID 조회 (ecoeco.app)
+→ images.ecoeco.app 레코드 삭제
+→ api.ecoeco.app 레코드 삭제
 ```
 
 **정리 대상**:
-- `images.growbin.app` (CloudFront CNAME or A Record)
-- `api.growbin.app` (ALB A Record)
+- `images.ecoeco.app` (CloudFront CNAME or A Record)
+- `api.ecoeco.app` (ALB A Record)
 
 **처리 방법**:
 1. Hosted Zone ID 조회
@@ -312,7 +312,7 @@ aws cloudfront delete-distribution --id "$cf_id" --if-match "$FINAL_ETAG"
 # Get full record set
 IMAGES_RECORD=$(aws route53 list-resource-record-sets \
     --hosted-zone-id "$HOSTED_ZONE_ID" \
-    --query "ResourceRecordSets[?Name==\`images.growbin.app.\`] | [0]" \
+    --query "ResourceRecordSets[?Name==\`images.ecoeco.app.\`] | [0]" \
     --output json)
 
 # Create change batch
@@ -480,8 +480,8 @@ AUTO_MODE=true ./scripts/maintenance/destroy-with-cleanup.sh
 
 ### Route53 레코드
 
-- **Hosted Zone**: `growbin.app.` (점 필수!)
-- **레코드 이름**: `images.growbin.app.`, `api.growbin.app.` (점 필수!)
+- **Hosted Zone**: `ecoeco.app.` (점 필수!)
+- **레코드 이름**: `images.ecoeco.app.`, `api.ecoeco.app.` (점 필수!)
 - **삭제 실패**: ResourceRecordSet이 정확히 일치해야 함
 
 ### 네트워크 타임아웃

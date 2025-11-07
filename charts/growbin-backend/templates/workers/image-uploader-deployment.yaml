@@ -9,7 +9,7 @@ metadata:
     app: image-uploader
     component: worker
     queue: q.image_upload
-    {{- include "growbin-backend.labels" . | nindent 4 }}
+    {{- include "ecoeco-backend.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.workers.imageUploader.replicas }}
   selector:

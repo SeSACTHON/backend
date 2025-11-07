@@ -2,10 +2,10 @@
 
 ## 📦 생성된 파일 목록
 
-### 1. Helm Chart (charts/growbin-backend/)
+### 1. Helm Chart (charts/ecoeco-backend/)
 
 ```
-charts/growbin-backend/
+charts/ecoeco-backend/
 ├── Chart.yaml                                  # Chart 메타데이터
 ├── values.yaml                                 # 전체 설정 값
 ├── templates/
@@ -120,7 +120,7 @@ jobs:
       - name: Update Helm Chart
         run: |
           # values.yaml의 이미지 태그 업데이트
-          sed -i "s|tag: .*|tag: ${{ github.sha }}|" charts/growbin-backend/values.yaml
+          sed -i "s|tag: .*|tag: ${{ github.sha }}|" charts/ecoeco-backend/values.yaml
           git commit -am "chore: Update auth-api image tag"
           git push
 ```
@@ -147,7 +147,7 @@ kubectl get pods -n api
 ### 예시 1: Replica 변경
 
 ```yaml
-# charts/growbin-backend/values.yaml
+# charts/ecoeco-backend/values.yaml
 
 api:
   waste:
@@ -165,7 +165,7 @@ git push
 ### 예시 2: 새 서비스 활성화
 
 ```yaml
-# charts/growbin-backend/values.yaml
+# charts/ecoeco-backend/values.yaml
 
 api:
   newService:

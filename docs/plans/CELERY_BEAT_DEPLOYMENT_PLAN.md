@@ -264,7 +264,7 @@ spec:
       
       containers:
       - name: beat
-        image: ghcr.io/your-org/growbin-backend:latest
+        image: ghcr.io/your-org/ecoeco-backend:latest
         command:
         - celery
         - -A
@@ -340,7 +340,7 @@ import boto3
 def cleanup_old_images(days: int = 30):
     """오래된 이미지 정리 (S3)"""
     s3 = boto3.client("s3")
-    bucket = "growbin-waste-images"
+    bucket = "ecoeco-waste-images"
     
     cutoff_date = datetime.now() - timedelta(days=days)
     

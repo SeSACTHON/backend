@@ -8,7 +8,7 @@ metadata:
   name: api
   labels:
     name: api
-    app.kubernetes.io/part-of: growbin-backend
+    app.kubernetes.io/part-of: ecoeco-backend
     app.kubernetes.io/component: api-layer
     
 ---
@@ -18,7 +18,7 @@ metadata:
   name: workers
   labels:
     name: workers
-    app.kubernetes.io/part-of: growbin-backend
+    app.kubernetes.io/part-of: ecoeco-backend
     app.kubernetes.io/component: worker-layer
     
 ---
@@ -28,7 +28,7 @@ metadata:
   name: data
   labels:
     name: data
-    app.kubernetes.io/part-of: growbin-backend
+    app.kubernetes.io/part-of: ecoeco-backend
     app.kubernetes.io/component: data-layer
     
 ---
@@ -38,6 +38,6 @@ metadata:
   name: messaging
   labels:
     name: messaging
-    app.kubernetes.io/part-of: growbin-backend
+    app.kubernetes.io/part-of: ecoeco-backend
     app.kubernetes.io/component: messaging-layer
 

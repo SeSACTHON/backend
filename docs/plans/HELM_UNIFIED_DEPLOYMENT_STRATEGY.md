@@ -29,7 +29,7 @@ Option 2 (Helm Chart):
 ```
 backend/
 ├── charts/
-│   └── growbin-backend/  # ⬅️ 전체 백엔드를 하나의 Chart로!
+│   └── ecoeco-backend/  # ⬅️ 전체 백엔드를 하나의 Chart로!
 │       ├── Chart.yaml
 │       ├── values.yaml
 │       ├── values-dev.yaml
@@ -61,7 +61,7 @@ backend/
 │
 ├── k8s/
 │   └── argocd/
-│       └── growbin-backend-app.yaml  # ⬅️ ArgoCD Application 1개만!
+│       └── ecoeco-backend-app.yaml  # ⬅️ ArgoCD Application 1개만!
 │
 ├── app/
 │   ├── api/
@@ -88,9 +88,9 @@ backend/
 ### 1. Chart.yaml (메타데이터)
 
 ```yaml
-# charts/growbin-backend/Chart.yaml
+# charts/ecoeco-backend/Chart.yaml
 apiVersion: v2
-name: growbin-backend
+name: ecoeco-backend
 description: GrowBin Backend - Complete Application Stack
 type: application
 version: 1.0.0  # Chart 버전
@@ -105,7 +105,7 @@ keywords:
 
 maintainers:
   - name: GrowBin Team
-    email: team@growbin.app
+    email: team@ecoeco.app
 
 dependencies: []  # 외부 Chart 의존성 (필요 시)
 ```
@@ -113,17 +113,17 @@ dependencies: []  # 외부 Chart 의존성 (필요 시)
 ### 2. values.yaml (기본 설정)
 
 ```yaml
-# charts/growbin-backend/values.yaml
+# charts/ecoeco-backend/values.yaml
 
 # Global 설정
 global:
   image:
     registry: ghcr.io
-    repository: your-org/growbin-backend
+    repository: your-org/ecoeco-backend
     tag: latest  # ⬅️ 배포 시 자동 업데이트
     pullPolicy: IfNotPresent
   
-  domain: growbin.app
+  domain: ecoeco.app
   environment: production
 
 # Celery/RabbitMQ
@@ -228,7 +228,7 @@ ingress:
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: instance
-    alb.ingress.kubernetes.io/group.name: growbin-alb
+    alb.ingress.kubernetes.io/group.name: ecoeco-alb
   tls:
     enabled: true
     certificateArn: "arn:aws:acm:..."
@@ -248,7 +248,7 @@ monitoring:
 ### 3. values-prod.yaml (프로덕션 오버라이드)
 
 ```yaml
-# charts/growbin-backend/values-prod.yaml
+# charts/ecoeco-backend/values-prod.yaml
 
 global:
   image:
@@ -282,11 +282,11 @@ resources:
 ### 4. ArgoCD Application (1개만!)
 
 ```yaml
-# k8s/argocd/growbin-backend-app.yaml
+# k8s/argocd/ecoeco-backend-app.yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: growbin-backend
+  name: ecoeco-backend
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
@@ -296,7 +296,7 @@ spec:
   source:
     repoURL: https://github.com/your-org/sesacthon-backend.git
     targetRevision: main
-    path: charts/growbin-backend  # ⬅️ 하나의 Chart
+    path: charts/ecoeco-backend  # ⬅️ 하나의 Chart
     helm:
       valueFiles:
         - values-prod.yaml  # ⬅️ 환경별 values만 변경
@@ -329,7 +329,7 @@ spec:
 # 예: Locations Service 개발 완료
 
 # 1. values.yaml만 수정 (1분)
-vim charts/growbin-backend/values.yaml
+vim charts/ecoeco-backend/values.yaml
 ```
 
 ```yaml
@@ -342,12 +342,12 @@ api:
 
 ```bash
 # 2. 템플릿 추가 (5분)
-cat > charts/growbin-backend/templates/api/locations-deployment.yaml <<EOF
+cat > charts/ecoeco-backend/templates/api/locations-deployment.yaml <<EOF
 {{- if .Values.api.locations.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "growbin-backend.fullname" . }}-locations
+  name: {{ include "ecoeco-backend.fullname" . }}-locations
 spec:
   replicas: {{ .Values.api.locations.replicas }}
   # ... (템플릿 활용)
@@ -367,7 +367,7 @@ git push origin main
 
 ```bash
 # 1. values-prod.yaml만 수정
-vim charts/growbin-backend/values-prod.yaml
+vim charts/ecoeco-backend/values-prod.yaml
 ```
 
 ```yaml
@@ -388,10 +388,10 @@ git push origin main
 
 ```bash
 # GitHub Actions가 자동으로:
-# 1. 이미지 빌드: ghcr.io/org/growbin-backend:v1.3.0
+# 1. 이미지 빌드: ghcr.io/org/ecoeco-backend:v1.3.0
 # 2. values.yaml 업데이트:
 
-sed -i 's/tag: .*/tag: v1.3.0/' charts/growbin-backend/values.yaml
+sed -i 's/tag: .*/tag: v1.3.0/' charts/ecoeco-backend/values.yaml
 git commit -am "chore: Update image to v1.3.0"
 git push
 
@@ -429,7 +429,7 @@ git push
 
 관리 포인트:
   - ArgoCD Applications: 1개
-  - 디렉토리: charts/growbin-backend/
+  - 디렉토리: charts/ecoeco-backend/
   - 설정 중앙화
 ```
 
@@ -466,43 +466,43 @@ aiWorkers:
 
 ```bash
 # 1. Chart 생성
-helm create charts/growbin-backend
-rm -rf charts/growbin-backend/templates/*
+helm create charts/ecoeco-backend
+rm -rf charts/ecoeco-backend/templates/*
 
 # 2. 기존 k8s/waste/ → charts/templates/ai-workers/ 이동
-mkdir -p charts/growbin-backend/templates/ai-workers
+mkdir -p charts/ecoeco-backend/templates/ai-workers
 mv k8s/waste/ai-workers-deployment.yaml \
-   charts/growbin-backend/templates/ai-workers/
+   charts/ecoeco-backend/templates/ai-workers/
 
 # 3. 템플릿화 (변수 치환)
 # replicas: 3 → replicas: {{ .Values.aiWorkers.preprocess.replicas }}
 
 # 4. values.yaml 작성
-vim charts/growbin-backend/values.yaml
+vim charts/ecoeco-backend/values.yaml
 ```
 
 ### Phase 2: ArgoCD Application 업데이트 (5분)
 
 ```yaml
-# k8s/argocd/growbin-backend-app.yaml
+# k8s/argocd/ecoeco-backend-app.yaml
 spec:
   source:
-    path: charts/growbin-backend  # ⬅️ 변경
+    path: charts/ecoeco-backend  # ⬅️ 변경
     helm:
       valueFiles:
         - values-prod.yaml
 ```
 
 ```bash
-kubectl apply -f k8s/argocd/growbin-backend-app.yaml
-argocd app sync growbin-backend
+kubectl apply -f k8s/argocd/ecoeco-backend-app.yaml
+argocd app sync ecoeco-backend
 ```
 
 ### Phase 3: 검증 (10분)
 
 ```bash
 # 배포 확인
-argocd app get growbin-backend
+argocd app get ecoeco-backend
 kubectl get pods -n waste
 kubectl get pods -n default
 
@@ -535,7 +535,7 @@ ROI: 약 10,000% ⚡
 
 ```bash
 ✅ 1. Helm Chart 생성
-  helm create charts/growbin-backend
+  helm create charts/ecoeco-backend
 
 ✅ 2. 기존 YAML 이동 및 템플릿화
   k8s/waste/ → charts/templates/ai-workers/
@@ -544,11 +544,11 @@ ROI: 약 10,000% ⚡
   전역 설정, 서비스별 설정
   
 ✅ 4. ArgoCD Application 수정
-  path: charts/growbin-backend
+  path: charts/ecoeco-backend
   
 ✅ 5. 배포 및 검증
   kubectl apply -f k8s/argocd/
-  argocd app sync growbin-backend
+  argocd app sync ecoeco-backend
 
 ✅ 6. CI/CD 통합
   GitHub Actions → 이미지 태그 업데이트
@@ -571,7 +571,7 @@ git commit -m "feat: Migrate to Helm Chart structure"
 git push origin main
 
 # 4. ArgoCD Application 업데이트
-kubectl apply -f k8s/argocd/growbin-backend-app.yaml
+kubectl apply -f k8s/argocd/ecoeco-backend-app.yaml
 
 # ✅ 완료! 이후 모든 배포가 간단해짐
 ```

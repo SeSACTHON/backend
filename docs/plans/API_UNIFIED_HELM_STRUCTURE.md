@@ -25,7 +25,7 @@
 
 ```
 charts/
-└── growbin-backend/
+└── ecoeco-backend/
     ├── Chart.yaml
     ├── values.yaml
     ├── values-dev.yaml
@@ -71,17 +71,17 @@ charts/
 ## 📝 values.yaml (API 중심 구조)
 
 ```yaml
-# charts/growbin-backend/values.yaml
+# charts/ecoeco-backend/values.yaml
 
 # Global 설정
 global:
   image:
     registry: ghcr.io
-    repository: your-org/growbin-backend
+    repository: your-org/ecoeco-backend
     tag: latest
     pullPolicy: IfNotPresent
   
-  domain: growbin.app
+  domain: ecoeco.app
   environment: production
 
 # Celery/RabbitMQ (Async API용)
@@ -231,7 +231,7 @@ ingress:
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: instance
-    alb.ingress.kubernetes.io/group.name: growbin-alb
+    alb.ingress.kubernetes.io/group.name: ecoeco-alb
   tls:
     enabled: true
     certificateArn: "arn:aws:acm:..."
@@ -337,27 +337,27 @@ api.async.notification:
 ### REST API 템플릿
 
 ```yaml
-# charts/growbin-backend/templates/api/rest/waste-deployment.yaml
+# charts/ecoeco-backend/templates/api/rest/waste-deployment.yaml
 {{- if .Values.api.rest.waste.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "growbin-backend.fullname" . }}-api-waste
+  name: {{ include "ecoeco-backend.fullname" . }}-api-waste
   labels:
-    {{- include "growbin-backend.labels" . | nindent 4 }}
+    {{- include "ecoeco-backend.labels" . | nindent 4 }}
     app.kubernetes.io/component: api-rest
     app.kubernetes.io/name: waste
 spec:
   replicas: {{ .Values.api.rest.waste.replicas }}
   selector:
     matchLabels:
-      {{- include "growbin-backend.selectorLabels" . | nindent 6 }}
+      {{- include "ecoeco-backend.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: api-rest
       app.kubernetes.io/name: waste
   template:
     metadata:
       labels:
-        {{- include "growbin-backend.selectorLabels" . | nindent 8 }}
+        {{- include "ecoeco-backend.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: api-rest
         app.kubernetes.io/name: waste
     spec:
@@ -398,27 +398,27 @@ spec:
 ### Async API 템플릿
 
 ```yaml
-# charts/growbin-backend/templates/api/async/vision-deployment.yaml
+# charts/ecoeco-backend/templates/api/async/vision-deployment.yaml
 {{- if .Values.api.async.vision.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "growbin-backend.fullname" . }}-api-async-vision
+  name: {{ include "ecoeco-backend.fullname" . }}-api-async-vision
   labels:
-    {{- include "growbin-backend.labels" . | nindent 4 }}
+    {{- include "ecoeco-backend.labels" . | nindent 4 }}
     app.kubernetes.io/component: api-async
     app.kubernetes.io/name: vision
 spec:
   replicas: {{ .Values.api.async.vision.replicas }}
   selector:
     matchLabels:
-      {{- include "growbin-backend.selectorLabels" . | nindent 6 }}
+      {{- include "ecoeco-backend.selectorLabels" . | nindent 6 }}
       app.kubernetes.io/component: api-async
       app.kubernetes.io/name: vision
   template:
     metadata:
       labels:
-        {{- include "growbin-backend.selectorLabels" . | nindent 8 }}
+        {{- include "ecoeco-backend.selectorLabels" . | nindent 8 }}
         app.kubernetes.io/component: api-async
         app.kubernetes.io/name: vision
     spec:
@@ -532,7 +532,7 @@ api:
 ```
 backend/
 ├── charts/
-│   └── growbin-backend/
+│   └── ecoeco-backend/
 │       ├── Chart.yaml
 │       ├── values.yaml
 │       ├── values-dev.yaml
@@ -565,7 +565,7 @@ backend/
 │
 ├── k8s/
 │   └── argocd/
-│       └── growbin-backend-app.yaml
+│       └── ecoeco-backend-app.yaml
 │
 ├── app/
 │   ├── api/
@@ -599,8 +599,8 @@ api/
 ### 2. **일관된 명명 규칙**
 ```
 Pod 이름:
-- growbin-backend-api-rest-waste-xxx
-- growbin-backend-api-async-vision-xxx
+- ecoeco-backend-api-rest-waste-xxx
+- ecoeco-backend-api-async-vision-xxx
 
 Label:
 - app.kubernetes.io/component: api-rest

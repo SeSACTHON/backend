@@ -9,7 +9,7 @@ metadata:
     app: gpt5-analyzer
     component: worker
     queue: q.gpt5_analysis
-    {{- include "growbin-backend.labels" . | nindent 4 }}
+    {{- include "ecoeco-backend.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.workers.gpt5Analyzer.replicas }}
   selector:

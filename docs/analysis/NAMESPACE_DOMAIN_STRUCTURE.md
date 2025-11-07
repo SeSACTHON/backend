@@ -439,7 +439,7 @@ echo "✅ 마이그레이션 완료!"
 ### values.yaml (네임스페이스 분리)
 
 ```yaml
-# charts/growbin-backend/values.yaml
+# charts/ecoeco-backend/values.yaml
 
 # Namespace 설정
 namespaces:
@@ -480,11 +480,11 @@ data:
 ### 템플릿 수정
 
 ```yaml
-# charts/growbin-backend/templates/api/rest/waste-deployment.yaml
+# charts/ecoeco-backend/templates/api/rest/waste-deployment.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "growbin-backend.fullname" . }}-api-waste
+  name: {{ include "ecoeco-backend.fullname" . }}-api-waste
   namespace: {{ .Values.namespaces.api }}  # ⬅️ 동적 네임스페이스
   labels:
     # ...
@@ -684,7 +684,7 @@ git commit -m "refactor: Migrate to domain-based namespaces"
 git push
 
 # 6. ArgoCD Sync
-argocd app sync growbin-backend
+argocd app sync ecoeco-backend
 ```
 
 ---

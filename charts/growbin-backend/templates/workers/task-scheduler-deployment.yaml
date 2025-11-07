@@ -8,7 +8,7 @@ metadata:
   labels:
     app: task-scheduler
     component: scheduler
-    {{- include "growbin-backend.labels" . | nindent 4 }}
+    {{- include "ecoeco-backend.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.workers.taskScheduler.replicas }}
   strategy:

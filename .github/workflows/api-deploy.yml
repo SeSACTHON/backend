@@ -90,10 +90,10 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           NEW_TAG="${{ github.sha }}"
-          sed -i "s|tag: .*|tag: ${NEW_TAG}|" charts/growbin-backend/values.yaml
+          sed -i "s|tag: .*|tag: ${NEW_TAG}|" charts/ecoeco-backend/values.yaml
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git add charts/growbin-backend/values.yaml
+          git add charts/ecoeco-backend/values.yaml
           git commit -m "chore: Update waste-api image to ${NEW_TAG}"
           git push
 
@@ -142,10 +142,10 @@ jobs:
         if: github.ref == 'refs/heads/main'
         run: |
           NEW_TAG="${{ github.sha }}"
-          sed -i "s|tag: .*  # auth-api|tag: ${NEW_TAG}  # auth-api|" charts/growbin-backend/values.yaml
+          sed -i "s|tag: .*  # auth-api|tag: ${NEW_TAG}  # auth-api|" charts/ecoeco-backend/values.yaml
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git add charts/growbin-backend/values.yaml
+          git add charts/ecoeco-backend/values.yaml
           git commit -m "chore: Update auth-api image to ${NEW_TAG}"
           git push
 

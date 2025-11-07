@@ -18,7 +18,7 @@
         alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
         alb.ingress.kubernetes.io/ssl-redirect: '443'
         alb.ingress.kubernetes.io/certificate-arn: {{ acm_certificate_arn }}
-        alb.ingress.kubernetes.io/group.name: growbin-alb
+        alb.ingress.kubernetes.io/group.name: ecoeco-alb
         alb.ingress.kubernetes.io/group.order: '10'
         alb.ingress.kubernetes.io/backend-protocol: HTTPS
         alb.ingress.kubernetes.io/healthcheck-path: /argocd/health
@@ -60,7 +60,7 @@
         alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
         alb.ingress.kubernetes.io/ssl-redirect: '443'
         alb.ingress.kubernetes.io/certificate-arn: {{ acm_certificate_arn }}
-        alb.ingress.kubernetes.io/group.name: growbin-alb
+        alb.ingress.kubernetes.io/group.name: ecoeco-alb
         alb.ingress.kubernetes.io/group.order: '20'
         alb.ingress.kubernetes.io/backend-protocol: HTTP
         alb.ingress.kubernetes.io/healthcheck-path: /grafana/health
@@ -139,7 +139,7 @@
         alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
         alb.ingress.kubernetes.io/ssl-redirect: '443'
         alb.ingress.kubernetes.io/certificate-arn: {{ acm_certificate_arn }}
-        alb.ingress.kubernetes.io/group.name: growbin-alb
+        alb.ingress.kubernetes.io/group.name: ecoeco-alb
         alb.ingress.kubernetes.io/group.order: '30'
         alb.ingress.kubernetes.io/backend-protocol: HTTP
         alb.ingress.kubernetes.io/healthcheck-path: /api/health

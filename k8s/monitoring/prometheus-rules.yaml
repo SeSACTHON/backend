@@ -1,10 +1,10 @@
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
 metadata:
-  name: growbin-alerts
+  name: ecoeco-alerts
   namespace: default
   labels:
-    prometheus: growbin
+    prometheus: ecoeco
     role: alert-rules
 spec:
   groups:

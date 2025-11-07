@@ -271,7 +271,7 @@ Worker Nodes (6 Nodes):
 
 #### Problem #15: ArgoCD 502 Bad Gateway
 ```
-증상: https://growbin.app/argocd 접속 시 502
+증상: https://ecoeco.app/argocd 접속 시 502
 원인: Ingress backend-protocol HTTPS, ArgoCD는 HTTP 8080
 해결: backend-protocol: HTTP, Service Port: 80
 교훈: ArgoCD는 tls: false 기본 설정

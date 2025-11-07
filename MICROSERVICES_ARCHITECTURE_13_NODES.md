@@ -1,4 +1,4 @@
-# Growbin Backend - 13 Node Microservices Architecture
+# Ecoeco Backend - 13 Node Microservices Architecture
 
 ## 🎯 완벽한 API 분리 구조 (1 API = 1 Node)
 

@@ -1,11 +1,11 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: growbin-backend-13nodes
+  name: ecoeco-backend-13nodes
   namespace: argocd
   labels:
-    app.kubernetes.io/name: growbin-backend
-    app.kubernetes.io/part-of: growbin-platform
+    app.kubernetes.io/name: ecoeco-backend
+    app.kubernetes.io/part-of: ecoeco-platform
     architecture: microservices
     nodes: "13"
   annotations:
@@ -17,7 +17,7 @@ spec:
   source:
     repoURL: https://github.com/SeSACTHON/backend
     targetRevision: develop
-    path: charts/growbin-backend
+    path: charts/ecoeco-backend
     helm:
       valueFiles:
         - values-13nodes.yaml  # 13 노드 전용 values

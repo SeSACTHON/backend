@@ -447,7 +447,7 @@ S3_BUCKET_NAME=prod-sesacthon-images
 
 # CDN 설정 (신규)
 CDN_ENABLED=true
-CDN_BASE_URL=https://images.growbin.app
+CDN_BASE_URL=https://images.ecoeco.app
 CDN_CACHE_TTL=86400  # 24시간
 ```
 
@@ -684,7 +684,7 @@ function displayResult(result, imageUrl) {
 
 ```bash
 # CDN 성능 테스트
-curl -w "@curl-format.txt" -o /dev/null -s https://images.growbin.app/test.jpg
+curl -w "@curl-format.txt" -o /dev/null -s https://images.ecoeco.app/test.jpg
 
 # curl-format.txt
 time_namelookup:  %{time_namelookup}s\n
@@ -783,7 +783,7 @@ Redis DB 1: AI 분석 결과 캐싱
 - [ ] `terraform/s3.tf` CORS 수정
 - [ ] `terraform apply` 실행
 - [ ] CloudFront DNS 전파 확인 (15-30분)
-- [ ] CDN 동작 테스트 (`curl https://images.growbin.app/test.jpg`)
+- [ ] CDN 동작 테스트 (`curl https://images.ecoeco.app/test.jpg`)
 
 ### Phase 2: 백엔드 (별도 저장소)
 

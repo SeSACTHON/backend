@@ -31,7 +31,7 @@
 ### 3. ArgoCD
 - ✅ **repoURL** 수정 (`https://github.com/SeSACTHON/backend`)
 - ✅ **targetRevision** 수정 (`develop`)
-- ✅ **path** 수정 (`charts/growbin-backend`)
+- ✅ **path** 수정 (`charts/ecoeco-backend`)
 
 ---
 
@@ -59,7 +59,7 @@ cat ~/.ssh/k8s-cluster-key.pub
 ```bash
 # AWS Console 또는 CLI로 ACM 인증서 요청
 aws acm request-certificate \
-  --domain-name "*.growbin.app" \
+  --domain-name "*.ecoeco.app" \
   --validation-method DNS \
   --region ap-northeast-2
 
@@ -257,10 +257,10 @@ cd /Users/mango/workspace/SeSACTHON/backend
 kubectl apply -f argocd/application-13nodes.yaml
 
 # 배포 상태 확인
-argocd app get growbin-backend-13nodes
+argocd app get ecoeco-backend-13nodes
 
 # Sync 강제 실행 (필요 시)
-argocd app sync growbin-backend-13nodes
+argocd app sync ecoeco-backend-13nodes
 ```
 
 **5.3 배포 진행 상황 확인**
@@ -282,7 +282,7 @@ kubectl get ingress api-ingress -n api -o jsonpath='{.status.loadBalancer.ingres
 
 **6.1 Ingress Annotation 추가**
 
-`charts/growbin-backend/values-13nodes.yaml` 수정:
+`charts/ecoeco-backend/values-13nodes.yaml` 수정:
 ```yaml
 api:
   ingress:
@@ -295,7 +295,7 @@ api:
       alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
       alb.ingress.kubernetes.io/ssl-redirect: '443'
       alb.ingress.kubernetes.io/certificate-arn: <ACM_CERT_ARN>  # 추가
-      alb.ingress.kubernetes.io/load-balancer-name: growbin-api-alb  # 추가
+      alb.ingress.kubernetes.io/load-balancer-name: ecoeco-api-alb  # 추가
 ```
 
 **6.2 Git Push 및 ArgoCD Sync**
@@ -305,7 +305,7 @@ git commit -m "feat: Add ACM certificate to Ingress"
 git push origin feature/infrastructure-validation
 
 # ArgoCD가 자동으로 Sync (30초 이내)
-argocd app sync growbin-backend-13nodes
+argocd app sync ecoeco-backend-13nodes
 ```
 
 ---
@@ -320,13 +320,13 @@ ALB_DNS=$(kubectl get ingress api-ingress -n api -o jsonpath='{.status.loadBalan
 echo "ALB DNS: ${ALB_DNS}"
 
 # Route53에서 CNAME 레코드 생성
-# api.growbin.app → ${ALB_DNS}
+# api.ecoeco.app → ${ALB_DNS}
 ```
 
 **7.2 DNS 전파 확인**
 ```bash
-dig api.growbin.app
-nslookup api.growbin.app
+dig api.ecoeco.app
+nslookup api.ecoeco.app
 ```
 
 ---
@@ -336,12 +336,12 @@ nslookup api.growbin.app
 **8.1 Health Check**
 ```bash
 # 각 API Health Check
-curl -k https://api.growbin.app/api/v1/waste/health
-curl -k https://api.growbin.app/api/v1/auth/health
-curl -k https://api.growbin.app/api/v1/users/health
-curl -k https://api.growbin.app/api/v1/locations/health
-curl -k https://api.growbin.app/api/v1/recycle/health
-curl -k https://api.growbin.app/api/v1/chat/health
+curl -k https://api.ecoeco.app/api/v1/waste/health
+curl -k https://api.ecoeco.app/api/v1/auth/health
+curl -k https://api.ecoeco.app/api/v1/users/health
+curl -k https://api.ecoeco.app/api/v1/locations/health
+curl -k https://api.ecoeco.app/api/v1/recycle/health
+curl -k https://api.ecoeco.app/api/v1/chat/health
 ```
 
 **8.2 Pod 상태 확인**
@@ -412,7 +412,7 @@ kubectl exec -n api -it <POD_NAME> -- curl localhost:8000/health
 
 ### 문제 4: ArgoCD Sync 실패
 ```bash
-argocd app get growbin-backend-13nodes
+argocd app get ecoeco-backend-13nodes
 
 # 가능한 원인:
 # 1. Helm Template 오류 → helm template 로컬 테스트

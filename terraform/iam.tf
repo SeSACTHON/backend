@@ -68,8 +68,8 @@ resource "aws_iam_policy" "s3_access" {
           "s3:ListBucket"
         ]
         Resource = [
-          "arn:aws:s3:::growbin-*",
-          "arn:aws:s3:::growbin-*/*"
+          "arn:aws:s3:::ecoeco-*",
+          "arn:aws:s3:::ecoeco-*/*"
         ]
       }
     ]

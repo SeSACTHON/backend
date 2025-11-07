@@ -1,7 +1,7 @@
 # Worker Layer 아키텍처
 
 작성 일시: 2025-11-06
-시스템: Growbin Backend (13-Node Cluster)
+시스템: Ecoeco Backend (13-Node Cluster)
 참고: [Celery 동작 방식](./CELERY_ARCHITECTURE.md), Instagram Architecture
 
 ---
@@ -9,7 +9,7 @@
 ## 📚 목차
 
 1. [Worker Layer 개요](#1-worker-layer-개요)
-2. [Growbin Worker 구조](#2-growbin-worker-구조)
+2. [Ecoeco Worker 구조](#2-ecoeco-worker-구조)
 3. [Worker 타입별 상세 설명](#3-worker-타입별-상세-설명)
 4. [WAL 통합 아키텍처](#4-wal-통합-아키텍처)
 5. [Worker 배포 전략](#5-worker-배포-전략)
@@ -30,7 +30,7 @@ Worker Layer = Celery Worker를 실행하는 인프라 계층
   - AI 모델 추론 (GPT-5, GPT-4o mini)
 ```
 
-### 1.2 Growbin에서의 역할
+### 1.2 Ecoeco에서의 역할
 
 ```mermaid
 graph TB
@@ -80,7 +80,7 @@ graph TB
 
 ---
 
-## 2. Growbin Worker 구조
+## 2. Ecoeco Worker 구조
 
 ### 2.1 전체 아키텍처
 
@@ -90,14 +90,14 @@ graph TB
         IU["image-uploader<br/>(4 processes)"]
         RR["rule-retriever<br/>(2 processes)"]
         TS["task-scheduler<br/>(Celery Beat, 1 process)"]
-        SWAL[("로컬 SQLite WAL ⭐<br/>/var/lib/growbin/worker-storage/task_queue.db<br/>├─ task_wal<br/>├─ sync_log<br/>└─ file_cache")]
+        SWAL[("로컬 SQLite WAL ⭐<br/>/var/lib/ecoeco/worker-storage/task_queue.db<br/>├─ task_wal<br/>├─ sync_log<br/>└─ file_cache")]
         SProm["Prometheus Exporter<br/>:9090/metrics"]
     end
     
     subgraph AI["Worker-AI (t3.medium, 4GB, 40GB)"]
         GPT5["gpt5-analyzer<br/>(3 processes)"]
         GPT4["response-generator<br/>(3 processes)"]
-        AWAL[("로컬 SQLite WAL ⭐<br/>/var/lib/growbin/worker-ai/task_queue.db<br/>├─ task_wal<br/>├─ gpt_cache<br/>├─ retry_queue<br/>└─ rate_limit_log")]
+        AWAL[("로컬 SQLite WAL ⭐<br/>/var/lib/ecoeco/worker-ai/task_queue.db<br/>├─ task_wal<br/>├─ gpt_cache<br/>├─ retry_queue<br/>└─ rate_limit_log")]
         AProm["Prometheus Exporter<br/>:9090/metrics"]
     end
     
@@ -226,14 +226,14 @@ def image_upload_task(self, user_id, image_path, analysis_id):
         s3_key = f"uploads/{user_id}/{analysis_id}/original.jpg"
         s3_client.upload_file(
             image_path,
-            bucket='prod-growbin-images',
+            bucket='prod-ecoeco-images',
             key=s3_key,
             ExtraArgs={
                 'ContentType': 'image/jpeg',
                 'CacheControl': 'max-age=31536000',  # 1년
             }
         )
-        s3_path = f"s3://prod-growbin-images/{s3_key}"
+        s3_path = f"s3://prod-ecoeco-images/{s3_key}"
         
         # 4. 썸네일 생성 및 업로드
         thumbnail = image.copy()
@@ -245,7 +245,7 @@ def image_upload_task(self, user_id, image_path, analysis_id):
         # 5. 결과 반환
         result = {
             "s3_path": s3_path,
-            "thumbnail_path": f"s3://prod-growbin-images/{thumbnail_key}"
+            "thumbnail_path": f"s3://prod-ecoeco-images/{thumbnail_key}"
         }
         
         # 6. 다음 Task 발행 (Vision 분석)
@@ -537,7 +537,7 @@ def response_generation_task(self, analysis_id, rules):
         final_response = response.choices[0].message.content
         
         # 3. PostgreSQL에 최종 결과 저장
-        with postgres_session('growbin_waste') as db:
+        with postgres_session('ecoeco_waste') as db:
             analysis = db.query(WasteAnalysis).get(analysis_id)
             analysis.status = 'completed'
             analysis.response = final_response
@@ -623,7 +623,7 @@ def wal_checkpoint():
 ### 4.1 Worker 로컬 WAL 구조
 
 ```sql
--- /var/lib/growbin/worker-storage/task_queue.db
+-- /var/lib/ecoeco/worker-storage/task_queue.db
 CREATE TABLE task_wal (
     task_id TEXT PRIMARY KEY,
     task_name TEXT NOT NULL,
@@ -659,7 +659,7 @@ CREATE TABLE file_cache (
 ```
 
 ```sql
--- /var/lib/growbin/worker-ai/task_queue.db
+-- /var/lib/ecoeco/worker-ai/task_queue.db
 -- (Worker-Storage와 동일한 task_wal 테이블)
 
 -- GPT API 응답 캐시
@@ -775,7 +775,7 @@ class LocalWALQueue:
 
 # Worker 전역 변수
 local_wal = LocalWALQueue(
-    db_path="/var/lib/growbin/task_queue.db",
+    db_path="/var/lib/ecoeco/task_queue.db",
     worker_type=os.getenv('WORKER_TYPE', 'storage')
 )
 ```
@@ -821,9 +821,9 @@ spec:
         
         env:
         - name: CELERY_BROKER_URL
-          value: "amqp://rabbitmq:5672/growbin"
+          value: "amqp://rabbitmq:5672/ecoeco"
         - name: DATABASE_URL
-          value: "postgresql://postgres:5432/growbin_waste"
+          value: "postgresql://postgres:5432/ecoeco_waste"
         - name: WORKER_TYPE
           value: "storage"
         
@@ -837,7 +837,7 @@ spec:
         
         volumeMounts:
         - name: wal-storage
-          mountPath: /var/lib/growbin
+          mountPath: /var/lib/ecoeco
         
         livenessProbe:
           exec:
@@ -1051,5 +1051,5 @@ app.conf.worker_prefetch_multiplier = 1
 ---
 
 **작성 일시**: 2025-11-06
-**시스템**: Growbin Backend (13-Node Cluster)
+**시스템**: Ecoeco Backend (13-Node Cluster)
 

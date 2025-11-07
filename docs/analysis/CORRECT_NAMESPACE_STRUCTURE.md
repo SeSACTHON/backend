@@ -211,7 +211,7 @@ Pod Selector: workload=async-workers
 ### 디렉토리 구조
 
 ```
-charts/growbin-backend/
+charts/ecoeco-backend/
 ├── Chart.yaml
 ├── values.yaml
 ├── values-dev.yaml
@@ -250,7 +250,7 @@ charts/growbin-backend/
 ## 📝 values.yaml
 
 ```yaml
-# charts/growbin-backend/values.yaml
+# charts/ecoeco-backend/values.yaml
 
 # Namespace 설정
 namespaces:
@@ -263,7 +263,7 @@ namespaces:
 global:
   image:
     registry: ghcr.io
-    repository: your-org/growbin-backend
+    repository: your-org/ecoeco-backend
     tag: latest
 
 # API Services (Sync)
@@ -365,12 +365,12 @@ messaging:
 #### API Service
 
 ```yaml
-# charts/growbin-backend/templates/api/waste-deployment.yaml
+# charts/ecoeco-backend/templates/api/waste-deployment.yaml
 {{- if .Values.api.waste.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "growbin-backend.fullname" . }}-api-waste
+  name: {{ include "ecoeco-backend.fullname" . }}-api-waste
   namespace: {{ .Values.namespaces.api }}  # ⬅️ "api" namespace
   labels:
     app.kubernetes.io/component: api-sync
@@ -395,12 +395,12 @@ spec:
 #### Async Worker
 
 ```yaml
-# charts/growbin-backend/templates/async/vision-deployment.yaml
+# charts/ecoeco-backend/templates/async/vision-deployment.yaml
 {{- if .Values.async.vision.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "growbin-backend.fullname" . }}-async-vision
+  name: {{ include "ecoeco-backend.fullname" . }}-async-vision
   namespace: {{ .Values.namespaces.async }}  # ⬅️ "async" namespace
   labels:
     app.kubernetes.io/component: async-worker

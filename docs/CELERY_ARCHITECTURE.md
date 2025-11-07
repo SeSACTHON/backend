@@ -1,7 +1,7 @@
 # Celery 동작 방식 및 아키텍처
 
 작성 일시: 2025-11-06
-시스템: Growbin Backend
+시스템: Ecoeco Backend
 참고: Celery Official Docs, Robin Storage
 
 ---
@@ -156,12 +156,12 @@ app.conf.task_queues = [
     Queue('celery', Exchange('celery'), routing_key='celery'),
     
     # 도메인별 Queue
-    Queue('user_input', Exchange('growbin'), routing_key='user.input'),
-    Queue('vision_analysis', Exchange('growbin'), routing_key='vision.analyze'),
-    Queue('response_generation', Exchange('growbin'), routing_key='response.generate'),
+    Queue('user_input', Exchange('ecoeco'), routing_key='user.input'),
+    Queue('vision_analysis', Exchange('ecoeco'), routing_key='vision.analyze'),
+    Queue('response_generation', Exchange('ecoeco'), routing_key='response.generate'),
     
     # 우선순위 Queue
-    Queue('high_priority', Exchange('growbin'), routing_key='priority.high',
+    Queue('high_priority', Exchange('ecoeco'), routing_key='priority.high',
           queue_arguments={'x-max-priority': 10}),
 ]
 

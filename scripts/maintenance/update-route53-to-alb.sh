@@ -6,8 +6,8 @@
 
 set -e
 
-ALB_DNS="k8s-growbinalb-18c99b272a-1896386009.ap-northeast-2.elb.amazonaws.com"
-HOSTED_ZONE_ID="Z0041593OSPVTJX3N306"  # growbin.app (올바른 ID)
+ALB_DNS="k8s-ecoecoalb-18c99b272a-1896386009.ap-northeast-2.elb.amazonaws.com"
+HOSTED_ZONE_ID="Z0041593OSPVTJX3N306"  # ecoeco.app (올바른 ID)
 ALB_ZONE_ID="ZWKZPGTI48KDX"  # ap-northeast-2 ALB Canonical Hosted Zone ID
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -18,15 +18,15 @@ echo "ALB DNS: $ALB_DNS"
 echo "Hosted Zone: $HOSTED_ZONE_ID"
 echo ""
 
-# 1. Apex domain (growbin.app)
-echo "📝 업데이트 중: growbin.app"
+# 1. Apex domain (ecoeco.app)
+echo "📝 업데이트 중: ecoeco.app"
 aws route53 change-resource-record-sets \
   --hosted-zone-id $HOSTED_ZONE_ID \
   --change-batch '{
     "Changes": [{
       "Action": "UPSERT",
       "ResourceRecordSet": {
-        "Name": "growbin.app",
+        "Name": "ecoeco.app",
         "Type": "A",
         "AliasTarget": {
           "HostedZoneId": "'$ALB_ZONE_ID'",
@@ -37,15 +37,15 @@ aws route53 change-resource-record-sets \
     }]
   }' > /dev/null
 
-# 2. www.growbin.app
-echo "📝 업데이트 중: www.growbin.app"
+# 2. www.ecoeco.app
+echo "📝 업데이트 중: www.ecoeco.app"
 aws route53 change-resource-record-sets \
   --hosted-zone-id $HOSTED_ZONE_ID \
   --change-batch '{
     "Changes": [{
       "Action": "UPSERT",
       "ResourceRecordSet": {
-        "Name": "www.growbin.app",
+        "Name": "www.ecoeco.app",
         "Type": "A",
         "AliasTarget": {
           "HostedZoneId": "'$ALB_ZONE_ID'",
@@ -56,15 +56,15 @@ aws route53 change-resource-record-sets \
     }]
   }' > /dev/null
 
-# 3. api.growbin.app
-echo "📝 업데이트 중: api.growbin.app"
+# 3. api.ecoeco.app
+echo "📝 업데이트 중: api.ecoeco.app"
 aws route53 change-resource-record-sets \
   --hosted-zone-id $HOSTED_ZONE_ID \
   --change-batch '{
     "Changes": [{
       "Action": "UPSERT",
       "ResourceRecordSet": {
-        "Name": "api.growbin.app",
+        "Name": "api.ecoeco.app",
         "Type": "A",
         "AliasTarget": {
           "HostedZoneId": "'$ALB_ZONE_ID'",
@@ -75,15 +75,15 @@ aws route53 change-resource-record-sets \
     }]
   }' > /dev/null
 
-# 4. argocd.growbin.app
-echo "📝 업데이트 중: argocd.growbin.app"
+# 4. argocd.ecoeco.app
+echo "📝 업데이트 중: argocd.ecoeco.app"
 aws route53 change-resource-record-sets \
   --hosted-zone-id $HOSTED_ZONE_ID \
   --change-batch '{
     "Changes": [{
       "Action": "UPSERT",
       "ResourceRecordSet": {
-        "Name": "argocd.growbin.app",
+        "Name": "argocd.ecoeco.app",
         "Type": "A",
         "AliasTarget": {
           "HostedZoneId": "'$ALB_ZONE_ID'",
@@ -94,15 +94,15 @@ aws route53 change-resource-record-sets \
     }]
   }' > /dev/null
 
-# 5. grafana.growbin.app
-echo "📝 업데이트 중: grafana.growbin.app"
+# 5. grafana.ecoeco.app
+echo "📝 업데이트 중: grafana.ecoeco.app"
 aws route53 change-resource-record-sets \
   --hosted-zone-id $HOSTED_ZONE_ID \
   --change-batch '{
     "Changes": [{
       "Action": "UPSERT",
       "ResourceRecordSet": {
-        "Name": "grafana.growbin.app",
+        "Name": "grafana.ecoeco.app",
         "Type": "A",
         "AliasTarget": {
           "HostedZoneId": "'$ALB_ZONE_ID'",
@@ -119,11 +119,11 @@ echo "✅ Route53 업데이트 완료!"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "1-2분 후 접속 테스트:"
-echo "  https://growbin.app/"
-echo "  https://growbin.app/argocd"
-echo "  https://growbin.app/grafana"
+echo "  https://ecoeco.app/"
+echo "  https://ecoeco.app/argocd"
+echo "  https://ecoeco.app/grafana"
 echo ""
 echo "DNS 전파 확인:"
-echo "  nslookup growbin.app"
+echo "  nslookup ecoeco.app"
 echo ""
 

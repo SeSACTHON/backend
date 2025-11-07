@@ -34,11 +34,11 @@ metadata:
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
     alb.ingress.kubernetes.io/ssl-redirect: '443'
     alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:721622471953:certificate/6e2ae21f-a345-4316-b151-376bdd9e121a
-    alb.ingress.kubernetes.io/group.name: growbin-alb
+    alb.ingress.kubernetes.io/group.name: ecoeco-alb
     alb.ingress.kubernetes.io/group.order: '30'
 spec:
   rules:
-  - host: growbin.app
+  - host: ecoeco.app
     http:
       paths:
       - path: /api/v1

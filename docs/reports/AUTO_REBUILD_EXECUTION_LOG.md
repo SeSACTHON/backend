@@ -276,8 +276,8 @@ k8s-worker-2               : ok=40   changed=21   unreachable=0    failed=0    s
      kubectl get pods -A
 
   4. 도메인 확인:
-     https://growbin.app
-     https://api.growbin.app
+     https://ecoeco.app
+     https://api.ecoeco.app
 ```
 
 ---

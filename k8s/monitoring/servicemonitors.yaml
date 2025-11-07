@@ -4,7 +4,7 @@ metadata:
   name: api-services-monitor
   namespace: default
   labels:
-    app: growbin-api
+    app: ecoeco-api
     monitoring: prometheus
 spec:
   selector:

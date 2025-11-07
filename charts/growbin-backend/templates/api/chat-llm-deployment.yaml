@@ -9,7 +9,7 @@ metadata:
     app: chat-llm-api
     component: api
     domain: chat
-    {{- include "growbin-backend.labels" . | nindent 4 }}
+    {{- include "ecoeco-backend.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.api.chatLlm.replicas }}
   selector:
@@ -75,7 +75,7 @@ metadata:
   namespace: {{ .Values.namespaces.api }}
   labels:
     app: chat-llm-api
-    {{- include "growbin-backend.labels" . | nindent 4 }}
+    {{- include "ecoeco-backend.labels" . | nindent 4 }}
 spec:
   type: NodePort
   ports:

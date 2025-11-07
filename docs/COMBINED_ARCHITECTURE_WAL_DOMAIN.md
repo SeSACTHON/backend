@@ -1,7 +1,7 @@
 # WAL + 도메인 분리 통합 아키텍처
 
 분석 일시: 2025-11-06
-시스템: Growbin Backend (13-Node Cluster)
+시스템: Ecoeco Backend (13-Node Cluster)
 참고: Robin Storage, OStore, PostgreSQL WAL
 
 ---
@@ -17,11 +17,11 @@
 ```mermaid
 graph TB
     subgraph CP["Control Plane (전역 조율)"]
-        PG_Auth["growbin_auth<br/>(2GB, HA)<br/>인증/인가"]
-        PG_Waste["growbin_waste<br/>(5GB, HA)<br/>폐기물 분석"]
-        PG_Chat["growbin_chat<br/>(3GB, HA)<br/>LLM 채팅"]
-        PG_Location["growbin_location<br/>(1GB, HA)<br/>위치 정보"]
-        PG_Analytics["growbin_analytics<br/>(10GB, Read Replica)<br/>분석/통계"]
+        PG_Auth["ecoeco_auth<br/>(2GB, HA)<br/>인증/인가"]
+        PG_Waste["ecoeco_waste<br/>(5GB, HA)<br/>폐기물 분석"]
+        PG_Chat["ecoeco_chat<br/>(3GB, HA)<br/>LLM 채팅"]
+        PG_Location["ecoeco_location<br/>(1GB, HA)<br/>위치 정보"]
+        PG_Analytics["ecoeco_analytics<br/>(10GB, Read Replica)<br/>분석/통계"]
     end
     
     subgraph MQ["Message Queue Layer (도메인별 큐 분리)"]
@@ -85,8 +85,8 @@ graph TB
 sequenceDiagram
     participant User as 사용자
     participant API as waste-api
-    participant AuthDB as growbin_auth DB
-    participant WasteDB as growbin_waste DB
+    participant AuthDB as ecoeco_auth DB
+    participant WasteDB as ecoeco_waste DB
     participant RMQ as RabbitMQ
     participant WS as Worker-Storage
     participant WAI as Worker-AI
@@ -160,8 +160,8 @@ graph TB
     end
     
     subgraph L4["[L4] Database Layer"]
-        F11["F11: growbin_waste DB 다운"]
-        F12["F12: growbin_auth DB 다운"]
+        F11["F11: ecoeco_waste DB 다운"]
+        F12["F12: ecoeco_auth DB 다운"]
         F13["F13: DB 커넥션 풀 고갈"]
         F14["F14: 디스크 용량 부족"]
     end
@@ -291,7 +291,7 @@ kubectl rollout restart deployment/worker-storage
 # workers/storage/celery_app.py
 if __name__ == "__main__":
     # WAL 복구
-    recovery = WALRecovery("/var/lib/growbin/task_queue.db")
+    recovery = WALRecovery("/var/lib/ecoeco/task_queue.db")
     recovery.recover_on_startup()
     
     # Celery Worker 시작
@@ -330,20 +330,20 @@ def recover_on_startup(self):
 
 ---
 
-#### F11: growbin_waste DB 다운 (도메인별 격리 ✅)
+#### F11: ecoeco_waste DB 다운 (도메인별 격리 ✅)
 
 **영향 범위**:
 - ❌ 폐기물 분석 결과 저장 실패
-- ✅ growbin_auth, growbin_chat DB 정상 (격리됨!)
+- ✅ ecoeco_auth, ecoeco_chat DB 정상 (격리됨!)
 - ✅ Worker WAL에 임시 저장
 
 **감지**:
 ```python
 - alert: WasteDBDown
-  expr: pg_up{database="growbin_waste"} == 0
+  expr: pg_up{database="ecoeco_waste"} == 0
   for: 1m
   annotations:
-    summary: "growbin_waste DB 다운"
+    summary: "ecoeco_waste DB 다운"
 ```
 
 **복구 전략**:
@@ -353,7 +353,7 @@ def recover_on_startup(self):
 def sync_to_postgres(self, task_id):
     try:
         # PostgreSQL 저장 시도
-        with postgres_session('growbin_waste') as db:
+        with postgres_session('ecoeco_waste') as db:
             task_data = get_from_wal(task_id)
             db.add(TaskLog(**task_data))
             db.commit()
@@ -555,7 +555,7 @@ def update_wal_metrics_postrun(task_id, task_name, **kwargs):
     wal_sync_delay.observe(sync_delay)
     
     # WAL 파일 크기
-    wal_size = os.path.getsize("/var/lib/growbin/task_queue.db-wal")
+    wal_size = os.path.getsize("/var/lib/ecoeco/task_queue.db-wal")
     wal_file_size.set(wal_size)
 ```
 
@@ -564,12 +564,12 @@ def update_wal_metrics_postrun(task_id, task_name, **kwargs):
 ```json
 {
   "dashboard": {
-    "title": "Growbin WAL + Domain Architecture",
+    "title": "Ecoeco WAL + Domain Architecture",
     "panels": [
       {
         "title": "도메인별 DB 상태",
         "targets": [{
-          "expr": "pg_up{database=~\"growbin_(auth|waste|chat|location|analytics)\"}"
+          "expr": "pg_up{database=~\"ecoeco_(auth|waste|chat|location|analytics)\"}"
         }]
       },
       {
@@ -627,8 +627,8 @@ def update_wal_metrics_postrun(task_id, task_name, **kwargs):
 | **F4: RabbitMQ 다운** | 새 메시지 발행 불가 | 2분 | 0 (Durable Queue) | 클러스터 재시작 |
 | **F7: Worker-Storage 다운** | S3 업로드 중단 | 1분 | 0 (로컬 WAL) | WAL 복구 → 재발행 |
 | **F8: Worker-AI 다운** | AI 분석 중단 | 1분 | 0 (로컬 WAL + 캐시) | WAL 복구 → 재발행 |
-| **F11: growbin_waste DB 다운** | 분석 결과 저장 실패 | 5분 | 0 (Worker WAL) | DB 복구 → WAL 재동기화 |
-| **F12: growbin_auth DB 다운** | 인증 실패 | 5분 | 0 | DB 복구 |
+| **F11: ecoeco_waste DB 다운** | 분석 결과 저장 실패 | 5분 | 0 (Worker WAL) | DB 복구 → WAL 재동기화 |
+| **F12: ecoeco_auth DB 다운** | 인증 실패 | 5분 | 0 | DB 복구 |
 | **F15: GPT-5 API 장애** | 이미지 분석 중단 | API 복구까지 | 0 (재시도 큐) | Exponential Backoff 재시도 |
 
 **핵심 포인트**:
@@ -647,17 +647,17 @@ def update_wal_metrics_postrun(task_id, task_name, **kwargs):
 # scripts/monitoring/health-check.sh
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo "🔍 Growbin 시스템 헬스체크 (WAL + 도메인 분리)"
+echo "🔍 Ecoeco 시스템 헬스체크 (WAL + 도메인 분리)"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
 # 1. PostgreSQL 도메인별 DB 체크
 echo ""
 echo "1️⃣  PostgreSQL 도메인별 DB 상태"
 for db in auth waste chat location analytics; do
-    if psql -h postgresql -U postgres -d "growbin_${db}" -c "SELECT 1" >/dev/null 2>&1; then
-        echo "  ✅ growbin_${db}: OK"
+    if psql -h postgresql -U postgres -d "ecoeco_${db}" -c "SELECT 1" >/dev/null 2>&1; then
+        echo "  ✅ ecoeco_${db}: OK"
     else
-        echo "  ❌ growbin_${db}: DOWN"
+        echo "  ❌ ecoeco_${db}: DOWN"
     fi
 done
 
@@ -676,7 +676,7 @@ done
 echo ""
 echo "3️⃣  Worker WAL 상태"
 for worker in storage ai; do
-    wal_db="/var/lib/growbin/worker-${worker}/task_queue.db"
+    wal_db="/var/lib/ecoeco/worker-${worker}/task_queue.db"
     if [ -f "$wal_db" ]; then
         pending=$(sqlite3 "$wal_db" "SELECT COUNT(*) FROM task_wal WHERE status IN ('pending', 'running')")
         echo "  ✅ Worker-${worker}: ${pending} pending tasks"
@@ -711,7 +711,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 # scripts/maintenance/wal-recovery.sh
 
 WORKER_TYPE=$1  # storage or ai
-WAL_DB="/var/lib/growbin/worker-${WORKER_TYPE}/task_queue.db"
+WAL_DB="/var/lib/ecoeco/worker-${WORKER_TYPE}/task_queue.db"
 
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🔄 Worker-${WORKER_TYPE} WAL 복구 시작"
@@ -800,7 +800,7 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
   DB 다운 → 전체 서비스 다운 ❌
 
 도메인별 DB + WAL 구조 (개선):
-  growbin_waste DB 다운
+  ecoeco_waste DB 다운
     → waste API 쓰기 실패
     → Worker WAL에 임시 저장 ✅
     → auth/chat/location API 정상 운영 ✅

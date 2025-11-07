@@ -1,15 +1,15 @@
-# Growbin Backend - Helm Chart Values
+# Ecoeco Backend - Helm Chart Values
 # 전체 서비스 설정 (6 API + 5 Celery Workers)
 
 # Global 설정
 global:
   image:
     registry: ghcr.io
-    repository: your-org/growbin-backend
+    repository: your-org/ecoeco-backend
     tag: latest
     pullPolicy: Always
   
-  domain: growbin.app
+  domain: ecoeco.app
   
   # 환경 변수
   env:
@@ -30,7 +30,7 @@ externalServices:
   postgresql:
     host: postgresql.data.svc.cluster.local
     port: 5432
-    database: growbin
+    database: ecoeco
   
   redis:
     host: redis.data.svc.cluster.local
@@ -87,7 +87,7 @@ api:
       alb.ingress.kubernetes.io/healthcheck-path: /health
       alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
       alb.ingress.kubernetes.io/ssl-redirect: '443'
-    host: api.growbin.app
+    host: api.ecoeco.app
   
   # 1. Waste API (메인)
   waste:
@@ -283,7 +283,7 @@ workers:
     queue: q.image_upload
     
     image:
-      repository: ghcr.io/your-org/growbin-backend
+      repository: ghcr.io/your-org/ecoeco-backend
       tag: latest
     
     command:
@@ -310,7 +310,7 @@ workers:
     
     env:
       - name: AWS_S3_BUCKET
-        value: "growbin-waste-images"
+        value: "ecoeco-waste-images"
       - name: AWS_REGION
         value: "ap-northeast-2"
   
@@ -321,7 +321,7 @@ workers:
     queue: q.gpt5_analysis
     
     image:
-      repository: ghcr.io/your-org/growbin-backend
+      repository: ghcr.io/your-org/ecoeco-backend
       tag: latest
     
     command:
@@ -360,7 +360,7 @@ workers:
     queue: q.rule_retrieval
     
     image:
-      repository: ghcr.io/your-org/growbin-backend
+      repository: ghcr.io/your-org/ecoeco-backend
       tag: latest
     
     command:
@@ -392,7 +392,7 @@ workers:
     queue: q.response_generation
     
     image:
-      repository: ghcr.io/your-org/growbin-backend
+      repository: ghcr.io/your-org/ecoeco-backend
       tag: latest
     
     command:
@@ -430,7 +430,7 @@ workers:
     replicas: 1  # ⚠️ 반드시 1개만!
     
     image:
-      repository: ghcr.io/your-org/growbin-backend
+      repository: ghcr.io/your-org/ecoeco-backend
       tag: latest
     
     command:

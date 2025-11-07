@@ -19,11 +19,11 @@
 # terraform/cloudfront.tf
 resource "aws_acm_certificate" "cdn" {
   provider          = aws.us_east_1  # ⭐ 반드시 us-east-1
-  domain_name       = "images.growbin.app"
+  domain_name       = "images.ecoeco.app"
   validation_method = "DNS"
   
   tags = {
-    Name    = "images.growbin.app"
+    Name    = "images.ecoeco.app"
     Purpose = "CloudFront CDN SSL"
   }
 }
@@ -35,7 +35,7 @@ resource "aws_acm_certificate" "cdn" {
 # ❌ ap-northeast-2 인증서는 CloudFront에서 사용 불가!
 resource "aws_acm_certificate" "cdn" {
   provider    = aws  # 기본 리전 (ap-northeast-2)
-  domain_name = "images.growbin.app"
+  domain_name = "images.ecoeco.app"
 }
 ```
 
@@ -117,10 +117,10 @@ def lambda_handler(event, context):
 
 ```python
 # ✅ 권장: URL 파라미터로 캐시 무효화
-image_url = f"https://images.growbin.app/waste_123.jpg?v={timestamp}"
+image_url = f"https://images.ecoeco.app/waste_123.jpg?v={timestamp}"
 
 # ❌ 비권장: 같은 URL 재사용
-image_url = "https://images.growbin.app/waste_123.jpg"  # 캐시 무효화 필요
+image_url = "https://images.ecoeco.app/waste_123.jpg"  # 캐시 무효화 필요
 ```
 
 ---
@@ -193,9 +193,9 @@ resource "aws_s3_bucket_cors_configuration" "images" {
     allowed_headers = ["*"]
     allowed_methods = ["GET", "HEAD"]
     allowed_origins = [
-      "https://growbin.app",
-      "https://*.growbin.app",
-      "https://images.growbin.app"  # CloudFront 도메인
+      "https://ecoeco.app",
+      "https://*.ecoeco.app",
+      "https://images.ecoeco.app"  # CloudFront 도메인
     ]
     expose_headers  = ["ETag"]
     max_age_seconds = 3600
@@ -250,7 +250,7 @@ data "aws_route53_zone" "main" {
 ```
 
 **확인 사항**:
-- [x] Route53에 `growbin.app` 호스팅 영역 존재
+- [x] Route53에 `ecoeco.app` 호스팅 영역 존재
 - [x] NS 레코드가 도메인 등록기관에 설정됨
 - [x] DNS 전파 완료 (24-48시간)
 
@@ -289,7 +289,7 @@ terraform output cloudfront_distribution_id
 
 # CDN URL 확인
 terraform output cdn_url
-# → https://images.growbin.app
+# → https://images.ecoeco.app
 
 # CloudFront 상태 확인
 aws cloudfront get-distribution \
@@ -299,11 +299,11 @@ aws cloudfront get-distribution \
 # → Deployed
 
 # DNS 확인
-dig images.growbin.app
+dig images.ecoeco.app
 # → CNAME d1234abcd5678.cloudfront.net
 
 # HTTPS 테스트
-curl -I https://images.growbin.app
+curl -I https://images.ecoeco.app
 # → HTTP/2 200
 # → x-cache: Miss from cloudfront (첫 요청)
 # → x-cache: Hit from cloudfront (두 번째 요청)
@@ -315,7 +315,7 @@ curl -I https://images.growbin.app
 # services/waste-api/app/core/storage.py
 import os
 
-CDN_DOMAIN = os.getenv("CDN_DOMAIN", "images.growbin.app")
+CDN_DOMAIN = os.getenv("CDN_DOMAIN", "images.ecoeco.app")
 
 def get_image_url(s3_key: str) -> str:
     """S3 키를 CDN URL로 변환"""
@@ -456,7 +456,7 @@ resource "aws_cloudfront_response_headers_policy" "security_headers" {
 
 ### 배포 후
 
-- [ ] `curl -I https://images.growbin.app` 응답 확인
+- [ ] `curl -I https://images.ecoeco.app` 응답 확인
 - [ ] 백엔드 코드 수정 (Pre-signed URL → CDN URL)
 - [ ] 캐시 히트율 모니터링
 - [ ] 비용 모니터링 설정

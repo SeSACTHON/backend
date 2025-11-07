@@ -9,7 +9,7 @@ metadata:
     app: response-generator
     component: worker
     queue: q.response_generation
-    {{- include "growbin-backend.labels" . | nindent 4 }}
+    {{- include "ecoeco-backend.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.workers.responseGenerator.replicas }}
   selector:

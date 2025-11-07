@@ -391,7 +391,7 @@ metadata:
     alb.ingress.kubernetes.io/target-type: instance
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
     alb.ingress.kubernetes.io/ssl-redirect: '443'
-    alb.ingress.kubernetes.io/group.name: growbin-alb
+    alb.ingress.kubernetes.io/group.name: ecoeco-alb
     alb.ingress.kubernetes.io/group.order: '40'
     alb.ingress.kubernetes.io/backend-protocol: HTTP
     alb.ingress.kubernetes.io/healthcheck-path: /health
@@ -428,7 +428,7 @@ echo "1️⃣ 클러스터 내부 (다른 Pod에서):"
 echo "   curl http://fastapi-test.default.svc.cluster.local:8000/health"
 echo ""
 echo "2️⃣ ALB/Ingress (외부, 약 3분 후):"
-echo "   curl https://growbin.app/api/v1/health"
+echo "   curl https://ecoeco.app/api/v1/health"
 echo ""
 echo "⚠️  보안: 외부 직접 접근 차단됨 (ALB를 통한 접근만 허용)"
 echo ""

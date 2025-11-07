@@ -483,7 +483,7 @@ metadata:
 spec:
   ingressClassName: alb
   rules:
-  - host: api.growbin.app
+  - host: api.ecoeco.app
     http:
       paths:
       # 폐기물 분류

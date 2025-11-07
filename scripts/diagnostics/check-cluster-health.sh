@@ -373,10 +373,10 @@ if [ "$INGRESS_COUNT" -gt 0 ] 2>/dev/null; then
                 if [ -n "$PATHS" ] && [ "$PATHS" != "<no value>" ]; then
                     FIRST_PATH=$(echo "$PATHS" | awk '{print $1}' | tr -d ' ')
                     # Path가 있고, host가 동일 도메인이면 path-based
-                    if [ -n "$FIRST_PATH" ] && [ "$FIRST_PATH" != "" ] && echo "$FIRST_PATH" | grep -q "^/" && [ "$HOST" = "growbin.app" ]; then
+                    if [ -n "$FIRST_PATH" ] && [ "$FIRST_PATH" != "" ] && echo "$FIRST_PATH" | grep -q "^/" && [ "$HOST" = "ecoeco.app" ]; then
                         PATH_BASED_COUNT=$((PATH_BASED_COUNT + 1))
                         echo "  ✅ $ing_name ($ns): Path-based ($FIRST_PATH)"
-                    elif [ -n "$HOST" ] && [ "$HOST" != "growbin.app" ]; then
+                    elif [ -n "$HOST" ] && [ "$HOST" != "ecoeco.app" ]; then
                         HOST_BASED_COUNT=$((HOST_BASED_COUNT + 1))
                         echo "  ⚠️  $ing_name ($ns): Host-based ($HOST)"
                     fi
@@ -387,7 +387,7 @@ if [ "$INGRESS_COUNT" -gt 0 ] 2>/dev/null; then
     set -e
     
     if [ "$ALB_GROUP_COUNT" -gt 0 ]; then
-        echo "  ✅ ALB 그룹 설정: $ALB_GROUP_COUNT개 Ingress가 동일 ALB 그룹 사용 (growbin-alb)"
+        echo "  ✅ ALB 그룹 설정: $ALB_GROUP_COUNT개 Ingress가 동일 ALB 그룹 사용 (ecoeco-alb)"
     fi
     
     if [ "$PATH_BASED_COUNT" -gt 0 ]; then

@@ -103,7 +103,7 @@ def on_worker_ready(sender, **kwargs):
     logger.info("Initializing WAL Manager...")
 
     # WAL Manager 초기화
-    db_path = os.getenv("WAL_DB_PATH", "/var/lib/growbin/wal/storage_worker.db")
+    db_path = os.getenv("WAL_DB_PATH", "/var/lib/ecoeco/wal/storage_worker.db")
     wal_manager = WALManager(db_path=db_path)
 
     # PostgreSQL Sync Manager 초기화
@@ -111,8 +111,8 @@ def on_worker_ready(sender, **kwargs):
     postgres_sync = PostgreSQLSyncManager(
         host=os.getenv("POSTGRES_HOST", "postgresql"),
         port=int(os.getenv("POSTGRES_PORT", "5432")),
-        database=os.getenv("POSTGRES_DB", "growbin_storage"),
-        user=os.getenv("POSTGRES_USER", "growbin"),
+        database=os.getenv("POSTGRES_DB", "ecoeco_storage"),
+        user=os.getenv("POSTGRES_USER", "ecoeco"),
         password=os.getenv("POSTGRES_PASSWORD", ""),
         wal_manager=wal_manager,
     )

@@ -9,7 +9,7 @@ metadata:
     app: rule-retriever
     component: worker
     queue: q.rule_retrieval
-    {{- include "growbin-backend.labels" . | nindent 4 }}
+    {{- include "ecoeco-backend.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.workers.ruleRetriever.replicas }}
   selector:

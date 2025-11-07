@@ -117,7 +117,7 @@ After: Mermaid 다이어그램 (26 라인)
 Before: ASCII 아트 기반 트리 구조 (31 라인)
 인터넷
   ↓
-Route53 (DNS - growbin.app)
+Route53 (DNS - ecoeco.app)
   ↓
 AWS Application Load Balancer (ALB)
   ├─ ACM 인증서 (SSL/TLS 자동 관리)
@@ -300,7 +300,7 @@ graph TB
 ```
 인터넷
   ↓
-Route53 (DNS - growbin.app)
+Route53 (DNS - ecoeco.app)
   ↓
 AWS Application Load Balancer (ALB)
   ├─ ACM 인증서 (SSL/TLS 자동 관리)
@@ -315,7 +315,7 @@ AWS Application Load Balancer (ALB)
 **After (Mermaid)**:
 ```mermaid
 graph TD
-    Internet["인터넷"] --> Route53["Route53<br/>(DNS - growbin.app)"]
+    Internet["인터넷"] --> Route53["Route53<br/>(DNS - ecoeco.app)"]
     Route53 --> ALB["AWS Application Load Balancer (ALB)<br/>✓ ACM 인증서 (SSL/TLS 자동 관리)<br/>✓ Target Type: instance (NodePort)<br/>✓ Path-based Routing"]
     
     ALB -->|"/argocd"| ArgoCD["ArgoCD<br/>(Master Node)"]

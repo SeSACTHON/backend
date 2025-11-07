@@ -1,7 +1,7 @@
-# DB 설계 사례 분석 및 Growbin 적용 방안
+# DB 설계 사례 분석 및 Ecoeco 적용 방안
 
 분석 일시: 2025-11-06
-대상 시스템: Growbin (폐기물 분석 서비스)
+대상 시스템: Ecoeco (폐기물 분석 서비스)
 참고 사례: Robin Storage, OStore
 
 ---
@@ -103,13 +103,13 @@
 
 ---
 
-## 🎯 2. Growbin 시스템 현황 분석
+## 🎯 2. Ecoeco 시스템 현황 분석
 
 ### 2.1 현재 데이터 구조
 
 ```
 ┌─────────────────────────────────────────────┐
-│ PostgreSQL (단일 DB: growbin)                │
+│ PostgreSQL (단일 DB: ecoeco)                │
 ├─────────────────────────────────────────────┤
 │ - users (사용자 정보)                        │
 │ - waste_analysis (분석 결과)                 │
@@ -140,7 +140,7 @@
 ┌─────────────────────────────────────────────┐
 │ S3 (이미지 저장)                             │
 ├─────────────────────────────────────────────┤
-│ - prod-growbin-images/                      │
+│ - prod-ecoeco-images/                      │
 │   ├─ uploads/{user_id}/{timestamp}.jpg      │
 │   └─ thumbnails/...                         │
 └─────────────────────────────────────────────┘
@@ -181,7 +181,7 @@
 | **노드별 설정** | SQLite | 로컬 최적화·장애 격리 |
 | **빠른 조회** | SQLite (WAL) | 네트워크 없이 즉시 조회 |
 
-**Growbin 적용**:
+**Ecoeco 적용**:
 ```
 전역 조율: PostgreSQL (사용자·정책·인증)
 로컬 최적화: Worker별 Task Queue (SQLite)
@@ -199,18 +199,18 @@
 2. **Scalability**: 버킷 증가 → DB 동적 생성 (무한 확장)
 3. **Fast Delete**: 버킷 삭제 → DB DROP (빠르고 안전)
 
-**Growbin 적용 가능성**:
+**Ecoeco 적용 가능성**:
 ```
-현재: 단일 DB (growbin)
+현재: 단일 DB (ecoeco)
 개선: 도메인별 DB 분리
-  - growbin_auth (인증/인가)
-  - growbin_waste (폐기물 분석)
-  - growbin_chat (LLM 채팅)
-  - growbin_location (위치 정보)
+  - ecoeco_auth (인증/인가)
+  - ecoeco_waste (폐기물 분석)
+  - ecoeco_chat (LLM 채팅)
+  - ecoeco_location (위치 정보)
   
 또는 테넌트별 DB 분리 (B2B 확장 시):
-  - growbin_tenant_company_a
-  - growbin_tenant_company_b
+  - ecoeco_tenant_company_a
+  - ecoeco_tenant_company_b
 ```
 
 ### 교훈 3: 3-Tier 계층 분리 (OStore)
@@ -221,7 +221,7 @@ MStore (Meta Store)      → 메타데이터 계층 (샤딩)
 DStore (Data Store)      → 데이터 계층 (로컬 인덱스)
 ```
 
-**Growbin 적용**:
+**Ecoeco 적용**:
 ```
 Control Plane    → PostgreSQL (사용자·정책·도메인 등록)
 API Layer        → 도메인별 서비스 (waste, auth, chat, location)
@@ -231,13 +231,13 @@ Data Layer       → S3/CloudFront (이미지), PostgreSQL (메타)
 
 ---
 
-## 🚀 4. Growbin 개선 방안 제안
+## 🚀 4. Ecoeco 개선 방안 제안
 
 ### 방안 A: 도메인별 DB 분리 (단기) ⭐ 권장
 
 **현재**:
 ```sql
-growbin (단일 DB)
+ecoeco (단일 DB)
   ├─ users
   ├─ waste_analysis
   ├─ waste_images
@@ -249,7 +249,7 @@ growbin (단일 DB)
 **개선 후**:
 ```sql
 ┌─────────────────────────────────────┐
-│ growbin_auth (인증/인가)            │
+│ ecoeco_auth (인증/인가)            │
 ├─────────────────────────────────────┤
 │ - users                             │
 │ - sessions                          │
@@ -258,7 +258,7 @@ growbin (단일 DB)
 └─────────────────────────────────────┘
 
 ┌─────────────────────────────────────┐
-│ growbin_waste (폐기물 분석)         │
+│ ecoeco_waste (폐기물 분석)         │
 ├─────────────────────────────────────┤
 │ - waste_analysis                    │
 │ - waste_images                      │
@@ -267,7 +267,7 @@ growbin (단일 DB)
 └─────────────────────────────────────┘
 
 ┌─────────────────────────────────────┐
-│ growbin_chat (LLM 채팅)             │
+│ ecoeco_chat (LLM 채팅)             │
 ├─────────────────────────────────────┤
 │ - chat_sessions                     │
 │ - chat_messages                     │
@@ -276,7 +276,7 @@ growbin (단일 DB)
 └─────────────────────────────────────┘
 
 ┌─────────────────────────────────────┐
-│ growbin_location (위치 정보)        │
+│ ecoeco_location (위치 정보)        │
 ├─────────────────────────────────────┤
 │ - user_locations                    │
 │ - recycling_centers                 │
@@ -285,7 +285,7 @@ growbin (단일 DB)
 └─────────────────────────────────────┘
 
 ┌─────────────────────────────────────┐
-│ growbin_analytics (분석/통계)       │
+│ ecoeco_analytics (분석/통계)       │
 ├─────────────────────────────────────┤
 │ - user_stats                        │
 │ - waste_trends                      │
@@ -328,12 +328,12 @@ growbin (단일 DB)
 **예시 구조**:
 ```python
 # worker-storage (image-uploader, rule-retriever)
-/var/lib/growbin/worker-storage/task_queue.db
+/var/lib/ecoeco/worker-storage/task_queue.db
   - tasks (id, type, status, payload, created_at, completed_at)
   - task_logs (task_id, timestamp, message, level)
 
 # worker-ai (gpt5-analyzer, response-generator)
-/var/lib/growbin/worker-ai/task_queue.db
+/var/lib/ecoeco/worker-ai/task_queue.db
   - tasks (...)
   - gpt_cache (prompt_hash, response, model, timestamp)
 ```
@@ -365,23 +365,23 @@ CM (Control Manager)
   └─ tenant_db_mapping (tenant_id → db_name)
 
 Tenant DB (테넌트별 물리 격리)
-  ├─ growbin_tenant_company_a
+  ├─ ecoeco_tenant_company_a
   │   ├─ users
   │   ├─ waste_analysis
   │   └─ ...
-  ├─ growbin_tenant_company_b
+  ├─ ecoeco_tenant_company_b
   └─ ...
 ```
 
 **템플릿 DB 방식** (OStore 참고):
 ```sql
 -- 1. 템플릿 DB 생성
-CREATE DATABASE growbin_tenant_template;
-ALTER DATABASE growbin_tenant_template SET datistemplate = TRUE;
+CREATE DATABASE ecoeco_tenant_template;
+ALTER DATABASE ecoeco_tenant_template SET datistemplate = TRUE;
 
 -- 2. 새 테넌트 생성 시
-CREATE DATABASE growbin_tenant_{company_id} 
-  WITH TEMPLATE growbin_tenant_template;
+CREATE DATABASE ecoeco_tenant_{company_id} 
+  WITH TEMPLATE ecoeco_tenant_template;
 ```
 
 **장점**:
@@ -426,7 +426,7 @@ S3 (images)
 
 **예시 구조**:
 ```sql
--- /var/lib/growbin/api-waste/image_index.db
+-- /var/lib/ecoeco/api-waste/image_index.db
 CREATE TABLE image_cache (
     image_id TEXT PRIMARY KEY,
     user_id TEXT,
@@ -455,11 +455,11 @@ CREATE TABLE image_cache (
 ┌─────────────────────────────────────────────┐
 │ PostgreSQL Cluster (StatefulSet)            │
 ├─────────────────────────────────────────────┤
-│ growbin_auth       (2GB, HA)                │
-│ growbin_waste      (5GB, HA)                │
-│ growbin_chat       (3GB, HA)                │
-│ growbin_location   (1GB, HA)                │
-│ growbin_analytics  (10GB, Read Replica)     │
+│ ecoeco_auth       (2GB, HA)                │
+│ ecoeco_waste      (5GB, HA)                │
+│ ecoeco_chat       (3GB, HA)                │
+│ ecoeco_location   (1GB, HA)                │
+│ ecoeco_analytics  (10GB, Read Replica)     │
 └─────────────────────────────────────────────┘
 ```
 
@@ -475,18 +475,18 @@ resource "kubernetes_config_map" "postgresql_init" {
   data = {
     "01-create-databases.sql" = <<-EOF
       -- 도메인별 DB 생성
-      CREATE DATABASE growbin_auth;
-      CREATE DATABASE growbin_waste;
-      CREATE DATABASE growbin_chat;
-      CREATE DATABASE growbin_location;
-      CREATE DATABASE growbin_analytics;
+      CREATE DATABASE ecoeco_auth;
+      CREATE DATABASE ecoeco_waste;
+      CREATE DATABASE ecoeco_chat;
+      CREATE DATABASE ecoeco_location;
+      CREATE DATABASE ecoeco_analytics;
       
       -- 도메인별 사용자 생성 (최소 권한)
       CREATE USER auth_user WITH PASSWORD 'xxx';
-      GRANT ALL ON DATABASE growbin_auth TO auth_user;
+      GRANT ALL ON DATABASE ecoeco_auth TO auth_user;
       
       CREATE USER waste_user WITH PASSWORD 'xxx';
-      GRANT ALL ON DATABASE growbin_waste TO waste_user;
+      GRANT ALL ON DATABASE ecoeco_waste TO waste_user;
       -- ...
     EOF
   }
@@ -498,20 +498,20 @@ resource "kubernetes_config_map" "postgresql_init" {
 ```
 Worker-Storage Pod
   ├─ Celery Worker (image-uploader, rule-retriever)
-  └─ /var/lib/growbin/task_queue.db (SQLite, WAL)
+  └─ /var/lib/ecoeco/task_queue.db (SQLite, WAL)
 
 Worker-AI Pod
   ├─ Celery Worker (gpt5-analyzer, response-generator)
-  └─ /var/lib/growbin/task_queue.db (SQLite, WAL)
+  └─ /var/lib/ecoeco/task_queue.db (SQLite, WAL)
 ```
 
 ### Phase 3: 테넌트별 DB 분리 (B2B 확장 시)
 
 ```
-growbin_control (CM)
+ecoeco_control (CM)
   └─ tenant_registry
 
-growbin_tenant_{company_id} (동적 생성)
+ecoeco_tenant_{company_id} (동적 생성)
   ├─ users
   ├─ waste_analysis
   └─ ...
@@ -530,19 +530,19 @@ from sqlalchemy.orm import sessionmaker
 
 # 도메인별 DB 엔진
 auth_engine = create_engine(
-    "postgresql://auth_user:xxx@postgresql:5432/growbin_auth",
+    "postgresql://auth_user:xxx@postgresql:5432/ecoeco_auth",
     pool_size=10,
     max_overflow=20
 )
 
 waste_engine = create_engine(
-    "postgresql://waste_user:xxx@postgresql:5432/growbin_waste",
+    "postgresql://waste_user:xxx@postgresql:5432/ecoeco_waste",
     pool_size=20,  # 트래픽 많음
     max_overflow=40
 )
 
 chat_engine = create_engine(
-    "postgresql://chat_user:xxx@postgresql:5432/growbin_chat",
+    "postgresql://chat_user:xxx@postgresql:5432/ecoeco_chat",
     pool_size=15,
     max_overflow=30
 )
@@ -560,7 +560,7 @@ from app.db.connections import WasteSession
 @router.post("/analyze")
 async def analyze_waste(image: UploadFile):
     with WasteSession() as db:
-        # growbin_waste DB만 사용
+        # ecoeco_waste DB만 사용
         analysis = WasteAnalysis(
             user_id=current_user.id,
             image_path=s3_path,
@@ -582,7 +582,7 @@ import sqlite3
 from contextlib import contextmanager
 
 class LocalTaskQueue:
-    def __init__(self, db_path="/var/lib/growbin/task_queue.db"):
+    def __init__(self, db_path="/var/lib/ecoeco/task_queue.db"):
         self.db_path = db_path
         self._init_db()
     
@@ -678,19 +678,19 @@ def image_upload_task(image_path):
 ### Step 1: 도메인별 DB 생성 (1주)
 ```bash
 # PostgreSQL에서 실행
-CREATE DATABASE growbin_auth;
-CREATE DATABASE growbin_waste;
-CREATE DATABASE growbin_chat;
-CREATE DATABASE growbin_location;
-CREATE DATABASE growbin_analytics;
+CREATE DATABASE ecoeco_auth;
+CREATE DATABASE ecoeco_waste;
+CREATE DATABASE ecoeco_chat;
+CREATE DATABASE ecoeco_location;
+CREATE DATABASE ecoeco_analytics;
 ```
 
 ### Step 2: 데이터 마이그레이션 (2주)
 ```bash
 # 각 도메인별로 테이블 복사
-pg_dump growbin -t users -t sessions | psql growbin_auth
-pg_dump growbin -t waste_analysis -t waste_images | psql growbin_waste
-pg_dump growbin -t chat_history -t chat_messages | psql growbin_chat
+pg_dump ecoeco -t users -t sessions | psql ecoeco_auth
+pg_dump ecoeco -t waste_analysis -t waste_images | psql ecoeco_waste
+pg_dump ecoeco -t chat_history -t chat_messages | psql ecoeco_chat
 # ...
 ```
 
@@ -717,7 +717,7 @@ pg_dump growbin -t chat_history -t chat_messages | psql growbin_chat
 
 **도메인별 DB 분리** ⭐⭐⭐
 - Robin/OStore 교훈: 전역 vs 로컬 분리
-- Growbin 적용: auth, waste, chat, location 도메인별 DB
+- Ecoeco 적용: auth, waste, chat, location 도메인별 DB
 - 장점: 장애 격리, 스케일 독립, 개발 독립
 - 비용: 코드 수정 2주, 마이그레이션 2주
 
@@ -725,7 +725,7 @@ pg_dump growbin -t chat_history -t chat_messages | psql growbin_chat
 
 **Worker 로컬 SQLite** ⭐⭐
 - Robin 교훈: 노드별 로컬 최적화
-- Growbin 적용: Celery Worker Task Queue
+- Ecoeco 적용: Celery Worker Task Queue
 - 장점: 빠른 조회, 장애 격리
 - 비용: 코드 수정 1주
 
@@ -733,7 +733,7 @@ pg_dump growbin -t chat_history -t chat_messages | psql growbin_chat
 
 **테넌트별 DB 분리** ⭐
 - OStore 교훈: 버킷별 물리 격리
-- Growbin 적용: B2B 확장 시 기업별 DB
+- Ecoeco 적용: B2B 확장 시 기업별 DB
 - 장점: 완전한 Tenant Isolation
 - 비용: B2B 전략 확정 후 검토
 

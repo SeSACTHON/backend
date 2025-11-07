@@ -61,12 +61,12 @@ graph TB
     subgraph Internet["🌐 Internet"]
         User[User/Browser]
         Route53["`**Route53**
-        growbin.app`"]
+        ecoeco.app`"]
     end
     
     subgraph AWS["☁️ AWS Cloud (ap-northeast-2)"]
         ACM["`**ACM**
-        *.growbin.app`"]
+        *.ecoeco.app`"]
         ALB["`**Application LB**
         SSL/TLS Termination
         Path-based Routing`"]
@@ -213,7 +213,7 @@ Monitoring Node (Observability)
 
 ```mermaid
 graph TD
-    Internet["인터넷"] --> Route53["Route53<br/>(DNS - growbin.app)"]
+    Internet["인터넷"] --> Route53["Route53<br/>(DNS - ecoeco.app)"]
     Route53 --> ALB["AWS Application Load Balancer (ALB)<br/>✓ ACM 인증서 (SSL/TLS 자동 관리)<br/>✓ Target Type: instance (NodePort)<br/>✓ Path-based Routing"]
     
     ALB -->|"/argocd"| ArgoCD["ArgoCD<br/>(Master Node)"]
@@ -625,7 +625,7 @@ Async Workers (Celery)
 GitOps (완료) ✅
 ├─ ArgoCD v2.12.6 (kubectl)
 │   ├─ 설치: Ansible Role (ansible/roles/argocd/)
-│   ├─ 접근: https://growbin.app/argocd
+│   ├─ 접근: https://ecoeco.app/argocd
 │   ├─ 인증: admin / kubectl -n argocd get secret
 │   └─ Ingress: ALB + ACM SSL/TLS
 │
@@ -681,7 +681,7 @@ Monitoring (완료) ✅
 │   ├─ Retention: 7d / 40GB
 │   └─ Storage: 50Gi (gp3)
 ├─ Grafana v10.1.0
-│   ├─ 접근: https://growbin.app/grafana
+│   ├─ 접근: https://ecoeco.app/grafana
 │   ├─ CPU: 500m
 │   └─ Memory: 512Mi
 └─ Alertmanager v0.26.0
@@ -698,7 +698,7 @@ Load Balancing (완료) ✅
 │       ├─ /grafana → Grafana (Monitoring Node)
 │       └─ /api/v1/* → API Services (Worker Nodes)
 ├─ ACM Certificate
-│   └─ Domain: *.growbin.app
+│   └─ Domain: *.ecoeco.app
 └─ Route53 DNS
     ├─ A Record (Alias) → ALB
     └─ 자동화: Ansible (09-route53-update.yml)
@@ -910,7 +910,7 @@ Phase 7: 트러블슈팅 (완료)
 Phase 8: GitOps 배포 파이프라인 (완료)
 ├─ ArgoCD v2.12.6 설치 (Ansible 자동화)
 ├─ ALB Ingress 연동 (/argocd 경로)
-├─ HTTPS 접근 (https://growbin.app/argocd)
+├─ HTTPS 접근 (https://ecoeco.app/argocd)
 ├─ GitHub Container Registry (GHCR) 통합 준비
 └─ Helm Charts 기반 배포 구조 설계
     ├─ GitHub Actions (CI) - 빌드 & 테스트
@@ -1002,18 +1002,18 @@ Phase 10: 고급 배포 전략 (계획 중)
 ssh -i ~/.ssh/sesacthon.pem ubuntu@<MASTER_PUBLIC_IP>
 
 # ArgoCD (External)
-https://growbin.app/argocd
+https://ecoeco.app/argocd
 Username: admin
 Password: kubectl -n argocd get secret argocd-initial-admin-secret \
          -o jsonpath="{.data.password}" | base64 -d
 
 # Grafana (External)
-https://growbin.app/grafana
+https://ecoeco.app/grafana
 Username: admin
 Password: <GRAFANA_PASSWORD>
 
 # Prometheus (Port Forward)
-http://growbin.app/prometheus
+http://ecoeco.app/prometheus
 ```
 
 ### 주요 명령어
@@ -1080,7 +1080,7 @@ docs/troubleshooting/README.md
 
 **GitOps 배포 파이프라인 구축 완료:**
 - ✅ ArgoCD v2.12.6 설치 (Ansible 자동화)
-- ✅ ALB Ingress 연동 (https://growbin.app/argocd)
+- ✅ ALB Ingress 연동 (https://ecoeco.app/argocd)
 - ✅ GitHub Container Registry (GHCR) 통합 설계
 - ✅ Helm Charts 기반 배포 구조 완성
 - ✅ GitHub Actions CI 파이프라인 설계

@@ -86,9 +86,9 @@ Backend:
 └─ S3 - Pre-signed URL (이미지)
 
 Networking:
-├─ Route53 - DNS (growbin.app)
+├─ Route53 - DNS (ecoeco.app)
 ├─ ALB - L7 Load Balancing
-├─ ACM - SSL/TLS (*.growbin.app)
+├─ ACM - SSL/TLS (*.ecoeco.app)
 └─ Path-based Routing
 
 Monitoring:
@@ -223,10 +223,10 @@ kubectl get nodes
 kubectl get pods -A
 
 # 3. ArgoCD 접속
-https://growbin.app/argocd
+https://ecoeco.app/argocd
 
 # 4. Grafana 접속
-https://growbin.app/grafana
+https://ecoeco.app/grafana
 ```
 
 ---
