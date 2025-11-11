@@ -48,6 +48,18 @@ Worker 서비스: 2개 (storage, ai)
 
 ## 🏗️ 아키텍처
 
+### 전체 애플리케이션 아키텍처
+
+![Application Architecture](docs/images/application-architecture.png)
+
+**주요 구성 요소**:
+- **AWS Services**: Route53, ALB, S3, RDS, CloudFront
+- **Kubernetes Control Plane**: Ingress, API, Scheduler, Controller Manager, etcd
+- **Application Layer**: 7개 도메인별 API (auth, my, scan, character, location, info, chat)
+- **Storage**: Redis (JWT Blacklist, Cache), PostgreSQL (Main DB)
+- **Message Queue**: Celery (비동기 작업), RabbitMQ (메시지 브로커)
+- **Monitoring**: Prometheus, Grafana, Atlantis (GitOps)
+
 ### 클러스터 구성 (14-Node)
 
 ```mermaid
@@ -253,7 +265,7 @@ graph TD
 | 분류 | 문서 | 설명 |
 |------|------|------|
 | **시작하기** | [IaC Quick Start](docs/infrastructure/04-IaC_QUICK_START.md) | Terraform + Ansible 빠른 시작 |
-| **아키텍처** | [14-Node Architecture](docs/architecture/13-nodes-architecture.md) | 전체 아키텍처 설계 |
+| **아키텍처** | [14-Node Architecture](docs/deployment/14-node-completion-summary.md) | 14-Node 아키텍처 완성 문서 |
 | **배포** | [Auto Rebuild Guide](docs/deployment/AUTO_REBUILD_GUIDE.md) | 자동 배포 스크립트 가이드 |
 | **GitOps** | [GitOps Architecture](docs/deployment/GITOPS_ARCHITECTURE.md) | GitOps 전체 구성 상세 설명 |
 | **GitOps** | [GitOps Quick Reference](docs/deployment/GITOPS_QUICK_REFERENCE.md) | GitOps 빠른 참조 가이드 |
@@ -582,52 +594,57 @@ Alerting:
 
 ```yaml
 Infrastructure:
-  ✅ 14-Node Terraform 모듈 작성
-  ✅ Ansible Playbook (Bootstrap, Label)
+  ✅ 14-Node Terraform 모듈 작성 완료
+  ✅ Ansible Playbook (Bootstrap, Label, Monitoring)
   ✅ VPC, Subnets, Security Groups
   ✅ CloudFront + ACM Certificate
   ✅ S3 Bucket (이미지 스토리지)
+  ✅ Route53 DNS 자동 업데이트
 
 Kubernetes:
   ✅ kubeadm 클러스터 초기화
-  ✅ Calico CNI 설치
-  ✅ AWS ALB Controller
-  ✅ EBS CSI Driver
-  ✅ Label & Annotation 시스템
+  ✅ Calico CNI 설치 및 구성
+  ✅ AWS ALB Controller (Ingress)
+  ✅ EBS CSI Driver (동적 프로비저닝)
+  ✅ Label & Annotation 시스템 (도메인별 분리)
+  ✅ 14-Node 클러스터 성공적 배포
 
-GitOps:
+GitOps (완성):
   ✅ Terraform + Atlantis 통합 (https://atlantis.growbin.app)
   ✅ ArgoCD + ApplicationSet (https://argocd.growbin.app)
-  ✅ 4-Layer GitOps 아키텍처 구현
-  ✅ 각 도구의 역할 명확히 분리
-  ✅ GitHub Actions (간소화)
+  ✅ 4-Layer GitOps 아키텍처 완성
+  ✅ GitHub Actions (Lint/Test + Helm values 자동 업데이트)
+  ✅ Helm Charts (values-14nodes.yaml)
+  ✅ 완전 자동 배포 파이프라인 구축
 
 Monitoring:
-  ✅ Prometheus + Grafana
+  ✅ Prometheus + Grafana (https://grafana.growbin.app)
   ✅ ServiceMonitor (18개)
   ✅ Alert Rules (26개)
-  ✅ Grafana Dashboard
+  ✅ 14-Node 대시보드
 
 Documentation:
-  ✅ 아키텍처 문서
-  ✅ 배포 가이드
-  ✅ 트러블슈팅 가이드
-  ✅ GitOps 설계 문서
+  ✅ 아키텍처 문서 (30개)
+  ✅ 배포 가이드 (22개)
+  ✅ 트러블슈팅 가이드 (20개)
+  ✅ GitOps 설계 문서 완성
+  ✅ 문서 정리 (Archive 제거)
 ```
 
 ### 🚧 진행 중 / 계획
 
 ```yaml
-진행 중:
-  🔄 14-Node 클러스터 최초 배포
-  🔄 Ansible playbook 실행
-  🔄 ArgoCD ApplicationSet 배포
+다음 단계:
+  📝 API 애플리케이션 개발 (services/)
+  📝 실제 서비스 배포 및 테스트
+  📝 GitOps 파이프라인 검증
+  📝 성능 테스트 및 최적화
 
-계획:
-  📝 API 애플리케이션 개발
-  📝 Worker 애플리케이션 개발
-  📝 Service Mesh (Istio) 도입
-  📝 EKS 전환 검토
+향후 계획:
+  🔮 Service Mesh (Istio/Linkerd) 도입 검토
+  🔮 Multi-AZ 확장
+  🔮 Auto Scaling (HPA/Cluster Autoscaler)
+  🔮 Backup & Disaster Recovery
 ```
 
 ---
