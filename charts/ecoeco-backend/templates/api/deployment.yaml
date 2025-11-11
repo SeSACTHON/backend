@@ -41,7 +41,7 @@ spec:
           imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
           ports:
             - name: http
-              containerPort: {{ $config.service.port }}
+              containerPort: {{ $config.port }}
               protocol: TCP
           env:
             {{- range $.Values.env.common }}

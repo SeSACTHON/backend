@@ -72,6 +72,10 @@ api:
       repository: ghcr.io/sesacthon/auth
       tag: latest  # auto
     
+    service:
+      type: ClusterIP
+      port: 8000
+    
     nodeSelector:
       domain: auth
     
@@ -118,6 +122,10 @@ api:
       repository: ghcr.io/sesacthon/my
       tag: latest  # auto
     
+    service:
+      type: ClusterIP
+      port: 8000
+    
     nodeSelector:
       domain: my
     
@@ -143,6 +151,10 @@ api:
     image:
       repository: ghcr.io/sesacthon/scan
       tag: latest  # auto
+    
+    service:
+      type: ClusterIP
+      port: 8000
     
     nodeSelector:
       domain: scan
@@ -172,6 +184,10 @@ api:
       repository: ghcr.io/sesacthon/character
       tag: latest  # auto
     
+    service:
+      type: ClusterIP
+      port: 8000
+    
     nodeSelector:
       domain: character
     
@@ -197,6 +213,10 @@ api:
     image:
       repository: ghcr.io/sesacthon/location
       tag: latest  # auto
+    
+    service:
+      type: ClusterIP
+      port: 8000
     
     nodeSelector:
       domain: location
@@ -229,6 +249,10 @@ api:
       repository: ghcr.io/sesacthon/info
       tag: latest  # auto
     
+    service:
+      type: ClusterIP
+      port: 8000
+    
     nodeSelector:
       domain: info
     
@@ -254,6 +278,10 @@ api:
     image:
       repository: ghcr.io/sesacthon/chat
       tag: latest  # auto
+    
+    service:
+      type: ClusterIP
+      port: 8000
     
     nodeSelector:
       domain: chat
