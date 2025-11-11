@@ -50,7 +50,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_PREFIX }}/auth-api
+          images: ${{ env.IMAGE_PREFIX }}/auth
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -62,7 +62,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./services/auth-api
+          context: ./services/auth
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -94,7 +94,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_PREFIX }}/my-api
+          images: ${{ env.IMAGE_PREFIX }}/my
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -106,7 +106,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./services/my-api
+          context: ./services/my
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -142,7 +142,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_PREFIX }}/scan-api
+          images: ${{ env.IMAGE_PREFIX }}/scan
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -154,7 +154,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./services/scan-api
+          context: ./services/scan
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -186,7 +186,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_PREFIX }}/character-api
+          images: ${{ env.IMAGE_PREFIX }}/character
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -198,7 +198,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./services/character-api
+          context: ./services/character
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -230,7 +230,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.IMAGE_PREFIX }}/location-api
+          images: ${{ env.IMAGE_PREFIX }}/location
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -242,7 +242,7 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./services/location-api
+          context: ./services/location
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -276,11 +276,11 @@ jobs:
   #       id: meta
   #       uses: docker/metadata-action@v5
   #       with:
-  #         images: ${{ env.IMAGE_PREFIX }}/info-api
+  #         images: ${{ env.IMAGE_PREFIX }}/info
   #     - name: Build and push Docker image
   #       uses: docker/build-push-action@v5
   #       with:
-  #         context: ./services/info-api
+  #         context: ./services/info
   #         push: true
   #         tags: ${{ steps.meta.outputs.tags }}
 
@@ -307,11 +307,11 @@ jobs:
   #       id: meta
   #       uses: docker/metadata-action@v5
   #       with:
-  #         images: ${{ env.IMAGE_PREFIX }}/chat-api
+  #         images: ${{ env.IMAGE_PREFIX }}/chat
   #     - name: Build and push Docker image
   #       uses: docker/build-push-action@v5
   #       with:
-  #         context: ./services/chat-api
+  #         context: ./services/chat
   #         push: true
   #         tags: ${{ steps.meta.outputs.tags }}
 
