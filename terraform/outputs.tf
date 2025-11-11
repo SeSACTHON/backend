@@ -27,6 +27,7 @@ output "api_auth_instance_id" {
   value       = module.api_auth.instance_id
 }
 
+# API-1: Auth
 output "api_auth_public_ip" {
   description = "Auth API Public IP"
   value       = module.api_auth.public_ip
@@ -91,6 +92,29 @@ output "api_location_instance_id" {
   value       = module.api_location.instance_id
 }
 
+# API-3: Scan
+output "api_scan_public_ip" {
+  description = "Scan API Public IP"
+  value       = module.api_scan.public_ip
+}
+
+output "api_scan_private_ip" {
+  description = "Scan API Private IP"
+  value       = module.api_scan.private_ip
+}
+
+# API-4: Character
+output "api_character_public_ip" {
+  description = "Character API Public IP"
+  value       = module.api_character.public_ip
+}
+
+output "api_character_private_ip" {
+  description = "Character API Private IP"
+  value       = module.api_character.private_ip
+}
+
+# API-5: Location
 output "api_location_public_ip" {
   description = "Location API Public IP"
   value       = module.api_location.public_ip
@@ -151,10 +175,9 @@ output "worker_storage_public_ip" {
   value       = module.worker_storage.public_ip
 }
 
-output "worker_storage_private_ip" {
-  description = "Worker Storage Private IP"
-  value       = module.worker_storage.private_ip
-}
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Worker Nodes Outputs (Phase 4: 주석 처리)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 # Worker-2: AI
 output "worker_ai_instance_id" {
@@ -167,10 +190,10 @@ output "worker_ai_public_ip" {
   value       = module.worker_ai.public_ip
 }
 
-output "worker_ai_private_ip" {
-  description = "Worker AI Private IP"
-  value       = module.worker_ai.private_ip
-}
+# output "worker_storage_private_ip" {
+#   description = "Worker Storage Private IP"
+#   value       = module.worker_storage.private_ip
+# }
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Infrastructure Nodes Outputs (Phase 1&2: PostgreSQL, Redis / Phase 4: RabbitMQ, Monitoring)
@@ -182,6 +205,11 @@ output "postgresql_instance_id" {
   value       = module.postgresql.instance_id
 }
 
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Infrastructure Nodes Outputs (Phase 1&2: PostgreSQL, Redis / Phase 4: RabbitMQ, Monitoring)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# PostgreSQL (Phase 1)
 output "postgresql_public_ip" {
   description = "PostgreSQL 노드 Public IP"
   value       = module.postgresql.public_ip
@@ -235,10 +263,10 @@ output "monitoring_public_ip" {
   value       = module.monitoring.public_ip
 }
 
-output "monitoring_private_ip" {
-  description = "Monitoring 노드 Private IP"
-  value       = module.monitoring.private_ip
-}
+# output "rabbitmq_private_ip" {
+#   description = "RabbitMQ 노드 Private IP"
+#   value       = module.rabbitmq.private_ip
+# }
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Ansible Inventory
