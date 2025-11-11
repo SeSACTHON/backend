@@ -15,8 +15,8 @@ graph TD
     end
 
     subgraph Route53["☁️ AWS Route53 (DNS)"]
-        DNS_Apex[ecoeco.app]
-        DNS_WWW[www.ecoeco.app]
+        DNS_Apex[growbin.app]
+        DNS_WWW[www.growbin.app]
         DNS_API[api.ecoeco.app]
         DNS_ArgoCD[argocd.ecoeco.app]
         DNS_Grafana[grafana.ecoeco.app]
@@ -24,7 +24,7 @@ graph TD
 
     subgraph AWS["🏢 AWS"]
         subgraph ACM["🔒 ACM Certificate"]
-            Cert[ecoeco.app<br/>*.ecoeco.app]
+            Cert[growbin.app *.growbin.app]
         end
 
         subgraph ALB["⚖️ Application Load Balancer"]
@@ -169,11 +169,11 @@ sequenceDiagram
 
 | 레코드 | 타입 | 값 | 설명 |
 |--------|------|-----|------|
-| `ecoeco.app` | A (Alias) | ALB DNS | Apex 도메인 |
-| `www.ecoeco.app` | A (Alias) | ALB DNS | WWW 서브도메인 |
-| `api.ecoeco.app` | A (Alias) | ALB DNS | API 서브도메인 (향후) |
-| `argocd.ecoeco.app` | A (Alias) | ALB DNS | ArgoCD 서브도메인 (향후) |
-| `grafana.ecoeco.app` | A (Alias) | ALB DNS | Grafana 서브도메인 (향후) |
+| `growbin.app` | A (Alias) | ALB DNS | Apex 도메인 |
+| `www.growbin.app` | A (Alias) | ALB DNS | WWW 서브도메인 |
+| `api.growbin.app` | A (Alias) | ALB DNS | API 서브도메인 (향후) |
+| `argocd.growbin.app` | A (Alias) | ALB DNS | ArgoCD 서브도메인 (향후) |
+| `grafana.growbin.app` | A (Alias) | ALB DNS | Grafana 서브도메인 (향후) |
 
 **특징**:
 - ✅ **Alias 레코드**: A 레코드지만 IP 대신 AWS 리소스 (ALB)를 직접 가리킴
@@ -190,8 +190,8 @@ sequenceDiagram
 
 | 항목 | 값 |
 |------|-----|
-| **도메인** | `ecoeco.app` |
-| **SAN** | `*.ecoeco.app` |
+| **도메인** | `growbin.app` |
+| **SAN** | `*.growbin.app` |
 | **검증 방법** | DNS 검증 |
 | **자동 갱신** | ✅ 활성화 |
 | **ALB 연결** | ✅ Listener 443 |
@@ -199,7 +199,7 @@ sequenceDiagram
 **특징**:
 - ✅ **무료**: AWS에서 제공하는 SSL/TLS 인증서
 - ✅ **자동 갱신**: 만료 전 자동으로 갱신
-- ✅ **Wildcard**: `*.ecoeco.app` 모든 서브도메인 지원
+- ✅ **Wildcard**: `*.growbin.app` 모든 서브도메인 지원
 
 **설정 파일**:
 - Terraform: `terraform/acm.tf`
@@ -402,9 +402,9 @@ spec:
 ### 현재 구성: Path-based Routing
 
 ```
-https://ecoeco.app/argocd    → ArgoCD
-https://ecoeco.app/grafana   → Grafana
-https://ecoeco.app/api/v1/*  → API Services
+https://growbin.app/argocd    → ArgoCD
+https://growbin.app/grafana   → Grafana
+https://growbin.app/api/v1/*  → API Services
 ```
 
 **장점**:
@@ -421,9 +421,9 @@ https://ecoeco.app/api/v1/*  → API Services
 ### 향후 확장: Subdomain-based Routing (선택)
 
 ```
-https://argocd.ecoeco.app    → ArgoCD
-https://grafana.ecoeco.app   → Grafana
-https://api.ecoeco.app       → API Services
+https://argocd.growbin.app    → ArgoCD
+https://grafana.growbin.app   → Grafana
+https://api.growbin.app       → API Services
 ```
 
 **장점**:
@@ -459,7 +459,7 @@ echo ""
 
 # 1. Route53 → ALB
 echo "1️⃣ Route53 DNS 확인:"
-dig ecoeco.app +short
+dig growbin.app +short
 echo ""
 
 # 2. ALB DNS
@@ -479,7 +479,7 @@ echo ""
 
 # 5. Health Check
 echo "5️⃣ ALB Health Check:"
-curl -I https://ecoeco.app/argocd
+curl -I https://growbin.app/argocd
 echo ""
 ```
 
@@ -495,6 +495,6 @@ echo ""
 ---
 
 **작성일**: 2025-11-04  
-**버전**: 1.0.0  
+**버전**: v0.5.0 
 **최종 업데이트**: Route53 → ALB Alias 레코드 자동 업데이트 추가
 
