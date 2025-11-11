@@ -1,23 +1,24 @@
 {{- range $name, $config := .Values.api }}
 {{- if $config.enabled }}
+{{- $fullName := printf "%s-api-%s" $.Release.Name $name }}
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ $config.name }}
+  name: {{ $fullName }}
   labels:
-    app: {{ $config.name }}
+    app: {{ $fullName }}
     component: api
     domain: {{ $name }}
 spec:
   replicas: {{ $config.replicas }}
   selector:
     matchLabels:
-      app: {{ $config.name }}
+      app: {{ $fullName }}
   template:
     metadata:
       labels:
-        app: {{ $config.name }}
+        app: {{ $fullName }}
         component: api
         domain: {{ $name }}
     spec:
@@ -36,7 +37,7 @@ spec:
         {{- toYaml $config.nodeSelector | nindent 8 }}
       {{- end }}
       containers:
-        - name: {{ $config.name }}
+        - name: {{ $fullName }}
           image: "{{ $.Values.global.imageRegistry }}/{{ $config.image.repository }}:{{ $config.image.tag }}"
           imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
           ports:
@@ -44,21 +45,37 @@ spec:
               containerPort: {{ $config.port }}
               protocol: TCP
           env:
+            {{- if $.Values.env }}
+            {{- if $.Values.env.common }}
             {{- range $.Values.env.common }}
             - name: {{ .name }}
               value: {{ .value | quote }}
             {{- end }}
+            {{- end }}
+            {{- if $.Values.env.database }}
             {{- range $.Values.env.database }}
             - name: {{ .name }}
               value: {{ .value | quote }}
             {{- end }}
+            {{- end }}
+            {{- if $.Values.env.cache }}
             {{- range $.Values.env.cache }}
             - name: {{ .name }}
               value: {{ .value | quote }}
             {{- end }}
+            {{- end }}
+            {{- if $.Values.env.queue }}
             {{- range $.Values.env.queue }}
             - name: {{ .name }}
               value: {{ .value | quote }}
+            {{- end }}
+            {{- end }}
+            {{- end }}
+            {{- if $config.env }}
+            {{- range $config.env }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
             {{- end }}
           livenessProbe:
             httpGet:
@@ -82,9 +99,9 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $config.name }}
+  name: {{ $fullName }}
   labels:
-    app: {{ $config.name }}
+    app: {{ $fullName }}
     component: api
 spec:
   type: {{ $config.service.type }}
@@ -94,7 +111,7 @@ spec:
       protocol: TCP
       name: http
   selector:
-    app: {{ $config.name }}
+    app: {{ $fullName }}
 {{- end }}
 {{- end }}
 
