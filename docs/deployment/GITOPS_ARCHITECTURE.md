@@ -6,10 +6,11 @@
 
 1. [GitOps 개요](#gitops-개요)
 2. [도구별 역할 구분](#도구별-역할-구분)
-3. [전체 워크플로우](#전체-워크플로우)
-4. [각 도구의 관리 범위](#각-도구의-관리-범위)
-5. [Git 저장소 구조](#git-저장소-구조)
-6. [변경 시나리오별 워크플로우](#변경-시나리오별-워크플로우)
+3. [Helm Chart의 역할](#helm-chart의-역할)
+4. [전체 워크플로우](#전체-워크플로우)
+5. [각 도구의 관리 범위](#각-도구의-관리-범위)
+6. [Git 저장소 구조](#git-저장소-구조)
+7. [변경 시나리오별 워크플로우](#변경-시나리오별-워크플로우)
 
 ---
 
@@ -164,8 +165,207 @@ PostSync Hook → Health Check, Smoke Test
    - 테스트
    - Docker 이미지 빌드
    - 이미지 푸시
-   - Manifest 파일의 이미지 태그 업데이트
+   - Helm Chart values 파일의 이미지 태그 업데이트
 4. ArgoCD가 감지하여 자동 배포
+```
+
+---
+
+## Helm Chart의 역할
+
+### 5. Helm (Kubernetes Package Manager)
+
+**역할**: Kubernetes 리소스를 템플릿화하여 관리
+
+**Helm Chart란?**
+- Kubernetes 리소스(Deployment, Service, ConfigMap 등)를 패키지로 묶은 것
+- 템플릿 + Values로 구성되어 환경별 설정을 쉽게 관리
+- ArgoCD가 Helm Chart를 렌더링하여 Kubernetes에 배포
+
+**관리 대상**:
+- ✅ Kubernetes 리소스 템플릿:
+  - `charts/ecoeco-backend/templates/`
+    - deployments.yaml
+    - services.yaml
+    - ingress.yaml
+    - configmaps.yaml
+    - secrets.yaml
+- ✅ 환경별 Values 파일:
+  - `values-14nodes.yaml` (14-Node 프로덕션)
+  - `values-dev.yaml` (개발 환경)
+  - `values.yaml` (기본값)
+
+**Helm Chart 구조**:
+```yaml
+charts/ecoeco-backend/
+├── Chart.yaml                    # Chart 메타데이터
+├── values.yaml                   # 기본 Values
+├── values-14nodes.yaml          # 14-Node 프로덕션 Values
+├── values-dev.yaml              # 개발 환경 Values
+└── templates/                   # Kubernetes 리소스 템플릿
+    ├── auth/
+    │   ├── deployment.yaml      # {{ .Values.api.auth.image.tag }}
+    │   └── service.yaml
+    ├── scan/
+    │   ├── deployment.yaml
+    │   └── service.yaml
+    ├── chat/
+    │   ├── deployment.yaml
+    │   └── service.yaml
+    ├── ingress.yaml
+    ├── configmap.yaml
+    └── secrets.yaml
+```
+
+**Values 파일 예시** (`values-14nodes.yaml`):
+```yaml
+global:
+  image:
+    registry: ghcr.io
+    repository: sesacthon
+    pullPolicy: Always
+  domain: growbin.app
+
+api:
+  auth:
+    enabled: true
+    replicaCount: 2
+    image:
+      name: auth-service
+      tag: v1.2.3                 # GitHub Actions가 업데이트
+    nodeSelector:
+      node-role: auth
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "100m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
+  
+  scan:
+    enabled: true
+    replicaCount: 2
+    image:
+      name: scan-service
+      tag: v1.4.5                 # GitHub Actions가 업데이트
+    nodeSelector:
+      node-role: scan
+    resources:
+      requests:
+        memory: "512Mi"
+        cpu: "200m"
+```
+
+**템플릿 파일 예시** (`templates/auth/deployment.yaml`):
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.api.auth.name | default "auth-service" }}
+  namespace: {{ .Values.api.namespace }}
+spec:
+  replicas: {{ .Values.api.auth.replicaCount }}
+  selector:
+    matchLabels:
+      app: auth
+  template:
+    metadata:
+      labels:
+        app: auth
+    spec:
+      nodeSelector:
+        {{- toYaml .Values.api.auth.nodeSelector | nindent 8 }}
+      containers:
+        - name: auth
+          image: "{{ .Values.global.image.registry }}/{{ .Values.global.image.repository }}/{{ .Values.api.auth.image.name }}:{{ .Values.api.auth.image.tag }}"
+          imagePullPolicy: {{ .Values.global.image.pullPolicy }}
+          ports:
+            - containerPort: 8000
+          env:
+            - name: DATABASE_URL
+              value: "postgresql://{{ .Values.externalServices.postgresql.host }}:{{ .Values.externalServices.postgresql.port }}/{{ .Values.externalServices.postgresql.database }}"
+          resources:
+            {{- toYaml .Values.api.auth.resources | nindent 12 }}
+```
+
+**Helm의 장점**:
+```yaml
+장점:
+  ✅ 템플릿화:
+    - 중복 코드 제거
+    - 유지보수 용이
+  
+  ✅ 환경별 관리:
+    - values-14nodes.yaml (프로덕션)
+    - values-dev.yaml (개발)
+    - 하나의 템플릿, 여러 환경
+  
+  ✅ 버전 관리:
+    - Chart.yaml에 버전 명시
+    - 롤백 용이
+  
+  ✅ ArgoCD 통합:
+    - ArgoCD가 Helm Chart를 직접 렌더링
+    - Helm CLI 불필요
+```
+
+**워크플로우**:
+```mermaid
+graph LR
+    A[GitHub Actions] --> B[이미지 빌드 & 푸시]
+    B --> C[values-14nodes.yaml<br/>이미지 태그 업데이트]
+    C --> D[Git Commit & Push]
+    D --> E[ArgoCD 감지]
+    E --> F[Helm Chart 렌더링]
+    F --> G[kubectl apply]
+    G --> H[Kubernetes Cluster]
+    
+    style A fill:#b91c1c,stroke:#dc2626,stroke-width:2px,color:#fff
+    style B fill:#0e7490,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style C fill:#166534,stroke:#16a34a,stroke-width:2px,color:#fff
+    style D fill:#78350f,stroke:#a16207,stroke-width:2px,color:#fff
+    style E fill:#6b21a8,stroke:#9333ea,stroke-width:2px,color:#fff
+    style F fill:#1e3a8a,stroke:#2563eb,stroke-width:2px,color:#fff
+    style G fill:#991b1b,stroke:#dc2626,stroke-width:2px,color:#fff
+    style H fill:#0c4a6e,stroke:#0369a1,stroke-width:2px,color:#fff
+```
+
+**Helm이 관리하지 않는 것**:
+- ❌ Docker 이미지 빌드 (GitHub Actions 담당)
+- ❌ AWS 인프라 (Atlantis 담당)
+- ❌ Kubernetes 클러스터 초기화 (Ansible 담당)
+- ❌ 실제 배포 실행 (ArgoCD가 Helm을 사용하여 배포)
+
+**Helm vs Raw Kubernetes YAML**:
+
+| 구분 | Raw YAML (k8s/) | Helm Chart (charts/) |
+|------|----------------|---------------------|
+| **관리 방식** | 파일별 개별 관리 | 템플릿 + Values |
+| **중복** | 높음 (반복 코드) | 낮음 (템플릿화) |
+| **환경 관리** | 파일 복사 필요 | Values 파일만 변경 |
+| **유지보수** | 어려움 | 쉬움 |
+| **ArgoCD 통합** | 가능 | 가능 (권장) |
+
+**실제 사용 예시**:
+
+```bash
+# ArgoCD Application에서 Helm Chart 지정
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: ecoeco-backend-14nodes
+spec:
+  source:
+    repoURL: https://github.com/SeSACTHON/backend.git
+    targetRevision: develop
+    path: charts/ecoeco-backend        # Helm Chart 경로
+    helm:
+      valueFiles:
+        - values-14nodes.yaml          # 14-Node 프로덕션 Values
+      parameters:
+        - name: api.auth.image.tag
+          value: v1.2.3                # 동적으로 변경 가능
 ```
 
 ---
@@ -182,6 +382,14 @@ graph LR
     D --> E[atlantis apply 코멘트]
     E --> F[AWS 인프라 생성]
     F --> G[EC2 Instances Running]
+    
+    style A fill:#78350f,stroke:#a16207,stroke-width:2px,color:#fff
+    style B fill:#0e7490,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style C fill:#b91c1c,stroke:#dc2626,stroke-width:2px,color:#fff
+    style D fill:#166534,stroke:#16a34a,stroke-width:2px,color:#fff
+    style E fill:#6b21a8,stroke:#9333ea,stroke-width:2px,color:#fff
+    style F fill:#1e3a8a,stroke:#2563eb,stroke-width:2px,color:#fff
+    style G fill:#991b1b,stroke:#dc2626,stroke-width:2px,color:#fff
 ```
 
 ### Phase 2: 클러스터 설정 (Ansible)
@@ -194,6 +402,14 @@ graph LR
     D --> E[Kubernetes 클러스터 초기화]
     E --> F[인프라 컴포넌트 설치]
     F --> G[클러스터 Ready]
+    
+    style A fill:#78350f,stroke:#a16207,stroke-width:2px,color:#fff
+    style B fill:#0e7490,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style C fill:#6b21a8,stroke:#9333ea,stroke-width:2px,color:#fff
+    style D fill:#166534,stroke:#16a34a,stroke-width:2px,color:#fff
+    style E fill:#1e3a8a,stroke:#2563eb,stroke-width:2px,color:#fff
+    style F fill:#b91c1c,stroke:#dc2626,stroke-width:2px,color:#fff
+    style G fill:#991b1b,stroke:#dc2626,stroke-width:2px,color:#fff
 ```
 
 ### Phase 3: 애플리케이션 배포 (ArgoCD + GitHub Actions)
@@ -207,6 +423,15 @@ graph LR
     E --> F[Git Push]
     F --> G[ArgoCD 감지]
     G --> H[자동 배포]
+    
+    style A fill:#78350f,stroke:#a16207,stroke-width:2px,color:#fff
+    style B fill:#0e7490,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style C fill:#b91c1c,stroke:#dc2626,stroke-width:2px,color:#fff
+    style D fill:#166534,stroke:#16a34a,stroke-width:2px,color:#fff
+    style E fill:#1e3a8a,stroke:#2563eb,stroke-width:2px,color:#fff
+    style F fill:#0e7490,stroke:#06b6d4,stroke-width:2px,color:#fff
+    style G fill:#6b21a8,stroke:#9333ea,stroke-width:2px,color:#fff
+    style H fill:#991b1b,stroke:#dc2626,stroke-width:2px,color:#fff
 ```
 
 ---
@@ -217,21 +442,28 @@ graph LR
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Layer 4: Application Code (개발자)                      │
+│  Layer 5: Application Code (개발자)                      │
 │  - 애플리케이션 소스 코드                                  │
 │  - 단위 테스트                                            │
 └─────────────────────────────────────────────────────────┘
-                    ↓ GitHub Actions
+                    ↓ GitHub Actions (CI)
 ┌─────────────────────────────────────────────────────────┐
-│  Layer 3: Container Images (GitHub Actions)              │
+│  Layer 4: Container Images (GitHub Actions)              │
 │  - Docker 이미지 빌드                                      │
-│  - 이미지 레지스트리 (ECR, Docker Hub)                      │
+│  - 이미지 레지스트리 (GHCR)                                │
 └─────────────────────────────────────────────────────────┘
                     ↓ Image Tag Update
 ┌─────────────────────────────────────────────────────────┐
-│  Layer 2: Kubernetes Resources (ArgoCD)                  │
-│  - Deployments, Services                                  │
-│  - ConfigMaps, Secrets                                    │
+│  Layer 3: Package Management (Helm)                      │
+│  - Kubernetes 리소스 템플릿                                │
+│  - Values 파일 (환경별 설정)                               │
+│  - Chart 버전 관리                                         │
+└─────────────────────────────────────────────────────────┘
+                    ↓ ArgoCD Render
+┌─────────────────────────────────────────────────────────┐
+│  Layer 2: Application Deployment (ArgoCD)                │
+│  - Helm Chart 렌더링                                       │
+│  - Git → Cluster 동기화                                   │
 │  - 애플리케이션 배포                                        │
 └─────────────────────────────────────────────────────────┘
                     ↓ kubectl apply
@@ -281,23 +513,34 @@ SeSACTHON/backend/
 │       ├── 08-monitoring.yml
 │       └── 09-atlantis.yml
 │
-├── k8s/                          # ArgoCD가 관리
-│   ├── auth/
-│   │   └── auth-deployment.yaml
-│   ├── scan/
-│   │   └── scan-deployment.yaml
-│   ├── chat/
-│   │   └── chat-deployment.yaml
-│   ├── community/
-│   │   └── community-deployment.yaml
-│   ├── database/
-│   │   ├── postgres-deployment.yaml
-│   │   ├── redis-deployment.yaml
-│   │   └── rabbitmq-deployment.yaml
-│   ├── ingress/
-│   │   └── 14-nodes-ingress.yaml
-│   └── argocd/
-│       └── applications/
+├── charts/                      # Helm Chart (ArgoCD가 사용)
+│   └── ecoeco-backend/
+│       ├── Chart.yaml
+│       ├── values.yaml          # 기본 Values
+│       ├── values-14nodes.yaml  # 14-Node 프로덕션
+│       ├── values-dev.yaml      # 개발 환경
+│       └── templates/           # Kubernetes 리소스 템플릿
+│           ├── auth/
+│           │   ├── deployment.yaml
+│           │   └── service.yaml
+│           ├── scan/
+│           │   ├── deployment.yaml
+│           │   └── service.yaml
+│           ├── chat/
+│           │   ├── deployment.yaml
+│           │   └── service.yaml
+│           ├── database/
+│           │   ├── postgres.yaml
+│           │   ├── redis.yaml
+│           │   └── rabbitmq.yaml
+│           ├── ingress.yaml
+│           └── configmap.yaml
+│
+├── argocd/                      # ArgoCD Application 정의
+│   ├── application-14nodes.yaml
+│   └── applications/
+│       ├── auth-app.yaml
+│       └── scan-app.yaml
 │
 ├── src/                          # GitHub Actions가 빌드
 │   ├── auth/
@@ -361,7 +604,7 @@ SeSACTHON/backend/
 
 ### 시나리오 3: Auth API 버전 업데이트
 
-**도구**: GitHub Actions → ArgoCD
+**도구**: GitHub Actions → Helm → ArgoCD
 
 ```bash
 1. src/auth/*.ts 코드 수정
@@ -371,14 +614,18 @@ SeSACTHON/backend/
 3. GitHub Actions 실행:
    - 테스트
    - Docker 이미지 빌드 (태그: v1.2.3)
-   - 이미지 푸시
+   - 이미지 푸시 (GHCR)
 
-4. GitHub Actions가 k8s/auth/auth-deployment.yaml 수정:
-   image: your-registry/auth-api:v1.2.3
+4. GitHub Actions가 charts/ecoeco-backend/values-14nodes.yaml 수정:
+   api:
+     auth:
+       image:
+         tag: v1.2.3  # 업데이트!
 
 5. Git Push
 
 6. ArgoCD가 변경 감지
+   → Helm Chart 렌더링
    → 자동 배포
 ```
 
@@ -569,21 +816,22 @@ SeSACTHON/backend/
 
 ## 결론
 
-### Atlantis vs Ansible vs ArgoCD
+### Atlantis vs Ansible vs Helm vs ArgoCD
 
-| 구분 | Atlantis | Ansible | ArgoCD |
-|------|----------|---------|--------|
-| **목적** | AWS 인프라 관리 | 클러스터 설정 | 애플리케이션 배포 |
-| **관리 대상** | EC2, VPC, IAM 등 | Kubeadm, CNI, 노드 설정 | Deployment, Service 등 |
-| **실행 방식** | PR 코멘트 | SSH | Git Sync |
-| **실행 주기** | 수동 (PR) | 수동/Hook | 자동 (3분마다) |
-| **롤백** | Git revert → apply | Playbook 재실행 | Git revert → Auto-sync |
+| 구분 | Atlantis | Ansible | Helm | ArgoCD |
+|------|----------|---------|------|--------|
+| **목적** | AWS 인프라 관리 | 클러스터 설정 | K8s 리소스 템플릿화 | 애플리케이션 배포 |
+| **관리 대상** | EC2, VPC, IAM 등 | Kubeadm, CNI, 노드 설정 | Chart 템플릿, Values | Helm Chart 렌더링 |
+| **실행 방식** | PR 코멘트 | SSH | 템플릿 + Values | Git Sync + Helm Render |
+| **실행 주기** | 수동 (PR) | 수동/Hook | ArgoCD에 의해 실행 | 자동 (3분마다) |
+| **롤백** | Git revert → apply | Playbook 재실행 | Values 변경 | Git revert → Auto-sync |
 
 ### 각 도구는 서로를 대체하지 않습니다!
 
 - **Atlantis**: Infrastructure Layer (AWS)
 - **Ansible**: Configuration Layer (Kubernetes Cluster)
-- **ArgoCD**: Application Layer (Kubernetes Apps)
+- **Helm**: Package Management Layer (K8s 리소스 템플릿)
+- **ArgoCD**: Application Layer (Kubernetes Apps 배포)
 
 **모두 필요하며, 각자의 역할이 명확합니다.**
 
@@ -593,12 +841,14 @@ SeSACTHON/backend/
 
 - [Atlantis 공식 문서](https://www.runatlantis.io/docs/)
 - [Ansible 공식 문서](https://docs.ansible.com/)
+- [Helm 공식 문서](https://helm.sh/docs/)
 - [ArgoCD 공식 문서](https://argo-cd.readthedocs.io/)
 - [GitOps 원칙](https://www.gitops.tech/)
+- [Helm Chart Best Practices](https://helm.sh/docs/chart_best_practices/)
 
 ---
 
-**작성일**: 2025-11-11  
-**버전**: v1.0.0  
-**아키텍처**: 14-Node Microservices with Full GitOps
+**문서 버전**: v0.7.0  
+**최종 업데이트**: 2025-11-11  
+**아키텍처**: 14-Node Microservices with Full GitOps (Terraform + Ansible + Helm + ArgoCD)
 

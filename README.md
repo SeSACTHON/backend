@@ -94,21 +94,21 @@ graph TB
     
     Total["📊 Total: 14 nodes, 30 vCPU, 22GB RAM"]
     
-    style M fill:#ff6b6b
-    style A1 fill:#4ecdc4
-    style A2 fill:#4ecdc4
-    style A3 fill:#4ecdc4
-    style A4 fill:#4ecdc4
-    style A5 fill:#4ecdc4
-    style A6 fill:#4ecdc4
-    style A7 fill:#4ecdc4
-    style W1 fill:#95e1d3
-    style W2 fill:#95e1d3
-    style I1 fill:#f38181
-    style I2 fill:#f38181
-    style I3 fill:#f38181
-    style I4 fill:#f38181
-    style Total fill:#ffd93d
+    style M fill:#b91c1c,color:#fff
+    style A1 fill:#0e7490,color:#fff
+    style A2 fill:#0e7490,color:#fff
+    style A3 fill:#0e7490,color:#fff
+    style A4 fill:#0e7490,color:#fff
+    style A5 fill:#0e7490,color:#fff
+    style A6 fill:#0e7490,color:#fff
+    style A7 fill:#0e7490,color:#fff
+    style W1 fill:#166534,color:#fff
+    style W2 fill:#166534,color:#fff
+    style I1 fill:#991b1b,color:#fff
+    style I2 fill:#991b1b,color:#fff
+    style I3 fill:#991b1b,color:#fff
+    style I4 fill:#991b1b,color:#fff
+    style Total fill:#a16207,color:#fff
 ```
 
 ### 네트워크 구조
@@ -122,13 +122,13 @@ graph TD
     E --> F[⚙️ Worker Pods<br/>Internal]
     F --> G[💾 PostgreSQL / Redis / RabbitMQ]
     
-    style A fill:#e1f5ff
-    style B fill:#b3e5fc
-    style C fill:#81d4fa
-    style D fill:#4fc3f7
-    style E fill:#29b6f6
-    style F fill:#039be5
-    style G fill:#0277bd,color:#fff
+    style A fill:#1e3a8a,color:#fff
+    style B fill:#0e7490,color:#fff
+    style C fill:#0891b2,color:#fff
+    style D fill:#0284c7,color:#fff
+    style E fill:#0369a1,color:#fff
+    style F fill:#075985,color:#fff
+    style G fill:#0c4a6e,color:#fff
 ```
 
 → 자세한 내용: [docs/architecture/05-final-k8s-architecture.md](docs/architecture/05-final-k8s-architecture.md)
@@ -250,14 +250,14 @@ graph TD
     
     AR --> AR1[13NODES_COMPLETE_SUMMARY.md]
     
-    style D fill:#ffd93d
-    style A fill:#ff6b6b
-    style DE fill:#4ecdc4
-    style I fill:#95e1d3
-    style G fill:#f38181
-    style T fill:#fcbad3
-    style DEV fill:#aa96da
-    style AR fill:#ffffd2
+    style D fill:#a16207,color:#fff
+    style A fill:#b91c1c,color:#fff
+    style DE fill:#0e7490,color:#fff
+    style I fill:#166534,color:#fff
+    style G fill:#991b1b,color:#fff
+    style T fill:#be123c,color:#fff
+    style DEV fill:#6b21a8,color:#fff
+    style AR fill:#78350f,color:#fff
 ```
 
 ### 주요 문서 빠른 링크
@@ -314,21 +314,21 @@ graph TB
         L0C["📁 terraform/*.tf"]
     end
     
-    style Layer3 fill:#e1f5fe
-    style Layer2 fill:#b3e5fc
-    style Layer1 fill:#81d4fa
-    style Layer0 fill:#4fc3f7
-    style L3A fill:#fff
-    style L3B fill:#fff
-    style L2A fill:#fff
-    style L2B fill:#fff
-    style L2C fill:#fff
-    style L1A fill:#fff
-    style L1B fill:#fff
-    style L1C fill:#fff
-    style L0A fill:#fff
-    style L0B fill:#fff
-    style L0C fill:#fff
+    style Layer3 fill:#1e3a8a,color:#fff
+    style Layer2 fill:#0e7490,color:#fff
+    style Layer1 fill:#166534,color:#fff
+    style Layer0 fill:#78350f,color:#fff
+    style L3A fill:#334155,color:#fff
+    style L3B fill:#334155,color:#fff
+    style L2A fill:#334155,color:#fff
+    style L2B fill:#334155,color:#fff
+    style L2C fill:#334155,color:#fff
+    style L1A fill:#334155,color:#fff
+    style L1B fill:#334155,color:#fff
+    style L1C fill:#334155,color:#fff
+    style L0A fill:#334155,color:#fff
+    style L0B fill:#334155,color:#fff
+    style L0C fill:#334155,color:#fff
 ```
 
 ### 도구별 역할 구분
@@ -438,10 +438,10 @@ graph LR
     S --> S1[auth/]
     S --> S2[scan/]
     
-    style T fill:#ff6b6b
-    style A fill:#4ecdc4
-    style K fill:#95e1d3
-    style S fill:#f38181
+    style T fill:#b91c1c,color:#fff
+    style A fill:#0e7490,color:#fff
+    style K fill:#166534,color:#fff
+    style S fill:#991b1b,color:#fff
 ```
 
 ### 상세 문서
