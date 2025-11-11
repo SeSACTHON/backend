@@ -1,4 +1,5 @@
 # 이코에코(Eco²) Backend: API & Infrastructure
+![E40B8A37-71A7-4B98-9BD8-6A60741D99DE_4_5005_c](https://github.com/user-attachments/assets/85067a31-500f-4afa-9909-1db6baded385)
 
 > **Self-Managed Kubernetes 기반 마이크로서비스 플랫폼**  
 > AI 분석 기반 쓰레기 분류 애플리케이션의 백엔드 인프라
@@ -49,7 +50,7 @@ Worker 서비스: 2개 (storage, ai)
 ## 🏗️ 아키텍처
 
 ### 전체 애플리케이션 아키텍처
-<img width="1087" height="713" alt="application-architecture" src="https://github.com/user-attachments/assets/03cfed48-7ec6-46a7-838f-5422fb9dab7e" />
+![E6A73249-BFDB-4CA9-A41B-4AF5A907C6D1](https://github.com/user-attachments/assets/375ac906-4a2c-4aca-bce0-889212e6914a)
 
 
 **주요 구성 요소**:
