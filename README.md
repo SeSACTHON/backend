@@ -1,4 +1,5 @@
-# SeSACTHON Backend Infrastructure
+# ♻️이코에코(Eco²) Backend: API & Infrastructure
+![E40B8A37-71A7-4B98-9BD8-6A60741D99DE_4_5005_c](https://github.com/user-attachments/assets/85067a31-500f-4afa-9909-1db6baded385)
 
 > **Self-Managed Kubernetes 기반 마이크로서비스 플랫폼**  
 > AI 분석 기반 쓰레기 분류 애플리케이션의 백엔드 인프라
@@ -49,8 +50,8 @@ Worker 서비스: 2개 (storage, ai)
 ## 🏗️ 아키텍처
 
 ### 전체 애플리케이션 아키텍처
+![E6A73249-BFDB-4CA9-A41B-4AF5A907C6D1](https://github.com/user-attachments/assets/375ac906-4a2c-4aca-bce0-889212e6914a)
 
-![Application Architecture](docs/images/application-architecture.png)
 
 **주요 구성 요소**:
 - **AWS Services**: Route53, ALB, S3, RDS, CloudFront
@@ -110,7 +111,6 @@ graph TB
     style I4 fill:#991b1b,color:#fff
     style Total fill:#a16207,color:#fff
 ```
-
 ### 네트워크 구조
 
 ```mermaid
@@ -207,58 +207,6 @@ argocd app list
 → 자세한 내용: [docs/deployment/AUTO_REBUILD_GUIDE.md](docs/deployment/AUTO_REBUILD_GUIDE.md)
 
 ---
-
-## 📚 문서 구조
-
-```mermaid
-graph TD
-    D[docs/]
-    
-    D --> A[architecture/<br/>아키텍처 설계]
-    D --> DE[deployment/<br/>배포 가이드]
-    D --> I[infrastructure/<br/>인프라 설정]
-    D --> G[guides/<br/>운영 가이드]
-    D --> T[troubleshooting/<br/>트러블슈팅]
-    D --> DEV[development/<br/>개발 가이드]
-    D --> AR[archive/<br/>히스토리 보관]
-    
-    A --> A1[01-README.md<br/>아키텍처 개요]
-    A --> A2[05-final-k8s-architecture.md]
-    A --> A3[12-why-self-managed-k8s.md]
-    A --> A4[13-nodes-architecture.md]
-    A --> A5[redis-jwt-blacklist-design.md]
-    
-    DE --> DE1[README.md<br/>배포 개요]
-    DE --> DE2[AUTO_REBUILD_GUIDE.md<br/>자동 배포]
-    DE --> DE3[gitops-automation-design.md]
-    DE --> DE4[14-node-completion-summary.md]
-    
-    I --> I1[01-README.md<br/>인프라 개요]
-    I --> I2[04-IaC_QUICK_START.md]
-    I --> I3[k8s-label-annotation-system.md]
-    
-    G --> G1[ARGOCD_GUIDE.md]
-    G --> G2[HELM_STATUS_GUIDE.md]
-    G --> G3[session-manager-guide.md]
-    
-    T --> T1[README.md]
-    T --> T2[ANSIBLE_SSH_TIMEOUT.md]
-    T --> T3[CLOUDFRONT_ACM_CERTIFICATE_STUCK.md]
-    
-    DEV --> DEV1[01-README.md]
-    DEV --> DEV2[04-git-workflow.md]
-    
-    AR --> AR1[13NODES_COMPLETE_SUMMARY.md]
-    
-    style D fill:#a16207,color:#fff
-    style A fill:#b91c1c,color:#fff
-    style DE fill:#0e7490,color:#fff
-    style I fill:#166534,color:#fff
-    style G fill:#991b1b,color:#fff
-    style T fill:#be123c,color:#fff
-    style DEV fill:#6b21a8,color:#fff
-    style AR fill:#78350f,color:#fff
-```
 
 ### 주요 문서 빠른 링크
 
@@ -494,7 +442,7 @@ Infrastructure (4):
   - monitoring: Prometheus + Grafana
 ```
 
-### 3. 고급 네트워킹
+### 3. 쿠버네티스 클러스터 네트워킹
 
 ```yaml
 CNI: Calico (Network Policy)
@@ -657,14 +605,8 @@ Documentation:
 
 - **Infrastructure**: Kubernetes, Terraform, Ansible, GitOps
 - **Backend**: FastAPI, PostgreSQL, Redis, RabbitMQ
-- **Frontend**: React Native
-- **AI**: TensorFlow, Computer Vision
-
----
-
-## 📝 라이센스
-
-이 프로젝트는 교육 목적으로 제작되었습니다.
+- **Frontend**: React, PWA
+- **AI**: GPT-5, GPT-4o-mini
 
 ---
 
@@ -679,6 +621,5 @@ Documentation:
 ---
 
 **Last Updated**: 2025-11-11  
-**Version**: 14-Node Production Architecture + Full GitOps  
-**Status**: ✅ Atlantis & ArgoCD Running
+**Version**: v0.7.0 (14-Nodes Production Architecture + Full GitOps)
 

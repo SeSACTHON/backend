@@ -106,9 +106,10 @@ Infrastructure & Applications (AWS, Kubernetes)
   - Auth API
   - Scan API
   - Chat API
-  - Community API
-  - User API
-  - Reward API
+  - Mypage API
+  - Location API
+  - Info API
+  - Character API
 - ✅ Database Deployments:
   - PostgreSQL
   - Redis
@@ -848,7 +849,7 @@ SeSACTHON/backend/
 
 ---
 
-**문서 버전**: v0.7.0  
-**최종 업데이트**: 2025-11-11  
-**아키텍처**: 14-Node Microservices with Full GitOps (Terraform + Ansible + Helm + ArgoCD)
+**작성일**: 2025-11-11  
+**버전**: v0.7.0  
+**아키텍처**: 14-Node Microservices with Full GitOps
 
