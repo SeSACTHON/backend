@@ -392,7 +392,7 @@ Infrastructure (4):
   - monitoring: Prometheus + Grafana
 ```
 
-### 3. 고급 네트워킹
+### 3. 쿠버네티스 클러스터 네트워킹
 
 ```yaml
 CNI: Calico (Network Policy)
