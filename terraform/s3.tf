@@ -28,6 +28,10 @@ resource "aws_s3_bucket_lifecycle_configuration" "images" {
     id     = "cleanup-old-images"
     status = "Enabled"
 
+    filter {
+      prefix = ""  # 모든 객체에 적용
+    }
+
     transition {
       days          = 30
       storage_class = "STANDARD_IA"  # Infrequent Access
@@ -112,7 +116,7 @@ resource "aws_iam_policy" "s3_presigned_url" {
 
 # IAM Role에 S3 Policy 추가 (EC2 Instance Profile)
 resource "aws_iam_role_policy_attachment" "s3_backend" {
-  role       = aws_iam_role.ec2_ssm_role.name
+  role       = aws_iam_role.k8s_node.name
   policy_arn = aws_iam_policy.s3_presigned_url.arn
 }
 

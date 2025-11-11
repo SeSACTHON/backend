@@ -9,16 +9,16 @@
 
 ### 1. ArgoCD Application (통합 배포)
 
-#### argocd/applications/growbin-backend.yaml
+#### argocd/applications/ecoeco-backend.yaml
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: growbin-backend
+  name: ecoeco-backend
 spec:
   source:
     repoURL: https://github.com/SeSACTHON/backend.git
-    path: charts/growbin-backend
+    path: charts/ecoeco-backend
     helm:
       valueFiles:
         - values-13nodes.yaml
@@ -41,7 +41,7 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: growbin-api-services
+  name: ecoeco-api-services
 spec:
   generators:
     - list:
@@ -55,12 +55,12 @@ spec:
 ```
 
 **생성되는 Application**: 6개
-- `growbin-api-waste`
-- `growbin-api-auth`
-- `growbin-api-userinfo`
-- `growbin-api-location`
-- `growbin-api-recycle-info`
-- `growbin-api-chat-llm`
+- `ecoeco-api-waste`
+- `ecoeco-api-auth`
+- `ecoeco-api-userinfo`
+- `ecoeco-api-location`
+- `ecoeco-api-recycle-info`
+- `ecoeco-api-chat-llm`
 
 ### 3. Worker Services ApplicationSet
 
@@ -69,7 +69,7 @@ spec:
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
-  name: growbin-worker-services
+  name: ecoeco-worker-services
 spec:
   generators:
     - list:
@@ -81,8 +81,8 @@ spec:
 ```
 
 **생성되는 Application**: 2개
-- `growbin-worker-storage`
-- `growbin-worker-ai`
+- `ecoeco-worker-storage`
+- `ecoeco-worker-ai`
 
 ### 4. README 문서
 
@@ -108,9 +108,9 @@ graph LR
 
 ## 📊 배포 전략 비교
 
-### 방법 1: 통합 배포 (growbin-backend.yaml)
+### 방법 1: 통합 배포 (ecoeco-backend.yaml)
 ```bash
-kubectl apply -f argocd/applications/growbin-backend.yaml
+kubectl apply -f argocd/applications/ecoeco-backend.yaml
 ```
 
 **장점**:
@@ -132,7 +132,7 @@ kubectl apply -f argocd/applications/worker-services-appset.yaml
 ## ✅ 테스트 체크리스트
 
 - [ ] ArgoCD 설치 확인
-- [ ] Application 적용: `kubectl apply -f argocd/applications/growbin-backend.yaml`
+- [ ] Application 적용: `kubectl apply -f argocd/applications/ecoeco-backend.yaml`
 - [ ] ArgoCD UI 접속: `kubectl port-forward svc/argocd-server -n argocd 8080:443`
 - [ ] Sync 상태 확인: `kubectl get application -n argocd`
 - [ ] Pod 생성 확인: `kubectl get pods -A`

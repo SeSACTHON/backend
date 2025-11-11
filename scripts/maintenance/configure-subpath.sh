@@ -49,7 +49,7 @@ kubectl get configmap prometheus-grafana -n monitoring -o yaml > /tmp/grafana-cm
 # Grafana.ini 수정 (완전한 설정)
 kubectl patch configmap prometheus-grafana -n monitoring --type merge -p '{
   "data": {
-    "grafana.ini": "[analytics]\ncheck_for_updates = true\n[grafana_net]\nurl = https://grafana.net\n[log]\nmode = console\n[paths]\ndata = /var/lib/grafana/\nlogs = /var/log/grafana\nplugins = /var/lib/grafana/plugins\nprovisioning = /etc/grafana/provisioning\n[server]\ndomain = growbin.app\nroot_url = https://growbin.app/grafana\nserve_from_sub_path = true\n"
+    "grafana.ini": "[analytics]\ncheck_for_updates = true\n[grafana_net]\nurl = https://grafana.net\n[log]\nmode = console\n[paths]\ndata = /var/lib/grafana/\nlogs = /var/log/grafana\nplugins = /var/lib/grafana/plugins\nprovisioning = /etc/grafana/provisioning\n[server]\ndomain = ecoeco.app\nroot_url = https://ecoeco.app/grafana\nserve_from_sub_path = true\n"
   }
 }'
 
@@ -124,8 +124,8 @@ echo "✅ 설정 완료!"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 echo "2-3분 후 접속 테스트:"
-echo "  https://growbin.app/argocd"
-echo "  https://growbin.app/grafana"
+echo "  https://ecoeco.app/argocd"
+echo "  https://ecoeco.app/grafana"
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "🔑 로그인 정보"

@@ -9,16 +9,16 @@
 
 ### 1. Chart 정의
 
-#### charts/growbin-backend/Chart.yaml
+#### charts/ecoeco-backend/Chart.yaml
 ```yaml
-name: growbin-backend
+name: ecoeco-backend
 version: 1.0.0
 description: 13-Node Microservices Architecture
 ```
 
 ### 2. Values 파일
 
-#### charts/growbin-backend/values-13nodes.yaml
+#### charts/ecoeco-backend/values-13nodes.yaml
 
 **API Services (6개)**:
 ```yaml
@@ -55,7 +55,7 @@ worker:
 ingress:
   enabled: true
   className: alb
-  host: api.growbin.app
+  host: api.ecoeco.app
   paths:
     - path: /api/v1/waste
       backend: waste-api
@@ -64,7 +64,7 @@ ingress:
 
 ### 3. API Deployment 템플릿
 
-#### charts/growbin-backend/templates/api/deployment.yaml
+#### charts/ecoeco-backend/templates/api/deployment.yaml
 ```yaml
 {{- range $name, $config := .Values.api }}
 apiVersion: apps/v1
@@ -95,7 +95,7 @@ spec:
 
 ### 4. Worker Deployment 템플릿
 
-#### charts/growbin-backend/templates/worker/deployment.yaml
+#### charts/ecoeco-backend/templates/worker/deployment.yaml
 ```yaml
 {{- range $name, $config := .Values.worker }}
 apiVersion: apps/v1
@@ -111,7 +111,7 @@ spec:
               value: {{ $config.concurrency | quote }}
           volumeMounts:
             - name: wal-storage
-              mountPath: /var/lib/growbin
+              mountPath: /var/lib/ecoeco
       volumes:
         - name: wal-storage
           emptyDir: {}
@@ -120,19 +120,19 @@ spec:
 
 **특징**:
 - Celery Pool Type 환경변수
-- WAL Volume Mount (`/var/lib/growbin`)
+- WAL Volume Mount (`/var/lib/ecoeco`)
 - Celery health check (inspect ping/active)
 
 ### 5. Ingress 템플릿
 
-#### charts/growbin-backend/templates/ingress.yaml
+#### charts/ecoeco-backend/templates/ingress.yaml
 ```yaml
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 spec:
   ingressClassName: alb
   rules:
-    - host: api.growbin.app
+    - host: api.ecoeco.app
       http:
         paths:
         {{- range .Values.ingress.paths }}
@@ -147,7 +147,7 @@ spec:
 ## 📁 Helm Chart 구조
 
 ```
-charts/growbin-backend/
+charts/ecoeco-backend/
 ├── Chart.yaml
 ├── values-13nodes.yaml
 └── templates/
@@ -162,25 +162,25 @@ charts/growbin-backend/
 
 ### 설치
 ```bash
-helm install growbin-backend charts/growbin-backend \
-  -f charts/growbin-backend/values-13nodes.yaml
+helm install ecoeco-backend charts/ecoeco-backend \
+  -f charts/ecoeco-backend/values-13nodes.yaml
 ```
 
 ### 업그레이드
 ```bash
-helm upgrade growbin-backend charts/growbin-backend \
-  -f charts/growbin-backend/values-13nodes.yaml
+helm upgrade ecoeco-backend charts/ecoeco-backend \
+  -f charts/ecoeco-backend/values-13nodes.yaml
 ```
 
 ### 템플릿 확인
 ```bash
-helm template growbin-backend charts/growbin-backend \
-  -f charts/growbin-backend/values-13nodes.yaml
+helm template ecoeco-backend charts/ecoeco-backend \
+  -f charts/ecoeco-backend/values-13nodes.yaml
 ```
 
 ## ✅ 테스트 체크리스트
 
-- [ ] `helm lint charts/growbin-backend`
+- [ ] `helm lint charts/ecoeco-backend`
 - [ ] `helm template` 출력 확인
 - [ ] API Deployment 6개 생성 확인
 - [ ] Worker Deployment 2개 생성 확인
