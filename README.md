@@ -555,14 +555,8 @@ Documentation:
 
 - **Infrastructure**: Kubernetes, Terraform, Ansible, GitOps
 - **Backend**: FastAPI, PostgreSQL, Redis, RabbitMQ
-- **Frontend**: React Native
-- **AI**: TensorFlow, Computer Vision
-
----
-
-## 📝 라이센스
-
-이 프로젝트는 교육 목적으로 제작되었습니다.
+- **Frontend**: React, PWA
+- **AI**: GPT-5, GPT-4o-mini
 
 ---
 
@@ -577,6 +571,6 @@ Documentation:
 ---
 
 **Last Updated**: 2025-11-11  
-**Version**: 14-Node Production Architecture + Full GitOps  
+**Version**: v0.7.0 (14-Node Production Architecture + Full GitOps)
 **Status**: ✅ Atlantis & ArgoCD Running
 
