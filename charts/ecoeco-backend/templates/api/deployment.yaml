@@ -38,7 +38,11 @@ spec:
       {{- end }}
       containers:
         - name: {{ $fullName }}
+          {{- if and $config.image $config.image.repository $config.image.tag }}
           image: "{{ $config.image.repository }}:{{ $config.image.tag }}"
+          {{- else }}
+          {{- fail (printf "ERROR: API '%s' is missing image.repository or image.tag. Config: %v" $name $config) }}
+          {{- end }}
           imagePullPolicy: {{ $.Values.global.image.pullPolicy }}
           ports:
             - name: http
