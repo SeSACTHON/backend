@@ -1,47 +1,52 @@
-# 📚 Monitoring & Troubleshooting 문서 전체 추가
+# 🔧 스크립트 및 유틸리티 전체 업데이트
 
 ## 🎯 PR 목적
 
-운영 중 발생한 모든 트러블슈팅 케이스와 아키텍처 설계 문서를 체계적으로 정리하여 팀원 온보딩 및 장애 대응 시간을 단축합니다.
-## 📝 주요 변경사항
-
+14-Node 클러스터 배포/관리/테스트를 위한 모든 스크립트를 업데이트하고, 운영 편의성을 높이는 유틸리티를 추가합니다.
 ### Troubleshooting 문서 (14개)
 인프라, Ansible, Monitoring, ArgoCD, Atlantis, Database 관련 실전 트러블슈팅
 
-### Architecture 문서 (7개)
-Redis, WAL+MQ, Streaming vs Batch 등 설계 문서
+### Cluster 관리 스크립트 (3개)
+- `deploy.sh`: 14-Node 자동 배포
+- `destroy.sh`: 클러스터 정리
+- `push-ssh-keys.sh`: SSH 키 배포
 
-### TROUBLESHOOTING.md 업데이트
-14개 트러블슈팅 문서 인덱스 및 카테고리별 분류
+### Utilities 스크립트 (8개)
+- `ssh-master.sh`: 노드 SSH 접속
+- `create-atlantis-secret.sh`: Atlantis Secret
+- `create-argocd-ssh-secret.sh`: ArgoCD SSH
+- `fix-atlantis-config.sh`: Atlantis 설정 수정
+- 기타 4개
 
-## 📊 문서 구조
+### Testing 스크립트 (3개)
+- `verify-cluster.sh`: 클러스터 검증
+- `verify-gitops.sh`: GitOps 검증
+- `test-github-actions.sh`: GitHub Actions 테스트
 
+### Kubernetes 리소스
+- `k8s/ingress/`: Ingress Controller
+- `k8s/atlantis/`: Atlantis 배포
+
+### 문서
+- `V0.7.0_COMPLETION_GUIDE.md`
+
+## 🚀 사용법
+
+```bash
+# 배포
+./scripts/cluster/deploy.sh
+
+# 정리
+./scripts/cluster/destroy.sh
+
+# 노드 접속
+./scripts/utilities/ssh-master.sh auth
 ```
-docs/
-├── troubleshooting/ (14개)
-│   ├── ALB_PROVIDER_ID.md
-│   ├── ANSIBLE_SSH_TIMEOUT.md
-│   ├── ARGOCD_*.md (2개)
-│   ├── ATLANTIS_*.md (4개)
-│   └── ...
-│
-├── architecture/ (7개)
-│   ├── redis-*.md (2개)
-│   ├── wal-*.md (3개)
-│   └── chat-streaming-*.md (2개)
-│
-└── TROUBLESHOOTING.md
-```
-
-## 🎯 활용 방법
-
-1. **문제 발생 시**: TROUBLESHOOTING.md에서 키워드 검색
-2. **설계 검토 시**: architecture/ 문서 참조
-3. **신규 팀원**: 주요 케이스 3-5개 읽기
 
 ## ✅ 체크리스트
-- [x] Troubleshooting 14개
-- [x] Architecture 7개
-- [x] 인덱스 완료
+- [x] 스크립트 15개
+- [x] K8s 리소스
+- [x] 문서 추가
 
 ---
+자세한 내용은 커밋 메시지를 참조하세요.
