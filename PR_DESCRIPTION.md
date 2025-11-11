@@ -351,4 +351,3 @@ gh run list --workflow=infrastructure.yml
    - Quick Start 가이드가 도움이 되는가?
 
 이 PR이 머지되면 **완전한 GitOps 환경**이 구축됩니다! 🎉
-
