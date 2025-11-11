@@ -1,0 +1,291 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: atlantis
+  labels:
+    name: atlantis
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Atlantis Secrets
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: v1
+kind: Secret
+metadata:
+  name: atlantis-secrets
+  namespace: atlantis
+type: Opaque
+stringData:
+  # GitHub Personal Access Token (repo, admin:repo_hook 권한 필요)
+  github-token: "REPLACE_WITH_YOUR_GITHUB_TOKEN"
+  
+  # GitHub Webhook Secret (랜덤 문자열 생성: openssl rand -hex 20)
+  github-webhook-secret: "REPLACE_WITH_YOUR_WEBHOOK_SECRET"
+  
+  # AWS Credentials
+  aws-access-key-id: "REPLACE_WITH_YOUR_AWS_ACCESS_KEY_ID"
+  aws-secret-access-key: "REPLACE_WITH_YOUR_AWS_SECRET_ACCESS_KEY"
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Atlantis ConfigMap
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: atlantis-config
+  namespace: atlantis
+data:
+  AWS_REGION: "ap-northeast-2"
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Atlantis StatefulSet (데이터 영속성 필요)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: atlantis
+  namespace: atlantis
+  labels:
+    app: atlantis
+spec:
+  serviceName: atlantis
+  replicas: 1  # Atlantis는 단일 인스턴스 권장 (Lock 관리)
+  
+  selector:
+    matchLabels:
+      app: atlantis
+  
+  template:
+    metadata:
+      labels:
+        app: atlantis
+        tier: infrastructure
+        component: gitops
+    spec:
+      serviceAccountName: atlantis
+      
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      # SecurityContext (PersistentVolume 권한 문제 해결)
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsGroup: 1000
+      
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      # 14-Node 아키텍처: Monitoring 노드에 배포 (정확한 노드 지정)
+      # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+            - matchExpressions:
+              - key: kubernetes.io/hostname
+                operator: In
+                values:
+                - k8s-monitoring
+      
+      tolerations:
+        - key: node-role.kubernetes.io/infrastructure
+          operator: Equal
+          value: "true"
+          effect: NoSchedule
+      
+      containers:
+        - name: atlantis
+          image: ghcr.io/runatlantis/atlantis:v0.27.0
+          
+          # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          # Atlantis 실행 인자
+          # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          command: ["atlantis"]
+          args:
+            - server
+            - --atlantis-url=https://atlantis.growbin.app  # 외부 접속 URL (HTTPS)
+            - --repo-allowlist=github.com/SeSACTHON/*        # 허용할 Repository
+            - --gh-user=SeSACTHON                             # GitHub Organization
+            - --hide-prev-plan-comments                       # 이전 Plan 코멘트 숨김
+            - --port=4141                                     # 포트 명시적 설정 (권한 문제 해결)
+          
+          # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          # 환경 변수
+          # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          env:
+            # GitHub Token
+            - name: ATLANTIS_GH_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: atlantis-secrets
+                  key: github-token
+            
+            # GitHub Webhook Secret
+            - name: ATLANTIS_GH_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: atlantis-secrets
+                  key: github-webhook-secret
+            
+            # AWS Credentials
+            - name: AWS_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: atlantis-secrets
+                  key: aws-access-key-id
+            
+            - name: AWS_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: atlantis-secrets
+                  key: aws-secret-access-key
+            
+            - name: AWS_REGION
+              valueFrom:
+                configMapKeyRef:
+                  name: atlantis-config
+                  key: AWS_REGION
+            
+            # Atlantis 설정
+            - name: ATLANTIS_DATA_DIR
+              value: /atlantis-data
+            
+            - name: ATLANTIS_REPO_CONFIG_JSON
+              value: |
+                {
+                  "repos": [
+                    {
+                      "id": "github.com/SeSACTHON/backend",
+                      "apply_requirements": ["approved"],
+                      "allowed_overrides": ["workflow"],
+                      "allow_custom_workflows": true,
+                      "workflow": "infrastructure-workflow"
+                    }
+                  ]
+                }
+          
+          # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          # 포트
+          # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          ports:
+            - name: http
+              containerPort: 4141
+              protocol: TCP
+          
+          # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          # Health Check
+          # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 4141
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+          
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 4141
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+          
+          # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          # 리소스
+          # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "250m"
+            limits:
+              memory: "2Gi"
+              cpu: "1000m"
+          
+          # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          # 볼륨 마운트
+          # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+          volumeMounts:
+            - name: atlantis-data
+              mountPath: /atlantis-data
+  
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  # PersistentVolumeClaim
+  # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  volumeClaimTemplates:
+    - metadata:
+        name: atlantis-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: gp3  # AWS EBS gp3 (또는 클러스터 기본값)
+        resources:
+          requests:
+            storage: 20Gi
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Atlantis Service
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: v1
+kind: Service
+metadata:
+  name: atlantis
+  namespace: atlantis
+  labels:
+    app: atlantis
+spec:
+  type: NodePort  # ALB Ingress 사용 시 NodePort 필요 (target-type: instance)
+  selector:
+    app: atlantis
+  ports:
+    - name: http
+      port: 80
+      targetPort: 4141
+      protocol: TCP
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Atlantis ServiceAccount (Terraform State 접근 권한)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: atlantis
+  namespace: atlantis
+  annotations:
+    # IRSA (IAM Role for Service Account) - 선택사항
+    # eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT_ID:role/atlantis-role
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Atlantis Ingress (선택사항 - ALB Controller 사용 시)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Atlantis Ingress는 k8s/ingress/14-nodes-ingress.yaml에 통합됨
+# 이 파일은 참고용으로 남겨둠 (실제로는 14-nodes-ingress.yaml 사용)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: atlantis
+#   namespace: atlantis
+#   annotations:
+#     alb.ingress.kubernetes.io/scheme: internet-facing
+#     alb.ingress.kubernetes.io/target-type: instance  # Calico CNI 사용 시 instance 필수
+#     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+#     alb.ingress.kubernetes.io/ssl-redirect: '443'
+#     alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:ACCOUNT_ID:certificate/CERT_ID
+#     alb.ingress.kubernetes.io/group.name: ecoeco-main
+#     alb.ingress.kubernetes.io/group.order: '20'
+#     alb.ingress.kubernetes.io/backend-protocol: HTTP
+#     alb.ingress.kubernetes.io/healthcheck-path: /healthz
+#     alb.ingress.kubernetes.io/backend-protocol-timeout: '300'  # 5분 (GitHub Webhook)
+# spec:
+#   ingressClassName: alb
+#   rules:
+#     - host: atlantis.growbin.app
+#       http:
+#         paths:
+#           - path: /
+#             pathType: Prefix
+#             backend:
+#               service:
+#                 name: atlantis
+#                 port:
+#                   number: 80
+

@@ -1,0 +1,122 @@
+# Atlantis 설치 (Terraform GitOps)
+# 14-Node Architecture: Monitoring 노드에 배포
+---
+- name: "Atlantis namespace 생성"
+  shell: |
+    kubectl create namespace atlantis --dry-run=client -o yaml | kubectl apply -f -
+  register: atlantis_namespace
+  changed_when: "'created' in atlantis_namespace.stdout"
+
+- name: "Atlantis Secret 확인"
+  shell: |
+    kubectl get secret atlantis-secrets -n atlantis 2>/dev/null || echo "NOT_FOUND"
+  register: atlantis_secret_check
+  changed_when: false
+
+- name: "Atlantis Secret 생성 안내 (수동 생성 필요)"
+  debug:
+    msg:
+      - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - "⚠️  Atlantis Secret을 수동으로 생성해야 합니다"
+      - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - ""
+      - "필요한 Secret:"
+      - "  1. github-token: GitHub Personal Access Token"
+      - "     - 권한: repo, admin:repo_hook"
+      - "     - 생성: GitHub Settings → Developer settings → Personal access tokens"
+      - ""
+      - "  2. github-webhook-secret: Webhook Secret (랜덤 문자열)"
+      - "     - 생성: openssl rand -hex 20"
+      - ""
+      - "  3. aws-access-key-id: AWS Access Key ID"
+      - "  4. aws-secret-access-key: AWS Secret Access Key"
+      - ""
+      - "Secret 생성 명령어:"
+      - "  kubectl create secret generic atlantis-secrets -n atlantis \\"
+      - "    --from-literal=github-token='YOUR_GITHUB_TOKEN' \\"
+      - "    --from-literal=github-webhook-secret='YOUR_WEBHOOK_SECRET' \\"
+      - "    --from-literal=aws-access-key-id='YOUR_AWS_ACCESS_KEY_ID' \\"
+      - "    --from-literal=aws-secret-access-key='YOUR_AWS_SECRET_ACCESS_KEY'"
+      - ""
+      - "또는 파일에서 생성:"
+      - "  kubectl create secret generic atlantis-secrets -n atlantis \\"
+      - "    --from-file=github-token=/path/to/github-token.txt \\"
+      - "    --from-file=github-webhook-secret=/path/to/webhook-secret.txt \\"
+      - "    --from-file=aws-access-key-id=/path/to/aws-access-key-id.txt \\"
+      - "    --from-file=aws-secret-access-key=/path/to/aws-secret-access-key.txt"
+  when: atlantis_secret_check.stdout == "NOT_FOUND"
+
+- name: "Atlantis ConfigMap 생성"
+  shell: |
+    kubectl create configmap atlantis-config -n atlantis \
+      --from-literal=AWS_REGION=ap-northeast-2 \
+      --dry-run=client -o yaml | kubectl apply -f -
+  register: atlantis_configmap
+
+- name: "Atlantis Deployment 적용"
+  shell: |
+    kubectl apply -f {{ playbook_dir }}/../../k8s/atlantis/atlantis-deployment.yaml
+  register: atlantis_deployment
+  when: atlantis_secret_check.stdout != "NOT_FOUND"
+
+- name: "Atlantis Pod Ready 대기"
+  shell: |
+    kubectl wait --for=condition=ready pod -l app=atlantis -n atlantis --timeout=300s
+  when: atlantis_deployment is defined and atlantis_deployment.changed
+
+- name: "Atlantis Service를 NodePort로 변경 (ALB target-type: instance 필수)"
+  shell: |
+    kubectl patch svc atlantis -n atlantis -p '{"spec":{"type":"NodePort"}}'
+  register: atlantis_service_patch
+  changed_when: "'patched' in atlantis_service_patch.stdout or 'unchanged' in atlantis_service_patch.stdout"
+  when: atlantis_deployment is defined and atlantis_deployment.changed
+
+- name: "Atlantis Service 확인"
+  shell: |
+    kubectl get svc atlantis -n atlantis
+  register: atlantis_service
+  changed_when: false
+
+- name: "Atlantis Ingress 확인 (14-nodes-ingress.yaml에 포함됨)"
+  shell: |
+    kubectl get ingress atlantis-ingress -n atlantis 2>/dev/null || echo "Ingress 없음 (07-ingress-resources.yml에서 생성 예정)"
+  register: atlantis_ingress_check
+  changed_when: false
+
+- name: "Atlantis 정보 출력"
+  debug:
+    msg:
+      - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - "✅ Atlantis 배포 완료"
+      - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - ""
+      - "📍 배포 위치:"
+      - "  - Namespace: atlantis"
+      - "  - Node: k8s-monitoring (정확한 노드 지정: nodeAffinity)"
+      - "  - Pod: atlantis-0"
+      - ""
+      - "🌐 접속 정보:"
+      - "  - URL: https://atlantis.growbin.app"
+      - "  - Health Check: https://atlantis.growbin.app/healthz"
+      - ""
+      - "📋 다음 단계:"
+      - "  1. GitHub Webhook 설정:"
+      - "     - Repository Settings → Webhooks → Add webhook"
+      - "     - Payload URL: https://atlantis.growbin.app/events"
+      - "     - Content type: application/json"
+      - "     - SSL verification: ✅ Enable SSL verification"
+      - "     - Secret: (위에서 생성한 github-webhook-secret)"
+      - "     - Events: Pull requests, Pushes"
+      - ""
+      - "  2. 테스트 PR 생성:"
+      - "     - terraform/ 디렉토리 수정"
+      - "     - PR 생성 → 자동으로 'atlantis plan' 실행"
+      - "     - PR 코멘트에 'atlantis apply' 입력 → Apply 실행"
+      - ""
+      - "  3. Ingress 확인:"
+      - "     - 14-nodes-ingress.yaml에 포함됨 (07-ingress-resources.yml에서 자동 생성)"
+      - "     - kubectl get ingress -n atlantis"
+      - ""
+      - "{{ atlantis_service.stdout_lines }}"
+  when: atlantis_deployment is defined and atlantis_deployment.changed
+
