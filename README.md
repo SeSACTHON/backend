@@ -1,4 +1,4 @@
-# 이코에코(Eco²) Backend: API & Infrastructure
+# ♻️이코에코(Eco²) Backend: API & Infrastructure
 ![E40B8A37-71A7-4B98-9BD8-6A60741D99DE_4_5005_c](https://github.com/user-attachments/assets/85067a31-500f-4afa-9909-1db6baded385)
 
 > **Self-Managed Kubernetes 기반 마이크로서비스 플랫폼**  
@@ -572,5 +572,4 @@ Documentation:
 
 **Last Updated**: 2025-11-11  
 **Version**: v0.7.0 (14-Node Production Architecture + Full GitOps)
-**Status**: ✅ Atlantis & ArgoCD Running
 
