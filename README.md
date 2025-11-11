@@ -61,6 +61,56 @@ Worker 서비스: 2개 (storage, ai)
 - **Message Queue**: Celery (비동기 작업), RabbitMQ (메시지 브로커)
 - **Monitoring**: Prometheus, Grafana, Atlantis (GitOps)
 
+### 클러스터 구성 (14-Node)
+
+```mermaid
+graph TB
+    subgraph "14-Node Production Architecture"
+        subgraph "Master Nodes (1)"
+            M[k8s-master<br/>t3.large<br/>2 vCPU, 8GB]
+        end
+        
+        subgraph "API Nodes (7)"
+            A1[auth<br/>t3.micro<br/>2 vCPU, 1GB]
+            A2[my<br/>t3.micro<br/>2 vCPU, 1GB]
+            A3[scan<br/>t3.small<br/>2 vCPU, 2GB]
+            A4[character<br/>t3.micro<br/>2 vCPU, 1GB]
+            A5[location<br/>t3.micro<br/>2 vCPU, 1GB]
+            A6[info<br/>t3.micro<br/>2 vCPU, 1GB]
+            A7[chat<br/>t3.small<br/>2 vCPU, 2GB]
+        end
+        
+        subgraph "Worker Nodes (2)"
+            W1[storage<br/>t3.small<br/>2 vCPU, 2GB]
+            W2[ai<br/>t3.small<br/>2 vCPU, 2GB]
+        end
+        
+        subgraph "Infra Nodes (4)"
+            I1[postgresql<br/>t3.small<br/>2 vCPU, 2GB]
+            I2[redis<br/>t3.micro<br/>2 vCPU, 1GB]
+            I3[rabbitmq<br/>t3.small<br/>2 vCPU, 2GB]
+            I4[monitoring<br/>t3.small<br/>2 vCPU, 2GB]
+        end
+    end
+    
+    Total["📊 Total: 14 nodes, 30 vCPU, 22GB RAM"]
+    
+    style M fill:#b91c1c,color:#fff
+    style A1 fill:#0e7490,color:#fff
+    style A2 fill:#0e7490,color:#fff
+    style A3 fill:#0e7490,color:#fff
+    style A4 fill:#0e7490,color:#fff
+    style A5 fill:#0e7490,color:#fff
+    style A6 fill:#0e7490,color:#fff
+    style A7 fill:#0e7490,color:#fff
+    style W1 fill:#166534,color:#fff
+    style W2 fill:#166534,color:#fff
+    style I1 fill:#991b1b,color:#fff
+    style I2 fill:#991b1b,color:#fff
+    style I3 fill:#991b1b,color:#fff
+    style I4 fill:#991b1b,color:#fff
+    style Total fill:#a16207,color:#fff
+```
 ### 네트워크 구조
 
 ```mermaid
@@ -72,13 +122,13 @@ graph TD
     E --> F[⚙️ Worker Pods<br/>Internal]
     F --> G[💾 PostgreSQL / Redis / RabbitMQ]
     
-    style A fill:#e1f5ff
-    style B fill:#b3e5fc
-    style C fill:#81d4fa
-    style D fill:#4fc3f7
-    style E fill:#29b6f6
-    style F fill:#039be5
-    style G fill:#0277bd,color:#fff
+    style A fill:#1e3a8a,color:#fff
+    style B fill:#0e7490,color:#fff
+    style C fill:#0891b2,color:#fff
+    style D fill:#0284c7,color:#fff
+    style E fill:#0369a1,color:#fff
+    style F fill:#075985,color:#fff
+    style G fill:#0c4a6e,color:#fff
 ```
 
 → 자세한 내용: [docs/architecture/05-final-k8s-architecture.md](docs/architecture/05-final-k8s-architecture.md)
@@ -212,21 +262,21 @@ graph TB
         L0C["📁 terraform/*.tf"]
     end
     
-    style Layer3 fill:#e1f5fe
-    style Layer2 fill:#b3e5fc
-    style Layer1 fill:#81d4fa
-    style Layer0 fill:#4fc3f7
-    style L3A fill:#fff
-    style L3B fill:#fff
-    style L2A fill:#fff
-    style L2B fill:#fff
-    style L2C fill:#fff
-    style L1A fill:#fff
-    style L1B fill:#fff
-    style L1C fill:#fff
-    style L0A fill:#fff
-    style L0B fill:#fff
-    style L0C fill:#fff
+    style Layer3 fill:#1e3a8a,color:#fff
+    style Layer2 fill:#0e7490,color:#fff
+    style Layer1 fill:#166534,color:#fff
+    style Layer0 fill:#78350f,color:#fff
+    style L3A fill:#334155,color:#fff
+    style L3B fill:#334155,color:#fff
+    style L2A fill:#334155,color:#fff
+    style L2B fill:#334155,color:#fff
+    style L2C fill:#334155,color:#fff
+    style L1A fill:#334155,color:#fff
+    style L1B fill:#334155,color:#fff
+    style L1C fill:#334155,color:#fff
+    style L0A fill:#334155,color:#fff
+    style L0B fill:#334155,color:#fff
+    style L0C fill:#334155,color:#fff
 ```
 
 ### 도구별 역할 구분
@@ -336,10 +386,10 @@ graph LR
     S --> S1[auth/]
     S --> S2[scan/]
     
-    style T fill:#ff6b6b
-    style A fill:#4ecdc4
-    style K fill:#95e1d3
-    style S fill:#f38181
+    style T fill:#b91c1c,color:#fff
+    style A fill:#0e7490,color:#fff
+    style K fill:#166534,color:#fff
+    style S fill:#991b1b,color:#fff
 ```
 
 ### 상세 문서
