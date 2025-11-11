@@ -84,6 +84,10 @@ api:
         value: "auth-api"
       - name: REDIS_HOST
         value: "redis.db.svc.cluster.local"
+      - name: GITOPS_TEST_VERSION
+        value: "v0.7.0-test-2025-11-11"
+      - name: GITOPS_TEST_MESSAGE
+        value: "Testing ArgoCD Auto-Sync from develop branch"
     
     livenessProbe:
       httpGet:

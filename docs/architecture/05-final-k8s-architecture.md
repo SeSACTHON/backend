@@ -503,8 +503,7 @@ sequenceDiagram
             App->>Scan: GET /scan/status/{job_id}
             Scan->>Redis: 진행률 조회
             Redis-->>App: progress: 60%
-    end
-    
+    end    
         App->>Scan: GET /scan/status/{job_id}
         Scan->>Redis: 최종 결과 조회
         Redis-->>App: 분석 완료!
