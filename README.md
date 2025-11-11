@@ -1,4 +1,4 @@
-# SeSACTHON Backend Infrastructure
+# 이코에코(Eco²) Backend: API & Infrastructure
 
 > **Self-Managed Kubernetes 기반 마이크로서비스 플랫폼**  
 > AI 분석 기반 쓰레기 분류 애플리케이션의 백엔드 인프라
@@ -59,57 +59,6 @@ Worker 서비스: 2개 (storage, ai)
 - **Storage**: Redis (JWT Blacklist, Cache), PostgreSQL (Main DB)
 - **Message Queue**: Celery (비동기 작업), RabbitMQ (메시지 브로커)
 - **Monitoring**: Prometheus, Grafana, Atlantis (GitOps)
-
-### 클러스터 구성 (14-Node)
-
-```mermaid
-graph TB
-    subgraph "14-Node Production Architecture"
-        subgraph "Master Nodes (1)"
-            M[k8s-master<br/>t3.large<br/>2 vCPU, 8GB]
-        end
-        
-        subgraph "API Nodes (7)"
-            A1[auth<br/>t3.micro<br/>2 vCPU, 1GB]
-            A2[my<br/>t3.micro<br/>2 vCPU, 1GB]
-            A3[scan<br/>t3.small<br/>2 vCPU, 2GB]
-            A4[character<br/>t3.micro<br/>2 vCPU, 1GB]
-            A5[location<br/>t3.micro<br/>2 vCPU, 1GB]
-            A6[info<br/>t3.micro<br/>2 vCPU, 1GB]
-            A7[chat<br/>t3.small<br/>2 vCPU, 2GB]
-        end
-        
-        subgraph "Worker Nodes (2)"
-            W1[storage<br/>t3.small<br/>2 vCPU, 2GB]
-            W2[ai<br/>t3.small<br/>2 vCPU, 2GB]
-        end
-        
-        subgraph "Infra Nodes (4)"
-            I1[postgresql<br/>t3.small<br/>2 vCPU, 2GB]
-            I2[redis<br/>t3.micro<br/>2 vCPU, 1GB]
-            I3[rabbitmq<br/>t3.small<br/>2 vCPU, 2GB]
-            I4[monitoring<br/>t3.small<br/>2 vCPU, 2GB]
-        end
-    end
-    
-    Total["📊 Total: 14 nodes, 30 vCPU, 22GB RAM"]
-    
-    style M fill:#ff6b6b
-    style A1 fill:#4ecdc4
-    style A2 fill:#4ecdc4
-    style A3 fill:#4ecdc4
-    style A4 fill:#4ecdc4
-    style A5 fill:#4ecdc4
-    style A6 fill:#4ecdc4
-    style A7 fill:#4ecdc4
-    style W1 fill:#95e1d3
-    style W2 fill:#95e1d3
-    style I1 fill:#f38181
-    style I2 fill:#f38181
-    style I3 fill:#f38181
-    style I4 fill:#f38181
-    style Total fill:#ffd93d
-```
 
 ### 네트워크 구조
 
