@@ -11,7 +11,6 @@ on:
     paths:
       - 'terraform/**'
       - 'ansible/**'
-      - '.github/workflows/infrastructure.yml'
   
   pull_request:
     branches:
@@ -164,10 +163,6 @@ jobs:
     if: |
       (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')) ||
       (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
-    
-    outputs:
-      terraform_outputs: ${{ steps.outputs.outputs }}
-      ansible_inventory: ${{ steps.outputs.inventory }}
     
     steps:
       - name: 📥 Checkout Code

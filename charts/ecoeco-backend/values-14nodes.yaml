@@ -33,6 +33,10 @@ externalServices:
     port: 5672
     managementPort: 15672
 
+  s3:
+    bucket: sesacthon-images
+    region: ap-northeast-2
+
 #############################################
 # API Services (7개 도메인별 전용 노드)
 #############################################
@@ -59,7 +63,7 @@ api:
   
   # 1. Auth API (인증/인가 - JWT Blacklist)
   auth:
-    enabled: true
+    enabled: false  # ApplicationSet에서 활성화
     replicas: 2
     port: 8000
     path: /api/v1/auth
@@ -67,6 +71,10 @@ api:
     image:
       repository: ghcr.io/sesacthon/auth
       tag: latest  # auto
+    
+    service:
+      type: ClusterIP
+      port: 8000
     
     nodeSelector:
       domain: auth
@@ -105,7 +113,7 @@ api:
   
   # 2. My API (마이페이지)
   my:
-    enabled: true
+    enabled: false  # ApplicationSet에서 활성화
     replicas: 2
     port: 8000
     path: /api/v1/my
@@ -113,6 +121,10 @@ api:
     image:
       repository: ghcr.io/sesacthon/my
       tag: latest  # auto
+    
+    service:
+      type: ClusterIP
+      port: 8000
     
     nodeSelector:
       domain: my
@@ -131,7 +143,7 @@ api:
   
   # 3. Scan API (쓰레기 분류 - 고트래픽)
   scan:
-    enabled: true
+    enabled: false  # ApplicationSet에서 활성화
     replicas: 3
     port: 8000
     path: /api/v1/scan
@@ -139,6 +151,10 @@ api:
     image:
       repository: ghcr.io/sesacthon/scan
       tag: latest  # auto
+    
+    service:
+      type: ClusterIP
+      port: 8000
     
     nodeSelector:
       domain: scan
@@ -159,7 +175,7 @@ api:
   
   # 4. Character API (캐릭터)
   character:
-    enabled: true
+    enabled: false  # ApplicationSet에서 활성화
     replicas: 2
     port: 8000
     path: /api/v1/character
@@ -167,6 +183,10 @@ api:
     image:
       repository: ghcr.io/sesacthon/character
       tag: latest  # auto
+    
+    service:
+      type: ClusterIP
+      port: 8000
     
     nodeSelector:
       domain: character
@@ -185,7 +205,7 @@ api:
   
   # 5. Location API (위치 기반)
   location:
-    enabled: true
+    enabled: false  # ApplicationSet에서 활성화
     replicas: 2
     port: 8000
     path: /api/v1/location
@@ -193,6 +213,10 @@ api:
     image:
       repository: ghcr.io/sesacthon/location
       tag: latest  # auto
+    
+    service:
+      type: ClusterIP
+      port: 8000
     
     nodeSelector:
       domain: location
@@ -216,7 +240,7 @@ api:
   
   # 6. Info API (재활용 정보)
   info:
-    enabled: true
+    enabled: false  # ApplicationSet에서 활성화
     replicas: 2
     port: 8000
     path: /api/v1/info
@@ -224,6 +248,10 @@ api:
     image:
       repository: ghcr.io/sesacthon/info
       tag: latest  # auto
+    
+    service:
+      type: ClusterIP
+      port: 8000
     
     nodeSelector:
       domain: info
@@ -242,7 +270,7 @@ api:
   
   # 7. Chat API (AI 챗봇 - WebSocket)
   chat:
-    enabled: true
+    enabled: false  # ApplicationSet에서 활성화
     replicas: 2
     port: 8000
     path: /api/v1/chat
@@ -250,6 +278,10 @@ api:
     image:
       repository: ghcr.io/sesacthon/chat
       tag: latest  # auto
+    
+    service:
+      type: ClusterIP
+      port: 8000
     
     nodeSelector:
       domain: chat

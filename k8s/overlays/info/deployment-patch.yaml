@@ -1,0 +1,32 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+spec:
+  replicas: 2
+  template:
+    spec:
+      nodeSelector:
+        domain: info
+      tolerations:
+      - key: domain
+        operator: Equal
+        value: info
+        effect: NoSchedule
+      - key: node.kubernetes.io/unreachable
+        operator: Exists
+        effect: NoExecute
+        tolerationSeconds: 300
+      - key: node.kubernetes.io/unreachable
+        operator: Exists
+        effect: NoSchedule
+      containers:
+      - name: app
+        env:
+        - name: SERVICE_NAME
+          value: "info-api"
+        - name: REDIS_HOST
+          value: "redis.db.svc.cluster.local"
+        - name: POSTGRES_HOST
+          value: "postgresql.db.svc.cluster.local"
+
