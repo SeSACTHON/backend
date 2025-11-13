@@ -282,6 +282,7 @@ jobs:
           cat >> ~/.ssh/config <<EOF
           Host *
             IdentityFile ~/.ssh/k8s-cluster-key.pem
+            IdentitiesOnly yes
             StrictHostKeyChecking no
             UserKnownHostsFile /dev/null
             ServerAliveInterval 60
