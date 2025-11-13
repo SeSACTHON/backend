@@ -275,8 +275,8 @@ jobs:
       - name: 🔑 Setup SSH Key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/k8s-cluster-key.pem
-          chmod 600 ~/.ssh/k8s-cluster-key.pem
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/sesacthon.pem
+          chmod 600 ~/.ssh/sesacthon.pem
           
           # 🔍 키 검증
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -284,7 +284,7 @@ jobs:
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
           
           # 키 파일 크기 확인
-          KEY_SIZE=$(wc -c < ~/.ssh/k8s-cluster-key.pem)
+          KEY_SIZE=$(wc -c < ~/.ssh/sesacthon.pem)
           echo "✅ Key file size: $KEY_SIZE bytes"
           
           if [ "$KEY_SIZE" -eq 0 ]; then
@@ -293,7 +293,7 @@ jobs:
           fi
           
           # 키 형식 검증
-          if ssh-keygen -y -f ~/.ssh/k8s-cluster-key.pem > /dev/null 2>&1; then
+          if ssh-keygen -y -f ~/.ssh/sesacthon.pem > /dev/null 2>&1; then
             echo "✅ SSH key format is valid (RSA)"
           else
             echo "❌ ERROR: SSH key format is invalid!"
@@ -302,7 +302,7 @@ jobs:
           fi
           
           # 공개 키 지문 출력 (마지막 16자만)
-          PUBLIC_KEY=$(ssh-keygen -y -f ~/.ssh/k8s-cluster-key.pem)
+          PUBLIC_KEY=$(ssh-keygen -y -f ~/.ssh/sesacthon.pem)
           echo "✅ Public key fingerprint (last 16 chars): ...${PUBLIC_KEY: -16}"
           
           echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -310,7 +310,7 @@ jobs:
           # SSH Config 설정
           cat >> ~/.ssh/config <<EOF
           Host *
-            IdentityFile ~/.ssh/k8s-cluster-key.pem
+            IdentityFile ~/.ssh/sesacthon.pem
             IdentitiesOnly yes
             StrictHostKeyChecking no
             UserKnownHostsFile /dev/null
@@ -329,20 +329,11 @@ jobs:
           cat ansible/inventory/hosts.ini
       
       - name: 🔍 Test SSH Connectivity
-        env:
-          ANSIBLE_PRIVATE_KEY_FILE: ~/.ssh/k8s-cluster-key.pem
-          ANSIBLE_HOST_KEY_CHECKING: 'False'
-          ANSIBLE_SSH_ARGS: '-o IdentitiesOnly=yes -o IdentityFile=~/.ssh/k8s-cluster-key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
         run: |
           cd ansible
-          ansible all -i inventory/hosts.ini -m ping --timeout=30 \
-            -e 'ansible_ssh_common_args="-o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"'
+          ansible all -i inventory/hosts.ini -m ping --timeout=30
       
       - name: ⚙️ Run Ansible Playbook (site.yml)
-        env:
-          ANSIBLE_PRIVATE_KEY_FILE: ~/.ssh/k8s-cluster-key.pem
-          ANSIBLE_HOST_KEY_CHECKING: 'False'
-          ANSIBLE_SSH_ARGS: '-o IdentitiesOnly=yes -o IdentityFile=~/.ssh/k8s-cluster-key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
         run: |
           cd ansible
           
@@ -352,15 +343,10 @@ jobs:
           
           ansible-playbook site.yml \
             -i inventory/hosts.ini \
-            -e 'ansible_ssh_common_args="-o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"' \
             --timeout=300 \
             -v
       
       - name: 🏷️ Label Kubernetes Nodes
-        env:
-          ANSIBLE_PRIVATE_KEY_FILE: ~/.ssh/k8s-cluster-key.pem
-          ANSIBLE_HOST_KEY_CHECKING: 'False'
-          ANSIBLE_SSH_ARGS: '-o IdentitiesOnly=yes -o IdentityFile=~/.ssh/k8s-cluster-key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
         run: |
           cd ansible
           
@@ -370,7 +356,6 @@ jobs:
           
           ansible-playbook playbooks/label-nodes.yml \
             -i inventory/hosts.ini \
-            -e 'ansible_ssh_common_args="-o IdentitiesOnly=yes -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"' \
             -v
       
       - name: ✅ Ansible Bootstrap Summary
@@ -418,16 +403,15 @@ jobs:
       
       - name: 🔑 Setup Kubeconfig
         run: |
-          mkdir -p ~/.kube
+          mkdir -p ~/.kube ~/.ssh
           
           # SSH Key 설정
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/k8s-cluster-key.pem
-          chmod 600 ~/.ssh/k8s-cluster-key.pem
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/sesacthon.pem
+          chmod 600 ~/.ssh/sesacthon.pem
           
           # Master 노드에서 kubeconfig 가져오기
           scp -o StrictHostKeyChecking=no \
-            -i ~/.ssh/k8s-cluster-key.pem \
+            -i ~/.ssh/sesacthon.pem \
             ubuntu@${{ steps.master.outputs.master_ip }}:/home/ubuntu/.kube/config \
             ~/.kube/config
           
