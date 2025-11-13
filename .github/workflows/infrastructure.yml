@@ -302,14 +302,17 @@ jobs:
       - name: 🔍 Test SSH Connectivity
         env:
           ANSIBLE_PRIVATE_KEY_FILE: ~/.ssh/k8s-cluster-key.pem
+          ANSIBLE_HOST_KEY_CHECKING: 'False'
+          ANSIBLE_SSH_ARGS: '-o IdentitiesOnly=yes -o IdentityFile=~/.ssh/k8s-cluster-key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
         run: |
           cd ansible
-          ansible all -i inventory/hosts.ini -m ping --timeout=30 \
-            --private-key=~/.ssh/k8s-cluster-key.pem
+          ansible all -i inventory/hosts.ini -m ping --timeout=30
       
       - name: ⚙️ Run Ansible Playbook (site.yml)
         env:
           ANSIBLE_PRIVATE_KEY_FILE: ~/.ssh/k8s-cluster-key.pem
+          ANSIBLE_HOST_KEY_CHECKING: 'False'
+          ANSIBLE_SSH_ARGS: '-o IdentitiesOnly=yes -o IdentityFile=~/.ssh/k8s-cluster-key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
         run: |
           cd ansible
           
@@ -319,13 +322,14 @@ jobs:
           
           ansible-playbook site.yml \
             -i inventory/hosts.ini \
-            --private-key=~/.ssh/k8s-cluster-key.pem \
             --timeout=300 \
             -v
       
       - name: 🏷️ Label Kubernetes Nodes
         env:
           ANSIBLE_PRIVATE_KEY_FILE: ~/.ssh/k8s-cluster-key.pem
+          ANSIBLE_HOST_KEY_CHECKING: 'False'
+          ANSIBLE_SSH_ARGS: '-o IdentitiesOnly=yes -o IdentityFile=~/.ssh/k8s-cluster-key.pem -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null'
         run: |
           cd ansible
           
@@ -335,7 +339,6 @@ jobs:
           
           ansible-playbook playbooks/label-nodes.yml \
             -i inventory/hosts.ini \
-            --private-key=~/.ssh/k8s-cluster-key.pem \
             -v
       
       - name: ✅ Ansible Bootstrap Summary
