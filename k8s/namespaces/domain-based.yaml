@@ -1,11 +1,19 @@
 # 도메인별 네임스페이스 정의
 # 14-Node Microservices Architecture
 #
-# Option 1: 도메인별 완전 격리
+# Tier 구조 (Application Layer 중심):
+#   - Tier 1 (Presentation): API Gateway, Ingress (ALB)
+#   - Tier 2 (Business Logic): 도메인별 API (auth, my, scan, ...)
+#   - Tier 3 (Integration): Message Queue (RabbitMQ - async)
+#   - Tier 4 (Data): Database & Cache (PostgreSQL, Redis)
+#   - Tier 0 (Observability): Monitoring, Logging (별도 계층)
+#   - Kubernetes Control Plane: kube-system (etcd, api-server, scheduler)
+#
 # 참고: docs/architecture/09-NAMESPACE_STRATEGY_ANALYSIS.md
 
 ---
-# API 도메인별 네임스페이스
+# Tier 2: Business Logic (도메인별 API)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -13,7 +21,7 @@ metadata:
   labels:
     name: auth
     domain: auth
-    tier: api
+    tier: business-logic
     layer: "2"
     phase: "1"
     app.kubernetes.io/part-of: ecoeco-backend
@@ -27,7 +35,7 @@ metadata:
   labels:
     name: my
     domain: my
-    tier: api
+    tier: business-logic
     layer: "2"
     phase: "1"
     app.kubernetes.io/part-of: ecoeco-backend
@@ -41,7 +49,7 @@ metadata:
   labels:
     name: scan
     domain: scan
-    tier: api
+    tier: business-logic
     layer: "2"
     phase: "2"
     app.kubernetes.io/part-of: ecoeco-backend
@@ -55,7 +63,7 @@ metadata:
   labels:
     name: character
     domain: character
-    tier: api
+    tier: business-logic
     layer: "2"
     phase: "2"
     app.kubernetes.io/part-of: ecoeco-backend
@@ -69,7 +77,7 @@ metadata:
   labels:
     name: location
     domain: location
-    tier: api
+    tier: business-logic
     layer: "2"
     phase: "2"
     app.kubernetes.io/part-of: ecoeco-backend
@@ -83,7 +91,7 @@ metadata:
   labels:
     name: info
     domain: info
-    tier: api
+    tier: business-logic
     layer: "2"
     phase: "3"
     app.kubernetes.io/part-of: ecoeco-backend
@@ -97,14 +105,29 @@ metadata:
   labels:
     name: chat
     domain: chat
-    tier: api
+    tier: business-logic
     layer: "2"
     phase: "3"
     app.kubernetes.io/part-of: ecoeco-backend
     app.kubernetes.io/component: api-layer
 
 ---
-# Data 계층 (Tier 4: 최하위 - Database & Cache)
+# Tier 3: Integration (Message Queue - Async 통신)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: messaging
+  labels:
+    name: messaging
+    tier: integration
+    layer: "3"
+    app.kubernetes.io/part-of: ecoeco-backend
+    app.kubernetes.io/component: messaging
+
+---
+# Tier 4: Data (Database & Cache)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -117,42 +140,30 @@ metadata:
     app.kubernetes.io/component: data-layer
 
 ---
-# Message Queue 계층 (Tier 3: Async 통신)
-# 참고: RabbitMQ는 scan API의 비동기 처리용
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: messaging
-  labels:
-    name: messaging
-    tier: message-queue
-    layer: "3"
-    app.kubernetes.io/part-of: ecoeco-backend
-    app.kubernetes.io/component: messaging
-
----
-# Control Plane 계층 (Tier 1: Monitoring & GitOps)
+# Tier 0: Observability (Monitoring & Logging - 별도 계층)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apiVersion: v1
 kind: Namespace
 metadata:
   name: monitoring
   labels:
     name: monitoring
-    tier: control-plane
-    layer: "1"
+    tier: observability
+    layer: "0"
     app.kubernetes.io/part-of: ecoeco-backend
     app.kubernetes.io/component: monitoring
 
 ---
-# Control Plane 계층 (Tier 1: GitOps - Atlantis)
+# GitOps (Infrastructure Management - 별도 계층)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apiVersion: v1
 kind: Namespace
 metadata:
   name: atlantis
   labels:
     name: atlantis
-    tier: control-plane
-    layer: "1"
+    tier: infrastructure
+    layer: "0"
     app.kubernetes.io/part-of: ecoeco-backend
     app.kubernetes.io/component: gitops
 
