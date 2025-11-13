@@ -1,6 +1,6 @@
 # 네임스페이스 일관성 점검 체크리스트
 
-> **문서 버전**: v1.0.0  
+> **문서 버전**: v1.1.0  
 > **최종 업데이트**: 2025-11-13  
 > **목적**: 네임스페이스 변경 시 전체 스택의 일관성을 보장하기 위한 체계적 점검 메뉴얼
 
@@ -9,11 +9,12 @@
 ## 📋 점검 개요
 
 ### 점검 대상
-네임스페이스 변경 시 **4개 레이어**를 모두 점검해야 합니다:
+네임스페이스 변경 시 **5개 레이어**를 모두 점검해야 합니다:
 1. **Kubernetes Manifests** (네임스페이스 정의)
 2. **Kustomize Overlays** (서비스 배포 설정)
 3. **ArgoCD ApplicationSet** (GitOps 배포 자동화)
 4. **Ansible Playbooks** (클러스터 초기 구성)
+5. **CI/CD Pipelines** (GitHub Actions - Terraform/Ansible)
 
 ### 점검 시점
 - 네임스페이스 구조 변경 시 (예: `api` → 도메인별 네임스페이스)
@@ -596,6 +597,157 @@ chmod +x scripts/check-namespace-consistency.sh
 | | | `monitoring_namespace` | `monitoring` |
 | | `ansible/playbooks/10-namespaces.yml` | 네임스페이스 생성 | ✅ 있음 |
 | | `ansible/roles/{postgresql,redis,rabbitmq}/tasks/main.yml` | 네임스페이스 변수 사용 | `{{ postgres_namespace }}`, `{{ redis_namespace }}`, `{{ rabbitmq_namespace }}` |
+| **Layer 5** | `terraform/templates/hosts.tpl` | `[api_nodes]` 섹션 | 중복 없이 1번만 정의 |
+| | | API 노드 | auth, my, scan, character, location, info, chat (7개) |
+| | | 제거된 노드 참조 | ❌ api_waste, api_userinfo, api_recycle_info, api_chat_llm |
+| | `terraform/outputs.tf` | `ansible_inventory` templatefile 변수 | hosts.tpl과 일치 (7개 API 노드) |
+| | `.github/workflows/infrastructure.yml` | Terraform Plan | PR 생성 시 자동 실행 |
+| | | Terraform Validate | 템플릿 변수 검증 |
+
+---
+
+## ✅ Layer 5: CI/CD Pipelines
+
+### 5.1 Terraform 템플릿 (Ansible Inventory)
+
+**파일**: `terraform/templates/hosts.tpl`
+
+**점검 항목**:
+- [ ] `[api_nodes]` 섹션이 중복되지 않았는가?
+- [ ] 모든 API 노드가 현재 14-node 구조와 일치하는가?
+  - auth, my, scan, character, location, info, chat (7개)
+- [ ] 제거된 노드를 참조하지 않는가?
+  - ❌ `api_waste`, `api_userinfo`, `api_recycle_info`, `api_chat_llm`
+- [ ] 각 노드의 `domain` 변수가 올바른가?
+- [ ] Worker 노드의 `domain` 변수가 올바른가?
+  - `worker-storage`: domain=scan
+  - `worker-ai`: domain=scan,chat
+
+**점검 명령**:
+```bash
+# Terraform 템플릿 검증
+cd terraform
+terraform init
+terraform validate
+
+# 템플릿에서 참조하는 변수 확인
+grep -n "api_.*_public_ip" templates/hosts.tpl
+grep -n "\[api_nodes\]" templates/hosts.tpl  # 중복 확인
+```
+
+**예상 결과**:
+```
+✅ terraform validate: Success! The configuration is valid.
+✅ [api_nodes] 섹션은 1번만 나타나야 함
+```
+
+---
+
+### 5.2 Terraform Outputs
+
+**파일**: `terraform/outputs.tf`
+
+**점검 항목**:
+- [ ] `ansible_inventory` output의 templatefile 변수가 `hosts.tpl`과 일치하는가?
+- [ ] 모든 API 노드 변수가 정의되어 있는가?
+  - `api_auth_public_ip`, `api_auth_private_ip`
+  - `api_my_public_ip`, `api_my_private_ip`
+  - `api_scan_public_ip`, `api_scan_private_ip`
+  - `api_character_public_ip`, `api_character_private_ip`
+  - `api_location_public_ip`, `api_location_private_ip`
+  - `api_info_public_ip`, `api_info_private_ip`
+  - `api_chat_public_ip`, `api_chat_private_ip`
+- [ ] 제거된 노드 변수가 없는가?
+  - ❌ `api_waste_*`, `api_userinfo_*`, `api_recycle_info_*`, `api_chat_llm_*`
+
+**점검 명령**:
+```bash
+# outputs.tf에서 templatefile 변수 확인
+grep -A 30 'templatefile.*hosts.tpl' terraform/outputs.tf
+
+# 변수 개수 확인
+grep "api_.*_public_ip" terraform/outputs.tf | wc -l  # 7개 (API nodes)
+```
+
+---
+
+### 5.3 GitHub Actions Workflow
+
+**파일**: `.github/workflows/infrastructure.yml`
+
+**점검 항목**:
+- [ ] Terraform Plan 단계가 정상 실행되는가?
+- [ ] Terraform Validate가 통과하는가?
+- [ ] PR 생성 시 Terraform Plan이 자동 실행되는가?
+- [ ] `main` 브랜치 머지 시 Terraform Apply가 실행되는가?
+
+**점검 명령**:
+```bash
+# PR 생성 시 자동 실행되는 CI 확인
+gh pr checks <PR_NUMBER>
+
+# 실패한 workflow 로그 확인
+gh run view <RUN_ID> --log-failed
+
+# 특정 job 로그 확인
+gh run view <RUN_ID> --job=<JOB_ID>
+```
+
+**예상 결과**:
+```
+✅ 📋 Terraform Plan      pass
+✅ 📊 Deployment Summary  pass
+⏭️ ⚙️ Ansible Bootstrap   skipping (main 브랜치만)
+⏭️ 🚀 Terraform Apply     skipping (main 브랜치만)
+⏭️ 🔄 ArgoCD Sync         skipping (main 브랜치만)
+```
+
+**트러블슈팅**:
+```bash
+# Terraform 템플릿 오류 (변수 누락)
+Error: Invalid function argument
+  on outputs.tf line 254, in output "ansible_inventory":
+ 254:   value = templatefile("${path.module}/templates/hosts.tpl", {
+Invalid value for "vars" parameter: vars map does not contain key
+"api_waste_public_ip", referenced at ./templates/hosts.tpl:33,30-49.
+
+# 해결: hosts.tpl에서 제거된 노드 참조 제거
+```
+
+---
+
+### 5.4 Ansible Inventory 자동 생성
+
+**파일**: `ansible/inventory/hosts` (Terraform에서 자동 생성)
+
+**점검 항목**:
+- [ ] Terraform Apply 후 `ansible/inventory/hosts` 파일이 올바르게 생성되는가?
+- [ ] 모든 API 노드의 `domain` 변수가 올바른가?
+- [ ] `[api_nodes]` 그룹에 7개 노드만 있는가?
+
+**점검 명령**:
+```bash
+# Terraform 실행 후 생성된 Inventory 확인
+cat ansible/inventory/hosts
+
+# API 노드 개수 확인
+grep -A 10 "\[api_nodes\]" ansible/inventory/hosts | grep "k8s-api" | wc -l  # 7개
+
+# Domain 변수 확인
+grep "domain=" ansible/inventory/hosts | grep "k8s-api"
+```
+
+**예상 출력**:
+```
+[api_nodes]
+k8s-api-auth ansible_host=... domain=auth
+k8s-api-my ansible_host=... domain=my
+k8s-api-scan ansible_host=... domain=scan
+k8s-api-character ansible_host=... domain=character
+k8s-api-location ansible_host=... domain=location
+k8s-api-info ansible_host=... domain=info
+k8s-api-chat ansible_host=... domain=chat
+```
 
 ---
 
@@ -635,6 +787,7 @@ chmod +x scripts/check-namespace-consistency.sh
 
 | 버전 | 날짜 | 변경 내역 |
 |------|------|-----------|
+| v1.1.0 | 2025-11-13 | Layer 5 추가: CI/CD Pipelines (Terraform 템플릿, GitHub Actions) |
 | v1.0.0 | 2025-11-13 | 초기 버전 작성 (네임스페이스 일관성 점검 체크리스트) |
 
 

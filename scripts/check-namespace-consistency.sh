@@ -194,6 +194,40 @@ else
     ((ERRORS++))
 fi
 
+# 9. Terraform 템플릿 점검 (추가)
+echo ""
+echo "✅ Layer 5: Terraform 템플릿 점검"
+echo "---"
+
+echo -n "  hosts.tpl [api_nodes] 중복... "
+API_NODES_COUNT=$(grep -c "^\[api_nodes\]" terraform/templates/hosts.tpl)
+if [ "$API_NODES_COUNT" -gt 1 ]; then
+    echo "❌ FAIL: [api_nodes] 섹션이 $API_NODES_COUNT 번 나타남 (1번이어야 함)"
+    ((ERRORS++))
+else
+    echo "✅ OK (1번)"
+fi
+
+echo -n "  hosts.tpl 제거된 노드 참조... "
+DEPRECATED_NODES="api_waste|api_userinfo|api_recycle_info|api_chat_llm"
+if grep -E "$DEPRECATED_NODES" terraform/templates/hosts.tpl > /dev/null 2>&1; then
+    echo "❌ FAIL: 제거된 노드 참조 발견"
+    grep -E "$DEPRECATED_NODES" terraform/templates/hosts.tpl
+    ((ERRORS++))
+else
+    echo "✅ OK"
+fi
+
+echo -n "  outputs.tf 변수 개수... "
+API_VAR_COUNT=$(grep -c "api_.*_public_ip\|api_.*_private_ip" terraform/outputs.tf | head -1)
+EXPECTED_COUNT=14  # 7 API nodes * 2 (public + private)
+if [ "$API_VAR_COUNT" -ne "$EXPECTED_COUNT" ]; then
+    echo "❌ FAIL: API 노드 변수 개수 불일치 (expected: $EXPECTED_COUNT, got: $API_VAR_COUNT)"
+    ((ERRORS++))
+else
+    echo "✅ OK ($EXPECTED_COUNT 변수)"
+fi
+
 # 최종 결과
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
