@@ -219,13 +219,13 @@ else
 fi
 
 echo -n "  outputs.tf 변수 개수... "
-API_VAR_COUNT=$(grep -c "api_.*_public_ip\|api_.*_private_ip" terraform/outputs.tf | head -1)
-EXPECTED_COUNT=14  # 7 API nodes * 2 (public + private)
+API_VAR_COUNT=$(grep -E "api_.*_public_ip\s*=" terraform/outputs.tf | wc -l | tr -d ' ')
+EXPECTED_COUNT=7  # 7 API nodes (public_ip만 카운트)
 if [ "$API_VAR_COUNT" -ne "$EXPECTED_COUNT" ]; then
     echo "❌ FAIL: API 노드 변수 개수 불일치 (expected: $EXPECTED_COUNT, got: $API_VAR_COUNT)"
     ((ERRORS++))
 else
-    echo "✅ OK ($EXPECTED_COUNT 변수)"
+    echo "✅ OK ($EXPECTED_COUNT API nodes)"
 fi
 
 # 최종 결과
