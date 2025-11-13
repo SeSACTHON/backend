@@ -14,6 +14,7 @@ metadata:
     name: auth
     domain: auth
     tier: api
+    layer: "2"
     phase: "1"
     app.kubernetes.io/part-of: ecoeco-backend
     app.kubernetes.io/component: api-layer
@@ -27,6 +28,7 @@ metadata:
     name: my
     domain: my
     tier: api
+    layer: "2"
     phase: "1"
     app.kubernetes.io/part-of: ecoeco-backend
     app.kubernetes.io/component: api-layer
@@ -40,6 +42,7 @@ metadata:
     name: scan
     domain: scan
     tier: api
+    layer: "2"
     phase: "2"
     app.kubernetes.io/part-of: ecoeco-backend
     app.kubernetes.io/component: api-layer
@@ -53,6 +56,7 @@ metadata:
     name: character
     domain: character
     tier: api
+    layer: "2"
     phase: "2"
     app.kubernetes.io/part-of: ecoeco-backend
     app.kubernetes.io/component: api-layer
@@ -66,6 +70,7 @@ metadata:
     name: location
     domain: location
     tier: api
+    layer: "2"
     phase: "2"
     app.kubernetes.io/part-of: ecoeco-backend
     app.kubernetes.io/component: api-layer
@@ -79,6 +84,7 @@ metadata:
     name: info
     domain: info
     tier: api
+    layer: "2"
     phase: "3"
     app.kubernetes.io/part-of: ecoeco-backend
     app.kubernetes.io/component: api-layer
@@ -92,43 +98,61 @@ metadata:
     name: chat
     domain: chat
     tier: api
+    layer: "2"
     phase: "3"
     app.kubernetes.io/part-of: ecoeco-backend
     app.kubernetes.io/component: api-layer
 
 ---
-# Infrastructure 네임스페이스
+# Data 계층 (Tier 4: 최하위 - Database & Cache)
 apiVersion: v1
 kind: Namespace
 metadata:
   name: data
   labels:
     name: data
-    tier: infrastructure
+    tier: data
+    layer: "4"
     app.kubernetes.io/part-of: ecoeco-backend
     app.kubernetes.io/component: data-layer
 
 ---
-# Observability 네임스페이스
+# Message Queue 계층 (Tier 3: Async 통신)
+# 참고: RabbitMQ는 scan API의 비동기 처리용
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: messaging
+  labels:
+    name: messaging
+    tier: message-queue
+    layer: "3"
+    app.kubernetes.io/part-of: ecoeco-backend
+    app.kubernetes.io/component: messaging
+
+---
+# Control Plane 계층 (Tier 1: Monitoring & GitOps)
 apiVersion: v1
 kind: Namespace
 metadata:
   name: monitoring
   labels:
     name: monitoring
-    tier: observability
+    tier: control-plane
+    layer: "1"
     app.kubernetes.io/part-of: ecoeco-backend
     app.kubernetes.io/component: monitoring
 
 ---
-# GitOps 네임스페이스
+# Control Plane 계층 (Tier 1: GitOps - Atlantis)
 apiVersion: v1
 kind: Namespace
 metadata:
   name: atlantis
   labels:
     name: atlantis
-    tier: gitops
+    tier: control-plane
+    layer: "1"
     app.kubernetes.io/part-of: ecoeco-backend
     app.kubernetes.io/component: gitops
 

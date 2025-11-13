@@ -5,7 +5,7 @@
 
 ---
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 전체 API 서비스 자동 발견 (모든 도메인 네임스페이스)
+# 전체 API 서비스 자동 발견 (Tier 2: API Layer)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
@@ -15,6 +15,8 @@ metadata:
   labels:
     app: ecoeco
     component: api
+    tier: api
+    layer: "2"
     monitoring: prometheus
 spec:
   selector:
@@ -38,6 +40,12 @@ spec:
         # node label 추가
         - sourceLabels: [__meta_kubernetes_pod_node_name]
           targetLabel: node
+        # tier label 추가
+        - sourceLabels: [__meta_kubernetes_pod_label_tier]
+          targetLabel: tier
+        # layer label 추가
+        - sourceLabels: [__meta_kubernetes_pod_label_layer]
+          targetLabel: layer
   namespaceSelector:
     matchNames:
       - auth
@@ -302,21 +310,22 @@ spec:
 
 ---
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# data 네임스페이스 (Infrastructure)
+# data 네임스페이스 (Tier 4: Data Layer - PostgreSQL, Redis)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
-  name: data-infrastructure-monitor
+  name: data-layer-monitor
   namespace: monitoring
   labels:
     app: ecoeco
-    tier: infrastructure
+    tier: data
+    layer: "4"
     monitoring: prometheus
 spec:
   selector:
     matchLabels:
-      tier: infrastructure
+      tier: data
   endpoints:
     - port: metrics
       interval: 30s
@@ -329,9 +338,51 @@ spec:
           targetLabel: service
         - sourceLabels: [__meta_kubernetes_pod_node_name]
           targetLabel: node
+        - sourceLabels: [__meta_kubernetes_pod_label_tier]
+          targetLabel: tier
+        - sourceLabels: [__meta_kubernetes_pod_label_layer]
+          targetLabel: layer
   namespaceSelector:
     matchNames:
       - data
+
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# messaging 네임스페이스 (Tier 3: Message Queue - RabbitMQ)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: message-queue-monitor
+  namespace: monitoring
+  labels:
+    app: ecoeco
+    tier: message-queue
+    layer: "3"
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      tier: message-queue
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+      scheme: http
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_service_name]
+          targetLabel: service
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+        - sourceLabels: [__meta_kubernetes_pod_label_tier]
+          targetLabel: tier
+        - sourceLabels: [__meta_kubernetes_pod_label_layer]
+          targetLabel: layer
+  namespaceSelector:
+    matchNames:
+      - messaging
 
 ---
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -370,7 +421,7 @@ spec:
 
 ---
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Prometheus 자체 모니터링
+# monitoring 네임스페이스 (Tier 1: Control Plane - Prometheus, Grafana)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
@@ -379,6 +430,8 @@ metadata:
   namespace: monitoring
   labels:
     app: prometheus
+    tier: control-plane
+    layer: "1"
     monitoring: prometheus
 spec:
   selector:
@@ -398,26 +451,38 @@ spec:
 # ServiceMonitor Summary (Domain-Based Namespace Architecture)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 #
-# 총 11개 ServiceMonitor:
-#   1. API Services (전체 자동 발견): 모든 도메인 네임스페이스
+# Tier 구조 (4-Layer Architecture):
+#   Tier 1 (Control Plane): monitoring, atlantis
+#   Tier 2 (API): auth, my, scan, character, location, info, chat
+#   Tier 3 (Message Queue): messaging (RabbitMQ - async)
+#   Tier 4 (Data): data (PostgreSQL, Redis)
+#
+# 총 13개 ServiceMonitor:
+#   1. API Services (전체 자동 발견): Tier 2 - 모든 도메인 네임스페이스
 #   2-8. Individual APIs: auth, my, scan, character, location, info, chat
-#   9. Data Infrastructure: postgresql, redis, rabbitmq
-#   10. Node Exporter: 전체 노드
-#   11. Prometheus: 자체 모니터링
+#   9. Data Layer: Tier 4 - postgresql, redis
+#   10. Message Queue: Tier 3 - rabbitmq
+#   11. Node Exporter: 전체 노드
+#   12. Prometheus: Tier 1 - 자체 모니터링
 #
 # Label 기반 자동 발견:
-#   - namespace: auth | my | scan | character | location | info | chat | data | monitoring
+#   - tier: control-plane | api | message-queue | data
+#   - layer: 1 | 2 | 3 | 4
+#   - namespace: auth | my | scan | character | location | info | chat | data | messaging | monitoring
 #   - domain: auth | my | scan | character | location | info | chat
 #   - phase: 1 | 2 | 3
-#   - tier: api | infrastructure
 #
 # Relabeling:
-#   - 자동으로 namespace, domain, phase, node label 추가
-#   - Grafana에서 네임스페이스 기반 필터링 가능
+#   - 자동으로 namespace, domain, phase, node, tier, layer label 추가
+#   - Grafana에서 tier/layer 기반 필터링 가능
+#
+# 트래픽 흐름:
+#   Client → Tier 1 (Control Plane) → Tier 2 (API) → Tier 3 (Message Queue) → Tier 4 (Data)
 #
 # 네임스페이스 기반 메트릭 수집:
-#   ✅ 도메인별 분리된 메트릭
+#   ✅ Tier별 분리된 메트릭
+#   ✅ Layer별 메트릭 집계
 #   ✅ namespace label로 구분
 #   ✅ NetworkPolicy와 독립적
-#   ✅ Grafana 대시보드에서 네임스페이스별 필터링 가능
+#   ✅ Grafana 대시보드에서 tier/layer 필터링 가능
 
