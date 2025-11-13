@@ -1,0 +1,125 @@
+#!/bin/bash
+# check-namespace-consistency.sh
+# 네임스페이스 일관성 점검 스크립트
+
+set -e
+
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "🔍 네임스페이스 일관성 점검 시작"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+ERRORS=0
+
+# 1. Kustomize Overlay 점검
+echo ""
+echo "✅ Layer 2: Kustomize Overlays 점검"
+echo "---"
+
+for domain in auth my scan character location info chat; do
+    echo -n "  $domain overlay... "
+    
+    # 네임스페이스 확인
+    NS=$(grep "^namespace:" k8s/overlays/$domain/kustomization.yaml | awk '{print $2}')
+    if [ "$NS" != "$domain" ]; then
+        echo "❌ FAIL: namespace mismatch (expected: $domain, got: $NS)"
+        ((ERRORS++))
+    else
+        echo "✅ OK"
+    fi
+    
+    # 데이터베이스 연결 문자열 확인
+    if grep -q "\.db\.svc\.cluster\.local" k8s/overlays/$domain/deployment-patch.yaml 2>/dev/null; then
+        echo "  ❌ FAIL: deployment-patch.yaml에서 'db' 네임스페이스 발견 (data 또는 messaging이어야 함)"
+        ((ERRORS++))
+    fi
+done
+
+# 2. ArgoCD ApplicationSet 점검
+echo ""
+echo "✅ Layer 3: ArgoCD ApplicationSet 점검"
+echo "---"
+
+echo -n "  tier 레이블... "
+if grep -q "tier: api" argocd/applications/ecoeco-appset-kustomize.yaml; then
+    echo "❌ FAIL: 'tier: api' 발견 (business-logic이어야 함)"
+    ((ERRORS++))
+else
+    echo "✅ OK"
+fi
+
+# 3. Ansible 변수 점검
+echo ""
+echo "✅ Layer 4: Ansible 변수 점검"
+echo "---"
+
+ANSIBLE_VARS="ansible/inventory/group_vars/all.yml"
+if [ ! -f "$ANSIBLE_VARS" ]; then
+    ANSIBLE_VARS="terraform/group_vars/all.yml"
+fi
+
+echo -n "  postgres_namespace... "
+PG_NS=$(grep "^postgres_namespace:" $ANSIBLE_VARS | awk '{print $2}' | tr -d '"')
+if [ "$PG_NS" != "data" ]; then
+    echo "❌ FAIL: expected 'data', got '$PG_NS'"
+    ((ERRORS++))
+else
+    echo "✅ OK"
+fi
+
+echo -n "  redis_namespace... "
+REDIS_NS=$(grep "^redis_namespace:" $ANSIBLE_VARS | awk '{print $2}' | tr -d '"')
+if [ "$REDIS_NS" != "data" ]; then
+    echo "❌ FAIL: expected 'data', got '$REDIS_NS'"
+    ((ERRORS++))
+else
+    echo "✅ OK"
+fi
+
+echo -n "  rabbitmq_namespace... "
+RABBITMQ_NS=$(grep "^rabbitmq_namespace:" $ANSIBLE_VARS | awk '{print $2}' | tr -d '"')
+if [ "$RABBITMQ_NS" != "messaging" ]; then
+    echo "❌ FAIL: expected 'messaging', got '$RABBITMQ_NS'"
+    ((ERRORS++))
+else
+    echo "✅ OK"
+fi
+
+# 4. NetworkPolicy 점검
+echo ""
+echo "✅ Layer 1: NetworkPolicy 점검"
+echo "---"
+
+echo -n "  data-ingress-from-api... "
+if grep -A 5 "data-ingress-from-api" k8s/networkpolicies/domain-isolation.yaml | grep -q "tier: api"; then
+    echo "❌ FAIL: 'tier: api' 발견 (business-logic이어야 함)"
+    ((ERRORS++))
+else
+    echo "✅ OK"
+fi
+
+# 5. ServiceMonitor 점검
+echo ""
+echo "✅ Layer 1: ServiceMonitor 점검"
+echo "---"
+
+echo -n "  api-services-all-domains... "
+if grep -A 10 "api-services-all-domains" k8s/monitoring/servicemonitors-domain-ns.yaml | grep -q "tier: api"; then
+    echo "❌ FAIL: 'tier: api' 발견 (business-logic이어야 함)"
+    ((ERRORS++))
+else
+    echo "✅ OK"
+fi
+
+# 최종 결과
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+if [ $ERRORS -eq 0 ]; then
+    echo "✅ 모든 점검 통과! 네임스페이스 일관성 확인 완료."
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    exit 0
+else
+    echo "❌ $ERRORS개 오류 발견! 위 내용을 확인하고 수정하세요."
+    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    exit 1
+fi
+
