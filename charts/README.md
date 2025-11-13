@@ -1,96 +1,52 @@
-# Helm Chart 상태 및 사용 방침
+# Charts Directory - Deprecated
 
-**현재 상태**: ⚠️ 참고용 유지 (실제 배포는 Kustomize 사용)
+## 상태
 
----
+**⚠️ Helm Chart는 더 이상 사용되지 않습니다.**
 
-## 📋 현재 배포 방식
+현재 프로젝트는 **Kustomize** 기반 GitOps로 전환되었습니다.
 
-### ✅ 실제 사용 중: Kustomize
+## 히스토리
 
-```yaml
-배포 도구: Kustomize + ArgoCD ApplicationSet
-구조:
-  k8s/
-  ├── base/           # 공통 manifests
-  └── overlays/       # API별 커스터마이징
-      ├── auth/
-      ├── my/
-      ├── scan/
-      └── ... (7개 API)
+- **2025-11-08**: Helm Chart 사용 종료, Kustomize로 전환 결정
+- **2025-11-13**: Helm Chart 완전 제거, `charts/` 디렉토리 정리
 
-네임스페이스: api (단일 네임스페이스)
+## 참고 문서
+
+- [Helm vs Kustomize 결정 문서](../docs/architecture/08-GITOPS_TOOLING_DECISION.md)
+- [네임스페이스 전략 분석](../docs/architecture/09-NAMESPACE_STRATEGY_ANALYSIS.md)
+
+## 현재 GitOps 구조
+
 ```
+k8s/
+├── base/                       # Kustomize Base
+│   ├── deployment.yaml
+│   ├── service.yaml
+│   └── kustomization.yaml
+├── overlays/                   # 도메인별 Overlay
+│   ├── auth/
+│   ├── my/
+│   ├── scan/
+│   ├── character/
+│   ├── location/
+│   ├── info/
+│   └── chat/
+├── namespaces/                 # 네임스페이스 정의
+│   └── domain-based.yaml
+└── networkpolicies/            # NetworkPolicy
+    └── domain-isolation.yaml
 
-**참고**: `docs/architecture/08-GITOPS_TOOLING_DECISION.md`
+argocd/
+└── applications/
+    └── ecoeco-appset-kustomize.yaml  # ApplicationSet
 
----
-
-## 📦 Helm Chart 상태
-
-### charts/ecoeco-backend/
-
-```yaml
-상태: 참고용 유지
-이유:
-  - Helm → Kustomize 마이그레이션 완료 (2025-11-11)
-  - 초기 구조 참고 자료
-  - 롤백 시 참고 가능
-
-실제 사용: ❌ 없음
-ArgoCD 배포: Kustomize만 사용
-```
-
----
-
-## 🔧 최근 변경사항
-
-### 2025-11-13: 네임스페이스 정리
-
-**변경 파일**: `charts/ecoeco-backend/templates/namespaces.yaml`
-
-```yaml
-Before:
-  - api ✅
-  - workers ❌
-  - data ❌
-  - messaging ❌
-
-After:
-  - api ✅ (단일 네임스페이스)
-  
-제거 이유:
-  - workers, data, messaging 실제 사용 안 함
-  - Kustomize overlays는 모두 api 네임스페이스 사용
-  - 문서와 실제 구조 일치
+ansible/
+└── playbooks/
+    └── 10-namespaces.yml       # 네임스페이스 생성 자동화
 ```
 
 ---
 
-## 📚 관련 문서
-
-- [GitOps 도구 선택](../../docs/architecture/08-GITOPS_TOOLING_DECISION.md) - Helm → Kustomize 전환 배경
-- [네임스페이스 전략](../../docs/architecture/09-NAMESPACE_STRATEGY_ANALYSIS.md) - 현재 구조 vs 베스트 프랙티스
-- [GitOps 파이프라인](../../docs/deployment/GITOPS_PIPELINE_KUSTOMIZE.md) - Kustomize 기반 배포
-
----
-
-## ⚠️ 주의사항
-
-```yaml
-Helm Chart 삭제 금지:
-  - 초기 구조 참고 자료
-  - 트러블슈팅 시 비교 가능
-  - 향후 하이브리드 배포 가능성
-
-실제 배포:
-  - Kustomize만 사용
-  - ArgoCD ApplicationSet
-  - Helm 사용 안 함
-```
-
----
-
-**작성일**: 2025-11-13  
-**상태**: Helm Chart 유지 (참고용), Kustomize 사용 (실제 배포)
-
+**마지막 업데이트**: 2025-11-13  
+**담당자**: EcoEco Backend Team

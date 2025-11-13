@@ -227,7 +227,7 @@ infra_nodes
 6. CNI 설치 (04-cni-install.yml) - Calico
 7. Add-ons (05-addons.yml)
 8. Node 라벨링 (label-nodes.yml) - domain, phase, tier
-9. Cert-Manager (06-cert-manager-issuer.yml)
+9. Cert-Manager (06-cert-manager-issuer.yml) - ACM 인증서 사용
 10. ALB Controller (07-alb-controller.yml)
 11. Monitoring (10-monitoring.yml) - Prometheus + Grafana
 12. Atlantis (16-atlantis.yml)

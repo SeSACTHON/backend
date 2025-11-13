@@ -1,6 +1,6 @@
 # 🏗️ 네임스페이스 전략 분석: 현재 vs 베스트 프랙티스
 
-**문서 버전**: v0.7.2  
+**문서 버전**: v0.8.0  
 **최종 업데이트**: 2025-11-13  
 **작성자**: Architecture Team
 
@@ -8,15 +8,52 @@
 
 ## 🎯 의사결정 요약
 
-**현재 전략**: 단일 네임스페이스 (`api`) + 기능별 네임스페이스 분리
+**현재 전략**: 도메인별 완전 격리 (Option 1 적용)
 
-**상태**: ⚠️ 개선 검토 중
+**상태**: ✅ **적용 완료** (Kustomize + Ansible + NetworkPolicy)
 
 ---
 
-## 📊 현재 네임스페이스 구조
+## 📊 적용된 네임스페이스 구조
 
-### 1️⃣ 실제 구성
+### 1️⃣ 실제 구성 (v0.8.0)
+
+| 네임스페이스 | 용도 | 배포 리소스 | NetworkPolicy |
+|------------|------|------------|--------------|
+| `auth` | 인증/인가 API | auth-api | ✅ |
+| `my` | 마이페이지 API | my-api | ✅ |
+| `scan` | 쓰레기 분류 API | scan-api | ✅ |
+| `character` | 캐릭터 API | character-api | ✅ |
+| `location` | 위치 기반 API | location-api | ✅ |
+| `info` | 재활용 정보 API | info-api | ✅ |
+| `chat` | AI 챗봇 API | chat-api | ✅ |
+| `data` | 인프라 계층 | postgresql, redis, rabbitmq | ✅ |
+| `monitoring` | 모니터링 | prometheus, grafana, node-exporter | ✅ |
+| `atlantis` | GitOps | atlantis | ❌ |
+| `kube-system` | Kubernetes 코어 | calico-node, coredns, kube-proxy, ebs-csi | - |
+
+### 2️⃣ 적용 스택
+
+```yaml
+# Kustomize: 도메인별 네임스페이스 분리
+k8s/overlays/auth/kustomization.yaml:
+  namespace: auth  # ← 변경 완료
+
+# ArgoCD: ApplicationSet 자동 배포
+argocd/applications/ecoeco-appset-kustomize.yaml:
+  destination:
+    namespace: '{{domain}}'  # ← 동적 네임스페이스
+
+# Ansible: 네임스페이스 생성 자동화
+ansible/playbooks/10-namespaces.yml:
+  - 네임스페이스 생성
+  - NetworkPolicy 적용
+
+# NetworkPolicy: 도메인별 격리
+k8s/networkpolicies/domain-isolation.yaml:
+  - API → Data 계층 접근 제어
+  - 도메인 간 격리
+```
 
 ```yaml
 # k8s/overlays/*/kustomization.yaml
@@ -662,26 +699,37 @@ sum(container_memory_usage_bytes) by (namespace)
 |------|------|-----------|
 | 2025-11-13 | v0.7.2 | 초안 작성 - 현재 구조 vs 베스트 프랙티스 비교, 3가지 옵션 제시, 단계별 로드맵 |
 | 2025-11-13 | v0.7.2 | Helm Chart 정리 - workers, data, messaging 네임스페이스 제거, 문서 업데이트 |
+| 2025-11-13 | v0.8.0 | **Option 1 적용 완료** - 도메인별 네임스페이스 분리 (auth, my, scan, character, location, info, chat, data, monitoring), NetworkPolicy 생성, Kustomize + ArgoCD + Ansible 전체 스택 업데이트 |
 
 ---
 
 ## ✍️ 결론
 
-**현재 네임스페이스 전략은 해커톤 MVP에 최적화되어 있습니다.**
+**도메인별 완전 격리 전략이 적용되었습니다!** ✅
 
+```yaml
+이전: api 단일 네임스페이스
+현재: 도메인별 완전 격리 (Option 1)
+적용: Kustomize + ArgoCD ApplicationSet + Ansible + NetworkPolicy
+
+개선 사항:
+✅ 도메인 간 완전 격리 (Zero Trust)
+✅ NetworkPolicy로 트래픽 제어
+✅ Data 계층 접근 제어
+✅ ArgoCD 자동 배포 (동적 네임스페이스)
+✅ Ansible 자동화 (네임스페이스 + NetworkPolicy)
+
+향후:
+- Atlantis 네임스페이스 NetworkPolicy 추가
+- ResourceQuota 설정 (필요 시)
+- PodDisruptionBudget 추가 (HA 필요 시)
 ```
-현재: api 단일 네임스페이스
-평가: ✅ 적절함 (빠른 개발 + 안정성)
 
-향후: 레이어별 → 도메인별 분리
-시점: 본선 진출 → 프로덕션 출시
-```
-
-**베스트 프랙티스를 모두 따르는 것보다, 프로젝트 단계에 맞는 전략이 더 중요합니다!** 🎯
+**베스트 프랙티스를 조기에 적용하여 확장 가능한 아키텍처를 구축했습니다!** 🚀
 
 ---
 
 **작성일**: 2025-11-13  
-**상태**: ✅ 현재 구조 유지 권장  
-**다음 검토**: 본선 진출 시 (Option 2 검토)
+**상태**: ✅ **Option 1 적용 완료 (도메인별 완전 격리)**  
+**다음 검토**: 프로덕션 출시 시 (ResourceQuota, PodDisruptionBudget 추가)
 

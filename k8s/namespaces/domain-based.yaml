@@ -1,0 +1,134 @@
+# 도메인별 네임스페이스 정의
+# 14-Node Microservices Architecture
+#
+# Option 1: 도메인별 완전 격리
+# 참고: docs/architecture/09-NAMESPACE_STRATEGY_ANALYSIS.md
+
+---
+# API 도메인별 네임스페이스
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: auth
+  labels:
+    name: auth
+    domain: auth
+    tier: api
+    phase: "1"
+    app.kubernetes.io/part-of: ecoeco-backend
+    app.kubernetes.io/component: api-layer
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: my
+  labels:
+    name: my
+    domain: my
+    tier: api
+    phase: "1"
+    app.kubernetes.io/part-of: ecoeco-backend
+    app.kubernetes.io/component: api-layer
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: scan
+  labels:
+    name: scan
+    domain: scan
+    tier: api
+    phase: "2"
+    app.kubernetes.io/part-of: ecoeco-backend
+    app.kubernetes.io/component: api-layer
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: character
+  labels:
+    name: character
+    domain: character
+    tier: api
+    phase: "2"
+    app.kubernetes.io/part-of: ecoeco-backend
+    app.kubernetes.io/component: api-layer
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: location
+  labels:
+    name: location
+    domain: location
+    tier: api
+    phase: "2"
+    app.kubernetes.io/part-of: ecoeco-backend
+    app.kubernetes.io/component: api-layer
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: info
+  labels:
+    name: info
+    domain: info
+    tier: api
+    phase: "3"
+    app.kubernetes.io/part-of: ecoeco-backend
+    app.kubernetes.io/component: api-layer
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: chat
+  labels:
+    name: chat
+    domain: chat
+    tier: api
+    phase: "3"
+    app.kubernetes.io/part-of: ecoeco-backend
+    app.kubernetes.io/component: api-layer
+
+---
+# Infrastructure 네임스페이스
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: data
+  labels:
+    name: data
+    tier: infrastructure
+    app.kubernetes.io/part-of: ecoeco-backend
+    app.kubernetes.io/component: data-layer
+
+---
+# Observability 네임스페이스
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    name: monitoring
+    tier: observability
+    app.kubernetes.io/part-of: ecoeco-backend
+    app.kubernetes.io/component: monitoring
+
+---
+# GitOps 네임스페이스
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: atlantis
+  labels:
+    name: atlantis
+    tier: gitops
+    app.kubernetes.io/part-of: ecoeco-backend
+    app.kubernetes.io/component: gitops
+
