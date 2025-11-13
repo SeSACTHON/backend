@@ -300,12 +300,16 @@ jobs:
           cat ansible/inventory/hosts.ini
       
       - name: 🔍 Test SSH Connectivity
+        env:
+          ANSIBLE_PRIVATE_KEY_FILE: ~/.ssh/k8s-cluster-key.pem
         run: |
           cd ansible
           ansible all -i inventory/hosts.ini -m ping --timeout=30 \
             --private-key=~/.ssh/k8s-cluster-key.pem
       
       - name: ⚙️ Run Ansible Playbook (site.yml)
+        env:
+          ANSIBLE_PRIVATE_KEY_FILE: ~/.ssh/k8s-cluster-key.pem
         run: |
           cd ansible
           
@@ -320,6 +324,8 @@ jobs:
             -v
       
       - name: 🏷️ Label Kubernetes Nodes
+        env:
+          ANSIBLE_PRIVATE_KEY_FILE: ~/.ssh/k8s-cluster-key.pem
         run: |
           cd ansible
           
