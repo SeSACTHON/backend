@@ -1,5 +1,8 @@
 # Namespace 리소스 정의
-# 13 Node Microservices Architecture
+# 14 Node Microservices Architecture
+# 
+# 현재 구조: api 단일 네임스페이스 (모든 API 통합)
+# 참고: docs/architecture/09-NAMESPACE_STRATEGY_ANALYSIS.md
 
 ---
 apiVersion: v1
@@ -10,34 +13,3 @@ metadata:
     name: api
     app.kubernetes.io/part-of: ecoeco-backend
     app.kubernetes.io/component: api-layer
-    
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: workers
-  labels:
-    name: workers
-    app.kubernetes.io/part-of: ecoeco-backend
-    app.kubernetes.io/component: worker-layer
-    
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: data
-  labels:
-    name: data
-    app.kubernetes.io/part-of: ecoeco-backend
-    app.kubernetes.io/component: data-layer
-    
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: messaging
-  labels:
-    name: messaging
-    app.kubernetes.io/part-of: ecoeco-backend
-    app.kubernetes.io/component: messaging-layer
-
