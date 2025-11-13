@@ -1,6 +1,6 @@
 # 🏗️ 네임스페이스 전략 분석: 현재 vs 베스트 프랙티스
 
-**문서 버전**: v0.8.0  
+**문서 버전**: v0.7.2  
 **최종 업데이트**: 2025-11-13  
 **작성자**: Architecture Team
 
@@ -699,7 +699,7 @@ sum(container_memory_usage_bytes) by (namespace)
 |------|------|-----------|
 | 2025-11-13 | v0.7.2 | 초안 작성 - 현재 구조 vs 베스트 프랙티스 비교, 3가지 옵션 제시, 단계별 로드맵 |
 | 2025-11-13 | v0.7.2 | Helm Chart 정리 - workers, data, messaging 네임스페이스 제거, 문서 업데이트 |
-| 2025-11-13 | v0.8.0 | **Option 1 적용 완료** - 도메인별 네임스페이스 분리 (auth, my, scan, character, location, info, chat, data, monitoring), NetworkPolicy 생성, Kustomize + ArgoCD + Ansible 전체 스택 업데이트 |
+| 2025-11-13 | v0.7.2 | **Option 1 적용 완료** - 도메인별 네임스페이스 분리 (auth, my, scan, character, location, info, chat, data, monitoring), NetworkPolicy 생성, Kustomize + ArgoCD + Ansible 전체 스택 업데이트 |
 
 ---
 

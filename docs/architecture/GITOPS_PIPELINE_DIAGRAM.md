@@ -555,6 +555,7 @@ graph TD
 ---
 
 **Last Updated**: 2025-11-12  
-**Version**: v1.0.0  
+**Version**: v0.8.0  
 **Architecture**: 14-Node Self-Managed Kubernetes
+
 

@@ -53,4 +53,25 @@
         msg: |
           ✅ NetworkPolicy 적용 완료
           {{ netpol_list.stdout }}
+    
+    - name: ServiceMonitor YAML 복사 (도메인별 네임스페이스)
+      copy:
+        src: ../../k8s/monitoring/servicemonitors-domain-ns.yaml
+        dest: /tmp/servicemonitors-domain-ns.yaml
+        mode: '0644'
+    
+    - name: ServiceMonitor 적용
+      command: kubectl apply -f /tmp/servicemonitors-domain-ns.yaml --kubeconfig={{ kube_config }}
+      register: sm_result
+      changed_when: "'created' in sm_result.stdout or 'configured' in sm_result.stdout"
+    
+    - name: ServiceMonitor 확인
+      command: kubectl get servicemonitors -n monitoring --kubeconfig={{ kube_config }}
+      register: sm_list
+    
+    - name: ServiceMonitor 결과 출력
+      debug:
+        msg: |
+          ✅ ServiceMonitor 적용 완료 (네임스페이스 기반 메트릭 수집)
+          {{ sm_list.stdout }}
 

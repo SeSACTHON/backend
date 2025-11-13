@@ -1,0 +1,423 @@
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ServiceMonitor for Domain-Based Namespace Architecture
+# Prometheus 자동 발견 설정 (도메인별 네임스페이스)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 전체 API 서비스 자동 발견 (모든 도메인 네임스페이스)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: api-services-all-domains
+  namespace: monitoring
+  labels:
+    app: ecoeco
+    component: api
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      tier: api  # 모든 API 서비스 자동 발견
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /metrics
+      scheme: http
+      relabelings:
+        # namespace label 추가 (도메인 식별)
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        # domain label 추가 (Pod Label)
+        - sourceLabels: [__meta_kubernetes_pod_label_domain]
+          targetLabel: domain
+        # phase label 추가
+        - sourceLabels: [__meta_kubernetes_pod_label_phase]
+          targetLabel: phase
+        # node label 추가
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+  namespaceSelector:
+    matchNames:
+      - auth
+      - my
+      - scan
+      - character
+      - location
+      - info
+      - chat
+
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# auth 네임스페이스 (Phase 1)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: auth-api-monitor
+  namespace: monitoring
+  labels:
+    app: ecoeco
+    domain: auth
+    phase: "1"
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      domain: auth
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /metrics
+      scheme: http
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_label_domain]
+          targetLabel: domain
+        - sourceLabels: [__meta_kubernetes_pod_label_phase]
+          targetLabel: phase
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+  namespaceSelector:
+    matchNames:
+      - auth
+
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# my 네임스페이스 (Phase 1)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: my-api-monitor
+  namespace: monitoring
+  labels:
+    app: ecoeco
+    domain: my
+    phase: "1"
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      domain: my
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /metrics
+      scheme: http
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_label_domain]
+          targetLabel: domain
+        - sourceLabels: [__meta_kubernetes_pod_label_phase]
+          targetLabel: phase
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+  namespaceSelector:
+    matchNames:
+      - my
+
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# scan 네임스페이스 (Phase 1 - 고트래픽)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: scan-api-monitor
+  namespace: monitoring
+  labels:
+    app: ecoeco
+    domain: scan
+    phase: "1"
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      domain: scan
+  endpoints:
+    - port: http
+      interval: 15s  # 고트래픽 서비스는 더 자주 수집
+      path: /metrics
+      scheme: http
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_label_domain]
+          targetLabel: domain
+        - sourceLabels: [__meta_kubernetes_pod_label_phase]
+          targetLabel: phase
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+  namespaceSelector:
+    matchNames:
+      - scan
+
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# character 네임스페이스 (Phase 2)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: character-api-monitor
+  namespace: monitoring
+  labels:
+    app: ecoeco
+    domain: character
+    phase: "2"
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      domain: character
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /metrics
+      scheme: http
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_label_domain]
+          targetLabel: domain
+        - sourceLabels: [__meta_kubernetes_pod_label_phase]
+          targetLabel: phase
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+  namespaceSelector:
+    matchNames:
+      - character
+
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# location 네임스페이스 (Phase 2)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: location-api-monitor
+  namespace: monitoring
+  labels:
+    app: ecoeco
+    domain: location
+    phase: "2"
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      domain: location
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /metrics
+      scheme: http
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_label_domain]
+          targetLabel: domain
+        - sourceLabels: [__meta_kubernetes_pod_label_phase]
+          targetLabel: phase
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+  namespaceSelector:
+    matchNames:
+      - location
+
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# info 네임스페이스 (Phase 3)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: info-api-monitor
+  namespace: monitoring
+  labels:
+    app: ecoeco
+    domain: info
+    phase: "3"
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      domain: info
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /metrics
+      scheme: http
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_label_domain]
+          targetLabel: domain
+        - sourceLabels: [__meta_kubernetes_pod_label_phase]
+          targetLabel: phase
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+  namespaceSelector:
+    matchNames:
+      - info
+
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# chat 네임스페이스 (Phase 3 - WebSocket)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: chat-api-monitor
+  namespace: monitoring
+  labels:
+    app: ecoeco
+    domain: chat
+    phase: "3"
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      domain: chat
+  endpoints:
+    - port: http
+      interval: 30s
+      path: /metrics
+      scheme: http
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_pod_label_domain]
+          targetLabel: domain
+        - sourceLabels: [__meta_kubernetes_pod_label_phase]
+          targetLabel: phase
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+  namespaceSelector:
+    matchNames:
+      - chat
+
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# data 네임스페이스 (Infrastructure)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: data-infrastructure-monitor
+  namespace: monitoring
+  labels:
+    app: ecoeco
+    tier: infrastructure
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      tier: infrastructure
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+      scheme: http
+      relabelings:
+        - sourceLabels: [__meta_kubernetes_namespace]
+          targetLabel: namespace
+        - sourceLabels: [__meta_kubernetes_service_name]
+          targetLabel: service
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+  namespaceSelector:
+    matchNames:
+      - data
+
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Node Exporter (전체 노드 모니터링)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: node-exporter-monitor
+  namespace: monitoring
+  labels:
+    app: node-exporter
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: node-exporter
+  endpoints:
+    - port: metrics
+      interval: 30s
+      path: /metrics
+      scheme: http
+      relabelings:
+        # 노드 정보 추가
+        - sourceLabels: [__meta_kubernetes_pod_node_name]
+          targetLabel: node
+        - sourceLabels: [__meta_kubernetes_node_label_workload]
+          targetLabel: workload
+        - sourceLabels: [__meta_kubernetes_node_label_domain]
+          targetLabel: domain
+        - sourceLabels: [__meta_kubernetes_node_label_phase]
+          targetLabel: phase
+  namespaceSelector:
+    matchNames:
+      - monitoring
+
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Prometheus 자체 모니터링
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: prometheus-self-monitor
+  namespace: monitoring
+  labels:
+    app: prometheus
+    monitoring: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: prometheus
+  endpoints:
+    - port: web
+      interval: 30s
+      path: /metrics
+      scheme: http
+  namespaceSelector:
+    matchNames:
+      - monitoring
+
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# ServiceMonitor Summary (Domain-Based Namespace Architecture)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#
+# 총 11개 ServiceMonitor:
+#   1. API Services (전체 자동 발견): 모든 도메인 네임스페이스
+#   2-8. Individual APIs: auth, my, scan, character, location, info, chat
+#   9. Data Infrastructure: postgresql, redis, rabbitmq
+#   10. Node Exporter: 전체 노드
+#   11. Prometheus: 자체 모니터링
+#
+# Label 기반 자동 발견:
+#   - namespace: auth | my | scan | character | location | info | chat | data | monitoring
+#   - domain: auth | my | scan | character | location | info | chat
+#   - phase: 1 | 2 | 3
+#   - tier: api | infrastructure
+#
+# Relabeling:
+#   - 자동으로 namespace, domain, phase, node label 추가
+#   - Grafana에서 네임스페이스 기반 필터링 가능
+#
+# 네임스페이스 기반 메트릭 수집:
+#   ✅ 도메인별 분리된 메트릭
+#   ✅ namespace label로 구분
+#   ✅ NetworkPolicy와 독립적
+#   ✅ Grafana 대시보드에서 네임스페이스별 필터링 가능
+
