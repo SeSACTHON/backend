@@ -9,7 +9,7 @@
 #   - Tier 0 (Observability): Monitoring, Logging (별도 계층)
 #   - Kubernetes Control Plane: kube-system (etcd, api-server, scheduler)
 #
-# 참고: docs/architecture/09-NAMESPACE_STRATEGY_ANALYSIS.md
+# 참고: docs/TROUBLESHOOTING.md (Namespace 섹션)
 
 ---
 # Tier 2: Business Logic (도메인별 API)
@@ -110,6 +110,21 @@ metadata:
     phase: "3"
     app.kubernetes.io/part-of: ecoeco-backend
     app.kubernetes.io/component: api-layer
+
+---
+# Tier 2: Business Logic (비동기 처리 - Celery Workers)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: workers
+  labels:
+    name: workers
+    tier: business-logic
+    layer: "2"
+    component: async-processor
+    app.kubernetes.io/part-of: ecoeco-backend
+    app.kubernetes.io/component: worker-layer
 
 ---
 # Tier 3: Integration (Message Queue - Async 통신)

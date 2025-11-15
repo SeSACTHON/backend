@@ -4,14 +4,12 @@ metadata:
   name: api
   labels:
     app: api
-    component: api
 spec:
-  type: ClusterIP
-  ports:
-  - port: 8000
-    targetPort: http
-    protocol: TCP
-    name: http
+  type: NodePort
   selector:
     app: api
-
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      nodePort: 32000

@@ -150,12 +150,7 @@
   roles:
     - postgresql
 
-- name: Atlantis 설치 (Terraform GitOps)
-  hosts: masters
-  become: yes
-  become_user: "{{ kubectl_user }}"
-  tasks:
-    - import_tasks: playbooks/09-atlantis.yml
+- import_playbook: playbooks/09-atlantis.yml
 
 - name: Ingress 리소스 생성 (ALB 자동 생성)
   hosts: masters
