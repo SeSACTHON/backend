@@ -6,9 +6,9 @@ from app.api.v1.endpoints import api_router, health_router
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="Auth API",
-        description="Authentication/Authorization service",
-        version="1.0.0",
+        title="Scan API",
+        description="Waste classification pipeline",
+        version="0.2.0",
     )
 
     app.add_middleware(
@@ -31,3 +31,4 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
