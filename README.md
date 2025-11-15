@@ -29,14 +29,6 @@ AI 폐기물 분류·지도·챗봇 등 도메인 API와 데이터 계층, GitOp
 -   Ingress/Egress 정책 면에서 default로 deny, 허용할 포트만 명시적으로 allow
 -   Data Layer는 Business Logic에서만 접근 가능
 
-#### 리소스 격리 고려사항
-
-초기엔 단일 api 네임스페이스에 7개 API를 몰아 배치했다. 빠른 개발엔 유리했지만 몇 가지 문제가 있었다:
-
--   ❌ 특정 API의 메모리 누수 시 다른 API도 영향받음
--   ❌ 도메인별 리소스 사용량 추적 불가
--   ❌ NetworkPolicy 적용 불가 (모두 같은 네임스페이스)
-
 ## Hardware
 | 역할  | 개수 | 용도 | 인스턴스 타입 |
 | --- | --- | --- | --- |
