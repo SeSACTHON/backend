@@ -37,4 +37,3 @@ class ChatFeedback(BaseModel):
     session_id: str
     rating: int
     comment: Optional[str] = None
-

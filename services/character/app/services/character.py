@@ -54,4 +54,3 @@ class CharacterService:
             "catalog_size": 5,
             "history_entries": 56,
         }
-

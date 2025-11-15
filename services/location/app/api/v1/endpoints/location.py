@@ -34,4 +34,3 @@ async def geocode(address: str, service: LocationService = Depends()):
 @router.post("/reverse-geocode", response_model=GeoResponse, summary="Coordinates to address")
 async def reverse_geocode(payload: Coordinates, service: LocationService = Depends()):
     return await service.reverse_geocode(payload)
-

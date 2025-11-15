@@ -27,4 +27,3 @@ class ScanCategory(BaseModel):
     name: str
     display_name: str
     instructions: List[str]
-

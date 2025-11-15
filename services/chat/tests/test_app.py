@@ -18,4 +18,3 @@ def load_fastapi_app() -> FastAPI:
 def test_fastapi_app_instantiates():
     app = load_fastapi_app()
     assert isinstance(app, FastAPI)
-

@@ -76,4 +76,3 @@ async def list_sessions(service: Annotated[AuthService, Depends()]):
         )
         for idx in range(1, 3)
     ]
-

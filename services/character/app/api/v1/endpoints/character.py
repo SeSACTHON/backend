@@ -34,4 +34,3 @@ async def history(user_id: str, service: CharacterService = Depends()):
 )
 async def catalog(service: CharacterService = Depends()):
     return await service.catalog()
-

@@ -34,4 +34,3 @@ class FAQEntry(BaseModel):
     question: str
     answer: str
     category: str
-

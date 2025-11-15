@@ -32,4 +32,3 @@ class UserPoints(BaseModel):
     total_points: int
     available_points: int
     used_points: int
-

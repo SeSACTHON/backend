@@ -41,4 +41,3 @@ class LocationService:
             "centers_indexed": 12,
             "geocode_requests_24h": 320,
         }
-

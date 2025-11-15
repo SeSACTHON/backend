@@ -108,9 +108,7 @@ class ChatService:
                 "questions in Korean. Provide concise, practical answers."
             ),
         }
-        converted_history = [
-            {"role": msg.role, "content": msg.content} for msg in history[-6:]
-        ]
+        converted_history = [{"role": msg.role, "content": msg.content} for msg in history[-6:]]
         converted_history.append({"role": "user", "content": current})
         return [system_prompt, *converted_history]
 
@@ -126,4 +124,3 @@ class ChatService:
             "종이팩과 종이는 어떻게 구분하나요?",
             "스티로폼 재활용 요령을 알려줘.",
         ]
-

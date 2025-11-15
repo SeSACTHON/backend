@@ -20,4 +20,3 @@ class LocationEntry(BaseModel):
 class GeoResponse(BaseModel):
     address: str
     coordinates: Coordinates
-

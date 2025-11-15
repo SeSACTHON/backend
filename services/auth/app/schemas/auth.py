@@ -28,4 +28,3 @@ class User(UserBase):
     id: int
     created_at: datetime
     avatar_url: Optional[str] = None
-

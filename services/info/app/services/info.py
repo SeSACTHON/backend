@@ -63,4 +63,3 @@ class InfoService:
             "faq_entries": 24,
             "last_sync_minutes_ago": 15,
         }
-

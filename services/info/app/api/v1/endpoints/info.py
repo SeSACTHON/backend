@@ -43,4 +43,3 @@ async def faq(
     service: InfoService = Depends(),
 ):
     return await service.faq(category=category, skip=skip, limit=limit)
-

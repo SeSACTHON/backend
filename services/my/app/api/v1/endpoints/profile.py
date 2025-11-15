@@ -43,4 +43,3 @@ async def history(
 async def delete_user(user_id: int, service: MyService = Depends()):
     await service.delete_user(user_id)
     return {"message": f"user {user_id} deleted"}
-

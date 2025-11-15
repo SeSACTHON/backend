@@ -23,4 +23,3 @@ class CharacterHistoryEntry(BaseModel):
     character_id: str
     timestamp: datetime
     context: dict[str, str]
-

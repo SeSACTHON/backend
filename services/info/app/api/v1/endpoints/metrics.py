@@ -8,4 +8,3 @@ router = APIRouter(prefix="/metrics", tags=["metrics"])
 @router.get("/", summary="Info service metrics")
 async def metrics(service: InfoService = Depends()):
     return await service.metrics()
-

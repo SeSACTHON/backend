@@ -57,4 +57,3 @@ class AuthService:
             token_type="bearer",
             expires_in=expires,
         )
-

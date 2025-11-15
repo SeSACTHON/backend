@@ -51,4 +51,3 @@ async def suggestions(service: ChatService = Depends()):
 async def feedback(payload: ChatFeedback, service: ChatService = Depends()):
     await service.submit_feedback(payload)
     return {"message": "feedback stored"}
-

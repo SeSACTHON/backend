@@ -39,4 +39,3 @@ async def task(task_id: str, service: ScanService = Depends()):
 )
 async def categories(service: ScanService = Depends()):
     return await service.categories()
-

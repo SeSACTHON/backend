@@ -13,4 +13,3 @@ async def health():
 @router.get("/ready")
 async def readiness():
     return {"status": "ready", "service": f"{SERVICE_NAME}-api"}
-

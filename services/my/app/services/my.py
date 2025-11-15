@@ -46,4 +46,3 @@ class MyService:
             "weekly_active_users": 82,
             "avg_points_per_user": 1340,
         }
-

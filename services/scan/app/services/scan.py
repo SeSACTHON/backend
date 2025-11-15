@@ -49,4 +49,3 @@ class ScanService:
             "avg_processing_ms": 820,
             "successful_classifications": 320,
         }
-

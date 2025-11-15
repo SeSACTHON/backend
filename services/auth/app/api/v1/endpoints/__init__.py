@@ -10,4 +10,3 @@ health_router = APIRouter()
 health_router.include_router(health.router)
 
 __all__ = ["api_router", "health_router"]
-
