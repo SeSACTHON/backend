@@ -3,7 +3,7 @@
 ![E40B8A37-71A7-4B98-9BD8-6A60741D99DE_4_5005_c](https://github.com/user-attachments/assets/51ac6f45-ef6d-403b-92e2-00a705af78da)
 
 
-Self-managed Kubernetes 기반으로 Terraform · Ansible · ArgoCD · Atlantis를 결합해 운영하는 14-Node 마이크로서비스 플랫폼입니다.  
+Self-managed Kubernetes Cluster를 기반으로 Terraform · Ansible · ArgoCD · Atlantis를 결합해 운영합니다.  
 AI 폐기물 분류·지도·챗봇 등 도메인 API와 데이터 계층, GitOps 파이프라인을 하나의 리포지토리에서 관리합니다.
 
 ---
