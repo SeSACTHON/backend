@@ -145,7 +145,7 @@
                         echo "Terraform Apply Complete!"
         EOF
       register: atlantis_repo_config
-
+      when:
         - atlantis_deployment is defined and atlantis_deployment.changed
         - atlantis_pod_status != "Running"
 

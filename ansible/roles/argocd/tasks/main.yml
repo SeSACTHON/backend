@@ -50,7 +50,7 @@
 
 - name: root-app.yaml 복사 (Master 노드로)
   copy:
-    src: "{{ playbook_dir }}/../../argocd/root-app.yaml"
+    src: "{{ playbook_dir }}/../../../argocd/root-app.yaml"
     dest: /tmp/root-app.yaml
     mode: '0644'
 

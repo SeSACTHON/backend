@@ -71,10 +71,6 @@ spec:
         repoURL: https://github.com/SeSACTHON/backend
         targetRevision: develop
         path: k8s/overlays/{{domain}}
-        kustomize:
-          images:
-            - name: ghcr.io/sesacthon/{{domain}}-api
-              newTag: latest
       
       destination:
         server: https://kubernetes.default.svc

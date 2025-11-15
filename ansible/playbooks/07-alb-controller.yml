@@ -1,81 +1,18 @@
 # AWS Load Balancer Controller 설치
 # 공식 문서: https://kubernetes-sigs.github.io/aws-load-balancer-controller/
+# Note: import_tasks로 호출되므로 tasks만 정의 (hosts 제거)
 ---
-- name: AWS Load Balancer Controller (Helm by ArgoCD) 안내
-  hosts: masters
-  vars:
-    helm_managed_alb: true   # 기본값: ArgoCD (15-alb-controller)에서 설치
-  tasks:
-    - name: "ArgoCD에서 ALB Controller를 관리하고 있습니다"
-      debug:
-        msg:
-          - "Wave 15 Application (`argocd/apps/15-alb-controller.yaml`)이 eks/aws-load-balancer-controller Chart를 배포합니다."
-          - "별도 작업이 필요하지 않습니다."
-          - "이 Playbook을 사용하려면 `-e helm_managed_alb=false`로 호출하세요."
-      when: helm_managed_alb | bool
-
-    - block:
-        - name: Helm 설치 여부 확인
-          command: which helm
-          register: helm_check
-          failed_when: false
-          changed_when: false
-
-        - name: Helm 설치 (ALB Controller 필수)
-          shell: |
-            curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
-          when: helm_check.rc != 0
-
-        - name: AWS Load Balancer Controller 설치 확인
-          command: kubectl get deployment -n kube-system aws-load-balancer-controller
-          register: alb_controller_check
-          failed_when: false
-          changed_when: false
-
-        - name: AWS Load Balancer Controller 설치
-          when: alb_controller_check.rc != 0
-          block:
-            - name: AWS Load Balancer Controller CRDs 설치
-              shell: |
-                kubectl apply -k "github.com/aws/eks-charts/stable/aws-load-balancer-controller/crds?ref=master"
-              register: alb_crds
-            
-            - name: AWS Load Balancer Controller Helm repo 추가
-              command: helm repo add eks https://aws.github.io/eks-charts
-              changed_when: false
-            
-            - name: Helm repo 업데이트
-              command: helm repo update
-              changed_when: false
-            
-            - name: AWS Load Balancer Controller 설치 (Helm)
-              shell: |
-                helm install aws-load-balancer-controller eks/aws-load-balancer-controller \
-                  -n kube-system \
-                  --set clusterName={{ cluster_name }} \
-                  --set region={{ aws_region }} \
-                  --set vpcId={{ vpc_id }} \
-                  --set serviceAccount.create=false \
-                  --set enableShield=false \
-                  --set enableWaf=false \
-                  --set enableWafv2=false
-              register: alb_controller_install
-            
-            - name: AWS Load Balancer Controller Pod 대기
-              command: kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=aws-load-balancer-controller -n kube-system --timeout=300s
-              when: alb_controller_install.changed
-
-        - name: AWS Load Balancer Controller 상태 확인
-          command: kubectl get deployment -n kube-system aws-load-balancer-controller
-          register: alb_status
-          changed_when: false
-
-        - name: AWS Load Balancer Controller 정보 출력
-          debug:
-            msg:
-              - "✅ AWS Load Balancer Controller 설치 완료"
-              - "이제 Ingress 생성 시 ALB가 자동 생성됩니다"
-              - "{{ alb_status.stdout_lines }}"
-      when: not helm_managed_alb | bool
-
-
+- name: "ArgoCD가 ALB Controller를 관리합니다 (Wave 20)"
+  debug:
+    msg:
+      - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - "ℹ️  ArgoCD Application (`argocd/apps/20-alb-controller.yaml`)이"
+      - "   eks/aws-load-balancer-controller Helm Chart를 자동 배포합니다."
+      - "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      - ""
+      - "📍 배포 시점: ArgoCD root-app 배포 후 Wave 20"
+      - "📍 설치 위치: kube-system namespace"
+      - ""
+      - "💡 수동 설치가 필요한 경우:"
+      - "   ansible-playbook site.yml -e helm_managed_alb=false"
+      - ""
