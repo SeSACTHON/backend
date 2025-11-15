@@ -36,7 +36,7 @@ spec:
         - name: region
           value: ap-northeast-2
         - name: vpcId
-          value: vpc-08049a4dd788790fa
+          value: vpc-0cb5bbb41f25671f5
         - name: serviceAccount.create
           value: "true"
 
