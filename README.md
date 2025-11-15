@@ -65,7 +65,6 @@ graph TD
     ALB --> CALICO["Calico + NetworkPolicy"]
     CALICO --> APISYNC["API Pods<br> auth · my · character · location · info"]
     CALICO --> APIAI["API Pods<br> scan · chat"]
-    CALICO --> WORK["Worker Pods: ai"]
     APISYNC["non-AI API<br> auth · my · character · location · info"] --> REDIS["Redis"]
     REDIS["Redis"] --> POSTGRE["PostgreSQL"]
     APIAI["AI API<br> scan · chat"] --> RABBITMQ["RabbitMQ"]
