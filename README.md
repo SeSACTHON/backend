@@ -66,7 +66,6 @@ graph TD
     CALICO --> API["API Pods: auth · my · scan · character · location · info · chat"]
     CALICO --> WORK["Worker Pods<br/>storage · ai"]
     API["non-AI API: auth · my · character · location · info"] --> DATA["Redis"]
-    DATA["Redis"] --> DATA["PostgreSQL"]
     API["AI API: scan · character · location · info · chat"] --> DATA["RabbitMQ"]
     DATA["RabbitMQ"] --> WORK["Worker Pods: ai"]
     WORK["Worker Pods: ai"] --> DATA["PostgreSQL · Redis"]
