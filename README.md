@@ -11,6 +11,14 @@ AI 폐기물 분류·지도·챗봇 등 도메인 API와 데이터 계층, GitOp
 ## Architecture
 ![E6A73249-BFDB-4CA9-A41B-4AF5A907C6D1](https://github.com/user-attachments/assets/c1e5430d-0fd6-4c78-9e3b-f7940502dc1e)
 
+
+#### 4-Tier 아키텍처 구성
+-   Tier 1 (Presentation) → ALB(L7) / Ingress
+-   Tier 2 (Business Logic) → API Nodes (7개), Celery Workers
+-   Tier 3 (Integration) → RabbitMQ
+-   Tier 4 (Data) → PostgreSQL, Redis
+-   Tier 0 (Observability) → Monitoring
+
 | Layer | 네임스페이스 | 할당된 노드 | NetworkPolicy |
 | --- | --- | --- | --- |
 | Tier 1 | kube-system에 포함, ALB Controller | master node | IMDS, In-cluster API, DNS, AWS API Egress 허용 |
