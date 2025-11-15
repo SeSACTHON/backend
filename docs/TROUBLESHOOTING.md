@@ -1455,7 +1455,334 @@ journalctl -u kubelet -f                 # Worker 노드에서
 
 ---
 
-**최종 업데이트**: 2025-11-07  
-**버전**: v0.6.0  
-**아키텍처**: 14-Node Microservices + Worker Local SQLite WAL
+## 18. GitOps 배포 문제 (2025-11-16 추가)
+
+### 18.1. Kustomize 상위 디렉토리 참조 오류
+
+#### 문제
+```
+Error: file '../namespaces/domain-based.yaml' is not in or below 'k8s/foundations'
+```
+
+**원인**: Kustomize는 보안상 상위 디렉토리 참조 불가
+
+#### 해결
+```bash
+# 파일을 foundations 디렉토리 안으로 복사
+cp k8s/namespaces/domain-based.yaml k8s/foundations/namespaces.yaml
+
+# kustomization.yaml 수정
+resources:
+  - namespaces.yaml  # 상대 경로로 변경
+```
+
+**커밋**: `c17defd`
+
+---
+
+### 18.2. ApplicationSet kustomize.images 문법 오류
+
+#### 문제
+```
+ApplicationSet.argoproj.io "api-services" is invalid: 
+spec.template.spec.source.kustomize.images[0]: Invalid value: "object"
+```
+
+**원인**: ApplicationSet에서 kustomize.images는 객체 형태 사용 불가
+
+#### 해결
+```yaml
+# argocd/apps/80-apis-app-of-apps.yaml
+# BEFORE (오류)
+source:
+  path: k8s/overlays/{{domain}}
+  kustomize:
+    images:
+      - name: ghcr.io/sesacthon/{{domain}}-api
+        newTag: latest
+
+# AFTER (수정)
+source:
+  path: k8s/overlays/{{domain}}
+  # kustomize.images 제거 - overlay의 patch-deployment.yaml에서 이미 latest 지정
+```
+
+**커밋**: `7f79d30`
+
+---
+
+### 18.3. CI Workflow YAML 파싱 오류
+
+#### 문제
+```
+YAML parsing failed: could not find expected ':'
+in ".github/workflows/ci-quality-gate.yml", line 186
+```
+
+**원인**: Python heredoc의 들여쓰기 문제
+
+#### 해결
+```yaml
+# .github/workflows/ci-quality-gate.yml
+# BEFORE (오류)
+python <<'PY'
+import json  # 들여쓰기 없음
+...
+PY
+
+# AFTER (수정)
+python3 <<'PYEOF'
+  import json  # YAML 문법에 맞게 들여쓰기
+  ...
+PYEOF
+```
+
+**커밋**: `84b1c1d`
+
+---
+
+### 18.4. GHCR ImagePullBackOff (권한 문제)
+
+#### 문제
+```
+Failed to pull image "ghcr.io/sesacthon/auth-api:latest": 403 Forbidden
+```
+
+**원인**: Secret의 GitHub token에 `read:packages` 권한 없음
+
+#### 해결
+```bash
+# 1. read:packages 권한이 있는 토큰 생성
+# GitHub Settings → Developer settings → Personal access tokens
+
+# 2. 모든 namespace에 Secret 재생성
+for ns in auth character chat info location my scan workers; do
+  kubectl delete secret ghcr-secret -n $ns
+  kubectl create secret docker-registry ghcr-secret \
+    --docker-server=ghcr.io \
+    --docker-username=<USERNAME> \
+    --docker-password=<TOKEN_WITH_READ_PACKAGES> \
+    --namespace=$ns
+done
+
+# 3. Pods 재생성
+kubectl delete pod --all -n auth
+```
+
+**필수 권한**: `read:packages`, `write:packages` (빌드 시)
+
+**커밋**: Secret 생성 (수동), `0f6663e` (imagePullSecrets 추가)
+
+---
+
+### 18.5. RabbitMQ Bitnami Debian 이미지 중단
+
+#### 문제
+```
+bitnami/rabbitmq:4.1.3-debian-12-r1: not found
+bitnami/rabbitmq:3.13.7-debian-12-r0: not found
+```
+
+**원인**: Bitnami의 Debian 기반 RabbitMQ 이미지가 2025-08-28부터 중단됨
+
+#### 해결 방법
+
+**Option A: Docker Official Image (임시)**
+```yaml
+# charts/data/databases/values.yaml
+rabbitmq:
+  image:
+    registry: docker.io
+    repository: rabbitmq
+    tag: "3.13-management"
+```
+
+**주의**: Bitnami Chart의 init scripts가 Docker Official Image와 호환되지 않을 수 있음
+
+**Option B: RabbitMQ Cluster Operator (권장)**
+```yaml
+# argocd/apps/50-data-operators.yaml에 추가
+# RabbitMQ Operator 설치 후
+# RabbitMQCluster CRD로 배포
+```
+
+**커밋**: `dd51c46`
+
+**참고**: https://www.rabbitmq.com/kubernetes/operator/operator-overview.html
+
+---
+
+### 18.6. Ansible Playbook import_tasks 문법 충돌
+
+#### 문제
+```
+ERROR: conflicting action statements: hosts, tasks
+Origin: ansible/playbooks/07-alb-controller.yml:4:3
+```
+
+**원인**: `import_tasks`로 호출되는 playbook에 `hosts` 정의 불가
+
+#### 해결
+```yaml
+# ansible/playbooks/07-alb-controller.yml
+# BEFORE (오류)
+---
+- name: Task name
+  hosts: masters  # ← import_tasks로 호출 시 불가
+  tasks:
+    - ...
+
+# AFTER (수정)
+---
+- name: Task name
+  # hosts 제거, tasks만 정의
+  set_fact:
+    ...
+```
+
+**커밋**: `7f79d30`
+
+---
+
+### 18.7. VPC 삭제 실패 (ALB/Target Groups 남음)
+
+#### 문제
+```
+terraform destroy 실패
+Error: VPC has dependencies and cannot be deleted
+```
+
+**원인**: Kubernetes ALB Controller가 생성한 ALB, Target Groups가 남아있음
+
+#### 해결
+```bash
+# VPC cleanup 스크립트 사용
+bash scripts/cleanup-vpc-resources.sh
+
+# 수동 정리
+VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Project,Values=SeSACTHON" --query 'Vpcs[0].VpcId' --output text)
+
+# Target Groups 삭제
+aws elbv2 describe-target-groups --query "TargetGroups[?VpcId=='$VPC_ID'].TargetGroupArn" --output text | \
+  xargs -I {} aws elbv2 delete-target-group --target-group-arn {}
+
+# Load Balancers 삭제
+aws elbv2 describe-load-balancers --query "LoadBalancers[?VpcId=='$VPC_ID'].LoadBalancerArn" --output text | \
+  xargs -I {} aws elbv2 delete-load-balancer --load-balancer-arn {}
+
+# 30초 대기 후 terraform destroy
+sleep 30
+terraform destroy -auto-approve
+```
+
+**스크립트**: `scripts/cleanup-vpc-resources.sh` 생성됨
+
+---
+
+### 18.8. scan-api CrashLoopBackOff (모듈 경로)
+
+#### 문제
+```
+ERROR: Error loading ASGI app. Could not import module "main".
+```
+
+**원인**: Dockerfile의 uvicorn 경로가 잘못됨
+
+#### 해결
+```dockerfile
+# services/scan/Dockerfile
+# BEFORE
+CMD ["uvicorn", "main:app", ...]
+
+# AFTER  
+CMD ["uvicorn", "app.main:app", ...]
+```
+
+**커밋**: `eb154a7`
+
+---
+
+### 18.9. ArgoCD Application 자동 Sync 안됨
+
+#### 문제
+Applications가 OutOfSync 상태로 남아있음
+
+#### 원인
+```yaml
+syncPolicy:
+  automated:
+    prune: true
+    selfHeal: true  # 설정되어 있지만 delay 있음
+```
+
+#### 해결
+```bash
+# 수동 sync 트리거
+kubectl patch application <app-name> -n argocd --type merge \
+  -p '{"operation":{"initiatedBy":{"username":"admin"},"sync":{"revision":"develop"}}}'
+
+# 또는 Application 재생성 (root-app이 자동 재생성)
+kubectl delete application <app-name> -n argocd
+```
+
+**시간이 지나면 자동으로 sync됨** (retryPolicy 설정)
+
+---
+
+### 18.10. ALB Controller VPC ID 하드코딩
+
+#### 문제
+```
+ALB Controller CrashLoopBackOff
+Error: unable to create controller
+```
+
+**원인**: ArgoCD Application에 이전 VPC ID 하드코딩됨
+
+#### 해결
+```yaml
+# argocd/apps/20-alb-controller.yaml
+# 현재 VPC ID로 수정 필요
+parameters:
+  - name: vpcId
+    value: vpc-0cb5bbb41f25671f5  # 새 VPC ID
+```
+
+**개선안**: ConfigMap이나 External Secrets로 동적 주입 고려
+
+**커밋**: `0645847`
+
+---
+
+## 19. 베스트 프랙티스 (2025-11-16 업데이트)
+
+### 19.1. GitOps 배포
+
+**권장:**
+- ✅ Namespace는 ArgoCD foundations에서만 관리 (Ansible 중복 제거)
+- ✅ Cert-manager 제거, ACM 사용
+- ✅ Kustomize 리소스는 같은 디렉토리나 하위에만
+- ✅ ApplicationSet에서 kustomize.images 사용 금지
+- ✅ CI YAML heredoc는 올바른 들여쓰기
+
+### 19.2. GHCR 이미지 관리
+
+**권장:**
+- ✅ Token에 `read:packages`, `write:packages` 권한 필수
+- ✅ imagePullSecrets를 base deployment에 정의
+- ✅ Private packages 사용 시 모든 namespace에 Secret 생성
+- ✅ CI에서 `secrets.GH_TOKEN` 사용 (GITHUB_TOKEN은 제한적)
+
+### 19.3. Bitnami Charts
+
+**주의:**
+- ⚠️ Bitnami Debian 이미지 중단 (2025-08-28)
+- ✅ Docker Official Image 또는 Operator 사용 권장
+- ✅ Bitnami Chart와 Docker Official Image 호환성 확인 필요
+
+---
+
+**최종 업데이트**: 2025-11-16  
+**버전**: v0.7.3  
+**아키텍처**: 14-Node GitOps Production
 
