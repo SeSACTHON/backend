@@ -187,12 +187,16 @@ jobs:
 
           files = os.environ.get("CHANGED_FILES", "").split()
           services = []
-          for path in files:
-              parts = path.split("/")
-              if len(parts) >= 2 and parts[0] == "services":
-                  svc = parts[1]
-                  if svc and svc not in services:
-                      services.append(svc)
+            repo_root = os.environ.get("GITHUB_WORKSPACE", "")
+            for path in files:
+                parts = path.split("/")
+                if len(parts) >= 2 and parts[0] == "services":
+                    svc = parts[1]
+                    service_path = os.path.join("services", svc)
+                    if not os.path.isdir(service_path):
+                        continue  # README.md 등 파일은 건너뛰기
+                    if svc and svc not in services:
+                        services.append(svc)
 
           if not services:
               with open(os.environ["GITHUB_OUTPUT"], "a") as out:
