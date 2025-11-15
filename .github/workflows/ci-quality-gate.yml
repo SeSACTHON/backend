@@ -124,6 +124,7 @@ jobs:
         run: |
           set -euo pipefail
           targets=(
+            k8s/foundations
             k8s/infrastructure
             k8s/data-operators
             k8s/overlays/auth
