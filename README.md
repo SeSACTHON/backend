@@ -1,9 +1,16 @@
-# Eco² Backend
+# 이코에코(Eco²) Backend & Infrastructure
+
+![E40B8A37-71A7-4B98-9BD8-6A60741D99DE_4_5005_c](https://github.com/user-attachments/assets/51ac6f45-ef6d-403b-92e2-00a705af78da)
+
 
 Self-managed Kubernetes 기반으로 Terraform · Ansible · ArgoCD · Atlantis를 결합해 운영하는 14-Node 마이크로서비스 플랫폼입니다.  
 AI 폐기물 분류·지도·챗봇 등 도메인 API와 데이터 계층, GitOps 파이프라인을 하나의 리포지토리에서 관리합니다.
 
 ---
+
+## Architecture
+![E6A73249-BFDB-4CA9-A41B-4AF5A907C6D1](https://github.com/user-attachments/assets/c1e5430d-0fd6-4c78-9e3b-f7940502dc1e)
+
 
 ## Overview
 
