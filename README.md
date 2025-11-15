@@ -76,19 +76,6 @@ graph TD
 
 ---
 
-## Quick Links
-
-| 카테고리 | 문서 |
-|----------|------|
-| 아키텍처 허브 | `docs/architecture/01-README.md` |
-| GitOps & Atlantis | `docs/architecture/gitops/APP-OF-APPS-DECISION.md`, `docs/architecture/gitops/ATLANTIS_TERRAFORM_FLOW.md` |
-| 네트워크/네임스페이스 | `docs/architecture/networking/11-ALB_CALICO_PATTERNS_RESEARCH.md`, `docs/architecture/networking/09-NAMESPACE_STRATEGY_ANALYSIS.md` |
-| 데이터 계층 | `docs/architecture/data/database-architecture.md`, `docs/architecture/data/redis-jwt-blacklist-design.md` |
-| 배포 가이드 | `docs/deployment/README.md` |
-| 트러블슈팅 | `docs/TROUBLESHOOTING.md` |
-
----
-
 ## GitOps Flow
 
 ```mermaid
@@ -194,6 +181,18 @@ backend/
 ├── services/            # FastAPI 도메인 코드
 └── docs/                # Architecture / Deployment / Troubleshooting
 ```
+
+---
+
+## Documentation
+
+| 카테고리 | 문서 |
+|----------|------|
+| 아키텍처 허브 | docs/architecture/README.md |
+| GitOps & Atlantis | docs/architecture/gitops/APP-OF-APPS-DECISION.md, docs/architecture/gitops/ATLANTIS_TERRAFORM_FLOW.md |
+| 네트워크/네임스페이스 | docs/architecture/networking/11-ALB_CALICO_PATTERNS_RESEARCH.md, docs/architecture/networking/09-NAMESPACE_STRATEGY_ANALYSIS.md |
+| 배포 가이드 | docs/deployment/README.md` |
+| 트러블슈팅 | docs/TROUBLESHOOTING.md |
 
 ---
 
