@@ -113,7 +113,7 @@ spec:
 ### Wave 기반 Application 구조
 | Wave | Application | Type | Source Path |
 |------|-------------|------|-------------|
-| -1 | foundations | Kustomize | `k8s/foundations` |
+| -1 | namespaces | Kustomize | `k8s/namespaces` |
 | 0 | infrastructure | Kustomize | `k8s/infrastructure` |
 | 20 | alb-controller | Helm | `charts/platform/aws-lb-controller` (external) |
 | 40 | monitoring | Helm | `charts/observability/kube-prometheus-stack` |
@@ -131,31 +131,15 @@ spec:
 
 ## ⚠️ 4. Kustomize 구조 검증
 
-### 발견된 문제: 경로 중복
+### 최신 구조
 
-**문제:**
 ```
 k8s/
-├── namespaces/
-│   └── domain-based.yaml  ← foundations에서 참조
+├── namespaces/          ← Wave 00 (모든 Namespace 단일 관리)
+│   ├── kustomization.yaml
+│   └── domain-based.yaml
 └── infrastructure/
-    └── namespaces/
-        └── domain-based.yaml  ← infrastructure에서 참조
-```
-
-**foundations 참조:**
-```yaml
-# k8s/foundations/kustomization.yaml
-resources:
-  - ../namespaces/domain-based.yaml  # k8s/namespaces/domain-based.yaml
-```
-
-**infrastructure 참조:**
-```yaml
-# k8s/infrastructure/kustomization.yaml
-resources:
-  - namespaces  # k8s/infrastructure/namespaces/
-  - networkpolicies
+    └── networkpolicies/ ← Wave 01 (보안 리소스)
 ```
 
 ### 검증 결과

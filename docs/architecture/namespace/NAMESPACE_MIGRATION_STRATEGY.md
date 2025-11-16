@@ -23,11 +23,9 @@
 ### 1️⃣ ArgoCD 현재 설정
 
 ```yaml
-# argocd/applications/ecoeco-appset-kustomize.yaml
 source:
   repoURL: https://github.com/SeSACTHON/backend
   targetRevision: main  # ← main 브랜치 추적
-  path: k8s/overlays/{{domain}}
 
 destination:
   namespace: '{{namespace}}'  # ← 도메인별 네임스페이스
@@ -237,7 +235,6 @@ graph TB
 ```bash
 # 1. Ansible로 네임스페이스 먼저 생성
 cd /Users/mango/workspace/SeSACTHON/backend
-ansible-playbook ansible/playbooks/10-namespaces.yml
 
 # 2. 네임스페이스 생성 확인
 kubectl get namespaces -l app.kubernetes.io/part-of=ecoeco-backend
@@ -573,7 +570,6 @@ ssh ubuntu@<MASTER_IP>
 
 # ✅ 2. Ansible 네임스페이스 생성
 cd /Users/mango/workspace/SeSACTHON/backend
-ansible-playbook ansible/playbooks/10-namespaces.yml
 
 # ✅ 3. 네임스페이스 확인
 kubectl get namespaces -l app.kubernetes.io/part-of=ecoeco-backend

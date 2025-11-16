@@ -9,7 +9,7 @@
 ## 📋 점검 개요
 
 ### 점검 대상
-네임스페이스 변경 시 **5개 레이어**를 모두 점검해야 합니다:
+네임스페이스 변경 시 **5개 영역**을 모두 점검해야 합니다:
 1. **Kubernetes Manifests** (네임스페이스 정의)
 2. **Kustomize Overlays** (서비스 배포 설정)
 3. **ArgoCD ApplicationSet** (GitOps 배포 자동화)
@@ -20,15 +20,14 @@
 - 네임스페이스 구조 변경 시 (예: `api` → 도메인별 네임스페이스)
 - 새로운 서비스 추가 시
 - 인프라 리소스(DB, Cache, MQ) 네임스페이스 변경 시
-- Tier/Layer 레이블 정책 변경 시
+- Tier 레이블 정책 변경 시
 
 ---
 
-## ✅ Layer 1: Kubernetes Manifests
+## ✅ Kubernetes Manifests
 
 ### 1.1 네임스페이스 정의 파일
 
-**파일**: `k8s/namespaces/domain-based.yaml`
 
 **점검 항목**:
 - [ ] 모든 네임스페이스가 정의되어 있는가?
@@ -38,11 +37,6 @@
   - `data`: data
   - `observability`: monitoring
   - `infrastructure`: atlantis
-- [ ] `layer` 레이블이 올바른가?
-  - Layer 0: observability, infrastructure
-  - Layer 2: business-logic
-  - Layer 3: integration
-  - Layer 4: data
 - [ ] `phase` 레이블이 올바른가? (Phase 1/2/3)
 - [ ] `app.kubernetes.io/part-of: ecoeco-backend` 레이블이 있는가?
 
@@ -53,21 +47,20 @@ kubectl get namespaces -l app.kubernetes.io/part-of=ecoeco-backend --show-labels
 
 **예상 출력**:
 ```
-auth          Active   layer=2,tier=business-logic,phase=1
-my            Active   layer=2,tier=business-logic,phase=1
-scan          Active   layer=2,tier=business-logic,phase=1
+auth          Active   tier=business-logic,phase=1
+my            Active   tier=business-logic,phase=1
+scan          Active   tier=business-logic,phase=1
 ...
-data          Active   layer=4,tier=data
-messaging     Active   layer=3,tier=integration
-monitoring    Active   layer=0,tier=observability
-atlantis      Active   layer=0,tier=infrastructure
+data          Active   tier=data
+messaging     Active   tier=integration
+monitoring    Active   tier=observability
+atlantis      Active   tier=infrastructure
 ```
 
 ---
 
 ### 1.2 NetworkPolicy
 
-**파일**: `k8s/networkpolicies/domain-isolation.yaml`
 
 **점검 항목**:
 - [ ] `data-ingress-from-api` PolicyTier 2 (`business-logic`)에서만 접근 허용하는가?
@@ -93,12 +86,11 @@ from:
 
 ### 1.3 ServiceMonitor (Prometheus)
 
-**파일**: `k8s/monitoring/servicemonitors-domain-ns.yaml`
 
 **점검 항목**:
 - [ ] 모든 도메인 네임스페이스를 대상으로 하는 ServiceMonitor가 있는가?
-- [ ] `tier` 및 `layer` 레이블이 올바른가?
-- [ ] `relabelings`에 `namespace`, `domain`, `phase`, `tier`, `layer` 자동 추가 설정이 있는가?
+- [ ] `tier` 레이블이 올바른가?
+- [ ] `relabelings`에 `namespace`, `domain`, `phase`, `tier` 자동 추가 설정이 있는가?
 - [ ] `namespaceSelector.matchNames`가 올바른 네임스페이스 목록을 포함하는가?
 
 **점검 명령**:
@@ -124,11 +116,10 @@ namespaceSelector:
 
 ---
 
-## ✅ Layer 2: Kustomize Overlays
+## ✅ Kustomize Overlays
 
 ### 2.1 네임스페이스 참조
 
-**파일**: `k8s/overlays/*/kustomization.yaml`
 
 **점검 항목**:
 - [ ] 각 도메인의 `namespace` 필드가 도메인명과 일치하는가?
@@ -137,14 +128,10 @@ namespaceSelector:
 
 **점검 명령**:
 ```bash
-grep -r "namespace:" k8s/overlays/*/kustomization.yaml
 ```
 
 **예상 출력**:
 ```
-k8s/overlays/auth/kustomization.yaml:namespace: auth
-k8s/overlays/my/kustomization.yaml:namespace: my
-k8s/overlays/scan/kustomization.yaml:namespace: scan
 ...
 ```
 
@@ -152,7 +139,6 @@ k8s/overlays/scan/kustomization.yaml:namespace: scan
 
 ### 2.2 데이터베이스/캐시 연결 문자열
 
-**파일**: `k8s/overlays/*/deployment-patch.yaml`
 
 **점검 항목**:
 - [ ] `POSTGRES_HOST`가 올바른 네임스페이스를 참조하는가?
@@ -161,9 +147,6 @@ k8s/overlays/scan/kustomization.yaml:namespace: scan
 
 **점검 명령**:
 ```bash
-grep -r "POSTGRES_HOST" k8s/overlays/*/deployment-patch.yaml
-grep -r "REDIS_HOST" k8s/overlays/*/deployment-patch.yaml
-grep -r "RABBITMQ_HOST" k8s/overlays/*/deployment-patch.yaml
 ```
 
 **예상 출력**:
@@ -181,11 +164,10 @@ REDIS_HOST: redis.default.svc.cluster.local       # ❌ 잘못됨!
 
 ---
 
-## ✅ Layer 3: ArgoCD ApplicationSet
+## ✅ ArgoCD ApplicationSet
 
 ### 3.1 ApplicationSet 설정
 
-**파일**: `argocd/applications/ecoeco-appset-kustomize.yaml`
 
 **점검 항목**:
 - [ ] `generators.list.elements`에 모든 도메인이 정의되어 있는가?
@@ -219,9 +201,6 @@ namespace: '{{namespace}}'  # ✅ 동적 할당
 
 ### 3.2 Ingress 리소스 (추가)
 
-**파일**: 
-- `k8s/ingress/domain-based-api-ingress.yaml` (API Services)
-- `k8s/ingress/infrastructure-ingress.yaml` (Atlantis, ArgoCD, Grafana, Prometheus)
 
 **점검 항목**:
 - [ ] 각 API Ingress가 해당 도메인 네임스페이스에 배포되는가?
@@ -293,11 +272,10 @@ spec:
 
 ---
 
-## ✅ Layer 4: Ansible Playbooks
+## ✅ Ansible Playbooks
 
 ### 4.1 네임스페이스 변수
 
-**파일**: `ansible/inventory/group_vars/all.yml` (또는 `terraform/group_vars/all.yml`)
 
 **점검 항목**:
 - [ ] `postgres_namespace`가 `data`인가?
@@ -308,7 +286,6 @@ spec:
 
 **점검 명령**:
 ```bash
-grep -E "(postgres_namespace|redis_namespace|rabbitmq_namespace|monitoring_namespace|atlantis_namespace)" ansible/inventory/group_vars/all.yml
 ```
 
 **예상 출력**:
@@ -324,7 +301,6 @@ atlantis_namespace: "atlantis"
 
 ### 4.2 네임스페이스 생성 Playbook
 
-**파일**: `ansible/playbooks/10-namespaces.yml`
 
 **점검 항목**:
 - [ ] `domain-based.yaml` 복사 및 적용 태스크가 있는가?
@@ -333,14 +309,12 @@ atlantis_namespace: "atlantis"
 
 **점검 명령**:
 ```bash
-grep -A 5 "네임스페이스 YAML 복사" ansible/playbooks/10-namespaces.yml
 ```
 
 ---
 
 ### 4.3 데이터베이스/캐시 Role
 
-**파일**: `ansible/roles/{postgresql,redis,rabbitmq}/tasks/main.yml`
 
 **점검 항목**:
 - [ ] 각 Role에서 `{{ postgres_namespace }}`, `{{ redis_namespace }}`, `{{ rabbitmq_namespace }}` 변수를 올바르게 사용하는가?
@@ -351,12 +325,8 @@ grep -A 5 "네임스페이스 YAML 복사" ansible/playbooks/10-namespaces.yml
 
 **점검 명령**:
 ```bash
-grep "postgres_namespace" ansible/roles/postgresql/tasks/main.yml
-grep "redis_namespace" ansible/roles/redis/tasks/main.yml
-grep "rabbitmq_namespace" ansible/roles/rabbitmq/tasks/main.yml
 
 # Secret 이름 확인
-grep "kubectl create secret" ansible/roles/postgresql/tasks/main.yml
 ```
 
 **예상 출력**:
@@ -376,9 +346,6 @@ kubectl create secret generic postgresql-secret \  # ✅ "postgres-secret" 아�
 **Secret 이름 규칙**:
 | 서비스 | Secret 이름 | 네임스페이스 | 생성 위치 |
 |--------|------------|-------------|----------|
-| PostgreSQL | `postgresql-secret` | `data` | `ansible/roles/postgresql/tasks/main.yml` |
-| RabbitMQ | `rabbitmq-default-user` | `messaging` | `ansible/roles/rabbitmq/tasks/main.yml` |
-| Atlantis | `atlantis-secrets` | `atlantis` | `k8s/atlantis/atlantis-deployment.yaml` |
 | AWS Credentials | `aws-credentials` | `workers`, `data`, `scan` | `scripts/create-aws-credentials-secret.sh` |
 
 **점검 항목**:
@@ -419,7 +386,6 @@ export AWS_SECRET_ACCESS_KEY='your-secret-key'
 
 ### 4.5 Ingress Playbook (추가)
 
-**파일**: `ansible/playbooks/07-ingress-resources.yml`
 
 **점검 항목**:
 - [ ] ~~`api` 네임스페이스 생성 태스크가 제거되었는가?~~ (✅ 제거됨)
@@ -430,11 +396,9 @@ export AWS_SECRET_ACCESS_KEY='your-secret-key'
 **점검 명령**:
 ```bash
 # api 네임스페이스 생성 태스크가 없어야 함
-grep -n "kubectl create namespace api" ansible/playbooks/07-ingress-resources.yml
 # ❌ 결과가 나오면 안됨!
 
 # 도메인별 Ingress 적용 태스크 확인
-grep -A 5 "도메인별 API Ingress" ansible/playbooks/07-ingress-resources.yml
 ```
 
 ---
@@ -457,14 +421,13 @@ ERRORS=0
 
 # 1. Kustomize Overlay 점검
 echo ""
-echo "✅ Layer 2: Kustomize Overlays 점검"
+echo "✅ Kustomize Overlays 점검"
 echo "---"
 
 for domain in auth my scan character location info chat; do
     echo -n "  $domain overlay... "
     
     # 네임스페이스 확인
-    NS=$(grep "^namespace:" k8s/overlays/$domain/kustomization.yaml | awk '{print $2}')
     if [ "$NS" != "$domain" ]; then
         echo "❌ FAIL: namespace mismatch (expected: $domain, got: $NS)"
         ((ERRORS++))
@@ -473,7 +436,6 @@ for domain in auth my scan character location info chat; do
     fi
     
     # 데이터베이스 연결 문자열 확인
-    if grep -q "\.db\.svc\.cluster\.local" k8s/overlays/$domain/deployment-patch.yaml 2>/dev/null; then
         echo "  ❌ FAIL: deployment-patch.yaml에서 'db' 네임스페이스 발견 (data 또는 messaging이어야 함)"
         ((ERRORS++))
     fi
@@ -481,11 +443,10 @@ done
 
 # 2. ArgoCD ApplicationSet 점검
 echo ""
-echo "✅ Layer 3: ArgoCD ApplicationSet 점검"
+echo "✅ ArgoCD ApplicationSet 점검"
 echo "---"
 
 echo -n "  tier 레이블... "
-if grep -q "tier: api" argocd/applications/ecoeco-appset-kustomize.yaml; then
     echo "❌ FAIL: 'tier: api' 발견 (business-logic이어야 함)"
     ((ERRORS++))
 else
@@ -494,12 +455,10 @@ fi
 
 # 3. Ansible 변수 점검
 echo ""
-echo "✅ Layer 4: Ansible 변수 점검"
+echo "✅ Ansible 변수 점검"
 echo "---"
 
-ANSIBLE_VARS="ansible/inventory/group_vars/all.yml"
 if [ ! -f "$ANSIBLE_VARS" ]; then
-    ANSIBLE_VARS="terraform/group_vars/all.yml"
 fi
 
 echo -n "  postgres_namespace... "
@@ -531,11 +490,10 @@ fi
 
 # 4. NetworkPolicy 점검
 echo ""
-echo "✅ Layer 1: NetworkPolicy 점검"
+echo "✅ NetworkPolicy 점검"
 echo "---"
 
 echo -n "  data-ingress-from-api... "
-if grep -A 5 "data-ingress-from-api" k8s/networkpolicies/domain-isolation.yaml | grep -q "tier: api"; then
     echo "❌ FAIL: 'tier: api' 발견 (business-logic이어야 함)"
     ((ERRORS++))
 else
@@ -544,11 +502,10 @@ fi
 
 # 5. ServiceMonitor 점검
 echo ""
-echo "✅ Layer 1: ServiceMonitor 점검"
+echo "✅ ServiceMonitor 점검"
 echo "---"
 
 echo -n "  api-services-all-domains... "
-if grep -A 10 "api-services-all-domains" k8s/monitoring/servicemonitors-domain-ns.yaml | grep -q "tier: api"; then
     echo "❌ FAIL: 'tier: api' 발견 (business-logic이어야 함)"
     ((ERRORS++))
 else
@@ -581,36 +538,24 @@ chmod +x scripts/check-namespace-consistency.sh
 
 | 레이어 | 파일 | 점검 항목 | 예상 값 |
 |--------|------|-----------|---------|
-| **Layer 1** | `k8s/namespaces/domain-based.yaml` | `tier` 레이블 | `business-logic`, `data`, `integration`, `observability`, `infrastructure` |
-| | `k8s/networkpolicies/domain-isolation.yaml` | `namespaceSelector.matchLabels.tier` | `business-logic` (❌ `api` 아님!) |
-| | `k8s/monitoring/servicemonitors-domain-ns.yaml` | `selector.matchLabels.tier` | `business-logic`, `data`, `integration`, `observability` |
-| **Layer 2** | `k8s/overlays/*/kustomization.yaml` | `namespace` | 도메인명 (auth, my, scan, ...) |
-| | `k8s/overlays/*/deployment-patch.yaml` | `POSTGRES_HOST` | `postgresql.data.svc.cluster.local` (❌ `.db.` 아님!) |
 | | | `REDIS_HOST` | `redis.data.svc.cluster.local` (❌ `.db.` 아님!) |
 | | | `RABBITMQ_HOST` | `rabbitmq.messaging.svc.cluster.local` (❌ `.db.` 아님!) |
-| **Layer 3** | `argocd/applications/ecoeco-appset-kustomize.yaml` | `elements[].namespace` | 도메인명 (auth, my, scan, ...) |
 | | | `template.metadata.labels.tier` | `business-logic` (❌ `api` 아님!) |
 | | | `template.spec.destination.namespace` | `'{{namespace}}'` (동적 할당) |
-| **Layer 4** | `ansible/inventory/group_vars/all.yml` | `postgres_namespace` | `data` (❌ `db` 아님!) |
 | | | `redis_namespace` | `data` (❌ `db` 아님!) |
 | | | `rabbitmq_namespace` | `messaging` |
 | | | `monitoring_namespace` | `monitoring` |
-| | `ansible/playbooks/10-namespaces.yml` | 네임스페이스 생성 | ✅ 있음 |
-| | `ansible/roles/{postgresql,redis,rabbitmq}/tasks/main.yml` | 네임스페이스 변수 사용 | `{{ postgres_namespace }}`, `{{ redis_namespace }}`, `{{ rabbitmq_namespace }}` |
-| **Layer 5** | `terraform/templates/hosts.tpl` | `[api_nodes]` 섹션 | 중복 없이 1번만 정의 |
 | | | API 노드 | auth, my, scan, character, location, info, chat (7개) |
 | | | 제거된 노드 참조 | ❌ api_waste, api_userinfo, api_recycle_info, api_chat_llm |
-| | `terraform/outputs.tf` | `ansible_inventory` templatefile 변수 | hosts.tpl과 일치 (7개 API 노드) |
 | | `.github/workflows/infrastructure.yml` | Terraform Plan | PR 생성 시 자동 실행 |
 | | | Terraform Validate | 템플릿 변수 검증 |
 
 ---
 
-## ✅ Layer 5: CI/CD Pipelines
+## ✅ CI/CD Pipelines
 
 ### 5.1 Terraform 템플릿 (Ansible Inventory)
 
-**파일**: `terraform/templates/hosts.tpl`
 
 **점검 항목**:
 - [ ] `[api_nodes]` 섹션이 중복되지 않았는가?
@@ -645,7 +590,6 @@ grep -n "\[api_nodes\]" templates/hosts.tpl  # 중복 확인
 
 ### 5.2 Terraform Outputs
 
-**파일**: `terraform/outputs.tf`
 
 **점검 항목**:
 - [ ] `ansible_inventory` output의 templatefile 변수가 `hosts.tpl`과 일치하는가?
@@ -663,17 +607,14 @@ grep -n "\[api_nodes\]" templates/hosts.tpl  # 중복 확인
 **점검 명령**:
 ```bash
 # outputs.tf에서 templatefile 변수 확인
-grep -A 30 'templatefile.*hosts.tpl' terraform/outputs.tf
 
 # 변수 개수 확인
-grep "api_.*_public_ip" terraform/outputs.tf | wc -l  # 7개 (API nodes)
 ```
 
 ---
 
 ### 5.3 GitHub Actions Workflow
 
-**파일**: `.github/workflows/infrastructure.yml`
 
 **점검 항목**:
 - [ ] Terraform Plan 단계가 정상 실행되는가?
@@ -718,23 +659,18 @@ Invalid value for "vars" parameter: vars map does not contain key
 
 ### 5.4 Ansible Inventory 자동 생성
 
-**파일**: `ansible/inventory/hosts` (Terraform에서 자동 생성)
 
 **점검 항목**:
-- [ ] Terraform Apply 후 `ansible/inventory/hosts` 파일이 올바르게 생성되는가?
 - [ ] 모든 API 노드의 `domain` 변수가 올바른가?
 - [ ] `[api_nodes]` 그룹에 7개 노드만 있는가?
 
 **점검 명령**:
 ```bash
 # Terraform 실행 후 생성된 Inventory 확인
-cat ansible/inventory/hosts
 
 # API 노드 개수 확인
-grep -A 10 "\[api_nodes\]" ansible/inventory/hosts | grep "k8s-api" | wc -l  # 7개
 
 # Domain 변수 확인
-grep "domain=" ansible/inventory/hosts | grep "k8s-api"
 ```
 
 **예상 출력**:
@@ -787,7 +723,7 @@ k8s-api-chat ansible_host=... domain=chat
 
 | 버전 | 날짜 | 변경 내역 |
 |------|------|-----------|
-| v1.1.0 | 2025-11-13 | Layer 5 추가: CI/CD Pipelines (Terraform 템플릿, GitHub Actions) |
+| v1.1.0 | 2025-11-13 | CI/CD Pipelines 점검 항목 추가 (Terraform 템플릿, GitHub Actions) |
 | v1.0.0 | 2025-11-13 | 초기 버전 작성 (네임스페이스 일관성 점검 체크리스트) |
 
 

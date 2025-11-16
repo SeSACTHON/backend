@@ -37,13 +37,13 @@
 - ✅ Ingress 생성 제거 (ArgoCD 관리)
 
 ### 2. ArgoCD 구조 수정
-- ✅ foundations: namespace 경로 수정
+- ✅ namespaces: namespace 경로 정리
 - ✅ ApplicationSet: kustomize.images 제거
 - ✅ ALB Controller: VPC ID 업데이트
 
 ### 3. CI/CD 복구
 - ✅ YAML heredoc 들여쓰기 수정
-- ✅ k8s/foundations를 kustomize build 테스트 추가
+- ✅ k8s/namespaces를 kustomize build 테스트에 포함
 - ✅ secrets.GITHUB_TOKEN → secrets.GH_TOKEN
 
 ### 4. 이미지 & Secret

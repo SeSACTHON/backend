@@ -1461,19 +1461,15 @@ journalctl -u kubelet -f                 # Worker 노드에서
 
 #### 문제
 ```
-Error: file '../namespaces/domain-based.yaml' is not in or below 'k8s/foundations'
+Error: file '../namespaces/domain-based.yaml' is not in or below 'k8s/namespaces'
 ```
 
 **원인**: Kustomize는 보안상 상위 디렉토리 참조 불가
 
 #### 해결
 ```bash
-# 파일을 foundations 디렉토리 안으로 복사
-cp k8s/namespaces/domain-based.yaml k8s/foundations/namespaces.yaml
-
-# kustomization.yaml 수정
-resources:
-  - namespaces.yaml  # 상대 경로로 변경
+# 모든 Namespace 리소스는 k8s/namespaces 디렉터리 안에 존재해야 함
+# (Wave 00: namespaces)
 ```
 
 **커밋**: `c17defd`
@@ -1759,7 +1755,7 @@ parameters:
 ### 19.1. GitOps 배포
 
 **권장:**
-- ✅ Namespace는 ArgoCD foundations에서만 관리 (Ansible 중복 제거)
+- ✅ Namespace는 ArgoCD namespaces에서만 관리 (Ansible 중복 제거)
 - ✅ Cert-manager 제거, ACM 사용
 - ✅ Kustomize 리소스는 같은 디렉토리나 하위에만
 - ✅ ApplicationSet에서 kustomize.images 사용 금지

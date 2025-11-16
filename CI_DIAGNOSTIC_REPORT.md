@@ -12,7 +12,7 @@
 - feat: add imagePullSecrets for GHCR - failure (0s)
 - fix: update alb-controller vpcId - failure (0s)
 - fix: use stable rabbitmq image - failure (0s)
-- fix: move namespaces into foundations - failure (0s)
+- fix: consolidate namespaces wave (기존 foundations) - failure (0s)
 - fix: correct ApplicationSet syntax - failure (0s)
 - chore: remove namespace duplication - failure (0s)
 - chore: update api images to latest - failure (0s)
@@ -58,11 +58,11 @@ targets=(
 ```
 
 **누락:**
-- ❌ `k8s/foundations` (최근 추가됨)
+- ❌ `k8s/namespaces` (최근 추가됨)
 - ❌ `k8s/platform`
 
 **수정 완료:**
-- ✅ k8s/foundations 추가 (commit d71d881)
+- ✅ k8s/namespaces 추가 (commit d71d881)
 
 **2. 잠재적 이슈: Helm dependency**
 
@@ -149,7 +149,7 @@ gh run view <run-id> --web
 
 | 시간 | 커밋 | 타입 | 상태 | 이유 |
 |------|------|------|------|------|
-| 22:33 | ci: add foundations | ci | ❌ 0s | 워크플로우 이슈 |
+| 22:33 | ci: add namespaces | ci | ❌ 0s | 워크플로우 이슈 |
 | 22:23 | feat: imagePullSecrets | feat | ❌ 0s | 워크플로우 이슈 |
 | 22:15 | fix: alb vpcId | fix | ❌ 0s | 워크플로우 이슈 |
 | 22:12 | fix: rabbitmq image | fix | ❌ 0s | 워크플로우 이슈 |
@@ -193,7 +193,7 @@ git push origin develop
 **CI가 실행조차 안되고 있습니다.**
 
 가능한 원인:
-1. ✅ k8s/foundations 누락 (수정 완료)
+1. ✅ k8s/namespaces 누락 (수정 완료)
 2. ⚠️ Helm dependency update 실패 가능성
 3. ⚠️ 워크플로우 파일 YAML 문법 오류
 4. ⚠️ GitHub Actions 조건문 문제

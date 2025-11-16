@@ -10,7 +10,6 @@
 
 ### ❌ 1. Ingress 네임스페이스 불일치 (치명적)
 
-**파일**: `k8s/ingress/14-nodes-ingress.yaml`
 
 **문제**:
 - **API Ingress가 `api` 네임스페이스에 배포됨**
@@ -134,7 +133,6 @@ namespace: api
 
 ### ❌ 2. Ansible Playbook의 `api` 네임스페이스 생성
 
-**파일**: `ansible/playbooks/07-ingress-resources.yml`
 
 **문제**:
 ```yaml
@@ -161,7 +159,6 @@ namespace: api
 Kustomize Base에 정의된 Service는 각 Overlay의 `namespace` 필드에 의해 자동으로 올바른 네임스페이스에 배포됩니다.
 
 ```yaml
-# k8s/base/service.yaml
 apiVersion: v1
 kind: Service
 metadata:
@@ -175,7 +172,6 @@ spec:
 ```
 
 ```yaml
-# k8s/overlays/auth/kustomization.yaml
 namespace: auth  # ✅ Service가 auth 네임스페이스에 생성됨
 namePrefix: auth-
 ```
@@ -196,7 +192,6 @@ kubectl get services -n scan
 
 #### 4.1 PostgreSQL Secret
 ```yaml
-# ansible/roles/postgresql/tasks/main.yml
 - name: "PostgreSQL 비밀번호 Secret 생성"
   shell: |
     kubectl create secret generic postgres-secret \
@@ -206,7 +201,6 @@ kubectl get services -n scan
 
 #### 4.2 RabbitMQ Secret
 ```yaml
-# ansible/roles/rabbitmq/tasks/main.yml
 - name: RabbitMQ 기본 사용자 Secret 생성
   shell: |
     kubectl create secret generic rabbitmq-default-user \
@@ -216,7 +210,6 @@ kubectl get services -n scan
 
 #### 4.3 Atlantis Secret
 ```yaml
-# k8s/atlantis/atlantis-deployment.yaml
 apiVersion: v1
 kind: Secret
 metadata:
@@ -226,7 +219,6 @@ metadata:
 
 #### 4.4 Grafana/Prometheus ConfigMap
 ```yaml
-# k8s/monitoring/grafana-deployment.yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -237,7 +229,6 @@ metadata:
 **문제점**: ❌ **Worker Deployments의 Secret 참조**
 
 ```yaml
-# k8s/workers/worker-wal-deployments.yaml (133-137)
 - name: POSTGRES_PASSWORD
   valueFrom:
     secretKeyRef:
@@ -262,7 +253,6 @@ metadata:
 
 #### 5.1 Prometheus ServiceAccount
 ```yaml
-# k8s/monitoring/prometheus-deployment.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -280,7 +270,6 @@ subjects:
 
 #### 5.2 Atlantis ServiceAccount
 ```yaml
-# k8s/atlantis/atlantis-deployment.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -295,64 +284,34 @@ metadata:
 ### 1. Namespace 정의
 | 파일 | 네임스페이스 | 상태 |
 |------|-------------|------|
-| `k8s/namespaces/domain-based.yaml` | auth, my, scan, character, location, info, chat, data, messaging, monitoring, atlantis | ✅ 정의됨 |
-| `k8s/atlantis/atlantis-deployment.yaml` | atlantis | ✅ 정의됨 (중복) |
 
 ### 2. Ingress 리소스
 | 파일 | Ingress 이름 | 네임스페이스 | 상태 |
 |------|-------------|-------------|------|
-| `k8s/ingress/14-nodes-ingress.yaml` | api-ingress | `api` | ❌ **불일치** |
-| `k8s/ingress/14-nodes-ingress.yaml` | atlantis-ingress | `atlantis` | ✅ 일치 |
-| `k8s/ingress/14-nodes-ingress.yaml` | grafana-ingress | `monitoring` | ✅ 일치 |
-| `k8s/ingress/14-nodes-ingress.yaml` | argocd-ingress | `argocd` | ✅ 일치 |
-| `k8s/ingress/14-nodes-ingress.yaml` | prometheus-ingress | `monitoring` | ✅ 일치 |
 
 ### 3. Service 리소스
 | 파일 | Service 패턴 | 네임스페이스 | 상태 |
 |------|-------------|-------------|------|
-| `k8s/base/service.yaml` | api (Kustomize Base) | Overlay에서 지정 | ✅ 동적 할당 |
-| `k8s/overlays/*/kustomization.yaml` | auth-api, my-api, ... | auth, my, scan, ... | ✅ 일치 |
-| `k8s/monitoring/*.yaml` | prometheus, grafana, node-exporter | `monitoring` | ✅ 일치 |
-| `k8s/atlantis/atlantis-deployment.yaml` | atlantis | `atlantis` | ✅ 일치 |
 
 ### 4. Secret 리소스
 | 생성 위치 | Secret 이름 | 네임스페이스 | 상태 |
 |----------|------------|-------------|------|
-| `ansible/roles/postgresql/tasks/main.yml` | postgres-secret | `data` | ✅ 일치 |
-| `ansible/roles/rabbitmq/tasks/main.yml` | rabbitmq-default-user | `messaging` | ✅ 일치 |
-| `k8s/atlantis/atlantis-deployment.yaml` | atlantis-secrets | `atlantis` | ✅ 일치 |
-| `k8s/workers/worker-wal-deployments.yaml` | postgresql-secret (참조) | ❓ 미정의 | ❌ **불일치** |
-| `k8s/workers/worker-wal-deployments.yaml` | aws-credentials (참조) | ❓ 미정의 | ❌ **누락** |
 
 ### 5. ConfigMap 리소스
 | 파일 | ConfigMap 이름 | 네임스페이스 | 상태 |
 |------|---------------|-------------|------|
-| `k8s/monitoring/grafana-deployment.yaml` | grafana-datasources | `monitoring` | ✅ 일치 |
-| `k8s/monitoring/grafana-deployment.yaml` | grafana-dashboards-config | `monitoring` | ✅ 일치 |
-| `k8s/monitoring/prometheus-deployment.yaml` | prometheus-config | `monitoring` | ✅ 일치 |
-| `k8s/monitoring/prometheus-deployment.yaml` | prometheus-rules | `monitoring` | ✅ 일치 |
-| `k8s/atlantis/atlantis-deployment.yaml` | atlantis-config | `atlantis` | ✅ 일치 |
-| `k8s/atlantis/atlantis-deployment.yaml` | atlantis-repo-config | `atlantis` | ✅ 일치 |
 
 ### 6. ServiceAccount 및 RBAC
 | 파일 | ServiceAccount | 네임스페이스 | ClusterRoleBinding | 상태 |
 |------|---------------|-------------|-------------------|------|
-| `k8s/monitoring/prometheus-deployment.yaml` | prometheus | `monitoring` | ✅ 명시적 참조 | ✅ 일치 |
-| `k8s/atlantis/atlantis-deployment.yaml` | atlantis | `atlantis` | ✅ 명시적 참조 | ✅ 일치 |
 
 ### 7. NetworkPolicy
 | 파일 | Policy 이름 | 대상 네임스페이스 | 상태 |
 |------|-----------|----------------|------|
-| `k8s/networkpolicies/domain-isolation.yaml` | data-ingress-from-api | `data` | ✅ 일치 |
-| `k8s/networkpolicies/domain-isolation.yaml` | messaging-ingress-from-api | `messaging` | ✅ 일치 |
-| `k8s/networkpolicies/domain-isolation.yaml` | monitoring-ingress | `monitoring` | ✅ 일치 |
 
 ### 8. ServiceMonitor (Prometheus Operator)
 | 파일 | ServiceMonitor 이름 | 네임스페이스 | 대상 네임스페이스 | 상태 |
 |------|-------------------|-------------|-----------------|------|
-| `k8s/monitoring/servicemonitors-domain-ns.yaml` | api-services-all-domains | `monitoring` | auth, my, scan, ... | ✅ 일치 |
-| `k8s/monitoring/servicemonitors-domain-ns.yaml` | data-layer-monitor | `monitoring` | `data` | ✅ 일치 |
-| `k8s/monitoring/servicemonitors-domain-ns.yaml` | integration-layer-monitor | `monitoring` | `messaging` | ✅ 일치 |
 
 ---
 
@@ -360,24 +319,20 @@ metadata:
 
 ### 🚨 Priority 1: 치명적 (배포 실패)
 
-1. **Ingress 네임스페이스 불일치** (`k8s/ingress/14-nodes-ingress.yaml`)
    - **영향**: API 라우팅 실패
    - **해결**: Ingress를 도메인별 네임스페이스로 분리
    - **예상 소요 시간**: 1-2시간
 
-2. **Ansible `api` 네임스페이스 생성** (`ansible/playbooks/07-ingress-resources.yml`)
    - **영향**: 불필요한 네임스페이스 생성
    - **해결**: Playbook에서 `api` 네임스페이스 생성 제거
    - **예상 소요 시간**: 10분
 
 ### ⚠️ Priority 2: 중요 (기능 제한)
 
-3. **Worker Deployments Secret 참조 오류** (`k8s/workers/worker-wal-deployments.yaml`)
    - **영향**: Worker Pod 시작 실패
    - **해결**: Secret 이름 통일 또는 Secret 생성
    - **예상 소요 시간**: 30분
 
-4. **Worker Deployments AWS Credentials Secret 누락** (`k8s/workers/worker-wal-deployments.yaml`)
    - **영향**: S3 접근 실패
    - **해결**: AWS Credentials Secret 생성
    - **예상 소요 시간**: 20분
@@ -385,8 +340,6 @@ metadata:
 ### 📝 Priority 3: 개선 사항 (문서화)
 
 5. **Atlantis Namespace 중복 정의**
-   - `k8s/namespaces/domain-based.yaml`
-   - `k8s/atlantis/atlantis-deployment.yaml`
    - **영향**: 없음 (idempotent)
    - **해결**: 한 곳에서만 정의 (권장)
 
@@ -418,7 +371,6 @@ metadata:
 
 ```bash
 # 1. 새로운 Ingress 파일 생성
-k8s/ingress/domain-based-ingress.yaml
 
 # 2. 각 도메인별 Ingress 생성
 auth-ingress (namespace: auth)
@@ -445,16 +397,13 @@ metadata:
 ### 2. Ansible Playbook 수정
 
 ```yaml
-# ansible/playbooks/07-ingress-resources.yml
 - name: "도메인별 Ingress 적용"
   shell: |
-    kubectl apply -f {{ playbook_dir }}/../../k8s/ingress/domain-based-ingress.yaml
 ```
 
 ### 3. Worker Deployments Secret 수정
 
 ```yaml
-# ansible/roles/postgresql/tasks/main.yml
 - name: "PostgreSQL 비밀번호 Secret 생성"
   shell: |
     kubectl create secret generic postgresql-secret \  # ✅ 이름 변경
@@ -478,10 +427,9 @@ kubectl create secret generic aws-credentials \
 
 **`docs/deployment/namespaces/NAMESPACE_CONSISTENCY_CHECKLIST.md`에 추가해야 할 항목**:
 
-### Layer 1: Kubernetes Manifests
+### Kubernetes Manifests
 
 ```markdown
-#### 1.4 Ingress 리소스 (`k8s/ingress/*.yaml`)
 - [ ] API Ingress가 올바른 네임스페이스에 배포되는가?
   - 옵션 A: 도메인별 Ingress (auth, my, scan, ...)
   - 옵션 B: 단일 Ingress + ExternalName Service
@@ -508,17 +456,15 @@ kubectl get secrets -n workers  # Worker 배포 시
 ```
 ```
 
-### Layer 4: Ansible Playbooks
+### Ansible Playbooks
 
 ```markdown
-#### 4.4 Ingress Playbook (`ansible/playbooks/07-ingress-resources.yml`)
 - [ ] `api` 네임스페이스 생성이 제거되었는가?
 - [ ] 도메인별 Ingress 적용 태스크가 추가되었는가?
 - [ ] Fallback Ingress 생성 로직이 제거되었는가?
 
 **점검 명령**:
 ```bash
-grep -n "kubectl create namespace api" ansible/playbooks/07-ingress-resources.yml
 # ❌ 결과가 나오면 안됨!
 ```
 ```
@@ -532,7 +478,7 @@ grep -n "kubectl create namespace api" ansible/playbooks/07-ingress-resources.ym
 ```bash
 # 6. Ingress 점검
 echo ""
-echo "✅ Layer 1: Ingress 점검"
+echo "✅ Ingress 점검"
 echo "---"
 
 echo -n "  api-ingress 네임스페이스... "
@@ -548,7 +494,7 @@ fi
 
 # 7. Secret 점검
 echo ""
-echo "✅ Layer 4: Secret 일관성 점검"
+echo "✅ Secret 일관성 점검"
 echo "---"
 
 echo -n "  postgres-secret (data 네임스페이스)... "

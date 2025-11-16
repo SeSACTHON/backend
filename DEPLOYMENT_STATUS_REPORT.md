@@ -51,7 +51,7 @@
 ✅ 17개 Applications 모두 생성
 
 Applications:
-  ✅ foundations: Synced/Healthy (Wave -1)
+  ✅ namespaces: Synced/Healthy (Wave -1)
   ✅ infrastructure: Synced/Healthy (Wave 0)
   ✅ platform: Synced/Healthy
   ✅ data-operators: Synced/Healthy

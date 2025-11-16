@@ -10,7 +10,7 @@
 - [x] Terraform 설정: 14대 노드 (main.tf)
 - [x] Ansible site.yml: 완전한 부트스트랩 프로세스
 - [x] ArgoCD role: root-app.yaml 자동 배포 포함
-- [x] k8s/foundations: 존재 (네임스페이스 정의)
+- [x] k8s/namespaces: 존재 (네임스페이스 정의)
 - [x] charts/data/databases: Helm umbrella chart 존재
 - [x] argocd/apps: App-of-Apps 구조 완성
 
@@ -198,7 +198,7 @@ kubectl get applications -n argocd -o json | jq -r '.items[] | "\(.metadata.name
 
 **예상 Applications (Wave 순서):**
 ```
-Wave -1:  foundations
+Wave -1:  namespaces
 Wave 10:  infrastructure (reserved)
 Wave 20:  alb-controller, platform
 Wave 30:  platform

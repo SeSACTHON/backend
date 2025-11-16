@@ -192,7 +192,7 @@ ssh -i ~/.ssh/sesacthon.pem ubuntu@${MASTER_IP} "kubectl get applications -n arg
 2. [ ] ArgoCD Pod Running
 3. [ ] root-app Application 존재
 4. [ ] Wave별 Applications 생성
-   - [ ] foundations (Wave -1)
+   - [ ] namespaces (Wave -1)
    - [ ] alb-controller (Wave 20)
    - [ ] monitoring (Wave 40)
    - [ ] data-operators (Wave 50)

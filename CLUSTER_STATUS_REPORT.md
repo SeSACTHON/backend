@@ -68,7 +68,7 @@
 argocd/
 ├── root-app.yaml                    # App of Apps 루트
 └── apps/
-    ├── 00-foundations.yaml          # Wave -1: CRDs, Namespaces
+    ├── 00-namespaces.yaml          # Wave -1: Namespaces
     ├── 10-infrastructure.yaml       # Wave 10
     ├── 20-alb-controller.yaml       # Wave 20: ALB Controller
     ├── 20-platform.yaml             # Wave 20

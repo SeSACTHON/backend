@@ -106,7 +106,7 @@ kubectl get applications -n argocd
 
 | Wave | 소스 | 설명 |
 |------|------|------|
-| 00 | `k8s/foundations` | 네임스페이스/CRD |
+| 00 | `k8s/namespaces` | 네임스페이스 |
 | 10 | `k8s/infrastructure` | NetworkPolicy, RBAC |
 | 20 | `k8s/ingress` | ALB Ingress (infra/api) |
 | 40 | Helm `charts/observability/*` | kube-prometheus-stack |
@@ -139,7 +139,7 @@ kubectl get applications -n argocd
 | 이슈 | 요약 | 문서 |
 |------|------|------|
 | ALB HTTPS→HTTP NAT | `backend-protocol: HTTP` + HTTPS-only listener + HTTP NodePort | `docs/TROUBLESHOOTING.md#8-argocd-리디렉션-루프-문제` |
-| Namespace 중복 정의 | `k8s/foundations` → `../namespaces/domain-based.yaml` 싱글 소스 | `k8s/foundations/kustomization.yaml` |
+| Namespace 중복 정의 | `k8s/namespaces` 한 곳에서 단일 관리 | `k8s/namespaces/kustomization.yaml` |
 | Atlantis 배포 | Helm Chart (`charts/platform/atlantis`) + ArgoCD Wave 70 | `docs/architecture/gitops/ATLANTIS_TERRAFORM_FLOW.md` |
 
 ---

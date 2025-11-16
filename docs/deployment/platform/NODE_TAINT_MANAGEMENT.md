@@ -1,6 +1,6 @@
 # Node Taint 자동화 가이드
 
-**문서 버전**: v0.8.1  
+**문서 버전**: v0.7.0  
 **최종 업데이트**: 2025-11-12  
 **참고**: Kubernetes Best Practices - Infrastructure as Code
 

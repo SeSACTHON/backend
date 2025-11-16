@@ -98,7 +98,7 @@ Pods:
 
 ### 배포 중
 5. ✅ Ansible playbook 문법 오류 수정
-6. ✅ Kustomize 경로 보안 문제 해결 (foundations)
+6. ✅ Kustomize 경로 보안 문제 해결 (namespaces)
 7. ✅ ApplicationSet kustomize.images 문법 수정
 8. ✅ VPC ID 하드코딩 → 동적 참조
 9. ✅ RabbitMQ 이미지 버전 수정
@@ -128,7 +128,7 @@ Total Pods: 60+
 ```
 Total Applications: 17
   - root-app: Synced/Healthy
-  - foundations: Synced/Healthy
+  - namespaces: Synced/Healthy
   - infrastructure: Synced/Healthy
   - platform: Synced/Healthy
   - data-operators: Synced/Healthy
@@ -204,11 +204,11 @@ Total Applications: 17
 eb154a7 - fix: correct scan-api uvicorn module path
 f982b88 - feat: prepare auth service for v0.7.3 deployment
 84b1c1d - fix: resolve YAML parsing error in ci-quality-gate workflow
-d71d881 - ci: add k8s/foundations to kustomize build tests
+d71d881 - ci: add k8s/namespaces to kustomize build tests
 0f6663e - feat: add imagePullSecrets for GHCR
 0645847 - fix: update alb-controller vpcId to current VPC
 c1fcf21 - fix: use stable rabbitmq image version
-c17defd - fix: move namespaces into foundations directory
+c17defd - fix: consolidate namespaces into k8s/namespaces
 7f79d30 - fix: correct ApplicationSet kustomize images syntax
 20b3c21 - chore: update api images to latest tag
 ```
@@ -224,7 +224,7 @@ c17defd - fix: move namespaces into foundations directory
 | 35-40분 | ArgoCD 설치 | ✅ |
 | 40-45분 | root-app 배포 | ✅ |
 | 45-60분 | Applications 자동 생성 | ✅ |
-| 60-75분 | 이슈 수정 (foundations, ApplicationSet 등) | ✅ |
+| 60-75분 | 이슈 수정 (namespaces, ApplicationSet 등) | ✅ |
 | 75-85분 | GHCR Secret 설정 | ✅ |
 | 85-90분 | API Pods 배포 완료 | ✅ |
 

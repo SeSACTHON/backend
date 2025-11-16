@@ -61,7 +61,7 @@ Line 123: Namespaces 생성 (playbooks/10-namespaces.yml)
 
 **시나리오:**
 1. **Line 116**: ArgoCD → root-app 배포
-   - Wave -1: foundations → k8s/namespaces/domain-based.yaml 적용
+   - Wave -1: namespaces → k8s/namespaces/domain-based.yaml 적용
    - Namespaces 생성 시도
    
 2. **Line 123**: Ansible playbook
@@ -80,7 +80,7 @@ Line 123: Namespaces 생성 (playbooks/10-namespaces.yml)
 # site.yml에서 제거
 - import_playbook: playbooks/10-namespaces.yml  # ← 주석 처리 또는 삭제
 
-# ArgoCD foundations이 자동으로 생성
+# ArgoCD namespaces가 자동으로 생성
 ```
 
 **Option B: 순서 조정**
@@ -91,9 +91,9 @@ Line 123: Namespaces 생성 (playbooks/10-namespaces.yml)
   ...
 ```
 
-**Option C: foundations에서 namespace 제거**
+**Option C: namespaces에서 namespace 제거**
 ```yaml
-# argocd/apps/00-foundations.yaml
+# argocd/apps/00-namespaces.yaml
 # Namespace 생성을 제거하고 CRD만 관리
 ```
 
@@ -105,9 +105,9 @@ Line 123: Namespaces 생성 (playbooks/10-namespaces.yml)
 ```yaml
 argocd/root-app.yaml
 └─ path: argocd/apps  (Wave -2)
-    ├─ 00-foundations.yaml (Wave -1)
-    │   └─ k8s/foundations
-    │       └─ k8s/namespaces/domain-based.yaml ← 14개 Namespace
+    ├─ 00-namespaces.yaml (Wave -1)
+    │   └─ k8s/namespaces
+    │       └─ domain-based.yaml ← 15개 Namespace
     │
     ├─ 10-infrastructure.yaml (Wave 0)
     │   └─ k8s/infrastructure
@@ -149,7 +149,7 @@ argocd/root-app.yaml
 ### 경로 매핑
 | Application | Source Path | 상태 |
 |-------------|-------------|------|
-| foundations | k8s/foundations | ✅ 존재 |
+| namespaces | k8s/namespaces | ✅ 존재 |
 | infrastructure | k8s/infrastructure | ✅ 수정 완료 |
 | api-auth | k8s/overlays/auth | ✅ 존재 |
 | api-character | k8s/overlays/character | ✅ 존재 |
@@ -163,8 +163,7 @@ argocd/root-app.yaml
 ```yaml
 # k8s/infrastructure/kustomization.yaml (수정 완료)
 resources:
-  # namespaces는 foundations에서 이미 생성됨
-  # - namespaces  ← 주석 처리
+  # namespaces는 Wave 00에서 이미 생성됨
   - networkpolicies
 ```
 
@@ -259,8 +258,8 @@ bash scripts/cleanup-vpc-resources.sh
 
 **Option B: Ansible만 사용**
 ```bash
-# argocd/apps/00-foundations.yaml 수정
-# k8s/foundations/kustomization.yaml에서
+# argocd/apps/00-namespaces.yaml 수정
+# k8s/namespaces/kustomization.yaml에서
 # - ../namespaces/domain-based.yaml 제거
 ```
 
@@ -310,7 +309,7 @@ helm dependency update
   ...
   roles:
     - argocd                    # ← root-app.yaml 자동 배포
-                                # foundations (Wave -1)이 namespace 생성
+                                # namespaces (Wave -1)이 namespace 생성
 
 # - import_playbook: playbooks/10-namespaces.yml  # ← 제거 or 주석
 ```
@@ -343,7 +342,7 @@ helm dependency update
    - root-app.yaml 배포 ← ArgoCD가 활성화됨
    - 10-namespaces.yml 실행 (중복이지만 문제없음)
 3. ArgoCD:
-   - Wave -1: foundations → Namespace 생성
+   - Wave -1: namespaces → Namespace 생성
    - Wave 0: infrastructure → NetworkPolicy
    - Wave 20: ALB Controller
    - Wave 40: Monitoring (Prometheus/Grafana)

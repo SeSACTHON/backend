@@ -218,13 +218,11 @@ spec:
 ```
 Wave -2: root-app (최우선)
     ↓
-Wave -1: foundations
-    - Prometheus Operator CRDs
-    - Cert-Manager CRDs
-    - Namespaces (auth, my, scan, character, location, info, chat, data, monitoring, atlantis)
-    - NetworkPolicies
+Wave -1: namespaces
+    - Namespaces (auth, my, scan, character, location, info, chat, workers, messaging, data, databases, monitoring, atlantis, default)
     ↓
 Wave 0: infrastructure  
+    - NetworkPolicies
     - Metrics Server
     - EBS CSI Driver + StorageClass
     - AWS Load Balancer Controller
@@ -299,7 +297,7 @@ backend/
 └── argocd/
     ├── root-app.yaml              # App of Apps 진입점
     └── apps/                      # Wave-based Apps
-        ├── 00-foundations.yaml    # Wave -1
+        ├── 00-namespaces.yaml    # Wave -1
         ├── 10-infrastructure.yaml # Wave 0
         ├── 20-alb-controller.yaml # Wave 20
         ├── 30-platform.yaml       # Wave 30
