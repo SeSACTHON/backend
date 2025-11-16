@@ -50,7 +50,7 @@ spec:
       imagePullSecrets:
         - name: ghcr-secret
       nodeSelector:
-        node-role.kubernetes.io/api: location
+        sesacthon.io/service: location
       tolerations:
         - key: domain
           operator: Equal
