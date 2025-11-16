@@ -4,25 +4,7 @@ kind: Kustomization
 resources:
   - ../../base
 
-patchesJson6902:
-  - target:
-      group: networking.k8s.io
-      version: v1
-      kind: Ingress
-      name: api-ingress
-      namespace: default
-    path: patch-api-ingress.json
-  - target:
-      group: networking.k8s.io
-      version: v1
-      kind: Ingress
-      name: argocd-ingress
-      namespace: argocd
-    path: patch-argocd-ingress.json
-  - target:
-      group: networking.k8s.io
-      version: v1
-      kind: Ingress
-      name: grafana-ingress
-      namespace: monitoring
-    path: patch-grafana-ingress.json
+patchesStrategicMerge:
+  - patch-api-ingress.yaml
+  - patch-argocd-ingress.yaml
+  - patch-grafana-ingress.yaml
