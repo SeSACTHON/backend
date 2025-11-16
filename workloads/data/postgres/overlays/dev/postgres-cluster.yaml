@@ -1,0 +1,25 @@
+apiVersion: acid.zalan.do/v1
+kind: postgresql
+metadata:
+  name: postgres-main
+  namespace: data
+spec:
+  teamId: platform
+  numberOfInstances: 1
+  users:
+    sesacthon: []
+  databases:
+    sesacthon: sesacthon
+  postgresql:
+    version: "15"
+  volume:
+    size: 20Gi
+    storageClass: gp3
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+

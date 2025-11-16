@@ -1,0 +1,119 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: auth
+  labels:
+    app.kubernetes.io/part-of: ecoeco-backend
+    tier: business-logic
+    domain: auth
+    phase: "1"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: my
+  labels:
+    app.kubernetes.io/part-of: ecoeco-backend
+    tier: business-logic
+    domain: my
+    phase: "1"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: scan
+  labels:
+    app.kubernetes.io/part-of: ecoeco-backend
+    tier: business-logic
+    domain: scan
+    phase: "2"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: character
+  labels:
+    app.kubernetes.io/part-of: ecoeco-backend
+    tier: business-logic
+    domain: character
+    phase: "2"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: location
+  labels:
+    app.kubernetes.io/part-of: ecoeco-backend
+    tier: business-logic
+    domain: location
+    phase: "2"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: info
+  labels:
+    app.kubernetes.io/part-of: ecoeco-backend
+    tier: business-logic
+    domain: info
+    phase: "3"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: chat
+  labels:
+    app.kubernetes.io/part-of: ecoeco-backend
+    tier: business-logic
+    domain: chat
+    phase: "3"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: data
+  labels:
+    app.kubernetes.io/part-of: ecoeco-backend
+    tier: data
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: messaging
+  labels:
+    app.kubernetes.io/part-of: ecoeco-backend
+    tier: integration
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: monitoring
+  labels:
+    app.kubernetes.io/part-of: ecoeco-backend
+    tier: observability
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-system
+  labels:
+    app.kubernetes.io/part-of: ecoeco-platform
+    tier: infrastructure
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: data-system
+  labels:
+    app.kubernetes.io/part-of: ecoeco-platform
+    tier: infrastructure
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: messaging-system
+  labels:
+    app.kubernetes.io/part-of: ecoeco-platform
+    tier: infrastructure
+
