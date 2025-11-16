@@ -19,12 +19,12 @@ spec:
             valueFile: platform/helm/kube-prometheus-stack/values/prod.yaml
   template:
     metadata:
-      name: {{env}}-kube-prom-stack
+      name: "{{env}}-kube-prom-stack"
       namespace: argocd
       labels:
         app.kubernetes.io/name: kube-prometheus-stack
     spec:
-      project: {{project}}
+      project: "{{project}}"
       sources:
         - repoURL: https://prometheus-community.github.io/helm-charts
           chart: kube-prometheus-stack
@@ -34,7 +34,7 @@ spec:
           ref: values
       destination:
         server: https://kubernetes.default.svc
-        namespace: {{namespace}}
+        namespace: "{{namespace}}"
       syncPolicy:
         automated:
           prune: true
@@ -45,4 +45,4 @@ spec:
       helm:
         releaseName: kube-prometheus-stack
         valueFiles:
-          - $values/{{ valueFile }}
+          - "$values/{{ valueFile }}"

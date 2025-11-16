@@ -18,17 +18,17 @@ spec:
             namespace: data-system
   template:
     metadata:
-      name: {{env}}-postgres-operator
+      name: "{{env}}-postgres-operator"
       namespace: argocd
     spec:
-      project: {{project}}
+      project: "{{project}}"
       sources:
         - repoURL: https://github.com/zalando/postgres-operator.git
           targetRevision: v1.10.0
           path: charts/postgres-operator
       destination:
         server: https://kubernetes.default.svc
-        namespace: {{namespace}}
+        namespace: "{{namespace}}"
       syncPolicy:
         automated:
           prune: true

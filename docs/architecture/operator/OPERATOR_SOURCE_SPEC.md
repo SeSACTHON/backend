@@ -9,11 +9,9 @@
 
 | Operator | Source / Chart | 주요 Custom Resource | 특징 / 선택 이유 | 비고 |
 |----------|----------------|----------------------|------------------|------|
-| **Zalando Postgres Operator** | GitHub: `github.com/zalando/postgres-operator`<br>Helm: `https://opensource.zalando.com/postgres-operator/charts/postgres-operator` | `postgresql` (`acid.zalan.do/v1`) | - battle-tested, 다중 샤드/팀 기반 관리<br>- AWS S3 WAL archiving, logical backup 지원 | Wave 25(Operator) / Wave 35(PostgresCluster) |
-| **CloudNativePG (대체안)** | GitHub: `github.com/cloudnative-pg/cloudnative-pg`<br>Installer: `kubectl apply -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.27/releases/cnpg-1.27.1.yaml` | `Cluster` (`postgresql.cnpg.io`) | - Sidecar 없는 네이티브 PG operator<br>- pgBackRest 내장 | 후보 (SPOF 감축 필요 시) |
-| **Redis Operator (Spotahome)** | GitHub: `github.com/spotahome/redis-operator`<br>Manifest: `https://raw.githubusercontent.com/spotahome/redis-operator/v1.0.0/deploy/operator.yaml` | `RedisFailover` (`databases.spotahome.com/v1`) | - Master/Replica 자동 Failover<br>- Sentinel 내장 | Wave 25 / Wave 35에서 `Redis[Cluster].yaml` |
-| **Redis Operator (Opstree) - 후보** | Helm Repo: `https://ot-container-kit.github.io/helm-charts/` (`redis-operator`) | `RedisCluster`, `RedisReplication` | - Percona 기반 Enterprise 기능<br>- TLS/ACL 내장 | SLA 요구 시 검토 |
-| **RabbitMQ Cluster Operator** | GitHub: `github.com/rabbitmq/cluster-operator`<br>YAML: `https://github.com/rabbitmq/cluster-operator/releases/download/v1.11.0/cluster-operator.yml` | `RabbitmqCluster` (`rabbitmq.com/v1beta1`) | - K8s Service 기반 클러스터/고가용성<br>- TLS/Cert Manager 통합 | Wave 25 (Operator) + Wave 35 (`RabbitmqCluster`) |
+| **Zalando Postgres Operator** | GitHub: `github.com/zalando/postgres-operator` (`charts/postgres-operator`, tag `v1.10.0`) | `postgresql` (`acid.zalan.do/v1`) | - battle-tested, 다중 샤드/팀 기반 관리<br>- AWS S3 WAL archiving, logical backup 지원 | Wave 25(Operator) / Wave 35(PostgresCluster) |
+| **Redis Operator (Spotahome)** | GitHub: `github.com/spotahome/redis-operator` (`deploy/`, tag `v1.0.0`) | `RedisFailover` (`databases.spotahome.com/v1`) | - Master/Replica 자동 Failover<br>- Sentinel 내장 | Wave 25 / Wave 35에서 `Redis[Cluster].yaml` |
+| **RabbitMQ Cluster Operator** | GitHub: `github.com/rabbitmq/cluster-operator` (`config/default`, tag `v1.11.0`) | `RabbitmqCluster` (`rabbitmq.com/v1beta1`) | - Upstream Operator, TLS/Cert Manager 통합<br>- StatefulSet 기반 Scaling | Wave 25 (Operator) + Wave 35 (`RabbitmqCluster`) |
 
 ### 최소 요구 사항
 - Namespace: `data-system` (Operators) / `data`, `messaging` (Instance)
@@ -27,8 +25,7 @@
 
 | Operator | Source / Chart | 주요 CRD | 특징 |
 |----------|----------------|----------|------|
-| **kube-prometheus-stack** (Prometheus Operator) | Helm: `https://prometheus-community.github.io/helm-charts` (`kube-prometheus-stack`) | `Prometheus`, `Alertmanager`, `ServiceMonitor`, `PodMonitor`, `PrometheusRule` | - Operator + 기본 Prom/Grafana/Alertmanager 번들<br>- CRD 버전 `monitoring.coreos.com/v1` |
-| **Grafana Operator (Optional)** | Helm: `https://grafana.github.io/helm-charts` (`grafana-operator`) | `Grafana`, `GrafanaDashboard`, `GrafanaDatasource` | - 대규모 Dashboard 관리 필요 시 도입 |
+| **kube-prometheus-stack** (Prometheus Operator) | Helm: `https://prometheus-community.github.io/helm-charts`, chart `kube-prometheus-stack`, version `56.21.1` | `Prometheus`, `Alertmanager`, `ServiceMonitor`, `PodMonitor`, `PrometheusRule` | - Operator + Prom/Grafana/Alertmanager 번들<br>- CNCF 관리 Repo, CRD `monitoring.coreos.com/v1` |
 
 ### 요구사항
 - Namespace: `monitoring`

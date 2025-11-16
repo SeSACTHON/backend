@@ -17,17 +17,17 @@ spec:
             namespace: messaging-system
   template:
     metadata:
-      name: {{env}}-rabbitmq-operator
+      name: "{{env}}-rabbitmq-operator"
       namespace: argocd
     spec:
-      project: {{project}}
+      project: "{{project}}"
       sources:
         - repoURL: https://github.com/rabbitmq/cluster-operator.git
           targetRevision: v1.11.0
           path: config/default
       destination:
         server: https://kubernetes.default.svc
-        namespace: {{namespace}}
+        namespace: "{{namespace}}"
       syncPolicy:
         automated:
           prune: true
