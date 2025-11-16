@@ -9,7 +9,7 @@ spec:
   project: dev
   source:
     repoURL: https://github.com/SeSACTHON/backend.git
-    targetRevision: HEAD
+    targetRevision: refactor/gitops-sync-wave
     path: workloads/namespaces/dev
   destination:
     server: https://kubernetes.default.svc

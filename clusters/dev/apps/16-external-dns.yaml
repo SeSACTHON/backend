@@ -9,8 +9,8 @@ spec:
   project: dev
   source:
     repoURL: https://github.com/SeSACTHON/backend.git
-    targetRevision: HEAD
-    path: platform/helm/external-dns
+    targetRevision: refactor/gitops-sync-wave
+    path: platform/charts/external-dns
   destination:
     server: https://kubernetes.default.svc
     namespace: platform-system

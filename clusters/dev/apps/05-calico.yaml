@@ -10,8 +10,8 @@ spec:
   project: dev
   source:
     repoURL: https://github.com/SeSACTHON/backend.git
-    targetRevision: HEAD
-    path: platform/helm/calico
+    targetRevision: refactor/gitops-sync-wave
+    path: platform/charts/calico
   destination:
     server: https://kubernetes.default.svc
     namespace: tigera-operator

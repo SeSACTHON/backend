@@ -9,8 +9,8 @@ spec:
   project: dev
   source:
     repoURL: https://github.com/SeSACTHON/backend.git
-    targetRevision: HEAD
-    path: platform/helm/kube-prometheus-stack
+    targetRevision: refactor/gitops-sync-wave
+    path: platform/charts/kube-prometheus-stack
   destination:
     server: https://kubernetes.default.svc
     namespace: prometheus

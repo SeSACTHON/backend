@@ -10,13 +10,13 @@ spec:
     - list:
         elements:
           - name: postgres-operator
-            path: platform/helm/postgres-operator
+            path: platform/charts/postgres-operator
             namespace: data-system
           - name: redis-operator
-            path: platform/helm/redis-operator
+            path: platform/charts/redis-operator
             namespace: data-system
           - name: rabbitmq-operator
-            path: platform/helm/rabbitmq-operator
+            path: platform/charts/rabbitmq-operator
             namespace: messaging-system
   template:
     metadata:
@@ -26,7 +26,7 @@ spec:
       project: dev
       source:
         repoURL: https://github.com/SeSACTHON/backend.git
-        targetRevision: HEAD
+        targetRevision: refactor/gitops-sync-wave
         path: "{{path}}"
       destination:
         server: https://kubernetes.default.svc
