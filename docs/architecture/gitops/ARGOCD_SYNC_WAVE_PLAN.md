@@ -9,25 +9,26 @@
 
 아래 표는 각 Wave에서 배포해야 하는 대표 리소스, 의존 관계, 그리고 예시 ArgoCD Application 파일을 정리한다. Wave 번호가 낮을수록 먼저 Sync 된다.
 
-| Wave | 계층 | 대표 리소스 | 선행 의존성 | ArgoCD 예시 |
-|------|------|-------------|-------------|-------------|
-| -1 | Namespaces · CRD Seed | `k8s/namespaces`, Core CRD (`prometheuses.monitoring.coreos.com`) | 없음 | `argocd/apps/00-namespaces.yaml` |
-| 0 | RBAC · Storage | ClusterRoleBinding, ServiceAccount, StorageClass, EBS-CSI | Wave -1 | `argocd/apps/01-infrastructure.yaml` |
-| 5 | Network | CNI (Calico), default NetworkPolicy, Node labels/taints | Wave 0 | `argocd/apps/05-network.yaml` *(신규 예정)* |
-| 10 | Platform | ExternalSecrets Operator | Wave 5 | `argocd/apps/10-platform.yaml` |
-| 15 | Ingress | AWS Load Balancer Controller (ACM via Terraform) | Wave 10 | `argocd/apps/15-ingress.yaml` |
-| 20 | Monitoring Operators | Prometheus Operator, Alertmanager CRDs | Wave 15 | `argocd/apps/20-monitoring-operators.yaml` |
-| 25 | Data Operators | Zalando Postgres Operator, Spotahome Redis Operator, RabbitMQ Cluster Operator | Wave 20 | `argocd/apps/25-data-operators.yaml` |
-| 30 | Monitoring Instances | kube-prometheus-stack (Prometheus, Grafana, Alertmanager) | Wave 20 | `argocd/apps/30-monitoring-instances.yaml` |
-| 35 | Data Instances | PostgreSQL / Redis / RabbitmqCluster CR, PVC, Secrets | Wave 25 | `argocd/apps/35-data-clusters.yaml` |
-| 40 | Exporters | Custom metrics exporters, ServiceMonitor, PodMonitor | Wave 30 & 35 | `argocd/apps/40-exporters.yaml` |
-| 50 | GitOps / Ops Tools | Atlantis, Argo Workflow, Internal dashboards | Wave 35 | `argocd/apps/50-tools.yaml` |
-| 60+ | Applications | API Deployments, Celery Workers, batch jobs | 모든 하위 계층 | `argocd/apps/60-apis-app-of-apps.yaml` |
-| 70+ | Application Ingress | instance+NodePort Ingress for ALB Path Based Routing | Wave 60 | `argocd/apps/70-applications-ingress.yaml` |
+| Wave | 계층 | 대표 리소스 | 선행 의존성 | ArgoCD 파일 (clusters/{env}/apps) |
+|------|------|-------------|-------------|-------------------------------|
+| -1 | CRD Seed | ALB, Prometheus, Postgres, ESO CRDs | 없음 | `00-crds.yaml` |
+| 2 | Namespaces | 13개 Namespace (tier, domain 레이블) | Wave -1 | `02-namespaces.yaml` |
+| 3 | RBAC · Storage | ServiceAccount, ClusterRole, Role, StorageClass | Wave 2 | `03-rbac-storage.yaml` |
+| 5 | CNI | Calico (VXLAN, BGP disabled) | Wave 3 | `05-calico.yaml` |
+| 6 | NetworkPolicy | default-deny, tier 기반 격리 (L3/L4) | Wave 5 | `06-network-policies.yaml` |
+| 10 | Secrets Operator | ExternalSecrets Operator (Helm) | Wave 6 | `10-secrets-operator.yaml` |
+| 11 | Secrets CR | ExternalSecret CR (SSM → K8s Secret) | Wave 10 | `11-secrets-cr.yaml` |
+| 15 | Ingress Controller | AWS Load Balancer Controller (ACM via Terraform) | Wave 11 | `15-alb-controller.yaml` |
+| 20 | Monitoring Operator | kube-prometheus-stack (Prometheus Operator) | Wave 15 | `20-monitoring-operator.yaml` |
+| 25 | Data Operators | Postgres/Redis/RabbitMQ Operators | Wave 20 | `25-data-operators.yaml` |
+| 35 | Data Instances | PostgresCluster, RedisFailover CR | Wave 25 | `35-data-cr.yaml` |
+| 60 | Applications | API Deployments (7개 도메인) | Wave 35 | `60-apis-appset.yaml` |
+| 70 | Application Ingress | ALB Path routing (api/argocd/grafana) | Wave 60 | `70-ingress.yaml` |
 
 ### 참고
-- Wave 번호는 5 단위로 확보해도 되지만, ArgoCD는 정수만 비교하므로 1 단위로도 표현 가능하다. 본 문서는 `sync-wave` 주석 또는 `argocd.argoproj.io/sync-wave` 어노테이션을 사용했을 때 직관적인 구간 배분을 목적으로 5 단위 간격을 권장한다.
-- `Monitoring Instances`(Wave 30)는 Operator가 제공하는 CRD가 먼저 생성되어야 하므로 Wave 20에 완전히 종속된다. 동일하게 `Data Instances`도 Wave 25(Operators) 이후로만 선언한다.
+- **파일명 = Wave 번호**: 직관성을 위해 파일명 prefix와 Wave를 일치 (`02-namespaces.yaml` → Wave 2)
+- **같은 Wave 내 순서**: 파일명 알파벳 순서로 적용 (예: `05-calico` → `06-network-policies`)
+- **ExternalSecrets 특이사항**: Operator(Wave 10) 직후 CR(Wave 11)을 배치해 Secret이 소비자(ALB, Wave 15)보다 먼저 준비되도록 함
 
 ---
 
