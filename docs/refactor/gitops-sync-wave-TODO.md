@@ -25,6 +25,8 @@
 - [x] 10-4. overlays 플랫 구조로 변경
 - [x] 11. Clusters App-of-Apps 생성
 - [x] 11-1. Wave 번호 파일명 일치화
+- [x] 14. Observability Stack 재구성
+- [x] 15. ExternalDNS · Route53 자동화
 - [x] 12. Ansible 부트스트랩 전용 정리
 - [ ] 13. 최종 검증 및 문서 동기화 (진행 중)
 
