@@ -25,6 +25,9 @@
 - [15. 베스트 프랙티스](#15-베스트-프랙티스)
 - [16. 참고 문서](#16-참고-문서)
 - [17. 지원](#17-지원)
+- [18. GitOps 배포 문제 (2025-11-16 추가)](#18-gitops-배포-문제-2025-11-16-추가)
+- [19. 베스트 프랙티스 (2025-11-16 업데이트)](#19-베스트-프랙티스-2025-11-16-업데이트)
+- [20. Legacy Troubleshooting Archive (docs/troubleshooting/*)](#20-legacy-troubleshooting-archive-docstroubleshooting)
 
 ---
 
@@ -1750,6 +1753,61 @@ parameters:
 
 ---
 
+### 18.11. ALB Controller egress 차단 (NetworkPolicy)
+
+#### 문제
+```
+aws-load-balancer-controller-7cbcb46f48-xxxxx  CrashLoopBackOff
+unable to create controller: Post "https://10.96.0.1:443/...": dial tcp 10.96.0.1:443: i/o timeout
+```
+
+- 외부 통신 (Kubernetes API, AWS API, IMDS 등)에 접근하지 못해 Operator가 기동 직후 종료
+- ALB, TargetGroup, Listener 동기화가 모두 멈추면서 Wave 15~70 전체가 OutOfSync
+
+#### 원인
+- GitOps v0.7.3 (`5341203`)에서 배포된 `k8s/infrastructure/networkpolicies/domain-isolation.yaml`이 **모든 네임스페이스 egress를 TCP 80/443 + data namespace**로만 제한
+- `kube-system` → API Server(10.96.0.1), DNS(UDP 53), AWS Public API(0.0.0.0/0:443) CIDR 이 허용되지 않아 Control Plane과 IRSA STS 호출이 모두 차단
+- 동일한 템플릿이 business-logic namespace 전체에 반복 적용되면서 ALB Controller 뿐 아니라 ExternalDNS, Metrics Server까지 연쇄 CrashLoop
+
+#### 해결
+1. 문제 Policy 제거 (`git revert 5341203 -- k8s/infrastructure/networkpolicies/domain-isolation.yaml` 혹은 `kubectl delete`로 즉시 완화)
+2. 전용 egress 허용 정책을 별도 파일로 재작성  
+   - `workloads/network-policies/base/allow-dns.yaml` (UDP/TCP 53)  
+   - `workloads/network-policies/base/default-deny-all.yaml` (기본 차단)  
+   - `alb-controller-egress` 커스텀 정책:  
+     ```yaml
+     egress:
+       - to:
+           - ipBlock: { cidr: 10.96.0.1/32 }        # Kubernetes API
+         ports:
+           - protocol: TCP
+             port: 443
+       - to:
+           - namespaceSelector:
+               matchLabels:
+                 kubernetes.io/metadata.name: kube-system
+         ports:
+           - protocol: UDP
+             port: 53
+           - protocol: TCP
+             port: 53
+       - to:
+           - ipBlock: { cidr: 169.254.169.254/32 }  # Instance Metadata
+           - ipBlock: { cidr: 0.0.0.0/0 }           # AWS API (STS 등)
+         ports:
+           - protocol: TCP
+             port: 443
+     ```
+3. Wave 5/6 (Calico → NetworkPolicy)에서 위 정책 세트를 배포하도록 `clusters/{env}/apps/05-calico.yaml`, `06-network-policies.yaml` 순서를 고정
+4. ALB Controller 재기동 (`kubectl rollout restart deployment/aws-load-balancer-controller -n kube-system`)
+
+#### 사후 조치
+- `5c4f5cc`에서 legacy `k8s/infrastructure/networkpolicies` 경로를 정리하고, 모든 정책을 `workloads/network-policies`로 통합
+- `77d694c`에서 overlays 없이 base/환경별 평면 구조로 재정비하여 ArgoCD Diff, GitHub PR 리뷰가 가능하도록 함
+- `docs/architecture/networking/NAMESPACE_NETWORKPOLICY_INGRESS.md`에 동일 사례를 표준 가이드로 연결하고, NetworkPolicy 변경 시 `kubectl logs` / `kubectl describe networkpolicy` 점검을 배포 체크리스트에 추가
+
+---
+
 ## 19. 베스트 프랙티스 (2025-11-16 업데이트)
 
 ### 19.1. GitOps 배포
@@ -1781,4 +1839,129 @@ parameters:
 **최종 업데이트**: 2025-11-16  
 **버전**: v0.7.3  
 **아키텍처**: 14-Node GitOps Production
+
+## 20. Legacy Troubleshooting Archive (docs/troubleshooting/\*)
+
+2025-11-11 `84dcb7fa` 등 문서 정리 커밋에서 삭제된 `docs/troubleshooting/*.md` 19건을 다시 이 문서에 통합했습니다. 기존 섹션과 내용이 겹치는 항목은 **버전/아키텍처 정보**만 표에 기록하고, 누락돼 있던 사례는 `20.1~20.10`에 전문을 요약해 복원했습니다.
+
+| Legacy ID | 이슈 | 버전·아키텍처 | 현재 반영 |
+|-----------|------|---------------|-----------|
+| 01 | ALB Provider ID 누락 | GitOps v0.6.0 · 14-Node | 20.1 (복원) |
+| 02 | auto-rebuild Ansible SSH 타임아웃 | GitOps v0.7.0 · 14-Node | 20.2 (복원) |
+| 03 | ArgoCD 502 Bad Gateway | GitOps v0.6.0 · 14-Node | 20.3 (복원) |
+| 04 | ArgoCD 리디렉션 루프 | GitOps v0.6.0 · 14-Node | 섹션 8 |
+| 05 | Atlantis Config YAML 파싱 오류 | GitOps v0.6.0 · 13-Node | 섹션 14 |
+| 06 | Atlantis Deployment 파일 없음 | GitOps v0.6.0 · 13-Node | 섹션 12 |
+| 07 | Atlantis executable not found | GitOps v0.6.0 · 13-Node | 섹션 13 |
+| 08 | Atlantis Pod에서 kubectl 미탑재 | GitOps v0.6.0 · 13-Node | 섹션 11 |
+| 09 | Atlantis CrashLoopBackOff | GitOps v0.6.0 · 13-Node | 섹션 10 |
+| 10 | CloudFront ACM Certificate stuck | GitOps v0.6.0 · 13-Node | 섹션 6.3 |
+| 11 | deploy.sh SSH 키/Ingress Deprecated 옵션 | GitOps v0.6.0 · 14-Node | 20.4 (복원) |
+| 12 | macOS TLS 인증서 오류 | GitOps v0.6.0 · Local Dev | 20.5 (복원) |
+| 13 | Monitoring 노드 리소스 분석 | GitOps v0.6.0 · 14-Node | 20.6 (복원) |
+| 14 | PostgreSQL FailedScheduling | GitOps v0.6.0 · 14-Node | 20.7 (복원) |
+| 15 | Prometheus 메모리 부족 | GitOps v0.6.0 · 14-Node | 섹션 9 |
+| 16 | Prometheus Pending (CPU 부족) | GitOps v0.6.0 · 14-Node | 20.8 (복원) |
+| 17 | Route53 → ALB 라우팅 수정 | GitOps v0.6.0 · 14-Node | 20.9 (복원) |
+| 18 | CloudFront/ACM/VPC 삭제 장애 | GitOps v0.6.0 · 14-Node | 20.10 (복원) |
+| 19 | VPC 삭제 지연 (Security Group) | GitOps v0.6.0 · 13-Node | 섹션 7 |
+
+### 20.1. ALB Provider ID 누락 (GitOps v0.6.0 · 14-Node)
+
+- **증상**: ALB가 만들어졌지만 TargetGroup이 비어 있고 `503 Service Unavailable`.
+- **원인**: Worker/Infra 노드 `spec.providerID`가 `aws:///ap-northeast-2a/`처럼 Instance ID 없이 비어 있어 AWS Load Balancer Controller가 노드를 식별하지 못함.
+- **해결**:
+  1. 긴급: 각 노드에서 `kubeadm-flags.env` 끝에 `--provider-id=aws:///AZ/i-xxxxxxxx`를 추가 후 `systemctl restart kubelet`.
+  2. 영구: `ansible/playbooks/03-worker-join.yml`에 `ec2-metadata` 기반 providerID 주입 태스크 추가.
+  3. 검증: `kubectl get nodes -o custom-columns='NAME:.metadata.name,PROVIDER:.spec.providerID'`.
+- **참고**: `terraform/alb-controller-iam.tf`, `ansible/playbooks/03-worker-join.yml`.
+
+### 20.2. auto-rebuild Ansible SSH 타임아웃 (GitOps v0.7.0 · 14-Node)
+
+- **증상**: `ansible-playbook site.yml` 단계에서 `Timeout when waiting for <old-ip>:22`.
+- **원인**: Terraform이 새 Public IP를 발급했으나 `auto-rebuild.sh`가 `ansible/inventory/hosts.ini`를 재생성하지 않아 구버전 IP(이전 클러스터)를 계속 사용.
+- **해결**:
+  - Terraform output을 진실원으로 사용:  
+    `terraform output -raw ansible_inventory > ansible/inventory/hosts.ini`.
+  - 스크립트 강화: apply 직후 inventory 재생성, 노드 개수 동적 계산, Phase3/4 라벨링·헬스체크 추가.
+  - 실행 순서: inventory 재생성 → `ansible all -m ping` → `ansible-playbook site.yml`.
+
+### 20.3. ArgoCD 502 Bad Gateway (GitOps v0.6.0 · 14-Node)
+
+- **증상**: `https://growbin.app/argocd` 접근 시 502, TargetHealth `unhealthy`.
+- **원인**: Ingress annotation이 `alb.ingress.kubernetes.io/backend-protocol: HTTPS`이고 Service Port가 443인 반면 ArgoCD 서버는 `server.insecure: true`로 HTTP 8080만 리슨.
+- **해결**:
+  1. `backend-protocol`을 HTTP로, backend Service Port를 80으로 수정.  
+     `kubectl annotate ingress argocd-ingress alb.ingress.kubernetes.io/backend-protocol=HTTP --overwrite`
+  2. `ansible/playbooks/07-ingress-resources.yml` 템플릿 업데이트.
+  3. `aws elbv2 describe-target-health`로 Health 확인.
+
+### 20.4. deploy.sh SSH 키·Ingress Deprecated 옵션 (GitOps v0.6.0 · 14-Node)
+
+- **증상**: `deploy.sh`가 `~/.ssh/sesacthon.pem` 미존재로 중단, `kubernetes.io/ingress.class` warning 다수 발생.
+- **해결**:
+  - SSH: Terraform이 업로드한 `~/.ssh/id_rsa`를 기본 키로 사용하도록 스크립트 수정.
+  - Ingress: annotation 대신 `spec.ingressClassName: alb` 사용.
+  - `ansible/ansible.cfg`에 `deprecation_warnings = False`.
+- **검증**: `kubectl get ingress -A -o jsonpath='{.items[*].spec.ingressClassName}'`.
+
+### 20.5. macOS TLS 인증서 오류 (GitOps v0.6.0 · Local Dev)
+
+- **증상**: macOS에서 Terraform/kubectl 실행 시 `x509: certificate signed by unknown authority`.
+- **원인**: Go 런타임이 macOS Keychain 인증서를 인식하지 못하거나 프록시형 SSL 검사 도구가 중간자 인증서를 삽입.
+- **해결 옵션**:
+  - Terraform을 Docker 이미지에서 실행하여 리눅스 cacerts 사용.
+  - 개발 환경에 한해 `SSL_CERT_FILE` 지정 또는 `GODEBUG=x509ignoreCN=0`.
+  - Keychain에서 루트 인증서를 재신뢰.
+
+### 20.6. Monitoring 노드 리소스 분석 (GitOps v0.6.0 · 14-Node)
+
+- **증상**: Prometheus/Grafana/Alertmanager가 다른 노드에 스케줄링되어 Monitoring 전용 노드가 비게 됨.
+- **원인**: Monitoring 노드에 `node-role.kubernetes.io/infrastructure=true:NoSchedule` taint가 있는데 Helm values에 toleration과 nodeSelector가 없었음.
+- **해결**:
+  - `kube-prometheus-stack` values에 공통 toleration/nodeSelector 추가(현재 dev/prod values에 반영).
+  - 리소스 분석: t3.medium 기준 CPU 1780m 사용(89%), RAM 2.4Gi(65%)로 업스케일 불필요.
+
+### 20.7. PostgreSQL FailedScheduling (GitOps v0.6.0 · 14-Node)
+
+- **증상**: `postgres-0`가 `FailedScheduling: ... node(s) didn't match Pod's node selector`.
+- **원인**: Storage 노드에 `workload=storage` 레이블이 누락되거나 잘못된 노드명을 사용해 Ansible 라벨링이 실패.
+- **해결**:
+  1. `kubectl get nodes -L workload`로 확인 후 `kubectl label nodes <node> workload=storage --overwrite`.
+  2. 필요 시 `scripts/fix-node-labels.sh` 실행 또는 Ansible 레이블 단계 재실행.
+  3. `kubectl rollout restart statefulset/postgres -n postgres`.
+
+### 20.8. Prometheus Pending (CPU 부족) (GitOps v0.6.0 · 14-Node)
+
+- **증상**: Prometheus StatefulSet이 Pending, 이벤트에 `1 Insufficient cpu`.
+- **원인**: Monitoring 노드(t3.large, 2000m)가 이미 1130m를 사용 중인 상태에서 Prometheus가 1000m 요청 → 가용량 초과.
+- **해결**:
+  - CPU request를 500m로 낮춤(`kubectl patch prometheus ...` 또는 Helm values 수정).
+  - 대안: Grafana를 다른 노드로 이동 또는 Monitoring 인스턴스를 t3.xlarge로 업그레이드.
+
+### 20.9. Route53 → ALB 라우팅 수정 (GitOps v0.6.0 · 14-Node)
+
+- **증상**: `growbin.app`, `argocd.growbin.app` 등이 Master Public IP를 직접 가리켜 TLS 종료·부하분산이 무력화.
+- **해결**:
+  - Terraform `aws_route53_record`를 ALB Alias로 교체하거나,
+  - ALB Controller가 생성된 뒤 Ansible Playbook으로 Route53 레코드를 자동 업데이트.
+- **예시**:
+  ```hcl
+  alias {
+    name    = data.aws_lb.alb[0].dns_name
+    zone_id = data.aws_lb.alb[0].zone_id
+    evaluate_target_health = true
+  }
+  ```
+
+### 20.10. CloudFront/ACM/VPC 삭제 장애 (GitOps v0.6.0 · 14-Node)
+
+- **증상**: `force-destroy-all.sh` 실행 시 CloudFront Distribution을 감지하지 못해 ACM Certificate와 VPC 삭제가 20분 이상 지연.
+- **원인**:
+  - `aws cloudfront list-distributions` JMESPath가 복잡해 `E1GGDPUBLRQG59`를 찾지 못함.
+  - CloudFront가 남아 있어 `arn:aws:acm:us-east-1:...` Certificate 삭제가 계속 pending.
+- **해결**:
+  1. `jq` 기반 단순 리스트로 Distribution ID를 검색하고 Disabled 상태 확인 후 명시적으로 삭제.
+  2. Certificate `InUseBy`를 검사해 CloudFront 삭제 완료까지 대기.
+  3. 필요 시 `scripts/utilities/manual-cleanup-cloudfront-acm.sh`로 수동 정리 후 Terraform destroy 재시도.
 
