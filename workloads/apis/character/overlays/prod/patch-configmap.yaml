@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: character-config
+  namespace: character
+data:
+  ENVIRONMENT: "prod"
+  DEBUG: "false"
+

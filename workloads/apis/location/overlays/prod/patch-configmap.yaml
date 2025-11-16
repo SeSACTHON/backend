@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: location-config
+  namespace: location
+data:
+  ENVIRONMENT: "prod"
+  DEBUG: "false"
+

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chat-config
+  namespace: chat
+data:
+  LOG_LEVEL: "INFO"
+  ENVIRONMENT: "base"
+
