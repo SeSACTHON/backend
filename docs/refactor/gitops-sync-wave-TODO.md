@@ -14,11 +14,11 @@
 - [x] 4. Platform CRDs 구조 생성
 - [x] 5. Workloads Ingress Kustomize 생성
 - [x] 6. ExternalSecrets 구조 생성
-- [ ] 7. Workloads Namespaces Kustomize 생성
-- [ ] 8. Workloads NetworkPolicy Kustomize 생성
-- [ ] 9. Workloads Data CR Kustomize 생성
-- [ ] 10. Workloads APIs Kustomize 생성
-- [ ] 11. Clusters App-of-Apps 생성
+- [x] 7. Workloads Namespaces Kustomize 생성
+- [x] 8. Workloads NetworkPolicy Kustomize 생성
+- [x] 9. Workloads Data CR Kustomize 생성
+- [x] 10. Workloads APIs Kustomize 생성
+- [🔄] 11. Clusters App-of-Apps 생성 (부분 완료)
 - [ ] 12. Ansible 부트스트랩 전용 정리
 - [ ] 13. 최종 검증 및 문서 동기화
 
@@ -120,19 +120,24 @@
 
 ---
 
-## 7. Workloads Namespaces Kustomize 생성 ⏳
+## 7. Workloads Namespaces Kustomize 생성 ✅
 
 ### 작업 항목
-- [ ] `workloads/namespaces/base/`: 모든 네임스페이스 정의 (tier, domain 레이블)
-- [ ] `workloads/namespaces/overlays/dev/`: dev 환경 레이블/어노테이션 패치
-- [ ] `workloads/namespaces/overlays/prod/`: prod 환경 레이블/어노테이션 패치
+- [x] `workloads/namespaces/base/`: 모든 네임스페이스 정의 (tier, domain 레이블)
+- [x] `workloads/namespaces/overlays/dev/`: dev 환경 레이블/어노테이션 패치
+- [x] `workloads/namespaces/overlays/prod/`: prod 환경 레이블/어노테이션 패치
+- [x] `workloads/namespaces/README.md`: 구조 설명
 
-### 필요 네임스페이스
+### 완료된 네임스페이스
 - `auth`, `my`, `scan`, `character`, `location`, `info`, `chat` (tier: business-logic)
-- `data` (tier: data)
+- `postgres`, `redis` (tier: data, data 네임스페이스를 분리)
 - `messaging` (tier: integration)
 - `monitoring` (tier: observability)
 - `platform-system`, `data-system`, `messaging-system` (Operator 네임스페이스)
+
+### 커밋
+- `e890116` refactor: split data tier into postgres/redis namespaces
+- `a056c69` refactor: use base+overlay pattern for data CRs
 
 ### 참고 문서
 - `docs/architecture/namespace/NAMESPACE_CONSISTENCY_CHECKLIST.md`
@@ -140,15 +145,19 @@
 
 ---
 
-## 8. Workloads NetworkPolicy Kustomize 생성 ⏳
+## 8. Workloads NetworkPolicy Kustomize 생성 ✅
 
 ### 작업 항목
-- [ ] `workloads/network-policies/base/default-deny-all.yaml`: 기본 거부 정책
-- [ ] `workloads/network-policies/base/allow-dns.yaml`: CoreDNS 허용
-- [ ] `workloads/network-policies/base/data-ingress.yaml`: tier=business-logic → data 허용
-- [ ] `workloads/network-policies/base/monitoring-ingress.yaml`: 모든 NS → monitoring 허용
-- [ ] `overlays/dev/`: 개발 환경용 느슨한 정책 (선택)
-- [ ] `overlays/prod/`: 프로덕션 엄격 정책
+- [x] `workloads/network-policies/base/default-deny-all.yaml`: 기본 거부 정책
+- [x] `workloads/network-policies/base/allow-dns.yaml`: CoreDNS 허용
+- [x] `workloads/network-policies/base/data-ingress.yaml`: tier=business-logic → postgres/redis 허용
+- [x] `workloads/network-policies/base/monitoring-ingress.yaml`: 모든 NS → monitoring 허용
+- [x] `overlays/dev/`: base 참조
+- [x] `overlays/prod/`: base 참조
+- [x] `workloads/network-policies/README.md`: 정책 설명
+
+### 커밋
+- `d09b8ee` feat: add workloads namespaces/networkpolicies/data CRs
 
 ### 참고 문서
 - `docs/architecture/networking/NETWORK_ISOLATION_POLICY.md`
@@ -159,15 +168,22 @@
 
 ---
 
-## 9. Workloads Data CR Kustomize 생성 ⏳
+## 9. Workloads Data CR Kustomize 생성 ✅
 
 ### 작업 항목
-- [ ] `workloads/data/postgres/base/`: PostgresCluster CR 기본 템플릿
-- [ ] `workloads/data/postgres/overlays/dev/`: dev 환경 (replicas: 1)
-- [ ] `workloads/data/postgres/overlays/prod/`: prod 환경 (replicas: 3, backup)
-- [ ] `workloads/data/redis/base/`: RedisFailover CR 기본
-- [ ] `workloads/data/redis/overlays/dev/`: dev 환경
-- [ ] `workloads/data/redis/overlays/prod/`: prod 환경
+- [x] `workloads/data/postgres/base/`: PostgresCluster CR 기본 템플릿
+- [x] `workloads/data/postgres/overlays/dev/`: dev 환경 (replicas: 1)
+- [x] `workloads/data/postgres/overlays/prod/`: prod 환경 (replicas: 1, backup)
+- [x] `workloads/data/redis/base/`: RedisFailover CR 기본
+- [x] `workloads/data/redis/overlays/dev/`: dev 환경
+- [x] `workloads/data/redis/overlays/prod/`: prod 환경
+- [x] `workloads/data/postgres/base/README.md`: Postgres CR 가이드
+- [x] `workloads/data/redis/base/README.md`: Redis Failover 가이드
+- [x] `workloads/data/README.md`: Data layer 개요
+
+### 커밋
+- `a056c69` refactor: use base+overlay pattern for data CRs
+- `8b7b8be` chore: set prod data instances to 1 replica
 
 ### 참고
 - Zalando Postgres Operator: `acid.zalan.do/v1` `postgresql` CR
@@ -175,13 +191,18 @@
 
 ---
 
-## 10. Workloads APIs Kustomize 생성 ⏳
+## 10. Workloads APIs Kustomize 생성 ✅
 
 ### 작업 항목
-- [ ] `workloads/apis/auth/base/`: Deployment + Service + ConfigMap
-- [ ] `workloads/apis/auth/overlays/dev/`: 환경변수, replicas, image tag
-- [ ] `workloads/apis/auth/overlays/prod/`: 동일 구조
-- [ ] 나머지 API: my, scan, character, location, info, chat (동일 패턴)
+- [x] `workloads/apis/auth/base/`: Deployment + Service + ConfigMap
+- [x] `workloads/apis/auth/overlays/dev/`: 환경변수, replicas, image tag
+- [x] `workloads/apis/auth/overlays/prod/`: 동일 구조
+- [x] 나머지 API: my, scan, character, location, info, chat (동일 패턴)
+- [x] 각 API 디렉터리에 README.md 추가 (7개)
+
+### 커밋
+- `7796b6d` feat: add auth api kustomize base+overlays
+- `dfb28e0` feat: add all api services kustomize structure
 
 ### 필수 요소
 - GHCR pull secret: `imagePullSecrets: [name: ghcr-secret]`
@@ -190,23 +211,28 @@
 
 ---
 
-## 11. Clusters App-of-Apps 생성 ⏳
+## 11. Clusters App-of-Apps 생성 🔄
 
 ### 작업 항목
-- [ ] `clusters/dev/root-app.yaml`: Dev 환경 루트 Application
-- [ ] `clusters/dev/apps/00-crds.yaml`: Wave -1, platform/crds 참조
-- [ ] `clusters/dev/apps/05-namespaces.yaml`: Wave 0, workloads/namespaces/overlays/dev
+- [x] `clusters/dev/root-app.yaml`: Dev 환경 루트 Application
+- [x] `clusters/dev/apps/00-crds.yaml`: Wave -1, platform/crds 참조
+- [x] `clusters/dev/apps/05-namespaces.yaml`: Wave 0, workloads/namespaces/overlays/dev
+- [x] `clusters/dev/apps/10-network-policies.yaml`: Wave 5, NetworkPolicy
 - [ ] `clusters/dev/apps/08-rbac-storage.yaml`: Wave 0, RBAC + StorageClass
-- [ ] `clusters/dev/apps/10-platform.yaml`: Wave 10, ExternalSecrets + cert-manager
-- [ ] `clusters/dev/apps/15-alb-controller.yaml`: Wave 15, ALB Helm
-- [ ] `clusters/dev/apps/20-monitoring-operator.yaml`: Wave 20, kube-prometheus-stack
-- [ ] `clusters/dev/apps/25-data-operators.yaml`: Wave 25, Postgres/Redis/RabbitMQ
-- [ ] `clusters/dev/apps/30-monitoring-cr.yaml`: Wave 30, Prometheus CR
-- [ ] `clusters/dev/apps/35-data-cr.yaml`: Wave 35, DB Instance CR
+- [ ] `clusters/dev/apps/15-platform.yaml`: Wave 10, ExternalSecrets + cert-manager
+- [ ] `clusters/dev/apps/20-alb-controller.yaml`: Wave 15, ALB Helm
+- [ ] `clusters/dev/apps/25-monitoring-operator.yaml`: Wave 20, kube-prometheus-stack
+- [ ] `clusters/dev/apps/30-data-operators.yaml`: Wave 25, Postgres/Redis/RabbitMQ
+- [ ] `clusters/dev/apps/40-monitoring-cr.yaml`: Wave 30, Prometheus CR
+- [ ] `clusters/dev/apps/45-data-cr.yaml`: Wave 35, DB Instance CR
 - [ ] `clusters/dev/apps/58-secrets.yaml`: Wave 58, ExternalSecrets
-- [ ] `clusters/dev/apps/60-apis-appset.yaml`: Wave 60+, API ApplicationSet
-- [ ] `clusters/dev/apps/70-applications-ingress.yaml`: Wave 70+, Ingress
+- [x] `clusters/dev/apps/60-apis-appset.yaml`: Wave 60+, API ApplicationSet
+- [x] `clusters/dev/apps/70-ingress.yaml`: Wave 70+, Ingress
+- [x] `clusters/dev/README.md`: Dev 환경 가이드
 - [ ] `clusters/prod/`: 동일 구조
+
+### 커밋
+- `4303d13` feat: add dev cluster app-of-apps structure (부분 완료)
 
 ### 참고
 - `ARGOCD_SYNC_WAVE_PLAN.md` 표 기준
@@ -227,7 +253,7 @@
 - Kubernetes 클러스터 초기화 (kubeadm init/join)
 - ArgoCD 설치
 - SSM Parameter 조회 (IRSA, VPC ID 등)
-- Root App 배포
+- ArogCD Root App 배포
 
 ---
 
