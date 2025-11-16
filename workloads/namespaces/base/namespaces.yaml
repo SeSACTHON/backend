@@ -72,10 +72,20 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: data
+  name: postgres
   labels:
     app.kubernetes.io/part-of: ecoeco-backend
     tier: data
+    data-type: postgres
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: redis
+  labels:
+    app.kubernetes.io/part-of: ecoeco-backend
+    tier: data
+    data-type: redis
 ---
 apiVersion: v1
 kind: Namespace

@@ -14,7 +14,8 @@
 |------|-----------|-------------|------|
 | **Business Logic** | `auth`, `my`, `scan`, `character`, `location`, `info`, `chat` | API Deployment/Service/ConfigMap/Secret | 애플리케이션 팀별 관리, 데이터 접근은 Service 호출로 제한 |
 | **Integration** | `messaging` | RabbitMQ Operator + Cluster CR | 서버 간 메시징, 고가용성 필요 |
-| **Data** | `data` | PostgreSQL Operator/Instances, Redis | 중앙 데이터 계층, 백업 taint |
+| **Data (Postgres)** | `postgres` | PostgreSQL Operator/Instances | DB 계층, tier=data |
+| **Data (Redis)** | `redis` | Redis Operator/Instances | Cache 계층, tier=data |
 | **Observability** | `monitoring` | kube-prometheus-stack, Grafana | 플랫폼 팀 관리, 모든 네임스페이스 리드 |
 | **Infrastructure** | `atlantis`, `workers`(필요 시) | Terraform/AWS credential Secret, Worker Daemon | DevOps 도구 전용 |
 
@@ -27,7 +28,7 @@
 | 역할 | ClusterRole 범위 | Namespace 접근 | 사용 주체 | 허용 작업 |
 |------|------------------|----------------|-----------|-----------|
 | **platform-admin** | Cluster-scoped (nodes, CRDs, namespaces, RBAC) | 전체 | Platform/SRE | 인프라 운영 전권 (Change window 필요) |
-| **data-ops** | Namespaced + data/messaging | `data`, `messaging` | DB 팀 | StatefulSet/Secret 관리, Snapshot/Backup Job 실행 |
+| **data-ops** | Namespaced + data/messaging | `postgres`, `redis`, `messaging` | DB 팀 | StatefulSet/Secret 관리, Snapshot/Backup Job 실행 |
 | **api-dev** | Namespaced | 각 도메인(`auth` 등) | 서비스 팀 | Deployment/Service/ConfigMap/Secret(own) 수정, 다른 namespace 읽기 금지 |
 | **observability** | ClusterRole(ReadOnly) | 모든 namespace Read | Monitoring 팀, Grafana SA | Pods/Services/Endpoints/CustomMetrics 읽기 |
 | **automation-ci** | ClusterRole(Argo/Atlantis) | 대상 namespace | ArgoCD, Atlantis SA | GitOps sync (`apps`, `deployments` 패치) |
@@ -94,7 +95,7 @@ rules:
     verbs: ["get", "list", "watch", "create", "update", "patch"]
 ```
 
-RoleBinding을 `data` 및 `messaging` 네임스페이스에 각각 생성한다.
+RoleBinding을 `postgres`, `redis`, `messaging` 네임스페이스에 각각 생성한다.
 
 ### 3.3 observability (읽기 전용)
 

@@ -2,7 +2,7 @@ apiVersion: acid.zalan.do/v1
 kind: postgresql
 metadata:
   name: postgres-main
-  namespace: data
+  namespace: postgres
 spec:
   teamId: platform
   numberOfInstances: 1

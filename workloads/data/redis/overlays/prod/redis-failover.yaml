@@ -2,7 +2,7 @@ apiVersion: databases.spotahome.com/v1
 kind: RedisFailover
 metadata:
   name: redis-main
-  namespace: data
+  namespace: redis
 spec:
   sentinel:
     replicas: 3
