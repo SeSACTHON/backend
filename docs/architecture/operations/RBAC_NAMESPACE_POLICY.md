@@ -2,9 +2,54 @@
 
 > **목적**: 현재 네임스페이스 구조(비즈니스 API, 데이터 계층, 모니터링, 인프라)에 맞춰 Kubernetes RBAC을 표준화해 권한 범위를 최소 권한 원칙(Least Privilege)으로 유지한다.  
 > **레퍼런스**: 
-> - Kubernetes 공식 문서 *“Using RBAC Authorization”*  
+> - Kubernetes 공식 문서 *"Using RBAC Authorization"*  
 > - CNCF App Delivery WG 보안 권고(*Least Privilege for GitOps*)  
 > - NSA/CISA Kubernetes Hardening Guide (2023)
+
+---
+
+## 0. 환경별 RBAC 전략
+
+| 환경 | 정책 | RoleBinding 위치 | 이유 |
+|------|------|------------------|------|
+| **dev** | 모든 인증된 사용자 → `cluster-admin` | `workloads/rbac-storage/overlays/dev/cluster-role-bindings.yaml` | 빠른 개발/디버깅, 네임스페이스 제약 없음 |
+| **prod** | ServiceAccount별 최소 권한 (Least Privilege) | `workloads/rbac-storage/overlays/prod/role-bindings.yaml` | 보안, 감사 추적, 장애 격리 |
+
+### Dev 환경 (Full Access)
+
+```yaml
+# workloads/rbac-storage/overlays/dev/cluster-role-bindings.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: dev-full-access
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: Group
+    name: system:authenticated  # 모든 인증된 사용자
+```
+
+### Prod 환경 (최소 권한)
+
+- `platform-admin` → ArgoCD Application Controller SA
+- `data-ops` → Postgres/Redis/RabbitMQ Operator SA (각 네임스페이스별 Role)
+- `observability-reader` → Prometheus SA (ClusterRole, ReadOnly)
+
+상세 바인딩: `workloads/rbac-storage/overlays/prod/role-bindings.yaml`
+
+### Terraform IRSA 연계
+
+모든 ServiceAccount의 AWS IAM 권한은 Terraform에서 생성:
+
+| ServiceAccount | Namespace | IAM Role (Terraform) | SSM Parameter 경로 |
+|---------------|-----------|----------------------|-------------------|
+| `external-secrets-sa` | `platform-system` | `aws_iam_role.external_secrets` | `/sesacthon/{env}/iam/external-secrets-role-arn` |
+| `postgres-operator` | `data-system` | `aws_iam_role.postgres_operator` | `/sesacthon/{env}/iam/postgres-operator-role-arn` |
+| `aws-load-balancer-controller` | `kube-system` | `aws_iam_role.alb_controller` | `/sesacthon/{env}/iam/alb-controller-role-arn` |
+
+파일: `terraform/irsa-roles.tf`
 
 ---
 
