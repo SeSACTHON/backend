@@ -1,0 +1,13 @@
+installation:
+  calicoNetwork:
+    bgp: Disabled
+    ipPools:
+      - cidr: 192.168.0.0/16
+        encapsulation: VXLAN
+        natOutgoing: Enabled
+        nodeSelector: all()
+  nodeMetricsPort: 9091
+  typhaMetricsPort: 9093
+  controlPlaneReplicas: 2
+  flexVolumePath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/
+

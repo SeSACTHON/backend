@@ -35,7 +35,21 @@
 
 ---
 
-## 3. Messaging / Event Operators
+## 3. Network (CNI)
+
+| 컴포넌트 | Source / Chart | 주요 리소스 | 설정 | Wave |
+|---------|----------------|------------|------|------|
+| **Calico (tigera-operator)** | Helm: `https://docs.tigera.io/calico/charts`, chart `tigera-operator`, version `v3.27.0` | `Installation` (`operator.tigera.io/v1`), `IPPool`, `NetworkPolicy` | - VXLAN Always, BGP disabled<br>- `spec.calicoNetwork.ipPools[].encapsulation: VXLAN`<br>- `spec.calicoNetwork.bgp: Disabled`<br>- `natOutgoing: Enabled` | Wave 5 (Network) |
+
+### 요구사항
+- Namespace: `tigera-operator` (Operator), `calico-system` (Data plane)
+- Wave: 5 (CNI 먼저), 이후 NetworkPolicy (동일 Wave 또는 바로 뒤)
+- 선행 조건: Kubernetes v1.24+ (kube-proxy IPVS/iptables 호환)
+- 참고: Tigera Operator는 Installation CR로 Calico 설정을 선언적으로 관리하며, VXLAN 모드에서 BGP를 비활성화하면 간단한 overlay network 구성 가능
+
+---
+
+## 4. Messaging / Event Operators
 
 | Operator | Source / Chart | CRD | 특징 |
 |----------|----------------|-----|------|
@@ -50,7 +64,7 @@
 
 ---
 
-## 4. 소스 명시 & 버전 관리
+## 5. 소스 명시 & 버전 관리
 
 1. **Helm Chart 버전**  
    - `platform/helm/<operator>/Chart.yaml`에 `version`, `appVersion` 명시  
