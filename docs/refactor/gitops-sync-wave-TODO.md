@@ -25,11 +25,10 @@
 - [x] 10-4. overlays 플랫 구조로 변경
 - [x] 11. Clusters App-of-Apps 생성
 - [x] 11-1. Wave 번호 파일명 일치화
-- [x] 14. Observability Stack 재구성
-- [x] 15. ExternalDNS · Route53 자동화
 - [x] 12. Ansible 부트스트랩 전용 정리
-- [ ] 13. 최종 검증 및 문서 동기화 (진행 중)
-
+- [x] 13. Observability Stack 재구성
+- [x] 14. ExternalDNS · Route53 자동화
+- [ ] 15. 최종 검증 및 문서 동기화 (진행 중)
 ---
 
 ## 1. 문서화 (Architecture Guides) ✅
@@ -301,21 +300,7 @@
 
 ---
 
-## 13. 최종 검증 및 문서 동기화 ⏳
-
-### 작업 항목
-- [ ] 모든 `platform/helm/*/app.yaml` YAML 문법 검증
-- [ ] `workloads/` 하위 모든 kustomization.yaml 파싱 검증
-- [ ] Wave 번호 일관성 체크 (문서 vs 실제 app.yaml)
-- [ ] ExternalSecret `remoteRef.key` 경로와 SSM Parameter 이름 일치 확인
-- [ ] RBAC/Tier 레이블 일관성 검증
-- [ ] `tmp/` 디렉터리 정리 (`.gitignore` 추가)
-- [ ] 문서 링크 검증 (상호 참조 깨진 곳 없는지)
-- [ ] README 업데이트 (새 구조 반영)
-
----
-
-## 14. Observability Stack 재구성 ✅
+## 13. Observability Stack 재구성 ✅
 
 ### 완료 항목
 - [x] Grafana를 kube-prometheus-stack에서 분리하여 `platform/helm/grafana/` Helm ApplicationSet 생성
@@ -328,7 +313,7 @@
 
 ---
 
-## 15. ExternalDNS · Route53 자동화 ✅
+## 14. ExternalDNS · Route53 자동화 ✅
 
 ### 완료 항목
 - [x] `docs/architecture/networking/EXTERNAL_DNS_ROUTE53.md` – Route53 자동화 가이드 작성
@@ -341,6 +326,19 @@
 
 ### 커밋
 - (작업 진행 중, 동일 브랜치 내 다수의 staged 변경 포함)
+---
+
+## 15. 최종 검증 및 문서 동기화 ⏳
+
+### 작업 항목
+- [ ] 모든 `platform/helm/*/app.yaml` YAML 문법 검증
+- [ ] `workloads/` 하위 모든 kustomization.yaml 파싱 검증
+- [ ] Wave 번호 일관성 체크 (문서 vs 실제 app.yaml)
+- [ ] ExternalSecret `remoteRef.key` 경로와 SSM Parameter 이름 일치 확인
+- [ ] RBAC/Tier 레이블 일관성 검증
+- [ ] `tmp/` 디렉터리 정리 (`.gitignore` 추가)
+- [ ] 문서 링크 검증 (상호 참조 깨진 곳 없는지)
+- [ ] README 업데이트 (새 구조 반영)
 
 ---
 
