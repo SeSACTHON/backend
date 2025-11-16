@@ -19,7 +19,9 @@
 | 10 | Secrets Operator | ExternalSecrets Operator (Helm) | Wave 6 | `10-secrets-operator.yaml` |
 | 11 | Secrets CR | ExternalSecret CR (SSM → K8s Secret) | Wave 10 | `11-secrets-cr.yaml` |
 | 15 | Ingress Controller | AWS Load Balancer Controller (ACM via Terraform) | Wave 11 | `15-alb-controller.yaml` |
+| 16 | DNS Automation | ExternalDNS (Route53 관리) | Wave 11, 15 | `16-external-dns.yaml` |
 | 20 | Monitoring Operator | kube-prometheus-stack (Prometheus Operator) | Wave 15 | `20-monitoring-operator.yaml` |
+| 21 | Observability UI | Grafana (Helm, 독립 배포) | Wave 20 | `21-grafana.yaml` |
 | 25 | Data Operators | Postgres/Redis/RabbitMQ Operators | Wave 20 | `25-data-operators.yaml` |
 | 35 | Data Instances | PostgresCluster, RedisFailover CR | Wave 25 | `35-data-cr.yaml` |
 | 60 | Applications | API Deployments (7개 도메인) | Wave 35 | `60-apis-appset.yaml` |

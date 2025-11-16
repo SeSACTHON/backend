@@ -1,8 +1,9 @@
-# refactor/gitops-sync-wave 브랜치 작업 체크리스트
+# GitOps Sync Wave (v0.7.4) 대표 문서
 
+> **버전**: v0.7.4  
 > **브랜치**: `refactor/gitops-sync-wave`  
 > **목적**: ArgoCD Sync Wave 기반 GitOps 구조 재정립 및 Helm/Kustomize 통합  
-> **시작일**: 2025-11-16
+> **기간**: 2025-11-16 ~ 현재
 
 ---
 
@@ -24,8 +25,8 @@
 - [x] 10-4. overlays 플랫 구조로 변경
 - [x] 11. Clusters App-of-Apps 생성
 - [x] 11-1. Wave 번호 파일명 일치화
-- [ ] 12. Ansible 부트스트랩 전용 정리
-- [ ] 13. 최종 검증 및 문서 동기화
+- [x] 12. Ansible 부트스트랩 전용 정리
+- [ ] 13. 최종 검증 및 문서 동기화 (진행 중)
 
 ---
 
@@ -284,20 +285,17 @@
 
 ---
 
-## 12. Ansible 부트스트랩 전용 정리 ⏳
+## 12. Ansible 부트스트랩 전용 정리 ✅
 
-### 작업 항목
-- [ ] `ansible/` 디렉터리 검토: 클러스터 구성 + ArgoCD 설치만 남기기
-- [ ] DB/Redis/RabbitMQ/Monitoring 설치 role 제거 (Helm/Operator로 대체)
-- [ ] Ingress 생성 playbook 제거 (Kustomize로 대체)
-- [ ] `ansible/site.yml` 간소화
-- [ ] `docs/architecture/deployment/ANSIBLE-TASK-CLASSIFICATION.md` 업데이트
+### 주요 변경
+- `ansible/site.yml`을 kubeadm + ArgoCD 설치 + Root App 실행으로 축소
+- DB/Redis/RabbitMQ/Monitoring 등 add-on roles 삭제, Helm/Wave에 위임
+- Route53 업데이트/ingress 역할 제거 (ExternalDNS로 대체 예정)
+- `docs/architecture/deployment/ANSIBLE_BOOTSTRAP_PLAN.md` 신규 작성
+- `docs/architecture/deployment/ANSIBLE-TASK-CLASSIFICATION.md`에 변경 내역 반영
 
-### 유지할 항목
-- Kubernetes 클러스터 초기화 (kubeadm init/join)
-- ArgoCD 설치
-- SSM Parameter 조회 (IRSA, VPC ID 등)
-- ArogCD Root App 배포
+### 커밋
+- `c232770` feat: reorganize namespaces and observability stack (Ansible 역할 정리 포함)
 
 ---
 
@@ -312,6 +310,35 @@
 - [ ] `tmp/` 디렉터리 정리 (`.gitignore` 추가)
 - [ ] 문서 링크 검증 (상호 참조 깨진 곳 없는지)
 - [ ] README 업데이트 (새 구조 반영)
+
+---
+
+## 14. Observability Stack 재구성 ✅
+
+### 완료 항목
+- [x] Grafana를 kube-prometheus-stack에서 분리하여 `platform/helm/grafana/` Helm ApplicationSet 생성
+- [x] 환경별 values(dev/prod) 및 IRSA/Secret 참조 업데이트
+- [x] `clusters/{env}/apps/21-grafana.yaml` 추가 (Wave 21)
+- [x] Grafana Namespace/Ingress/NetworkPolicy/RBAC 문서(`RBAC_NAMESPACE_POLICY.md`) 최신화
+
+### 커밋
+- `c232770` feat: reorganize namespaces and observability stack
+
+---
+
+## 15. ExternalDNS · Route53 자동화 ✅
+
+### 완료 항목
+- [x] `docs/architecture/networking/EXTERNAL_DNS_ROUTE53.md` – Route53 자동화 가이드 작성
+- [x] Terraform IRSA Role/Policy/SSM Parameter (`aws_iam_role.external_dns`, `/iam/external-dns-role-arn`)
+- [x] ServiceAccount, RBAC, ExternalSecret( IRSA Secret ) 추가 (`platform-system/external-dns`)
+- [x] `platform/helm/external-dns/` Helm ApplicationSet + dev/prod values 작성
+- [x] `clusters/{env}/apps/16-external-dns.yaml` – Wave 16 배포 정의
+- [x] 모든 ALB Ingress에 `external-dns.alpha.kubernetes.io/hostname` 주석 추가
+- [x] `ARGOCD_SYNC_WAVE_PLAN.md`, `SYNC_WAVE_SECRET_MATRIX.md`, `RBAC_NAMESPACE_POLICY.md` 등 파생 문서와 Wave 표 업데이트
+
+### 커밋
+- (작업 진행 중, 동일 브랜치 내 다수의 staged 변경 포함)
 
 ---
 

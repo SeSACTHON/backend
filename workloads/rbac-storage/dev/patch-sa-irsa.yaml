@@ -22,4 +22,12 @@ metadata:
   namespace: kube-system
   annotations:
     eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/dev-alb-controller"
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: external-dns
+  namespace: platform-system
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::123456789012:role/dev-external-dns"
 

@@ -5,6 +5,7 @@ metadata:
   namespace: argocd
   annotations:
     alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:123456789012:certificate/PROD_ARGOCD_CERT
+    external-dns.alpha.kubernetes.io/hostname: argocd.ecoeco.app
 spec:
   rules:
     - host: argocd.ecoeco.app

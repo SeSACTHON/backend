@@ -78,6 +78,63 @@ resource "aws_iam_role_policy" "external_secrets_ssm" {
 }
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 3. ExternalDNS IRSA (Route53)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+resource "aws_iam_role" "external_dns" {
+  name = "${var.environment}-external-dns"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Federated = local.oidc_provider_arn
+      }
+      Action = "sts:AssumeRoleWithWebIdentity"
+      Condition = {
+        StringEquals = {
+          "${local.oidc_provider_url}:sub" = "system:serviceaccount:platform-system:external-dns"
+          "${local.oidc_provider_url}:aud" = "sts.amazonaws.com"
+        }
+      }
+    }]
+  })
+
+  tags = {
+    Name        = "${var.environment}-external-dns"
+    Description = "IRSA for ExternalDNS (Route53 sync)"
+  }
+}
+
+resource "aws_iam_role_policy" "external_dns_route53" {
+  name = "Route53ChangeRecords"
+  role = aws_iam_role.external_dns.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "route53:ListHostedZones",
+          "route53:ListResourceRecordSets",
+          "route53:ChangeResourceRecordSets"
+        ]
+        Resource = "*"
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "route53:ListTagsForResource"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 3. Postgres Operator IRSA (S3 Backup)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -147,6 +204,18 @@ resource "aws_ssm_parameter" "postgres_operator_role_arn" {
   type        = "String"
   value       = aws_iam_role.postgres_operator.arn
   description = "Postgres Operator IRSA Role ARN"
+  tags = {
+    ManagedBy   = "terraform"
+    Scope       = "iam"
+    Environment = var.environment
+  }
+}
+
+resource "aws_ssm_parameter" "external_dns_role_arn" {
+  name        = "/sesacthon/${var.environment}/iam/external-dns-role-arn"
+  type        = "String"
+  value       = aws_iam_role.external_dns.arn
+  description = "ExternalDNS IRSA Role ARN"
   tags = {
     ManagedBy   = "terraform"
     Scope       = "iam"

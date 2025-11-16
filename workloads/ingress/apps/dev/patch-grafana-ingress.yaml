@@ -5,6 +5,7 @@ metadata:
   namespace: grafana
   annotations:
     alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:123456789012:certificate/DEV_GRAFANA_CERT
+    external-dns.alpha.kubernetes.io/hostname: grafana.dev.ecoeco.app
 spec:
   rules:
     - host: grafana.dev.ecoeco.app

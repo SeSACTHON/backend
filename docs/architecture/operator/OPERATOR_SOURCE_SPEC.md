@@ -30,6 +30,7 @@
 |----------|----------------|----------|------|
 | **kube-prometheus-stack** (Prometheus Operator) | Helm: `https://prometheus-community.github.io/helm-charts`, chart `kube-prometheus-stack`, version `56.21.1` | `Prometheus`, `Alertmanager`, `ServiceMonitor`, `PodMonitor`, `PrometheusRule` | - Prometheus/Alertmanager 번들<br>- CNCF 관리 Repo, CRD `monitoring.coreos.com/v1` |
 | **Grafana** | Helm: `https://grafana.github.io/helm-charts`, chart `grafana`, version `8.5.9` | (Helm-managed) | - 독립 Grafana 배포, admin Secret/Ingress 분리<br>- Datasource: Prometheus ClusterIP |
+| **Grafana** | Helm: `https://grafana.github.io/helm-charts`, chart `grafana`, version `8.5.9` | (Helm-managed) | - 독립 Grafana 배포, admin Secret/Ingress 분리<br>- Datasource: Prometheus ClusterIP |
 
 ### 요구사항
 - Namespace: `prometheus` (kube-prometheus-stack), `grafana` (grafana chart)

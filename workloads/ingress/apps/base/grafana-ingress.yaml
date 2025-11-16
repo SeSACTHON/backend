@@ -16,6 +16,7 @@ metadata:
     alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
     alb.ingress.kubernetes.io/healthy-threshold-count: "2"
     alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
+    external-dns.alpha.kubernetes.io/hostname: grafana.example.com
   labels:
     app.kubernetes.io/name: grafana
 spec:

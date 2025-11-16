@@ -48,6 +48,7 @@ subjects:
 | `external-secrets-sa` | `platform-system` | `aws_iam_role.external_secrets` | `/sesacthon/{env}/iam/external-secrets-role-arn` |
 | `postgres-operator` | `data-system` | `aws_iam_role.postgres_operator` | `/sesacthon/{env}/iam/postgres-operator-role-arn` |
 | `aws-load-balancer-controller` | `kube-system` | `aws_iam_role.alb_controller` | `/sesacthon/{env}/iam/alb-controller-role-arn` |
+| `external-dns` | `platform-system` | `aws_iam_role.external_dns` | `/sesacthon/{env}/iam/external-dns-role-arn` |
 
 파일: `terraform/irsa-roles.tf`
 
@@ -58,11 +59,11 @@ subjects:
 | Tier | Namespace | 주요 리소스 | 특징 |
 |------|-----------|-------------|------|
 | **Business Logic** | `auth`, `my`, `scan`, `character`, `location`, `info`, `chat` | API Deployment/Service/ConfigMap/Secret | 애플리케이션 팀별 관리, 데이터 접근은 Service 호출로 제한 |
-| **Integration** | `messaging` | RabbitMQ Operator + Cluster CR | 서버 간 메시징, 고가용성 필요 |
+| **Integration** | `rabbitmq` | RabbitMQ Operator + Cluster CR | 서버 간 메시징, 고가용성 필요 |
 | **Data (Postgres)** | `postgres` | PostgreSQL Operator/Instances | DB 계층, tier=data |
 | **Data (Redis)** | `redis` | Redis Operator/Instances | Cache 계층, tier=data |
-| **Observability** | `monitoring` | kube-prometheus-stack, Grafana | 플랫폼 팀 관리, 모든 네임스페이스 리드 |
-| **Infrastructure** | `atlantis`, `workers`(필요 시) | Terraform/AWS credential Secret, Worker Daemon | DevOps 도구 전용 |
+| **Observability** | `prometheus`, `grafana` | kube-prometheus-stack, Grafana | 플랫폼 팀 관리, 모든 네임스페이스 리드 |
+| **Infrastructure** | `platform-system`, `data-system`, `messaging-system` | Operators/App-of-Apps | DevOps 도구 전용 |
 
 이 문서는 위 분류를 기준으로 RBAC 역할을 정의한다.
 

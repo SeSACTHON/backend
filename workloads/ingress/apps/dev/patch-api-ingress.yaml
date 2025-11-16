@@ -5,6 +5,7 @@ metadata:
   namespace: default
   annotations:
     alb.ingress.kubernetes.io/certificate-arn: arn:aws:acm:ap-northeast-2:123456789012:certificate/DEV_API_CERT
+    external-dns.alpha.kubernetes.io/hostname: api.dev.ecoeco.app
 spec:
   rules:
     - host: api.dev.ecoeco.app
