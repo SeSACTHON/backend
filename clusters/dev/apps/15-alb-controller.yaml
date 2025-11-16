@@ -1,7 +1,7 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: dev-alb-controller
+  name: dev-alb-controller-appset
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "15"
@@ -11,9 +11,11 @@ spec:
     repoURL: https://github.com/SeSACTHON/backend.git
     targetRevision: refactor/gitops-sync-wave
     path: platform/charts/alb-controller
+    directory:
+      include: app.yaml
   destination:
     server: https://kubernetes.default.svc
-    namespace: kube-system
+    namespace: argocd
   syncPolicy:
     automated:
       prune: true

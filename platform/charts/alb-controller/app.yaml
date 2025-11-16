@@ -1,0 +1,47 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: alb-controller
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "15"
+    sesacthon.io/required-secrets: "alb-controller-values"
+spec:
+  generators:
+    - list:
+        elements:
+          - env: dev
+            project: dev
+            namespace: kube-system
+            valueFile: platform/charts/alb-controller/values/dev.yaml
+          - env: prod
+            project: prod
+            namespace: kube-system
+            valueFile: platform/charts/alb-controller/values/prod.yaml
+  template:
+    metadata:
+      name: "{{env}}-alb-controller"
+      namespace: argocd
+    spec:
+      project: "{{project}}"
+      sources:
+        - repoURL: https://aws.github.io/eks-charts
+          chart: aws-load-balancer-controller
+          targetRevision: 1.7.1
+        - repoURL: https://github.com/SeSACTHON/backend.git
+          targetRevision: refactor/gitops-sync-wave
+          ref: values
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: "{{namespace}}"
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+      helm:
+        releaseName: aws-load-balancer-controller
+        valueFiles:
+          - "$values/{{ valueFile }}"
+
