@@ -1,0 +1,22 @@
+clusterName: sesacthon-prod
+region: ap-northeast-2
+vpcId: ""  # Terraform output → alb-controller-values Secret
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: ""  # IRSA Role ARN
+replicaCount: 2
+enableShield: false
+enableWaf: false
+enableWafv2: false
+ingressClass: alb
+createIngressClassResource: true
+defaultTargetType: instance
+resources:
+  limits:
+    cpu: 200m
+    memory: 500Mi
+  requests:
+    cpu: 100m
+    memory: 200Mi
+

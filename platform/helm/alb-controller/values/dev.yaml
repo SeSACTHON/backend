@@ -1,0 +1,15 @@
+clusterName: sesacthon-dev
+region: ap-northeast-2
+vpcId: ""  # Terraform output → ExternalSecret → alb-controller-values Secret
+serviceAccount:
+  create: true
+  annotations:
+    eks.amazonaws.com/role-arn: ""  # IRSA Role ARN (Terraform)
+replicaCount: 1
+enableShield: false
+enableWaf: false
+enableWafv2: false
+ingressClass: alb
+createIngressClassResource: true
+defaultTargetType: instance
+
