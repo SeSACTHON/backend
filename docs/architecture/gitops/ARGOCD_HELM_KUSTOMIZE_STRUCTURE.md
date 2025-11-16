@@ -39,7 +39,7 @@ ArgoCD App-of-Apps는 `argocd/apps/root-app.yaml`에서 시작하며, `ARGOCD_SY
 | `50-tools.yaml` | 50 | Atlantis, Argo Workflow, 기타 Ops 도구 | `atlantis-github-token`, `slack-webhook` |
 | `58-secrets.yaml` | 58 | ExternalSecret / SOPS Secret Overlay | External Secrets Operator Ready (Wave 10) |
 | `60-apis-app-of-apps.yaml` | 60+ | API/Worker ApplicationSet | `ghcr-secret`, 서비스별 Config/Secret |
-| `70-applications-ingress.yaml` | 70+ | 서비스 Ingress (Instance+NodePort) | ACM/Issuer Secret, Host Routing Config |
+| `70-applications-ingress.yaml` | 70+ | 서비스 Ingress (Instance+NodePort, Path Routing) | ACM/Issuer Secret, Host Routing Config |
 
 > dev/prod 환경 모두 동일한 리스트를 사용하며, `values/{env}.yaml` 및 `workloads/**/overlays/{env}`에서 환경별 차이를 둔다.
 
@@ -97,7 +97,8 @@ Secrets/ConfigMap 선행 조건은 `SYNC_WAVE_SECRET_MATRIX.md`의 “필요한 
 | `workloads/monitoring/prometheus` | Prometheus, ServiceMonitor, Rule | 30 | `selector.matchLabels.tier=*` |
 | `workloads/monitoring/grafana` | Datasource/Dashboard CM or Grafana CR | 30 | `grafana-dashboard` ConfigMap |
 | `workloads/ingress/ingressclassparams` | ALB IngressClassParams | 15 | Subnet/SG ConfigMap 참조 |
-| `workloads/ingress/apps` | 서비스별 Ingress (Route) | 70+ | TLS Secret 사전 요구 |
+| `workloads/ingress/apps/base` | API/Argocd/Grafana Ingress + default backend | 70+ | ansible `07-ingress-resources.yml`를 Kustomize로 이전 |
+| `workloads/ingress/apps/overlays/(dev|prod)` | Host · Certificate 패치(JSON6902) | 70+ | `alb.ingress.kubernetes.io/certificate-arn`, `host` |
 | `workloads/secrets/external-secrets` | ExternalSecret CR (ASM/SSM) | 58 | `/sesacthon/{env}/*` Parameter |
 | `workloads/secrets/sops` | 암호화 Secret (선택) | 58 | `sops.yaml` 정책 |
 | `workloads/apis/{service}/overlays/{env}` | Deployment/Service/CM | 60+ | `sync-wave` per service 가능 |
@@ -110,7 +111,9 @@ Secrets/ConfigMap 선행 조건은 `SYNC_WAVE_SECRET_MATRIX.md`의 “필요한 
 
 ---
 
-## 5. 예시: `argocd/apps/25-data-operators.yaml`
+## 5. 예시
+
+### 5.1 `argocd/apps/25-data-operators.yaml`
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -151,6 +154,30 @@ spec:
 ```
 
 ---
+
+### 5.2 `workloads/ingress/apps` 구조
+
+```
+workloads/ingress/apps/
+├─ base/
+│  ├─ kustomization.yaml        # api/argocd/grafana/default-backend 자원 포함
+│  ├─ api-ingress.yaml          # ansible 07-ingress-resources와 동일한 Path 기반 라우팅
+│  ├─ argocd-ingress.yaml
+│  ├─ grafana-ingress.yaml
+│  └─ default-backend.yaml
+└─ overlays/
+   ├─ dev/
+   │  ├─ kustomization.yaml     # JSON6902 patch로 host / certificate-arn 교체
+   │  ├─ patch-api-ingress.json
+   │  ├─ patch-argocd-ingress.json
+   │  └─ patch-grafana-ingress.json
+   └─ prod/
+      └─ ... (동일 구조)
+```
+
+- Base manifest는 `api.example.com`, `argocd.example.com` 등 placeholder를 사용하고, Overlay에서 실제 도메인/ACM ARN을 덮어쓴다.  
+- ALB Path 기반 라우팅( `/api/v1/auth`, `/api/v1/my`, … )과 `alb.ingress.kubernetes.io/group.*` 어노테이션은 ansible `07-ingress-resources.yml`과 동일하게 유지된다.  
+- `argocd/apps/70-applications-ingress.yaml`은 환경별 Overlay를 참조한다. (예: `path: workloads/ingress/apps/overlays/dev`)
 
 ## 6. 운영 체크리스트
 
