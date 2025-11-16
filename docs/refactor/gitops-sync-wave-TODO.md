@@ -18,6 +18,10 @@
 - [x] 8. Workloads NetworkPolicy Kustomize 생성
 - [x] 9. Workloads Data CR Kustomize 생성
 - [x] 10. Workloads APIs Kustomize 생성
+- [x] 10-1. RBAC/Storage Kustomize 생성
+- [x] 10-2. IRSA Roles (Terraform)
+- [x] 10-3. JSON → YAML patch 전환
+- [x] 10-4. overlays 플랫 구조로 변경
 - [🔄] 11. Clusters App-of-Apps 생성 (부분 완료)
 - [ ] 12. Ansible 부트스트랩 전용 정리
 - [ ] 13. 최종 검증 및 문서 동기화
@@ -237,6 +241,36 @@
 ### 참고
 - `ARGOCD_SYNC_WAVE_PLAN.md` 표 기준
 - ApplicationSet generators로 환경 자동 매핑
+
+---
+
+## 10-1. RBAC/Storage Kustomize 생성 ✅
+
+### 완료 항목
+- [x] `terraform/irsa-roles.tf`: ExternalSecrets, Postgres Operator IAM Roles
+- [x] `workloads/rbac-storage/base/`: ServiceAccounts, ClusterRoles, Roles, StorageClass
+- [x] `workloads/rbac-storage/dev/`: cluster-admin 전체 권한
+- [x] `workloads/rbac-storage/prod/`: SA별 최소 권한 RoleBindings
+- [x] `workloads/rbac-storage/README.md`
+- [x] `docs/architecture/operations/RBAC_NAMESPACE_POLICY.md`: 환경별 전략 추가
+
+### 커밋
+- `761fa55` feat: add irsa roles and rbac/storage kustomize
+- `af8c30f` feat: add dev/prod rbac strategy and bindings
+
+---
+
+## 10-2. Kustomize 구조 개선 ✅
+
+### 완료 항목
+- [x] JSON6902 patch → YAML Strategic Merge Patch 전환
+- [x] overlays/ 디렉터리 제거, dev/prod를 base와 같은 레벨로 플랫화
+- [x] `resources: ../../base` → `resources: ../base` 경로 수정
+- [x] clusters/dev/apps 경로 업데이트 (`overlays/dev` → `dev`)
+
+### 커밋
+- `63d2a3f` refactor: convert json patches to yaml strategic merge
+- `77d694c` refactor: flatten overlay structure to follow k8s best practice
 
 ---
 
