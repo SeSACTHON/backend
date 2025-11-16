@@ -145,6 +145,7 @@ kubectl get applications -n argocd
 | ALB HTTPS→HTTP NAT | `backend-protocol: HTTP` + HTTPS-only listener + HTTP NodePort | `docs/TROUBLESHOOTING.md#8-argocd-리디렉션-루프-문제` |
 | Namespace 중복 정의 | `k8s/namespaces` 한 곳에서 단일 관리 | `k8s/namespaces/kustomization.yaml` |
 | Atlantis 배포 | Helm Chart (`platform/charts/platform/atlantis`) + ArgoCD Wave 70 | `docs/architecture/gitops/ATLANTIS_TERRAFORM_FLOW.md` |
+| GitOps/Cluster Health Check | `scripts/diagnostics/gitops_cluster_health.sh` 실행 · kubectl 기반 상태 요약 | README – Getting Started |
 
 ---
 
