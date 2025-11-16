@@ -1,16 +1,16 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: prod-rbac-storage
+  name: dev-rbac-storage
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/sync-wave: "3"
 spec:
-  project: prod
+  project: dev
   source:
     repoURL: https://github.com/SeSACTHON/backend.git
     targetRevision: HEAD
-    path: workloads/rbac-storage/prod
+    path: workloads/rbac-storage/dev
   destination:
     server: https://kubernetes.default.svc
   syncPolicy:
