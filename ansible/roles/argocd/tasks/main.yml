@@ -206,11 +206,19 @@
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 4. Root App 배포
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- name: root-app.yaml 복사 (Master 노드로)
+- name: Root App 경로 계산
+  set_fact:
+    argocd_root_app_file: "{{ playbook_dir }}/../clusters/{{ argocd_root_env }}/root-app.yaml"
+
+- name: root-app.yaml 복사 (선택적)
   copy:
-    src: "{{ playbook_dir }}/../clusters/dev/root-app.yaml"
+    src: "{{ argocd_root_app_file }}"
     dest: /tmp/root-app.yaml
-    mode: '0644'
+  when: argocd_root_env == 'dev'
+
+- name: ArgoCD Root App 배포
+  command: kubectl apply -f /tmp/root-app.yaml
+  when: argocd_root_env == 'dev'
 
 - name: ArgoCD Root App 배포
   command: kubectl apply -f /tmp/root-app.yaml
