@@ -27,95 +27,46 @@
   changed_when: false
 
 # Step 2: Calico 설치 여부 확인
-- name: Calico 설치 확인
-  command: kubectl get deployment -n kube-system calico-kube-controllers
-  register: calico_check
+- name: Tigera Operator 설치 확인
+  command: kubectl get deployment -n tigera-operator tigera-operator
+  register: calico_operator_check
   failed_when: false
   changed_when: false
 
-# Step 3: Calico 설치 (VXLAN 전용, BGP 완전 비활성화)
-- name: Calico 설치 - VXLAN 모드 (공식 문서 기반)
-  when: calico_check.rc != 0
+# Step 3: Calico 설치 (Helm과 동일한 Tigera Operator 구성)
+- name: Calico 설치 - Tigera Operator (Helm과 동일)
+  when: calico_operator_check.rc != 0
   block:
-    - name: Calico 기본 매니페스트 다운로드 및 설치
+    - name: Tigera Operator 매니페스트 적용
       shell: |
-        # 공식 Calico 매니페스트 설치
-        kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.4/manifests/calico.yaml
-      register: calico_install
+        kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.27.0/manifests/tigera-operator.yaml
+      register: tigera_operator_apply
     
-    - name: Calico VXLAN 전용 설정 (BGP 완전 비활성화)
+    - name: Calico Installation CR 생성 (VXLAN Only, BGP Disabled)
       shell: |
-        # 1. IP Pool을 VXLAN 전용으로 설정
-        kubectl patch ippool default-ipv4-ippool --type=merge --patch='
-        {
-          "spec": {
-            "ipipMode": "Never",
-            "vxlanMode": "Always",
-            "natOutgoing": true
-          }
-        }'
-        
-        # 2. BGP 완전 비활성화
-        kubectl apply -f - <<EOF
-        apiVersion: crd.projectcalico.org/v1
-        kind: BGPConfiguration
+        cat <<EOF | kubectl apply -f -
+        apiVersion: operator.tigera.io/v1
+        kind: Installation
         metadata:
           name: default
         spec:
-          nodeToNodeMeshEnabled: false
-          asNumber: 64512
+          calicoNetwork:
+            bgp: Disabled
+            ipPools:
+              - cidr: {{ pod_network_cidr }}
+                encapsulation: VXLAN
+                natOutgoing: Enabled
+                nodeSelector: all()
+          nodeMetricsPort: 9091
+          typhaMetricsPort: 9093
+          controlPlaneReplicas: 2
+          flexVolumePath: /usr/libexec/kubernetes/kubelet-plugins/volume/exec/
         EOF
-        
-        # 3. Felix 설정 (eBPF 비활성화, Service CIDR 제외)
-        kubectl apply -f - <<EOF
-        apiVersion: crd.projectcalico.org/v1
-        kind: FelixConfiguration
-        metadata:
-          name: default
-        spec:
-          bpfEnabled: false
-          ipipEnabled: false
-          vxlanEnabled: true
-        EOF
-        
-        echo "✅ Calico VXLAN 전용 설정 완료"
-      register: calico_vxlan_config
+      register: calico_installation_cr
     
-    - name: Calico DaemonSet Probe 수정 (BIRD 제거)
-      shell: |
-        # VXLAN 모드에서는 BIRD 불필요
-        kubectl patch daemonset calico-node -n kube-system --type=json -p='[
-          {
-            "op": "replace",
-            "path": "/spec/template/spec/containers/0/livenessProbe/exec/command",
-            "value": ["/bin/calico-node", "-felix-live"]
-          },
-          {
-            "op": "replace",
-            "path": "/spec/template/spec/containers/0/readinessProbe/exec/command",
-            "value": ["/bin/calico-node", "-felix-ready"]
-          }
-        ]'
-        echo "✅ Readiness probe에서 BIRD 체크 제거"
-      register: calico_probe
-    
-    - name: Calico DaemonSet 환경변수 설정
-      shell: |
-        kubectl set env daemonset/calico-node -n kube-system \
-          CLUSTER_TYPE=k8s \
-          CALICO_IPV4POOL_IPIP=Never \
-          CALICO_IPV4POOL_VXLAN=Always \
-          FELIX_IPIPENABLED=false \
-          FELIX_VXLANENABLED=true
-        echo "✅ 환경변수 설정 완료"
-      register: calico_env
-    
-    - name: Calico Pod 재시작
-      shell: |
-        kubectl delete pods -n kube-system -l k8s-app=calico-node --wait=false
-        kubectl delete pods -n kube-system -l k8s-app=calico-kube-controllers --wait=false
-        echo "⏳ Calico Pod 재생성 시작"
-      when: calico_vxlan_config.changed or calico_probe.changed or calico_env.changed
+    - name: Tigera Operator Ready 대기
+      command: kubectl rollout status deployment/tigera-operator -n tigera-operator --timeout=300s
+      register: tigera_operator_ready
 
 - name: Calico Node DaemonSet 대기 (안정화 시간 포함)
   shell: |
@@ -142,7 +93,7 @@
     echo "⚠️ Calico 일부만 준비됨: $READY/$DESIRED"
     echo "   계속 진행 (백그라운드로 안정화 예상)"
     exit 0
-  when: calico_check.rc != 0
+  when: calico_operator_check.rc != 0
   changed_when: false
 
 - name: 모든 Worker가 클러스터에 등록될 때까지 대기 (Phase 1&2)

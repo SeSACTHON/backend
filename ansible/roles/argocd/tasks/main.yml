@@ -1,22 +1,20 @@
 # ArgoCD 설치
 ---
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 1. CNI Pre-check (순환 의존성 방지)
+# 1. CNI Pre-check (Helm과 동일한 Calico 구성 보장)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- name: CNI 플러그인 설치 여부 확인
-  shell: kubectl get pods -n kube-system -l k8s-app=calico-node --no-headers 2>/dev/null | wc -l
-  register: calico_count
+- name: Calico DaemonSet 확인
+  command: kubectl get daemonset calico-node -n calico-system
+  register: calico_daemonset_check
   changed_when: false
-  failed_when: false
 
-- name: Calico CNI 수동 설치 (미설치 시)
-  command: kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.26.1/manifests/calico.yaml
-  when: calico_count.stdout | int == 0
-  register: calico_installed
+- name: Calico DaemonSet 없으면 중단
+  fail:
+    msg: "Calico DaemonSet이 존재하지 않습니다. ansible/playbooks/04-cni-install.yml 단계에서 Tigera Operator 설치가 필요합니다."
+  when: calico_daemonset_check.rc != 0
 
 - name: Calico Pod Ready 대기
-  command: kubectl wait --for=condition=ready pod -l k8s-app=calico-node -n kube-system --timeout=120s --all
-  when: calico_installed.changed
+  command: kubectl wait --for=condition=ready pod -l k8s-app=calico-node -n calico-system --timeout=300s --all
 
 - name: 노드 Ready 상태 확인
   shell: kubectl get nodes --no-headers | grep -v " Ready " | wc -l

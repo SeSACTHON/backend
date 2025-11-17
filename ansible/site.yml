@@ -58,6 +58,17 @@
     - import_tasks: playbooks/03-worker-join.yml
   # ⚠️ Worker join 실패 시 여기서 중단됨
 
+- name: Worker 노드 라벨 교정 (옵션)
+  hosts: workers,api_nodes,rabbitmq,postgresql,redis,monitoring
+  become: yes
+  gather_facts: yes
+  serial: 1
+  vars:
+    migrate_node_labels: "{{ migrate_node_labels | default(false) }}"
+  tasks:
+    - name: Sesacthon 표준 라벨/테인트 적용
+      ansible.builtin.import_tasks: playbooks/tasks/fix-node-labels.yml
+
 - name: Worker 노드 Provider ID 설정 (ALB Controller 필수)
   hosts: masters
   become: yes
