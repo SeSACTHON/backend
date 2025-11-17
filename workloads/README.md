@@ -37,6 +37,6 @@ kustomize build workloads/apis/auth/dev
 
 ## 참고
 - Helm 리소스: `platform/helm/<component>/app.yaml` (Argo CD ApplicationSet/Helm values)  
-- 문제 발생 시 `docs/TROUBLESHOOTING.md`와 `docs/deployment/LOCAL_CLUSTER_BOOTSTRAP.md` 내 Kustomize/Namespace 섹션을 참고하세요.  
+- 문제 발생 시 `docs/troubleshooting/TROUBLESHOOTING.md`와 `docs/deployment/LOCAL_CLUSTER_BOOTSTRAP.md` 내 Kustomize/Namespace 섹션을 참고하세요.  
 - 민감 값은 Terraform → SSM → ExternalSecret 경로로 주입되며, Kustomize 템플릿에는 literal 비밀번호를 두지 않습니다.
 
