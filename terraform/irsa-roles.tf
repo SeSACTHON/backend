@@ -8,8 +8,8 @@
 # OIDC Provider Data (EKS 클러스터용, Self-managed K8s는 별도 구성 필요)
 # Self-managed의 경우 Service Account Token Projection 사용
 locals {
-  oidc_provider_arn = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:oidc-provider/oidc.eks.${var.aws_region}.amazonaws.com/id/EXAMPLE"
-  oidc_provider_url = "oidc.eks.${var.aws_region}.amazonaws.com/id/EXAMPLE"
+  oidc_provider_arn = aws_iam_openid_connect_provider.cluster.arn
+  oidc_provider_url = trim(replace(aws_iam_openid_connect_provider.cluster.url, "https://", ""), "/")
 }
 
 data "aws_caller_identity" "current" {}

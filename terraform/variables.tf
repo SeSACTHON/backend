@@ -52,3 +52,9 @@ variable "create_wildcard_record" {
   default     = false
 }
 
+variable "service_account_oidc_issuer_url" {
+  description = "Self-managed Kubernetes ServiceAccount OIDC Issuer URL (예: https://oidc.sesacthon.io/dev). 비워두면 환경 이름을 기준으로 자동 구성됩니다."
+  type        = string
+  default     = ""
+}
+
