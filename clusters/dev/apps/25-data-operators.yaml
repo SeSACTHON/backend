@@ -30,7 +30,7 @@ spec:
         path: "{{path}}"
       destination:
         server: https://kubernetes.default.svc
-        namespace: argocd
+        namespace: "{{namespace}}"
       syncPolicy:
         automated:
           prune: true
