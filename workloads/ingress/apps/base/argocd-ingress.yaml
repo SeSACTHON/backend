@@ -19,7 +19,7 @@ metadata:
     alb.ingress.sesacthon.io/unhealthy-threshold-count: "2"
     external-dns.alpha.sesacthon.io/managed-by: external-dns
   labels:
-    app.sesacthon.io/name: argocd
+    app.kubernetes.io/name: argocd
 spec:
   ingressClassName: alb
   rules:

@@ -24,7 +24,7 @@ spec:
       name: "{{env}}-external-dns"
       namespace: argocd
       labels:
-        app.sesacthon.io/name: external-dns
+        app.kubernetes.io/name: external-dns
     spec:
       project: "{{project}}"
       sources:

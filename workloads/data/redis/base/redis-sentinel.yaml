@@ -4,7 +4,7 @@ metadata:
   name: redis-main
   namespace: redis
   labels:
-    app.sesacthon.io/name: redis
+    app.kubernetes.io/name: redis
     tier: data
 spec:
   clusterSize: 3

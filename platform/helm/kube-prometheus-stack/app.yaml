@@ -24,7 +24,7 @@ spec:
       name: "{{env}}-kube-prom-stack"
       namespace: argocd
       labels:
-        app.sesacthon.io/name: kube-prometheus-stack
+        app.kubernetes.io/name: kube-prometheus-stack
     spec:
       project: "{{project}}"
       sources:
