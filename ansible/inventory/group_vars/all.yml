@@ -28,3 +28,5 @@ argocd_http_node_port: 30080
 kubectl_user: "ubuntu"
 kubectl_home: "/home/ubuntu"
 
+argocd_root_env: "{{ cluster_env | default('dev') }}"
+deploy_prod_project: false   # dev 배포 시 prod 프로젝트 생략하고 싶다면
