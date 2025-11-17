@@ -12,9 +12,13 @@ spec:
           - env: dev
             project: dev
             namespace: data-system
+            targetRevision: refactor/gitops-sync-wave
+            valueFile: platform/helm/redis-operator/values/dev.yaml
           - env: prod
             project: prod
             namespace: data-system
+            targetRevision: main
+            valueFile: platform/helm/redis-operator/values/prod.yaml
   template:
     metadata:
       name: "{{env}}-redis-operator"
@@ -22,25 +26,12 @@ spec:
     spec:
       project: "{{project}}"
       sources:
-        - repoURL: https://github.com/spotahome/redis-operator.git
-          targetRevision: v1.0.0
-          path: deploy
-          kustomize:
-            patches:
-              - target:
-                  kind: Deployment
-                  name: redisoperator
-                patch: |
-                  - op: add
-                    path: /spec/template/spec/nodeSelector
-                    value:
-                      node-role.kubernetes.io/control-plane: ""
-                  - op: add
-                    path: /spec/template/spec/tolerations
-                    value:
-                      - key: node-role.kubernetes.io/control-plane
-                        operator: Exists
-                        effect: NoSchedule
+        - repoURL: https://ot-container-kit.github.io/helm-charts
+          chart: redis-operator
+          targetRevision: 0.22.2
+        - repoURL: https://github.com/SeSACTHON/backend.git
+          targetRevision: "{{targetRevision}}"
+          ref: values
       destination:
         server: https://kubernetes.default.svc
         namespace: "{{namespace}}"
@@ -50,3 +41,7 @@ spec:
           selfHeal: true
         syncOptions:
           - CreateNamespace=true
+      helm:
+        releaseName: redis-operator
+        valueFiles:
+          - $values/{{ valueFile }}
