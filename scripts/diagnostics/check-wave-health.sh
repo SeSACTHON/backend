@@ -27,3 +27,4 @@ done
 
 echo "✅ Wave 0/10/11 applications for '${ENVIRONMENT}' are Healthy & Synced."
 
+

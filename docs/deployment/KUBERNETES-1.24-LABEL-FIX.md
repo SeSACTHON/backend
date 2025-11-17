@@ -241,3 +241,4 @@ bash scripts/utilities/cleanup-deployment-artifacts.sh --cleanup-logs
 **해결자**: Backend Team  
 **소요시간**: 약 2시간 (진단 30분 + 수정 1시간 + 검증 30분)
 
+

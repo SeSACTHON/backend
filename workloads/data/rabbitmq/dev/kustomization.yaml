@@ -5,3 +5,4 @@ resources:
 patches:
   - path: rabbitmq-cluster.yaml
 
+

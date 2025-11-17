@@ -792,3 +792,4 @@ mypy app/
 **대상**: auth, my, location, info (동기식 서비스)
 
 
+

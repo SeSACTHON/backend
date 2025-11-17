@@ -28,3 +28,4 @@ echo "Combined manifest: ${OUTPUT_DIR}/combined.yaml"
 
 ls -1 "${OUTPUT_DIR}"
 
+

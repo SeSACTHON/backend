@@ -488,3 +488,4 @@ $ kubectl get applications -n argocd | grep Synced | wc -l
 - [ansible-label-sync.md](./ansible-label-sync.md)
 - [gitops-deployment.md](./gitops-deployment.md)
 
+

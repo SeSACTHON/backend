@@ -32,3 +32,4 @@ if errors:
 print("✅ ApplicationSet templates: no literal quotes detected.")
 PY
 
+

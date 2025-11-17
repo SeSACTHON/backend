@@ -34,3 +34,4 @@ rabbitmq/
 ExternalSecret(`workloads/secrets/external-secrets/*/data-secrets.yaml`)
 에서 동기화된 관리자 계정을 사용합니다.
 
+

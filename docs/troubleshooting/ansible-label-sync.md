@@ -1315,3 +1315,4 @@ chat-api-76488b98b5-gfgfw       0/1  ImagePullBackOff  k8s-api-chat       # ✅
 
 **다음 부트스트랩에서 자동 해결됨** ✅
 
+
