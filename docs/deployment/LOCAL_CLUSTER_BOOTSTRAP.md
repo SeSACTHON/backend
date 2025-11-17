@@ -134,6 +134,36 @@ argocd app get dev-root   # argocd CLI 사용 시
 - `docs/architecture/operator/OPERATOR_SOURCE_SPEC.md`
 - `docs/troubleshooting/TROUBLESHOOTING.md`
 
+---
+
+### Step 1.5. AWS 자격증명 Secret 생성 (임시 IRSA 대체)
+
+IRSA/OIDC가 준비되지 않았다면 ALB Controller·ExternalDNS·External Secrets Operator는 AWS Access Key/Secret Key가 담긴 Secret을 필요로 합니다.
+
+#### 1. Ansible 자동 프롬프트 (권장)
+- `ansible/site.yml` → `roles/argocd` 실행 중 Root-App 배포 직전에 **Access Key/Secret Key 입력을 요청**합니다.
+- 키를 입력하면 Ansible이 `kubectl apply -f -`로 `aws-global-credentials` Secret을 자동 생성합니다.
+  - 네임스페이스: `kube-system`, `platform-system`
+  - 비활성화하려면 `ansible-playbook ... -e create_aws_credentials_secret=false` 사용
+  - CI 자동화에서는 `-e aws_access_key_id=XXX -e aws_secret_access_key=YYY`로 미리 주입 가능
+
+#### 2. 수동 생성 (Fallback)
+```bash
+kubectl create secret generic aws-global-credentials \
+  -n kube-system \
+  --from-literal=aws_access_key_id=<ACCESS_KEY_ID> \
+  --from-literal=aws_secret_access_key=<SECRET_ACCESS_KEY>
+
+kubectl create secret generic aws-global-credentials \
+  -n platform-system \
+  --from-literal=aws_access_key_id=<ACCESS_KEY_ID> \
+  --from-literal=aws_secret_access_key=<SECRET_ACCESS_KEY>
+```
+
+> **주의**
+> - Secret은 Git에 커밋하지 말고, 키를 교체하면 `kubectl delete secret aws-global-credentials -n <ns>` 후 재생성하세요.
+> - IRSA를 다시 사용할 준비가 되면 `terraform.tfvars`에서 `enable_irsa = true`로 전환하고 본 Secret을 제거합니다.
+
 > 위 절차를 기준으로 로컬에서 테스트 클러스터를 올리고, GitOps Sync Wave 0→70까지 순차적으로 검증한다. 신규 작업자는 본 문서를 onboarding checklist로 사용한다.
 
 

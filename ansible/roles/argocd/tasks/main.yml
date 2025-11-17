@@ -134,6 +134,60 @@
   register: appproject_prod_created
   changed_when: "'created' in appproject_prod_created.stdout or 'configured' in appproject_prod_created.stdout"
 
+- block:
+    - name: AWS Access Key ID 입력
+      pause:
+        prompt: "AWS Access Key ID를 입력하세요"
+      register: aws_access_key_id_prompt
+      when: aws_access_key_id is not defined
+      no_log: true
+      run_once: true
+
+    - name: AWS Access Key ID 설정
+      set_fact:
+        aws_access_key_id: "{{ aws_access_key_id_prompt.user_input }}"
+      when: aws_access_key_id is not defined
+      no_log: true
+      run_once: true
+
+    - name: AWS Secret Access Key 입력
+      pause:
+        prompt: "AWS Secret Access Key를 입력하세요"
+        echo: no
+      register: aws_secret_access_key_prompt
+      when: aws_secret_access_key is not defined
+      no_log: true
+      run_once: true
+
+    - name: AWS Secret Access Key 설정
+      set_fact:
+        aws_secret_access_key: "{{ aws_secret_access_key_prompt.user_input }}"
+      when: aws_secret_access_key is not defined
+      no_log: true
+      run_once: true
+
+    - name: aws-global-credentials Secret 생성
+      become_user: "{{ kubectl_user }}"
+      shell: |
+        set -euo pipefail
+        cat <<'EOF' | kubectl apply -f -
+        apiVersion: v1
+        kind: Secret
+        metadata:
+          name: aws-global-credentials
+          namespace: {{ item }}
+        type: Opaque
+        data:
+          aws_access_key_id: {{ aws_access_key_id | b64encode }}
+          aws_secret_access_key: {{ aws_secret_access_key | b64encode }}
+        EOF
+      loop:
+        - kube-system
+        - platform-system
+      no_log: true
+      run_once: true
+  when: create_aws_credentials_secret | default(true)
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 4. Root App 배포
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
