@@ -18,7 +18,7 @@ assignees: ''
 - [ ] docs/development/
 - [ ] docs/deployment/
 - [ ] docs/infrastructure/
-- [ ] docs/TROUBLESHOOTING.md
+- [ ] docs/troubleshooting/TROUBLESHOOTING.md
 - [ ] 기타: 
 
 ## 💡 수정 이유

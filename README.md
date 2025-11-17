@@ -47,7 +47,7 @@ graph TD
 | 네트워크/네임스페이스 | `docs/architecture/networking/11-ALB_CALICO_PATTERNS_RESEARCH.md`, `docs/architecture/networking/09-NAMESPACE_STRATEGY_ANALYSIS.md` |
 | 데이터 계층 | `docs/architecture/data/database-architecture.md`, `docs/architecture/data/redis-jwt-blacklist-design.md` |
 | 배포 가이드 | `docs/deployment/README.md` |
-| 트러블슈팅 | `docs/TROUBLESHOOTING.md` |
+| 트러블슈팅 | `docs/troubleshooting/TROUBLESHOOTING.md` |
 
 ---
 
@@ -142,7 +142,7 @@ kubectl get applications -n argocd
 
 | 이슈 | 요약 | 문서 |
 |------|------|------|
-| ALB HTTPS→HTTP NAT | `backend-protocol: HTTP` + HTTPS-only listener + HTTP NodePort | `docs/TROUBLESHOOTING.md#8-argocd-리디렉션-루프-문제` |
+| ALB HTTPS→HTTP NAT | `backend-protocol: HTTP` + HTTPS-only listener + HTTP NodePort | `docs/troubleshooting/TROUBLESHOOTING.md#8-argocd-리디렉션-루프-문제` |
 | Namespace 중복 정의 | `k8s/namespaces` 한 곳에서 단일 관리 | `k8s/namespaces/kustomization.yaml` |
 | Atlantis 배포 | Helm Chart (`platform/helm/platform/atlantis`) + ArgoCD Wave 70 | `docs/architecture/gitops/ATLANTIS_TERRAFORM_FLOW.md` |
 | GitOps/Cluster Health Check | `scripts/diagnostics/gitops_cluster_health.sh` 실행 · kubectl 기반 상태 요약 | README – Getting Started |

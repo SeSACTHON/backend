@@ -160,7 +160,7 @@ Bitnami Chart로는 HA·백업·자동 복구 요구사항을 충족하기 어�
 | [RabbitMQ Cluster Operator](https://github.com/rabbitmq/cluster-operator) | RabbitMQ Core Team · MPL-2.0 | `kubectl apply -f https://github.com/rabbitmq/cluster-operator/releases/download/v2.7.0/cluster-operator.yml` *(버전은 최신 릴리스에 맞춰 변경)* | RabbitMQ 공식 팀이 유지보수, `RabbitmqCluster` CR로 클러스터/업그레이드/토폴로지 자동화, [공식 문서](https://www.rabbitmq.com/kubernetes/operator/operator-overview)에서 Messaging Topology Operator와 함께 지원 |
 
 > **Bitnami RabbitMQ 상태**  
-> Bitnami `rabbitmq`/`rabbitmq-cluster-operator` Chart는 2025-08-28 이후 Debian 기반 이미지가 중단되었고(`docs/TROUBLESHOOTING.md` §18.5), VMware/Broadcom 지원 매트릭스에서도 빠졌다. 내부 정책상 Bitnami RabbitMQ Chart는 **Deprecated**로 분류하며, 공식 RabbitMQ Operator로 즉시 마이그레이션한다.
+> Bitnami `rabbitmq`/`rabbitmq-cluster-operator` Chart는 2025-08-28 이후 Debian 기반 이미지가 중단되었고(`docs/troubleshooting/TROUBLESHOOTING.md` §18.5), VMware/Broadcom 지원 매트릭스에서도 빠졌다. 내부 정책상 Bitnami RabbitMQ Chart는 **Deprecated**로 분류하며, 공식 RabbitMQ Operator로 즉시 마이그레이션한다.
 
 ---
 

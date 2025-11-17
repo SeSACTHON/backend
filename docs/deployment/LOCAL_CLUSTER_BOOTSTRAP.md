@@ -104,7 +104,7 @@ argocd app get dev-root   # argocd CLI 사용 시
 | 25/35 | Data Operators / CR | `kubectl get postgres -A`, `kubectl get redisfailover -A` |
 | 60/70 | API + Ingress | `kubectl get deploy -n auth`, `kubectl get ingress -A` |
 
-> Sync 중 CrashLoop가 발생하면 `docs/TROUBLESHOOTING.md` 18.x~20.x 항목을 참조한다.
+> Sync 중 CrashLoop가 발생하면 `docs/troubleshooting/TROUBLESHOOTING.md` 18.x~20.x 항목을 참조한다.
 
 ### Step 5. Post-check & 로컬 개발용 설정
 
@@ -132,7 +132,7 @@ argocd app get dev-root   # argocd CLI 사용 시
 - `docs/architecture/deployment/ANSIBLE_BOOTSTRAP_PLAN.md`
 - `docs/architecture/gitops/ARGOCD_SYNC_WAVE_PLAN.md`
 - `docs/architecture/operator/OPERATOR_SOURCE_SPEC.md`
-- `docs/TROUBLESHOOTING.md`
+- `docs/troubleshooting/TROUBLESHOOTING.md`
 
 > 위 절차를 기준으로 로컬에서 테스트 클러스터를 올리고, GitOps Sync Wave 0→70까지 순차적으로 검증한다. 신규 작업자는 본 문서를 onboarding checklist로 사용한다.
 

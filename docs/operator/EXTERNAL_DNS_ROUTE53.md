@@ -35,7 +35,7 @@ Route53 (api.growbin.app, argocd.growbin.app, …)
 |------|-----------|------|
 | 1 | `terraform/irsa-roles.tf`, `ssm-parameters.tf` | IRSA Role (`external-dns`) + SSM `/sesacthon/{env}/iam/external-dns-role-arn` 추가 |
 | 2 | `workloads/rbac-storage/base/service-accounts.yaml` | `external-dns` ServiceAccount 정의 (Wave 3) |
-| 3 | `workloads/rbac-storage/{env}/patch-sa-irsa.yaml` | 각 환경에 IAM Role ARN 주입 |
+| 3 | `workloads/secrets/external-secrets/base/irsa-annotator-*.yaml` | IRSA 주입용 ServiceAccount + ClusterRole + Job (Argo Hook) |
 | 4 | `workloads/secrets/external-secrets/{env}/sa-irsa-patch.yaml` | IRSA ARN을 Secret으로 동기화 (Wave 11) |
 | 5 | `platform/helm/external-dns/` | Helm ApplicationSet + values(dev/prod) 생성 |
 | 6 | `clusters/{env}/apps/16-external-dns.yaml` | Sync Wave 16 Application 등록 |
@@ -76,10 +76,10 @@ env:
 | Wave | 리소스 | 비고 |
 |------|--------|------|
 | 0 | Namespaces (`workloads/namespaces`) | `platform-system` |
-| 3 | RBAC/ServiceAccounts | `external-dns` SA 및 annotation |
+| 3 | RBAC/ServiceAccounts | `external-dns` SA 정의 (annotation은 Wave 11 Hook) |
 | 5 | NetworkPolicy | `platform-system` egress 허용 (`kube-system`, AWS API) |
 | 10 | ExternalSecrets Operator | IRSA Secret 생성 준비 |
-| 11 | ExternalSecret (IRSA) | `/sesacthon/{env}/iam/external-dns-role-arn` → Secret |
+| 11 | ExternalSecret (IRSA) + `irsa-annotator` Job | `/sesacthon/{env}/iam/external-dns-role-arn` → Secret → ServiceAccount annotation |
 | 15 | ALB Controller | Ingress → ALB 생성 |
 | **16** | **ExternalDNS (Helm)** | Route53 Alias 관리 |
 | 20+ | Monitoring/Data/Apps | Route53 레코드가 이미 존재해야 함 |

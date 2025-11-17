@@ -2,6 +2,8 @@
 
 > 작성일: 2025-11-16  
 > 담당 범위: Kustomize Wave 00/01, NetworkPolicy, ALB Ingress
+>
+> 📌 **Default deny 일시 중단 메모**: 자세한 배경과 재적용 체크리스트는 `docs/networking/DEFAULT_DENY_ROLLOUT_NOTES.md` 참고
 
 ---
 
@@ -101,7 +103,7 @@
    - Namespace/Policy/Ingress 정의를 본 문서대로 재구성 후, 설계 문서와 코드가 항상 1:1 매핑되도록 유지
 3. **문서 연계**
    - 본 문서는 `docs/architecture/networking`의 기준 문서로 사용
-   - Troubleshooting 사례는 `docs/TROUBLESHOOTING.md` 19장과 링크 예정
+   - Troubleshooting 사례는 `docs/troubleshooting/TROUBLESHOOTING.md` 19장과 링크 예정
 
 ---
 

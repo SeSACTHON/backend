@@ -45,7 +45,7 @@ clusters/
 ## 3. 검증/문서
 - `workloads/README.md`: Kustomize 디렉터리 구조 및 작성 규칙  
 - `docs/deployment/LOCAL_CLUSTER_BOOTSTRAP.md`: Terraform → Ansible → Argo CD 부트스트랩 절차  
-- `docs/TROUBLESHOOTING.md`: Sync Wave별 문제 사례 정리
+- `docs/troubleshooting/TROUBLESHOOTING.md`: Sync Wave별 문제 사례 정리
 
 필요 시 새 환경을 추가하려면 `clusters/{env}` 디렉터리를 복제한 뒤 `apps/`의 `path`/`project`/`namespace` 값을 해당 환경에 맞게 수정하면 됩니다.
 

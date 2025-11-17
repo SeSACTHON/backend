@@ -49,7 +49,7 @@ args:
 
 ### Documentation 브랜치
 - `docs/troubleshooting/ATLANTIS_POD_CRASHLOOPBACKOFF.md`: 상세 문제 해결 가이드
-- `docs/TROUBLESHOOTING.md`: 인덱스 업데이트
+- `docs/troubleshooting/TROUBLESHOOTING.md`: 인덱스 업데이트
 
 ## 🧪 테스트
 
