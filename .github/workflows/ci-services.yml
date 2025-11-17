@@ -213,3 +213,4 @@ jobs:
             ghcr.io/sesacthon/${{ matrix.service }}-api:${{ github.sha }}
             ghcr.io/sesacthon/${{ matrix.service }}-api:latest
 
+
