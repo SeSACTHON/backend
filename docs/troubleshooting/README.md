@@ -6,13 +6,32 @@
 
 ```
 docs/
-├── TROUBLESHOOTING.md              # 📌 메인 인덱스 (빠른 참조)
 └── troubleshooting/
-    ├── README.md                   # 이 파일
-    ├── ansible-label-sync.md       # 🔥 Ansible 라벨 동기화 (2025-11-16)
-    ├── argocd-applicationset-patterns.md  # 🔥 ApplicationSet 패턴 (2025-11-16)
-    └── gitops-deployment.md        # GitOps 배포 문제
+    ├── README.md                         # 이 파일 (Navigation Hub)
+    ├── TROUBLESHOOTING.md                # ⚡ Rapid Diagnostics Runbook
+    ├── ansible-label-sync.md             # 🔥 Ansible 라벨 동기화 (2025-11-16)
+    ├── argocd-applicationset-patterns.md # 🔥 ApplicationSet 패턴 (2025-11-16)
+    ├── gitops-deployment.md              # GitOps 배포 문제
+    ├── cluster-cases.md                  # 클러스터 전역 실측 사례 (2025-11-16)
+    ├── calico-operator-helm-conflict.md  # Calico Operator vs Helm 충돌
+    ├── terraform-issues.md               # Terraform 오류 모음
+    ├── vpc-deletion-issues.md            # VPC 삭제 지연
+    └── cloudfront-issues.md              # CloudFront 문제 모음
 ```
+
+---
+
+## ⚡ 빠른 참조
+
+| 카테고리 | 즉시 확인 | 세부 문서 |
+|----------|-----------|-----------|
+| 클러스터 전체 영향 | 노드 NotReady / CoreDNS Pending / Pod 스케줄링 실패 / ArgoCD DNS Timeout | `ansible-label-sync.md` |
+| ArgoCD / GitOps | Application Unknown / OutOfSync / root-app 실패 / AppProject 누락 | `argocd-applicationset-patterns.md`, `ansible-label-sync.md` |
+| Infrastructure | ALB Controller / GHCR Pull / Kustomize 구조 / VPC 삭제 / CloudFront | `gitops-deployment.md`, `cluster-cases.md`, `terraform-issues.md`, `vpc-deletion-issues.md`, `cloudfront-issues.md` |
+| Application | ArgoCD 리디렉션 / Prometheus 메모리 / Atlantis CrashLoop | `argocd-ingress-issues.md`, `monitoring-issues.md`, `atlantis-issues.md` |
+| CNI/Calico | Operator vs Helm 충돌, VXLAN 구성 | `calico-operator-helm-conflict.md`, `ansible-label-sync.md#3` |
+
+> 현장 대응이 필요하면 `TROUBLESHOOTING.md`(Rapid Diagnostics Runbook)으로 곧장 이동해 절차를 따라가세요.
 
 ---
 
@@ -76,8 +95,7 @@ kubectl describe pod <pod-name> -n <namespace>
 kubectl logs <pod-name> -n <namespace> --tail=50
 
 # Step 3: 관련 문서 검색
-# TROUBLESHOOTING.md의 "빠른 참조"에서 증상으로 검색
-# 또는 문서 파일명으로 직접 접근
+# 이 README의 '빠른 참조' 표 또는 문서 카탈로그에서 해당 증상 선택
 ```
 
 ### 2. 카테고리별 접근
@@ -92,7 +110,8 @@ kubectl logs <pod-name> -n <namespace> --tail=50
 **GitOps 배포**:
 - → `gitops-deployment.md`
 
-**Infrastructure**:
+**Infrastructure / 운영 사례**:
+- → `cluster-cases.md`
 - → `terraform-issues.md`
 - → `vpc-deletion-issues.md`
 - → `cloudfront-issues.md`
@@ -135,14 +154,14 @@ sleep 30 && kubectl get pods -n kube-system -l k8s-app=kube-dns
 
 새로운 문제 발생 시:
 1. 해당 카테고리 파일에 추가
-2. 메인 TROUBLESHOOTING.md에 링크 추가
-3. 실제 클러스터 데이터 수집 및 포함
+2. 이 README의 문서 목록/빠른 참조 표에 링크 추가
+3. 실제 클러스터 데이터(로그/이벤트/커밋) 수집 및 포함
 
 ---
 
 ## 📊 통계
 
-**문서 개수**: 3개 (2025-11-16)  
+**문서 개수**: 8개 (2025-11-16 기준)  
 **해결된 문제**: 23개  
 **실제 클러스터 검증**: 3개 문서  
 **Ansible 자동화 개선**: 126줄  
@@ -155,7 +174,8 @@ sleep 30 && kubectl get pods -n kube-system -l k8s-app=kube-dns
 - ✅ ansible-label-sync.md 생성 (실제 클러스터 데이터 포함)
 - ✅ argocd-applicationset-patterns.md 생성
 - ✅ gitops-deployment.md 생성
-- ✅ TROUBLESHOOTING.md 간략화 (2847줄 → 200줄)
+- ✅ TROUBLESHOOTING.md → Rapid Diagnostics Runbook으로 전환
+- ✅ 이 README를 싱글 허브로 재편
 - ✅ Ansible playbook 126줄 개선
 
 ---
