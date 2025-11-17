@@ -9,8 +9,8 @@
 
 | Operator | Source / Chart | 주요 Custom Resource | 특징 / 선택 이유 | 비고 |
 |----------|----------------|----------------------|------------------|------|
-| **Zalando Postgres Operator** | GitHub: `github.com/zalando/postgres-operator` (`charts/postgres-operator`, tag `v1.10.0`)<br>Local values: `platform/helm/postgres-operator/values/{dev,prod}.yaml` | `postgresql` (`acid.zalan.do/v1`) | - Battle-tested, 다중 샤드/팀 기반 관리<br>- AWS S3 WAL archiving, logical backup 지원<br>- Env별 nodeSelector/toleration/backup 값을 Helm values로 분리 | Wave 25 (Operator) / Wave 35 (PostgresCluster) |
-| **Redis Operator (OT Container Kit)** | Helm Repo: `https://ot-container-kit.github.io/helm-charts`, chart `redis-operator`, version `0.22.2`<br>Local values: `platform/helm/redis-operator/values/{dev,prod}.yaml` | `Redis` / `RedisCluster` (`redis.redis.opstreelabs.in/v1beta1`) | - Sentinel/Failover 내장, metrics exporter 지원<br>- Helm valueFiles로 namespace/nodeSelector 등을 env별 관리 | Wave 25 (Operator) / Wave 35 (`Redis[Cluster].yaml`) |
+| **Zalando Postgres Operator** | GitHub: `github.com/zalando/postgres-operator` (`charts/postgres-operator`, tag `v1.10.0`)<br>Env overlay: `platform/helm/postgres-operator/{dev,prod}/patch-application.yaml` | `postgresql` (`acid.zalan.do/v1`) | - Battle-tested, 다중 샤드/팀 기반 관리<br>- AWS S3 WAL archiving, logical backup 지원<br>- Env별 nodeSelector/toleration/backup 값을 Helm valuesObject patch로 분리 | Wave 25 (Operator) / Wave 35 (PostgresCluster) |
+| **Redis Operator (OT Container Kit)** | Helm Repo: `https://ot-container-kit.github.io/helm-charts`, chart `redis-operator`, version `0.22.2`<br>Env overlay: `platform/helm/redis-operator/{dev,prod}/patch-application.yaml` | `Redis` / `RedisCluster` (`redis.redis.opstreelabs.in/v1beta1`) | - Sentinel/Failover 내장, metrics exporter 지원<br>- Helm overlay에서 namespace/nodeSelector 등을 관리 | Wave 25 (Operator) / Wave 35 (`Redis[Cluster].yaml`) |
 | **RabbitMQ Cluster Operator** | GitHub: `github.com/rabbitmq/cluster-operator` (`config/default`, tag `v1.11.0`)<br>Kustomize manifest upstream 그대로 사용 (Helm chart 없음) | `RabbitmqCluster` (`rabbitmq.com/v1beta1`) | - Upstream Operator, TLS/Cert Manager 통합<br>- StatefulSet 기반 Scaling<br>- ArgoCD ApplicationSet에서 JSON Patch로 nodeSelector/toleration만 주입 | Wave 25 (Operator) + Wave 35 (`RabbitmqCluster`) |
 
 ### 최소 요구 사항
@@ -26,7 +26,7 @@
 
 ### RabbitMQ Operator 배포 고려사항 (2025-11)
 - **Helm Chart 부재**: 공식 repo(`rabbitmq/cluster-operator`)는 `config/default` Kustomize 매니페스트만 릴리스하며, Bitnami Helm chart는 2025-09 EOL. 서드파티 chart를 채택하면 보안/업데이트 책임이 커지므로 upstream 매니페스트를 그대로 쓰기로 결정.
-- **GitOps 일관성 vs. 유지보수성**: Helm valueFiles를 통한 env 분리가 어렵다는 단점이 있지만, upstream 변경 추적이 단순하고 CRD/컨트롤러 버전 차이가 최소화된다. env 차이는 ApplicationSet JSON Patch(노드 스케줄링) 또는 향후 Kustomize overlay로 보완.
+- **GitOps 일관성 vs. 유지보수성**: Helm valuesObject(Kustomize overlay)로 env 차이를 관리하면 upstream 변경 추적이 단순하고 CRD/컨트롤러 버전 차이가 최소화된다.
 - **향후 선택지**: Helm 템플릿이 필요해질 경우
   1) upstream 매니페스트를 `helmify`로 자체 chart화하여 repo에 추가하거나  
   2) 커뮤니티 chart를 포크해 장기 유지한다.  
@@ -101,7 +101,7 @@
 3. **검증 플로우**  
    - Helm chart upgrade 시 `helm template` + `kubeconform`으로 CRD 호환성 검사  
    - Operator Pod 변경 시 `kubectl describe deploy`에서 `image:` SHA 기록  
-   - App-of-Apps에 `sesacthon.io/operator-version` 라벨 추가하여 추적
+   - App-of-Apps에 `kubernetes.io/operator-version` 라벨 추가하여 추적
 
 ---
 

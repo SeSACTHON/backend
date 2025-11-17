@@ -18,7 +18,7 @@ Kubernetes RBAC 역할 및 StorageClass 정의.
 - **현재(임시)**: OIDC/IRSA가 준비될 때까지 Access Key/Secret Key를 `aws-global-credentials` Secret으로 만들어 Pod에 환경변수로 주입한다.  
   - 네임스페이스: `kube-system`, `platform-system`  
   - Secret 키: `aws_access_key_id`, `aws_secret_access_key`  
-  - 관련 Helm values(`platform/helm/*/values/{env}.yaml`)에서 env → `valueFrom.secretKeyRef`로 사용
+  - 관련 Helm overlay(`platform/helm/*/{env}/patch-application.yaml`)에서 env → `valueFrom.secretKeyRef`로 사용
 - **향후(IRSA 재도입)**:
   1. Terraform (`terraform/irsa-roles.tf`)에서 `enable_irsa = true`로 바꾸고 OIDC Issuer를 등록  
   2. `*-sa-irsa-values` ExternalSecret 및 `irsa-annotator` Hook을 다시 활성화  

@@ -190,7 +190,7 @@ spec:
 
 ## 🎯 운영 권장사항
 - Root App + Wave 구조를 유지하며, 각 wave에 맞는 Kustomize/Helm 방식을 명시한다.
-- Helm 패키지는 `platform/helm/README.md` 의 가이드를 따라 dependency/values 를 관리하고, Kustomize 트리는 `k8s/` 아래에서만 유지한다.
+- Helm 패키지는 `platform/helm/README.md` 의 가이드를 따라 base/overlay(`patch-application.yaml`)를 관리하고, Kustomize 트리는 `k8s/` 아래에서만 유지한다.
 - 환경별 브랜치·경로(`argocd/applications/{stage,prod}`)를 분리해 멀티 릴리스 트레인을 운영한다.
 - ApplicationSet에서는 git/directory generator를 사용해 신규 도메인 추가 시 수작업을 줄이고, `syncOptions`/`retry`를 표준화한다.
 - Wave -1~1은 SRE/Security 프로젝트, Wave 2 이후는 도메인 프로젝트로 나눠 ArgoCD Project RBAC를 강화한다.

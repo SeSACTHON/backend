@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: redis-operator
+spec:
+  project: dev
+  source:
+    helm:
+      valuesObject:
+        redisOperator:
+          watchNamespace: ""
+        service:
+          namespace: data-system
+        nodeSelector:
+          node-role.kubernetes.io/control-plane: ""
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+

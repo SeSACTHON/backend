@@ -1,0 +1,17 @@
+apiVersion: rabbitmq.com/v1beta1
+kind: RabbitmqCluster
+metadata:
+  name: rabbitmq-main
+spec:
+  replicas: 3
+  persistence:
+    storageClassName: gp3
+    storage: 50Gi
+  resources:
+    requests:
+      cpu: "2"
+      memory: 4Gi
+    limits:
+      cpu: "4"
+      memory: 8Gi
+

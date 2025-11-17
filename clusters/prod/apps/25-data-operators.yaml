@@ -10,13 +10,16 @@ spec:
     - list:
         elements:
           - name: postgres-operator
-            path: platform/helm/postgres-operator
+            path: platform/helm/postgres-operator/prod
             namespace: data-system
           - name: redis-operator
-            path: platform/helm/redis-operator
+            path: platform/helm/redis-operator/prod
             namespace: data-system
           - name: rabbitmq-operator
-            path: platform/helm/rabbitmq-operator
+            path: platform/helm/rabbitmq-operator/prod
+            namespace: messaging-system
+          - name: rabbitmq-operator
+            path: platform/helm/rabbitmq-operator/prod
             namespace: messaging-system
   template:
     metadata:
@@ -26,7 +29,7 @@ spec:
       project: prod
       source:
         repoURL: https://github.com/SeSACTHON/backend.git
-        targetRevision: HEAD
+        targetRevision: main
         path: "{{path}}"
       destination:
         server: https://kubernetes.default.svc

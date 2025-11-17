@@ -1,0 +1,16 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: postgres-operator
+spec:
+  project: dev
+  source:
+    helm:
+      valuesObject:
+        nodeSelector:
+          node-role.kubernetes.io/control-plane: ""
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+

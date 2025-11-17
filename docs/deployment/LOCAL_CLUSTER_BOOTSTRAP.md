@@ -120,7 +120,7 @@ argocd app get dev-root   # argocd CLI 사용 시
    - 권장하지 않는다. Sync Wave 문서 및 ExternalSecret 경로가 Terraform output과 강하게 연결되어 있기 때문에, 동일한 변수/SSM 구조를 유지해야 한다.
 
 2. **Grafana를 kube-prometheus-stack과 다시 묶고 싶다면?**  
-   - `platform/helm/kube-prometheus-stack/values/{env}.yaml`에서 `grafana.enabled: true`로 변경하고 Wave 21 Grafana Application을 제거하면 된다. 배경 설명은 `docs/architecture/operator/OPERATOR_SOURCE_SPEC.md` 참고.
+   - `platform/helm/kube-prometheus-stack/{env}/patch-application.yaml`의 `helm.valuesObject.grafana.enabled`를 `true`로 변경하고 Wave 21 Grafana Application을 제거하면 된다. 배경 설명은 `docs/architecture/operator/OPERATOR_SOURCE_SPEC.md` 참고.
 
 3. **로컬 Kubernetes (kind, k3d)에서 테스트 가능합니까?**  
    - 현 구성은 AWS 인프라(LoadBalancer, SSM, IRSA)에 의존하므로 kind/k3d만으로는 완전한 동작을 보장하지 않는다. 로컬 단일 노드 테스트가 필요하면 ExternalSecret/ALB/IRSA 섹션을 Mocking 해야 한다.

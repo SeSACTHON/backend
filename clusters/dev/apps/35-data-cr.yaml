@@ -13,6 +13,8 @@ spec:
             path: workloads/data/postgres/dev
           - name: redis
             path: workloads/data/redis/dev
+          - name: rabbitmq
+            path: workloads/data/rabbitmq/dev
   template:
     metadata:
       name: dev-data-"{{name}}"

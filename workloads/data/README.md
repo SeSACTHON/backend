@@ -6,6 +6,7 @@ Operator가 관리하는 데이터 계층 인스턴스 정의 (Wave 35).
 
 - `postgres/`: Zalando Postgres Operator CR (`acid.zalan.do/v1` postgresql)
 - `redis/`: Spotahome Redis Operator CR (`databases.spotahome.com/v1` RedisFailover)
+- `rabbitmq/`: RabbitMQ Cluster Operator CR (`rabbitmq.com/v1beta1` RabbitmqCluster)
 
 ## 배포 순서
 
@@ -21,6 +22,8 @@ Operator가 관리하는 데이터 계층 인스턴스 정의 (Wave 35).
 | Postgres volume | 20Gi | 100Gi |
 | Redis replicas | 1 | 1 |
 | Redis volume | 10Gi | 50Gi |
+| RabbitMQ replicas | 1 | 3 |
+| RabbitMQ volume | 20Gi | 50Gi |
 | Backup | 비활성 | 활성 (S3) |
 
 ## 참고

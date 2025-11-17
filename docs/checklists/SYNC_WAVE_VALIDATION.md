@@ -9,11 +9,11 @@
 - [ ] `scripts/ci/lint-appset-templates.sh`로 ApplicationSet 템플릿에서 literal 따옴표(`"{{name}}"`)가 없는지 CI에서 강제한다.
 
 ## 2. Helm 모듈 점검
-- [ ] `platform/helm/<component>/app.yaml`은 **multi-source** 패턴을 따르고 `values` 소스의 `targetRevision`이 환경별 브랜치 변수(`{{targetRevision}}`)로 정의되어 있다.
-- [ ] 각 Helm Application(예: `05-calico.yaml`, `15-alb-controller.yaml`)은 `directory.include: app.yaml`을 사용해 values 파일이 매니페스트로 렌더되지 않도록 한다.
-- [ ] `platform/helm/<component>/values/{env}.yaml`이 실제 존재하며, 참조 경로(`valueFile`)가 동일하다.
+- [ ] `platform/helm/<component>/{base,dev,prod}` 구조가 존재하며, env 디렉터리의 `application.yaml`이 chart source·values 파일·Sync 옵션을 직접 선언한다.
+- [ ] 각 Helm Application(예: `05-calico.yaml`, `15-alb-controller.yaml`)은 `path: platform/helm/<component>/{env}`를 가리키고, 더 이상 `directory.include: app.yaml`을 사용하지 않는다.
+- [ ] 환경별 `patch-application.yaml`(또는 overlay)에서 Helm 설정이 선언되며, 중복/누락 없이 관리된다.
 - [ ] External chart 버전(`targetRevision`)이 CRD/Operator 버전과 호환되는지 사전 검증한다.
-- [ ] ExternalDNS는 `external-dns.alpha.sesacthon.io/managed-by=external-dns`가 붙은 Ingress/Service만 관리하며, Apex/Alias 레코드는 Terraform·Ansible(Route53)에서만 관리된다.
+- [ ] ExternalDNS는 `external-dns.alpha.kubernetes.io/managed-by=external-dns`가 붙은 Ingress/Service만 관리하며, Apex/Alias 레코드는 Terraform·Ansible(Route53)에서만 관리된다.
 
 ## 3. Kustomize(workloads) 점검
 - [ ] 모든 경로가 `base/` + `{env}/` 오버레이 구조를 가지며, `kustomization.yaml`이 base를 참조한다.

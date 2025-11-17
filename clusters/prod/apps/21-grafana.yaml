@@ -10,9 +10,7 @@ spec:
   source:
     repoURL: https://github.com/SeSACTHON/backend.git
     targetRevision: main
-    path: platform/helm/grafana
-    directory:
-      include: app.yaml
+    path: platform/helm/grafana/prod
   destination:
     server: https://kubernetes.default.svc
     namespace: grafana

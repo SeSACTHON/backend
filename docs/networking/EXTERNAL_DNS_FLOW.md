@@ -7,16 +7,16 @@
   - Apex 및 핵심 Alias 레코드는 Terraform/Ansible(Route53)에서 관리
   - 서브도메인(Ingress 기반)은 ExternalDNS가 자동 관리
 - **ExternalDNS 설정**
-  - Helm values(`platform/helm/external-dns/values/{env}.yaml`)에서
+  - env overlay(`platform/helm/external-dns/{env}/patch-application.yaml`)의 `helm.valuesObject`에서
     - `domainFilters: [growbin.app]`
     - `txtOwnerId: sesacthon-{env}`
-    - `extraArgs`에 `--annotation-filter=external-dns.alpha.sesacthon.io/managed-by in (external-dns)`
+    - `extraArgs`에 `--annotation-filter=external-dns.alpha.kubernetes.io/managed-by in (external-dns)`
   - AWS provider: Route53 public zone
 
 ## 2. 동작 흐름
 1. **Ingress/Service 정의**
    - `workloads/ingress/apps/**/patch-*.yaml` 등에서 서비스별 Ingress를 선언
-   - 각 리소스에 `external-dns.alpha.sesacthon.io/managed-by: external-dns` annotation과 `spec.rules[].host`(예: `api.dev.growbin.app`)를 설정
+   - 각 리소스에 `external-dns.alpha.kubernetes.io/managed-by: external-dns` annotation과 `spec.rules[].host`(예: `api.dev.growbin.app`)를 설정
 2. **ExternalDNS 감지**
    - ExternalDNS Pod가 해당 annotation 및 host를 읽고 Route53에 `A`/`CNAME` 레코드를 생성
    - 동일 레코드에 대해 TXT 레코드(`txtOwnerId`)로 소유권을 기록해 충돌 방지
@@ -29,14 +29,14 @@
 ## 3. 운영 수칙
 - **책임 분리**
   - Terraform/Ansible: Apex(`growbin.app`, `www.growbin.app`) 및 공용 Alias 레코드
-  - ExternalDNS: `external-dns.alpha.sesacthon.io/managed-by=external-dns`가 붙은 Ingress/Service 서브도메인
+  - ExternalDNS: `external-dns.alpha.kubernetes.io/managed-by=external-dns`가 붙은 Ingress/Service 서브도메인
 - **검증 절차**
   1. Ingress 추가 시 반드시 annotation + host를 설정
   2. `kubectl get ingress -A -o jsonpath='{..metadata.annotations.external-dns\\.alpha\\.sesacthon\\.io/managed-by}'` 명령으로 대상 리소스 확인
   3. Route53 콘솔 또는 CLI 로 생성된 레코드가 예상대로 Alias/Target 되는지 점검
 - **문서/체크리스트 반영**
   - `docs/checklists/SYNC_WAVE_VALIDATION.md` 2,5번 섹션에서 ExternalDNS 책임 범위 및 annotation 규칙을 확인
-  - 문제가 발견되면 `terraform/route53.tf`와 Helm values를 동시에 검토해 충돌 여부를 파악
+  - 문제가 발견되면 `terraform/route53.tf`와 Helm overlay(`patch-application.yaml`)를 동시에 검토해 충돌 여부를 파악
 
 ## 4. 트러블슈팅 포인트
 - **레코드가 생성되지 않을 때**

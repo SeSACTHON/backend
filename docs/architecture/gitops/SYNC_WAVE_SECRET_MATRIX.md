@@ -36,7 +36,7 @@ Terraform → SSM/Secrets Manager 저장 경로 예시:
 | **5** | Network (CNI, default NP) | CNI tuning ConfigMap(선택) | 수동 설정 | Calico Felix 설정 등 |
 | **10** | ALB Controller (Helm) | `alb-controller-values` Secret/CM: `clusterName`, `vpcId`, `region`, `awsAccountId` | Terraform outputs (`vpc_id`, `aws_region`) | Secret은 SSM → ExternalSecret으로 주입 |
 | **16** | DNS Automation | `external-dns-sa-irsa-values` Secret (IRSA), Ingress hostname annotations | SSM `/iam/external-dns-role-arn`, Git 매니페스트 | Route53 Alias 자동 생성 전 Secret 필요 |
-| **20** | Monitoring Operator (Helm) | `alertmanager-config` Secret, `grafana-datasource` ConfigMap, `grafana-admin` Secret(`/platform/grafana-admin-password`) | Slack/Webhook Secrets(GitHub `secrets.SLACK_WEBHOOK` 등), Internal URL, SSM Parameter Store | Helm valueFiles에서 참조 |
+| **20** | Monitoring Operator (Helm) | `alertmanager-config` Secret, `grafana-datasource` ConfigMap, `grafana-admin` Secret(`/platform/grafana-admin-password`) | Slack/Webhook Secrets(GitHub `secrets.SLACK_WEBHOOK` 등), Internal URL, SSM Parameter Store | Helm overlay(`patch-application.yaml`)에서 직접 참조 |
 | **25** | Data Operators (Helm) | S3 Backup credential Secret, Operator default ConfigMap | Terraform (S3 bucket), AWS IAM | ExternalSecrets 권장 |
 | **30** | Monitoring CR (Prometheus/Alertmanager) | Alert rule ConfigMap, Grafana dashboard ConfigMap, SLO Secret(옵션) | Git repo / Config repo | Wave 25보다 앞선 commit에 포함 |
 | **35** | Data CR (PostgresCluster, RedisCluster, RabbitmqCluster) | DB 사용자 Secret, TLS Secret, ConfigMap(연결 모드) | External Secrets Operator (SM/Parameter Store) | `postgresql-secret`(`/sesacthon/{env}/data/postgres-password`), `redis-secret`(`/data/redis-password`), `rabbitmq-default-user`(`/data/rabbitmq-password`) |
@@ -56,7 +56,7 @@ Terraform → SSM/Secrets Manager 저장 경로 예시:
     --docker-password=$GH_TOKEN \
     -n <namespace>
   ```
-- `secrets.SLACK_WEBHOOK`, `secrets.ATLANTIS_GH_TOKEN` 등은 ExternalSecrets 또는 ArgoCD Helm values로 전달.
+- `secrets.SLACK_WEBHOOK`, `secrets.ATLANTIS_GH_TOKEN` 등은 ExternalSecrets 또는 Helm overlay(`helm.valuesObject`)로 전달.
 
 ---
 

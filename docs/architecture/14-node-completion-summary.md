@@ -89,7 +89,7 @@ Infrastructure 노드 (4개):
 ### 3️⃣ Helm Charts (애플리케이션 정의) - 완료 ⭐
 
 **파일**:
-- ✅ `platform/helm/ecoeco-backend/values-14nodes.yaml` (NEW!)
+- ✅ `platform/helm/ecoeco-backend/dev/patch-application.yaml` (NEW!)
 
 **주요 내용**:
 ```yaml

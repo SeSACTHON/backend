@@ -1,0 +1,71 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+spec:
+  project: dev
+  source:
+    helm:
+      valuesObject:
+        fullnameOverride: kube-prometheus-stack
+        alertmanager:
+          enabled: true
+          configExistingSecret: alertmanager-config
+          alertmanagerSpec:
+            replicas: 1
+            storage: {}
+            tolerations:
+              - key: node-role.kubernetes.io/infrastructure
+                operator: Equal
+                value: "true"
+                effect: NoSchedule
+            nodeSelector:
+              node-role.kubernetes.io/infrastructure: monitoring
+        grafana:
+          enabled: false
+        prometheusOperator:
+          admissionWebhooks:
+            patch:
+              enabled: true
+          tls:
+            enabled: false
+          tolerations:
+            - key: node-role.kubernetes.io/infrastructure
+              operator: Equal
+              value: "true"
+              effect: NoSchedule
+          nodeSelector:
+            node-role.kubernetes.io/infrastructure: monitoring
+        prometheus:
+          prometheusSpec:
+            replicas: 1
+            retention: 15d
+            nodeSelector:
+              node-role.kubernetes.io/infrastructure: monitoring
+            tolerations:
+              - key: node-role.kubernetes.io/infrastructure
+                operator: Equal
+                value: "true"
+                effect: NoSchedule
+            serviceMonitorNamespaceSelector:
+              matchExpressions:
+                - key: kubernetes.io/metadata.name
+                  operator: In
+                  values:
+                    - auth
+                    - my
+                    - scan
+                    - character
+                    - location
+                    - info
+                    - chat
+                    - postgres
+                    - redis
+                    - rabbitmq
+                    - grafana
+                    - prometheus
+                    - default
+            serviceMonitorSelectorNilUsesHelmValues: false
+            additionalScrapeConfigsSecret:
+              enabled: false
+

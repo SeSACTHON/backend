@@ -11,7 +11,7 @@ spec:
   source:
     repoURL: https://github.com/SeSACTHON/backend.git
     targetRevision: main
-    path: platform/helm/calico
+    path: platform/helm/calico/prod
   destination:
     server: https://kubernetes.default.svc
     namespace: tigera-operator

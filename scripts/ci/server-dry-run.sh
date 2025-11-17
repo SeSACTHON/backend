@@ -10,7 +10,18 @@ if [[ ! -f "${MANIFEST}" ]]; then
 fi
 
 echo "::group::Apply CRDs"
-kubectl apply -k "${ROOT_DIR}/platform/crds"
+CRD_ROOT="${ROOT_DIR}/platform/crds"
+if [[ -d "${CRD_ROOT}/dev" || -d "${CRD_ROOT}/prod" ]]; then
+  for ENV in dev prod; do
+    CRD_PATH="${CRD_ROOT}/${ENV}"
+    if [[ -d "${CRD_PATH}" ]]; then
+      echo "Applying CRDs for ${ENV}: ${CRD_PATH}"
+      kubectl apply -k "${CRD_PATH}"
+    fi
+  done
+else
+  kubectl apply -k "${CRD_ROOT}"
+fi
 echo "::endgroup::"
 
 echo "::group::Server-side dry-run"

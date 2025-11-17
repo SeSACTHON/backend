@@ -10,9 +10,7 @@ spec:
   source:
     repoURL: https://github.com/SeSACTHON/backend.git
     targetRevision: main
-    path: platform/crds
-    directory:
-      recurse: true
+    path: platform/crds/prod
   destination:
     server: https://kubernetes.default.svc
     namespace: argocd
