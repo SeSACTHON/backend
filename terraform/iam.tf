@@ -246,7 +246,12 @@ resource "aws_iam_policy" "ebs_csi" {
 }
 
 # Attach policies to the role
-# Note: ALB Controller policy attachment is in alb-controller-iam.tf
+# Note: ALB Controller policy is attached here for non-IRSA setup
+
+resource "aws_iam_role_policy_attachment" "node_alb_controller" {
+  role       = aws_iam_role.k8s_node.name
+  policy_arn = aws_iam_policy.alb_controller.arn
+}
 
 resource "aws_iam_role_policy_attachment" "ecr_read" {
   role       = aws_iam_role.k8s_node.name

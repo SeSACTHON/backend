@@ -26,6 +26,16 @@ spec:
         sources:
           - ingress
           - service
+        nodeSelector:
+          role: control-plane
+        tolerations:
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+          - key: role
+            operator: Equal
+            value: control-plane
+            effect: NoSchedule
         extraArgs:
           - --aws-zone-type=public
           - --aws-prefer-cname=true
