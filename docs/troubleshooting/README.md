@@ -14,6 +14,7 @@ docs/
     ├── gitops-deployment.md              # GitOps 배포 문제
     ├── cluster-cases.md                  # 클러스터 전역 실측 사례 (2025-11-16)
     ├── calico-operator-helm-conflict.md  # Calico Operator vs Helm 충돌
+    ├── CALICO_TYPHA_PORT_5473_ISSUE.md   # 🔥 Calico Typha 포트 5473 문제 (2025-11-18)
     ├── terraform-issues.md               # Terraform 오류 모음
     ├── vpc-deletion-issues.md            # VPC 삭제 지연
     └── cloudfront-issues.md              # CloudFront 문제 모음
@@ -29,13 +30,28 @@ docs/
 | ArgoCD / GitOps | Application Unknown / OutOfSync / root-app 실패 / AppProject 누락 | `argocd-applicationset-patterns.md`, `ansible-label-sync.md` |
 | Infrastructure | ALB Controller / GHCR Pull / Kustomize 구조 / VPC 삭제 / CloudFront | `gitops-deployment.md`, `cluster-cases.md`, `terraform-issues.md`, `vpc-deletion-issues.md`, `cloudfront-issues.md` |
 | Application | ArgoCD 리디렉션 / Prometheus 메모리 / Atlantis CrashLoop | `argocd-ingress-issues.md`, `monitoring-issues.md`, `atlantis-issues.md` |
-| CNI/Calico | Operator vs Helm 충돌, VXLAN 구성 | `calico-operator-helm-conflict.md`, `ansible-label-sync.md#3` |
+| CNI/Calico | Operator vs Helm 충돌, VXLAN 구성, **Typha 포트 5473** | `calico-operator-helm-conflict.md`, `ansible-label-sync.md#3`, **`CALICO_TYPHA_PORT_5473_ISSUE.md`** |
 
 > 현장 대응이 필요하면 `TROUBLESHOOTING.md`(Rapid Diagnostics Runbook)으로 곧장 이동해 절차를 따라가세요.
 
 ---
 
-## 🔥 최신 문제 (2025-11-16)
+## 🔥 최신 문제 (2025-11-18)
+
+### [CALICO_TYPHA_PORT_5473_ISSUE.md](./CALICO_TYPHA_PORT_5473_ISSUE.md) ⭐ NEW
+**Calico Typha 포트(5473) 연결 실패 문제**
+
+해결된 문제:
+1. Master 노드의 calico-node Pod이 Ready 상태가 되지 않음
+2. Felix가 Typha에 연결하지 못함 (TCP 5473 timeout)
+3. AWS 보안 그룹에 Typha 포트 미개방
+4. Master ↔ Worker, Worker ↔ Worker 간 Typha 통신 차단
+
+**특징**: ✅ 실제 에러 로그 포함, ✅ 네트워크 진단 과정, ✅ 공식 문서 링크, ✅ AWS CLI 해결 방법
+
+**관련 문서**: [Calico Typha 아키텍처](../networking/CALICO_TYPHA_ARCHITECTURE.md)
+
+---
 
 ### [ansible-label-sync.md](./ansible-label-sync.md)
 **Ansible 노드 라벨과 Kubernetes Manifest 동기화**
@@ -161,14 +177,20 @@ sleep 30 && kubectl get pods -n kube-system -l k8s-app=kube-dns
 
 ## 📊 통계
 
-**문서 개수**: 8개 (2025-11-16 기준)  
-**해결된 문제**: 23개  
-**실제 클러스터 검증**: 3개 문서  
+**문서 개수**: 9개 (2025-11-18 기준)  
+**해결된 문제**: 27개  
+**실제 클러스터 검증**: 4개 문서  
 **Ansible 자동화 개선**: 126줄  
 
 ---
 
 ## 🔄 변경 이력
+
+### 2025-11-18
+- ✅ **CALICO_TYPHA_PORT_5473_ISSUE.md 생성** (실제 에러 로그, 네트워크 진단)
+- ✅ **CALICO_TYPHA_ARCHITECTURE.md 생성** (Mermaid 다이어그램, 공식 문서)
+- ✅ AWS 보안 그룹 Typha 포트 5473 추가
+- ✅ Terraform 모듈 업데이트 (security-groups)
 
 ### 2025-11-16
 - ✅ ansible-label-sync.md 생성 (실제 클러스터 데이터 포함)
