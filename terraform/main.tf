@@ -117,7 +117,7 @@ module "master" {
   source = "./modules/ec2"
 
   instance_name        = "k8s-master"
-  instance_type        = "t3.large" # 8GB (Control Plane + Prometheus)
+  instance_type        = "t3.xlarge" # 16GB (Control Plane + Prometheus)
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[0]
   security_group_ids   = [module.security_groups.cluster_sg_id]
@@ -149,7 +149,7 @@ module "api_auth" {
   source = "./modules/ec2"
 
   instance_name        = "k8s-api-auth"
-  instance_type        = "t3.micro" # 1GB
+  instance_type        = "t3.small" # 2GB
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[0]
   security_group_ids   = [module.security_groups.cluster_sg_id]
@@ -177,7 +177,7 @@ module "api_my" {
   source = "./modules/ec2"
 
   instance_name        = "k8s-api-my"
-  instance_type        = "t3.micro" # 1GB
+  instance_type        = "t3.small" # 2GB
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[1]
   security_group_ids   = [module.security_groups.cluster_sg_id]
@@ -205,7 +205,7 @@ module "api_scan" {
   source = "./modules/ec2"
 
   instance_name        = "k8s-api-scan"
-  instance_type        = "t3.small" # 2GB
+  instance_type        = "t3.medium" # 4GB
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[2]
   security_group_ids   = [module.security_groups.cluster_sg_id]
@@ -233,7 +233,7 @@ module "api_character" {
   source = "./modules/ec2"
 
   instance_name        = "k8s-api-character"
-  instance_type        = "t3.micro" # 1GB
+  instance_type        = "t3.small" # 2GB
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[0]
   security_group_ids   = [module.security_groups.cluster_sg_id]
@@ -261,7 +261,7 @@ module "api_location" {
   source = "./modules/ec2"
 
   instance_name        = "k8s-api-location"
-  instance_type        = "t3.micro" # 1GB
+  instance_type        = "t3.small" # 2GB
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[1]
   security_group_ids   = [module.security_groups.cluster_sg_id]
@@ -292,7 +292,7 @@ module "api_info" {
   source = "./modules/ec2"
 
   instance_name        = "k8s-api-info"
-  instance_type        = "t3.micro" # 1GB
+  instance_type        = "t3.small" # 2GB
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[2]
   security_group_ids   = [module.security_groups.cluster_sg_id]
@@ -320,7 +320,7 @@ module "api_chat" {
   source = "./modules/ec2"
 
   instance_name        = "k8s-api-chat"
-  instance_type        = "t3.small" # 2GB
+  instance_type        = "t3.medium" # 4GB
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[0]
   security_group_ids   = [module.security_groups.cluster_sg_id]
@@ -355,7 +355,7 @@ module "worker_storage" {
   source = "./modules/ec2"
 
   instance_name        = "k8s-worker-storage"
-  instance_type        = "t3.small" # 2GB (I/O Bound - Eventlet Pool)
+  instance_type        = "t3.medium" # 4GB (I/O Bound - Eventlet Pool)
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[2]
   security_group_ids   = [module.security_groups.cluster_sg_id]
@@ -384,7 +384,7 @@ module "worker_ai" {
   source = "./modules/ec2"
 
   instance_name        = "k8s-worker-ai"
-  instance_type        = "t3.small" # 2GB (Network Bound - Prefork Pool)
+  instance_type        = "t3.medium" # 4GB (Network Bound - Prefork Pool)
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[0]
   security_group_ids   = [module.security_groups.cluster_sg_id]
@@ -420,7 +420,7 @@ module "rabbitmq" {
   source = "./modules/ec2"
 
   instance_name        = "k8s-rabbitmq"
-  instance_type        = "t3.small" # 2GB (RabbitMQ only)
+  instance_type        = "t3.medium" # 4GB (RabbitMQ only)
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[1]
   security_group_ids   = [module.security_groups.cluster_sg_id]
@@ -450,7 +450,7 @@ module "postgresql" {
   source = "./modules/ec2"
 
   instance_name        = "k8s-postgresql"
-  instance_type        = "t3.medium" # 4GB (도메인별 DB: auth, my, scan, character, location, info, chat)
+  instance_type        = "t3.large" # 8GB (도메인별 DB: auth, my, scan, character, location, info, chat)
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[0]
   security_group_ids   = [module.security_groups.cluster_sg_id]
@@ -477,7 +477,7 @@ module "redis" {
   source = "./modules/ec2"
 
   instance_name        = "k8s-redis"
-  instance_type        = "t3.small" # 2GB (Redis only)
+  instance_type        = "t3.medium" # 4GB (Redis only)
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[1]
   security_group_ids   = [module.security_groups.cluster_sg_id]
@@ -505,7 +505,7 @@ module "monitoring" {
   source = "./modules/ec2"
 
   instance_name        = "k8s-monitoring"
-  instance_type        = "t3.medium" # 4GB (Prometheus + Grafana) - Optimized for 14-node cluster
+  instance_type        = "t3.large" # 8GB (Prometheus + Grafana) - Optimized for 14-node cluster
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[1]
   security_group_ids   = [module.security_groups.cluster_sg_id]

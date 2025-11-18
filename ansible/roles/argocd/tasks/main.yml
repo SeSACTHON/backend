@@ -35,6 +35,34 @@
   command: kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n {{ argocd_namespace }} --timeout=600s
   when: argocd_install.changed
 
+- name: ArgoCD 워크로드를 control-plane 노드에 고정
+  vars:
+    argocd_control_plane_patch:
+      spec:
+        template:
+          spec:
+            nodeSelector:
+              role: "control-plane"
+            tolerations:
+              - key: "role"
+                operator: "Equal"
+                value: "control-plane"
+                effect: "NoSchedule"
+  command: >
+    kubectl -n {{ argocd_namespace }}
+    patch {{ item.kind }} {{ item.name }}
+    --type merge
+    -p '{{ argocd_control_plane_patch | to_json }}'
+  loop:
+    - { kind: deployment,  name: argocd-server }
+    - { kind: deployment,  name: argocd-repo-server }
+    - { kind: deployment,  name: argocd-dex-server }
+    - { kind: deployment,  name: argocd-redis }
+    - { kind: statefulset, name: argocd-application-controller }
+  register: argocd_control_plane_result
+  changed_when: "'patched' in argocd_control_plane_result.stdout"
+  when: argocd_install is succeeded
+
 - name: ArgoCD Service를 NodePort(HTTP 단일 포트)로 변경
   shell: >
     kubectl patch svc argocd-server -n {{ argocd_namespace }}
