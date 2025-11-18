@@ -103,3 +103,19 @@ kubectl get events -A --sort-by='.lastTimestamp'
 ---
 
 > 📌 추가 사례·심층 분석은 README의 “빠른 참조” 및 문서 카탈로그에서 확인하세요. 이 Runbook은 “무엇을 어떤 순서로 점검/복구할지”에 집중합니다.
+
+---
+
+## 5. Incident Log – Calico/Tigera 재배포 실패 (2025-11-18)
+
+| 시각(KST) | Action | 결과/메시지 |
+|-----------|--------|-------------|
+| 19:00~20:30 | `kubectl get application dev-root -n argocd` | 하위 앱 `dev-external-dns`, `dev-external-secrets`, `dev-grafana`, `dev-calico`가 OutOfSync·Missing. 모든 노드 `node.kubernetes.io/network-unavailable` taint 유지. |
+| 20:30 | `kubectl get application dev-calico -o yaml` | `operationState.message` = “waiting for deletion of operator.tigera.io/Installation/default”. Argo는 tigera 리소스를 prune만 반복. |
+| 20:35~21:00 | SSA 도입 시도<br>`kubectl get application dev-calico -o jsonpath='{.spec.syncPolicy.syncOptions}'` → patch로 `ServerSideApply=true` 추가 | Annotation 256KiB 에러는 해소되었으나 기존 Installation CR이 삭제되지 않아 여전히 “Deletion 대기” 상태. |
+| 21:00 | `kubectl patch installation.operator.tigera.io default --type='json' -p='[{"op":"remove","path":"/metadata/finalizers/0"}]'` (두 번) | `Installation/default` 삭제 성공. 그러나 관련 CRD(`installations.operator.tigera.io`, `apiservers.operator.tigera.io`) 및 Ansible 잔존 리소스 때문에 Argo가 새 Sync를 시작하지 못함. |
+| 21:10~21:40 | `kubectl delete crd installations.operator.tigera.io apiservers.operator.tigera.io` 등 Calico CRD 정리 | 제거 완료했으나 Application OperationState가 reset되지 않아 컨트롤러 이벤트가 더 이상 갱신되지 않음. `kubectl patch application dev-calico ... {"status":{"reconciledAt":null}}` 필요했으나 네트워크 불능으로 효과 확인 불가. |
+| 21:45 이후 | `kubectl logs -n argocd argocd-application-controller-0` | Pod는 Running이나 노드(10.0.3.88) kubelet 포트 연결 실패로 로그 수집 실패. 모든 노드가 `node.kubernetes.io/network-unavailable`이라 Logging/PortForward 모두 차단. |
+| 22:00 | 결론: Calico를 GitOps(Helm)에서 제거하고 Ansible Playbook(`04-cni-install.yml`)로만 설치·운영. GitOps 경로(`clusters/dev/apps/05-calico.yaml`, `platform/helm/calico/**`) 삭제. |
+
+> 📌 Calico/Tigera GitOps 충돌 사례, 전체 Application 리스트, 이벤트/describe 출력은 `docs/troubleshooting/CALICO_GITOPS_INCIDENT_2025-11-18.md` 문서에서 확인하세요. 여기서는 다른 증상 공통 절차만 유지합니다.

@@ -74,12 +74,7 @@
   tasks:
     - import_tasks: playbooks/03-1-set-provider-id.yml
 
-- name: CNI 플러그인 설치 및 클러스터 검증 (Calico VXLAN Always, BGP Off)
-  hosts: masters
-  become: yes
-  become_user: "{{ kubectl_user }}"
-  tasks:
-    - ansible.builtin.import_tasks: playbooks/tasks/cni-install.yml
+- import_playbook: playbooks/04-cni-install.yml
 
 - name: ArgoCD 설치
   hosts: masters
