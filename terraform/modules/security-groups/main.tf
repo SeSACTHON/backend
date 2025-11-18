@@ -277,3 +277,35 @@ resource "aws_security_group_rule" "worker_to_master_vxlan" {
   description              = "VXLAN from worker (Calico)"
 }
 
+# Calico Typha (Master ↔ Worker)
+resource "aws_security_group_rule" "master_to_worker_typha" {
+  type                     = "ingress"
+  from_port                = 5473
+  to_port                  = 5473
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.worker.id
+  source_security_group_id = aws_security_group.master.id
+  description              = "Calico Typha from master"
+}
+
+resource "aws_security_group_rule" "worker_to_master_typha" {
+  type                     = "ingress"
+  from_port                = 5473
+  to_port                  = 5473
+  protocol                 = "tcp"
+  security_group_id        = aws_security_group.master.id
+  source_security_group_id = aws_security_group.worker.id
+  description              = "Calico Typha from worker"
+}
+
+# Calico Typha within workers
+resource "aws_security_group_rule" "worker_to_worker_typha" {
+  type              = "ingress"
+  from_port         = 5473
+  to_port           = 5473
+  protocol          = "tcp"
+  security_group_id = aws_security_group.worker.id
+  self              = true
+  description       = "Calico Typha between workers"
+}
+

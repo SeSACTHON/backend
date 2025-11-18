@@ -227,11 +227,6 @@
   copy:
     src: "{{ argocd_root_app_file }}"
     dest: /tmp/root-app.yaml
-  when: argocd_root_env == 'dev'
-
-- name: ArgoCD Root App 배포
-  command: kubectl apply -f /tmp/root-app.yaml
-  when: argocd_root_env == 'dev'
 
 - name: ArgoCD Root App 배포
   command: kubectl apply -f /tmp/root-app.yaml

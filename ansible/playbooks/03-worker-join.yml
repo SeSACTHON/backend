@@ -27,6 +27,11 @@
         path: /etc/kubernetes/kubelet.conf
       register: kubelet_conf
 
+    - name: Kubernetes CA 파일 존재 여부 확인
+      stat:
+        path: /etc/kubernetes/pki/ca.crt
+      register: kube_ca_cert
+
     - name: Kubelet 상태 확인 (이미 join된 경우)
       command: systemctl is-active kubelet
       register: kubelet_status
@@ -37,6 +42,33 @@
     - name: Join 상태 출력
       debug:
         msg: "{{ '✅ 이미 join됨' if kubelet_conf.stat.exists else '⚠️ Join 필요' }}"
+
+    - name: 이전 조인 흔적 사전 정리
+      block:
+        - name: kubelet 서비스 중지
+          systemd:
+            name: kubelet
+            state: stopped
+          failed_when: false
+
+        - name: kubeadm reset (사전 정리)
+          command: kubeadm reset -f --cri-socket=unix:///run/containerd/containerd.sock
+
+        - name: Kubernetes 잔여 디렉터리 삭제
+          file:
+            path: "{{ item }}"
+            state: absent
+          loop:
+            - /etc/kubernetes
+            - /var/lib/kubelet
+            - /etc/cni/net.d
+            - /var/lib/cni
+
+        - name: containerd 재시작 (사전 정리)
+          systemd:
+            name: containerd
+            state: restarted
+      when: not kubelet_conf.stat.exists and kube_ca_cert.stat.exists
 
     # Join 실행
     - name: join 명령어 파일 복사
