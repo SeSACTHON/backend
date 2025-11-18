@@ -125,7 +125,35 @@ resource "aws_ssm_parameter" "acm_certificate_arn" {
 }
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 5. Application Credentials (SecureString)
+# 5. GHCR (GitHub Container Registry) Credentials
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+resource "aws_ssm_parameter" "ghcr_username" {
+  name        = "/sesacthon/${var.environment}/ghcr/username"
+  type        = "String"
+  value       = "mangowhoiscloud"
+  description = "GitHub Container Registry Username"
+  tags = {
+    ManagedBy   = "terraform"
+    Scope       = "ghcr"
+    Environment = var.environment
+  }
+}
+
+resource "aws_ssm_parameter" "ghcr_token" {
+  name        = "/sesacthon/${var.environment}/ghcr/token"
+  type        = "SecureString"
+  value       = var.ghcr_token
+  description = "GitHub Container Registry Personal Access Token"
+  tags = {
+    ManagedBy   = "terraform"
+    Scope       = "ghcr"
+    Environment = var.environment
+  }
+}
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 6. Application Credentials (SecureString)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 locals {

@@ -64,3 +64,10 @@ variable "enable_irsa" {
   default     = false
 }
 
+variable "ghcr_token" {
+  description = "GitHub Container Registry Personal Access Token (read:packages 권한 필요). 민감 정보이므로 환경변수나 tfvars로 주입."
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
