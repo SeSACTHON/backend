@@ -513,10 +513,10 @@ $ kubectl get application ecoeco-api-auth -n argocd \
   -o jsonpath='{.status.conditions}'
 
 # ArgoCD repo-server 로그
-$ kubectl logs -n argocd -l app.sesacthon.io/name=argocd-repo-server
+$ kubectl logs -n argocd -l app.kubernetes.io/name=argocd-repo-server
 
 # ArgoCD application-controller 로그
-$ kubectl logs -n argocd -l app.sesacthon.io/name=argocd-application-controller
+$ kubectl logs -n argocd -l app.kubernetes.io/name=argocd-application-controller
 ```
 
 ---

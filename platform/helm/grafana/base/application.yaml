@@ -4,7 +4,7 @@ metadata:
   name: grafana
   namespace: argocd
   labels:
-    app.sesacthon.io/name: grafana
+    app.kubernetes.io/name: grafana
   annotations:
     argocd.argoproj.io/sync-wave: "21"
 spec:

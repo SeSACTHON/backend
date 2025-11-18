@@ -141,7 +141,7 @@ failed to validate kubelet flags: unknown 'sesacthon.io' or 'k8s.io' labels
 ```
 
 **원인:**
-Kubernetes 1.24+ 버전에서 `node-role.sesacthon.io/` prefix 라벨 제한
+Kubernetes 1.24+ 버전에서 `node-role.kubernetes.io/` prefix 라벨 제한
 
 **해결:**
 - ✅ 이미 `terraform/main.tf`에서 `sesacthon.io/` prefix로 수정됨

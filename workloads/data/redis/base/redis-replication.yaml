@@ -4,7 +4,7 @@ metadata:
   name: redis-main
   namespace: redis
   labels:
-    app.sesacthon.io/name: redis
+    app.kubernetes.io/name: redis
     tier: data
 spec:
   clusterSize: 3
@@ -14,11 +14,11 @@ spec:
   redisExporter:
     enabled: false
   nodeSelector:
-    sesacthon.io/infra-type: redis
+    infra-type: redis
   tolerations:
-    - key: sesacthon.io/infrastructure
+    - key: domain
       operator: Equal
-      value: "true"
+      value: data
       effect: NoSchedule
   storage:
     volumeClaimTemplate:

@@ -105,7 +105,7 @@
 - Namespace: `kube-system`
 - Secret/Config: `alb-controller-values` (VPC ID, Subnet IDs, SG ID 등 Terraform output 연동)
 - IAM: IRSA Role에 `AWSLoadBalancerControllerIAMPolicy` 부여 (`alb-controller-iam.tf`)
-- 서비스: NodePort 또는 `alb.ingress.sesacthon.io/target-type: ip` 선택 (현재 Instance 모드)
+- 서비스: NodePort 또는 `alb.ingress.kubernetes.io/target-type: ip` 선택 (현재 Instance 모드)
 
 ---
 

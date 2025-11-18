@@ -8,9 +8,9 @@ spec:
     helm:
       valuesObject:
         nodeSelector:
-          node-role.sesacthon.io/control-plane: ""
+          node-role.kubernetes.io/control-plane: ""
         tolerations:
-          - key: node-role.sesacthon.io/control-plane
+          - key: node-role.kubernetes.io/control-plane
             operator: Exists
             effect: NoSchedule
 

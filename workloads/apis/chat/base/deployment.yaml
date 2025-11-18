@@ -50,7 +50,7 @@ spec:
       imagePullSecrets:
         - name: ghcr-secret
       nodeSelector:
-        sesacthon.io/service: chat
+        domain: chat
       tolerations:
         - key: domain
           operator: Equal

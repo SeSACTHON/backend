@@ -116,7 +116,7 @@ Secrets/ConfigMap 선행 조건은 `SYNC_WAVE_SECRET_MATRIX.md`의 “필요한 
 | `workloads/monitoring/grafana` | Datasource/Dashboard CM or Grafana CR | 30 | `grafana-dashboard` ConfigMap |
 | `workloads/ingress/ingressclassparams` | ALB IngressClassParams | 15 | Subnet/SG ConfigMap 참조 |
 | `workloads/ingress/apps/base` | API/Argocd/Grafana Ingress + default backend | 70+ | ansible `07-ingress-resources.yml`를 Kustomize로 이전 |
-| `workloads/ingress/apps/overlays/(dev|prod)` | Host · Certificate 패치(JSON6902) | 70+ | `alb.ingress.sesacthon.io/certificate-arn`, `host` |
+| `workloads/ingress/apps/overlays/(dev|prod)` | Host · Certificate 패치(JSON6902) | 70+ | `alb.ingress.kubernetes.io/certificate-arn`, `host` |
 | `workloads/secrets/external-secrets` | ExternalSecret CR (ASM/SSM) | 58 | `/sesacthon/{env}/*` Parameter |
 | `workloads/secrets/sops` | 암호화 Secret (선택) | 58 | `sops.yaml` 정책 |
 | `workloads/apis/{service}/overlays/{env}` | Deployment/Service/CM | 60+ | `sync-wave` per service 가능 |
@@ -204,7 +204,7 @@ workloads/ingress/apps/
 ```
 
 - Base manifest는 `api.example.com`, `argocd.example.com` 등 placeholder를 사용하고, Overlay에서 실제 도메인/ACM ARN을 덮어쓴다.  
-- ALB Path 기반 라우팅( `/api/v1/auth`, `/api/v1/my`, … )과 `alb.ingress.sesacthon.io/group.*` 어노테이션은 ansible `07-ingress-resources.yml`과 동일하게 유지된다.  
+- ALB Path 기반 라우팅( `/api/v1/auth`, `/api/v1/my`, … )과 `alb.ingress.kubernetes.io/group.*` 어노테이션은 ansible `07-ingress-resources.yml`과 동일하게 유지된다.  
 - `argocd/apps/70-applications-ingress.yaml`은 환경별 Overlay를 참조한다. (예: `path: workloads/ingress/apps/overlays/dev`)
 
 ## 6. 운영 체크리스트

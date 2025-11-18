@@ -15,12 +15,12 @@ spec:
             replicas: 1
             storage: {}
             tolerations:
-              - key: node-role.sesacthon.io/infrastructure
+              - key: node-role.kubernetes.io/infrastructure
                 operator: Equal
                 value: "true"
                 effect: NoSchedule
             nodeSelector:
-              node-role.sesacthon.io/infrastructure: monitoring
+              node-role.kubernetes.io/infrastructure: monitoring
         grafana:
           enabled: false
         prometheusOperator:
@@ -30,26 +30,26 @@ spec:
           tls:
             enabled: false
           tolerations:
-            - key: node-role.sesacthon.io/infrastructure
+            - key: node-role.kubernetes.io/infrastructure
               operator: Equal
               value: "true"
               effect: NoSchedule
           nodeSelector:
-            node-role.sesacthon.io/infrastructure: monitoring
+            node-role.kubernetes.io/infrastructure: monitoring
         prometheus:
           prometheusSpec:
             replicas: 1
             retention: 15d
             nodeSelector:
-              node-role.sesacthon.io/infrastructure: monitoring
+              node-role.kubernetes.io/infrastructure: monitoring
             tolerations:
-              - key: node-role.sesacthon.io/infrastructure
+              - key: node-role.kubernetes.io/infrastructure
                 operator: Equal
                 value: "true"
                 effect: NoSchedule
             serviceMonitorNamespaceSelector:
               matchExpressions:
-                - key: sesacthon.io/metadata.name
+                - key: kubernetes.io/metadata.name
                   operator: In
                   values:
                     - auth

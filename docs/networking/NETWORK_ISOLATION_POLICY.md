@@ -39,7 +39,7 @@ spec:
     - to:
         - namespaceSelector:
             matchLabels:
-              sesacthon.io/metadata.name: kube-system
+              kubernetes.io/metadata.name: kube-system
           podSelector:
             matchLabels:
               k8s-app: kube-dns
@@ -79,7 +79,7 @@ spec:
 
 | Wave | 작업 | 내용 |
 |------|------|------|
-| Wave -1 | Namespaces | 레이블 표준화 (`tier`, `role`, `app.sesacthon.io/*`) |
+| Wave -1 | Namespaces | 레이블 표준화 (`tier`, `role`, `app.kubernetes.io/*`) |
 | Wave 0 | RBAC/Storage | NetworkPolicy에서 참조할 ServiceAccount/클래스 준비 |
 | **Wave 5** | **Network** | default-deny, DNS 허용, 동일 Layer 허용 정책 배포 |
 | Wave 10+ | Platform/Ingress | 레이어 격리 성공 시 TLS/Ingress 배포 |

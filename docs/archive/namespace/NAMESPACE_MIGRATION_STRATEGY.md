@@ -237,7 +237,7 @@ graph TB
 cd /Users/mango/workspace/SeSACTHON/backend
 
 # 2. 네임스페이스 생성 확인
-kubectl get namespaces -l app.sesacthon.io/part-of=ecoeco-backend
+kubectl get namespaces -l app.kubernetes.io/part-of=ecoeco-backend
 
 # 3. NetworkPolicy 확인
 kubectl get networkpolicies --all-namespaces
@@ -572,7 +572,7 @@ ssh ubuntu@<MASTER_IP>
 cd /Users/mango/workspace/SeSACTHON/backend
 
 # ✅ 3. 네임스페이스 확인
-kubectl get namespaces -l app.sesacthon.io/part-of=ecoeco-backend
+kubectl get namespaces -l app.kubernetes.io/part-of=ecoeco-backend
 # 예상 출력: auth, my, scan, character, location, info, chat, data, monitoring
 
 # ✅ 4. NetworkPolicy 확인

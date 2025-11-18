@@ -66,18 +66,18 @@ spec:
   template:
     spec:
       nodeSelector:
-        node-role.sesacthon.io/api: auth  # ❌ 노드에 없는 라벨
+        node-role.kubernetes.io/api: auth  # ❌ 노드에 없는 라벨
 ```
 
 **불일치 매핑 테이블**:
 
 | 리소스 | Ansible 라벨 (실제) | 구버전 Manifest | 결과 |
 |--------|-------------------|----------------|------|
-| API-auth | `sesacthon.io/service=auth` | `node-role.sesacthon.io/api: auth` | ❌ 불일치 |
-| API-my | `sesacthon.io/service=my` | `node-role.sesacthon.io/api: my` | ❌ 불일치 |
-| PostgreSQL | `sesacthon.io/infra-type=postgresql` | `node-role.sesacthon.io/infrastructure: postgresql` | ❌ 불일치 |
-| Redis | `sesacthon.io/infra-type=redis` | `node-role.sesacthon.io/infrastructure: redis` | ❌ 불일치 |
-| Worker-Storage | `sesacthon.io/worker-type=storage` | `node-role.sesacthon.io/worker: storage` | ❌ 불일치 |
+| API-auth | `sesacthon.io/service=auth` | `node-role.kubernetes.io/api: auth` | ❌ 불일치 |
+| API-my | `sesacthon.io/service=my` | `node-role.kubernetes.io/api: my` | ❌ 불일치 |
+| PostgreSQL | `sesacthon.io/infra-type=postgresql` | `node-role.kubernetes.io/infrastructure: postgresql` | ❌ 불일치 |
+| Redis | `sesacthon.io/infra-type=redis` | `node-role.kubernetes.io/infrastructure: redis` | ❌ 불일치 |
+| Worker-Storage | `sesacthon.io/worker-type=storage` | `node-role.kubernetes.io/worker: storage` | ❌ 불일치 |
 
 **영향받는 서비스**: 전체 9개 (auth, my, scan, character, location, info, chat + PostgreSQL + Redis)
 
@@ -342,7 +342,7 @@ kubectl create namespace argocd
 kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 
 # 4. ArgoCD Pod Ready 대기
-kubectl wait --for=condition=ready pod -l app.sesacthon.io/name=argocd-server -n argocd --timeout=300s
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n argocd --timeout=300s
 
 # 5. AppProject 생성
 kubectl apply -f - <<EOF
@@ -577,9 +577,9 @@ ArgoCD 기본 설치 매니페스트(`install.yaml`)에 포함된 NetworkPolicy�
 ```bash
 $ kubectl get networkpolicy -n argocd
 NAME                                              POD-SELECTOR
-argocd-application-controller-network-policy      app.sesacthon.io/name=argocd-application-controller
-argocd-redis-network-policy                       app.sesacthon.io/name=argocd-redis
-argocd-repo-server-network-policy                 app.sesacthon.io/name=argocd-repo-server
+argocd-application-controller-network-policy      app.kubernetes.io/name=argocd-application-controller
+argocd-redis-network-policy                       app.kubernetes.io/name=argocd-redis
+argocd-repo-server-network-policy                 app.kubernetes.io/name=argocd-repo-server
 # 7개의 제한적인 NetworkPolicy
 ```
 
@@ -651,7 +651,7 @@ $ kubectl get applications -n argocd | grep Synced | wc -l
 # 로컬에서 수정하고 커밋했지만 클러스터에 반영 안 됨
 kubectl get deploy auth-api -n auth -o yaml | grep nodeSelector
       nodeSelector:
-        node-role.sesacthon.io/api: auth  # ❌ 구버전 라벨 (수정 전)
+        node-role.kubernetes.io/api: auth  # ❌ 구버전 라벨 (수정 전)
 ```
 
 **ArgoCD Application 상태**:
@@ -1025,7 +1025,7 @@ node_labels:
 tolerations:
   - key: CriticalAddonsOnly
     operator: Exists
-  - key: node-role.sesacthon.io/control-plane
+  - key: node-role.kubernetes.io/control-plane
     operator: Exists
     effect: NoSchedule
 # ⚠️ domain, sesacthon.io/infrastructure taint는 tolerate 안 함
@@ -1045,8 +1045,8 @@ kubectl patch deployment coredns -n kube-system --type merge -p '
     "template": {
       "spec": {
         "tolerations": [
-          {"key": "node-role.sesacthon.io/control-plane", "operator": "Exists", "effect": "NoSchedule"},
-          {"key": "node-role.sesacthon.io/master", "operator": "Exists", "effect": "NoSchedule"},
+          {"key": "node-role.kubernetes.io/control-plane", "operator": "Exists", "effect": "NoSchedule"},
+          {"key": "node-role.kubernetes.io/master", "operator": "Exists", "effect": "NoSchedule"},
           {"key": "domain", "operator": "Exists", "effect": "NoSchedule"},
           {"key": "sesacthon.io/infrastructure", "operator": "Exists", "effect": "NoSchedule"},
           {"key": "CriticalAddonsOnly", "operator": "Exists"},
@@ -1061,7 +1061,7 @@ kubectl patch deployment coredns -n kube-system --type merge -p '
 
 **Option 2: Master taint 제거** (비권장):
 ```bash
-kubectl taint nodes k8s-master node-role.sesacthon.io/control-plane:NoSchedule-
+kubectl taint nodes k8s-master node-role.kubernetes.io/control-plane:NoSchedule-
 # ⚠️ Master 노드에 다른 Pod도 스케줄링될 수 있음
 ```
 
@@ -1081,8 +1081,8 @@ kubectl taint nodes k8s-master node-role.sesacthon.io/control-plane:NoSchedule-
         "template": {
           "spec": {
             "tolerations": [
-              {"key": "node-role.sesacthon.io/control-plane", "operator": "Exists", "effect": "NoSchedule"},
-              {"key": "node-role.sesacthon.io/master", "operator": "Exists", "effect": "NoSchedule"},
+              {"key": "node-role.kubernetes.io/control-plane", "operator": "Exists", "effect": "NoSchedule"},
+              {"key": "node-role.kubernetes.io/master", "operator": "Exists", "effect": "NoSchedule"},
               {"key": "domain", "operator": "Exists", "effect": "NoSchedule"},
               {"key": "sesacthon.io/infrastructure", "operator": "Exists", "effect": "NoSchedule"},
               {"key": "CriticalAddonsOnly", "operator": "Exists"},
@@ -1316,3 +1316,74 @@ chat-api-76488b98b5-gfgfw       0/1  ImagePullBackOff  k8s-api-chat       # ✅
 **다음 부트스트랩에서 자동 해결됨** ✅
 
 
+
+## 11. kubelet crashloop (Kubernetes 1.28 + `kubernetes.io/*` 라벨)
+
+### 문제
+
+**조인 단계 전체 실패**:
+```bash
+TASK [Join 상태 출력] ***************************************************
+ok: [k8s-worker-ai] =>  msg: ⚠️ Join 필요
+...
+TASK [클러스터 조인] *****************************************************
+FAILED - RETRYING: 클러스터 조인 (10 retries left).
+```
+
+**kubelet 로그** (Ubuntu 22.04, Kubernetes 1.28.4):
+```bash
+sudo journalctl -u kubelet -n 20
+
+failed to validate kubelet flags: unknown 'kubernetes.io' or 'k8s.io' labels specified with --node-labels: [kubernetes.io/node-role kubernetes.io/worker-type]
+--node-labels in the 'kubernetes.io' namespace must begin with an allowed prefix (kubelet.kubernetes.io, node.kubernetes.io) or be in the specifically allowed set (...)
+```
+
+### 원인
+
+Terraform/Ansible가 모든 노드에 다음과 같은 drop-in을 주입하고 있음:
+```ini
+# /etc/systemd/system/kubelet.service.d/10-node-labels.conf
+[Service]
+Environment="KUBELET_EXTRA_ARGS=--node-labels=kubernetes.io/node-role=worker,kubernetes.io/worker-type=ai,workload=worker-ai,phase=4"
+```
+Kubernetes 1.28부터는 `kubernetes.io/*`, `k8s.io/*` 네임스페이스가 **공식 허용 prefix/node.kubernetes.io/... 등**이 아니면 거부되며, kubelet이 기동하지 못해 `/etc/kubernetes/kubelet.conf` 가 생성되지 않습니다. 따라서 Ansible `join` 단계가 무한 대기 상태로 남습니다.
+
+### 영향
+
+- 모든 worker/API/infra 노드가 kubelet crashloop → `Join 상태 출력`이 계속 “⚠️ Join 필요”
+- `kubectl get nodes`가 항상 `NotReady` 또는 “리소스 없음”으로 표시되어 이후 GitOps 단계 진행 불가
+- Root 원인을 해결하기 전까지 Terraform/Ansible 재실행만으로는 복구되지 않음
+
+### 해결 전략
+
+1. **라벨 네임스페이스 재설계**  
+   - 예: `node.sesacthon.io/role`, `service.sesacthon.io/name`, `infra.sesacthon.io/type`, `taint.sesacthon.io/class`  
+   - 표준 prefix(`node-role.kubernetes.io/*`, `node.kubernetes.io/*`)는 그대로 유지 가능 (kubelet 허용 목록에 포함)
+2. **라벨 공급자 업데이트**  
+   - Terraform `kubelet_extra_args` 맵  
+   - `terraform/user-data/common.sh` drop-in  
+   - `ansible/playbooks/tasks/fix-node-labels.yml`
+3. **워크로드/운영 코드 전수 수정**  
+   - `workloads/**/deployment.yaml` nodeSelector / affinity  
+   - 데이터/모니터링/플랫폼 CR의 tolerations, nodeAffinity  
+   - Helm values / ArgoCD 패치 / 문서 내 `kubectl get nodes -l ...` 명령
+4. **배포 절차**
+   - 새 prefix를 코드 전체에 반영한 뒤 Terraform으로 **새 클러스터**를 부트스트랩  
+   - 기존 클러스터 업그레이드 시에는 dual-label(구/신 prefix 동시 부여) → 워크로드 업데이트 → 구 라벨 제거 순서 필요
+
+### 빠른 진단 체크리스트
+
+```bash
+# kubelet이 라벨 검증 오류로 죽는지 확인
+sudo journalctl -u kubelet | grep "failed to validate kubelet flags"
+
+# drop-in에 금지된 prefix가 존재하는지 확인
+sudo cat /etc/systemd/system/kubelet.service.d/10-node-labels.conf
+
+# 노드 라벨이 실제로 반영되지 않았는지 확인
+kubectl get nodes --show-labels | grep kubernetes.io
+```
+
+### 참고 링크
+- [docs/deployment/KUBERNETES-1.24-LABEL-FIX.md](../../docs/deployment/KUBERNETES-1.24-LABEL-FIX.md) – prefix 제한 배경
+- [docs/infrastructure/k8s-label-annotation-system.md](../../docs/infrastructure/k8s-label-annotation-system.md) – 기존 라벨 설계

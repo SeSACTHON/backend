@@ -15,7 +15,7 @@ error execution phase kubelet-start: timed out waiting for the condition
 **실제 원인:**
 ```
 failed to validate kubelet flags: unknown 'sesacthon.io' or 'k8s.io' labels 
-specified with --node-labels: [node-role.sesacthon.io/api]
+specified with --node-labels: [node-role.kubernetes.io/api]
 ```
 
 ## 🔍 근본 원인
@@ -30,21 +30,21 @@ Kubernetes 1.24부터 **kubelet 시작 시 `--node-labels`로 설정할 수 있�
 - ✅ 커스텀 도메인 (예: `sesacthon.io/*`, `company.com/*`)
 
 **금지된 prefix:**
-- ❌ `node-role.sesacthon.io/*`
+- ❌ `node-role.kubernetes.io/*`
 - ❌ 일반 `sesacthon.io/*` (일부 예외 제외)
 
 ### 우리 프로젝트에서의 문제
 
 **기존 설정 (terraform/main.tf):**
 ```hcl
-kubelet_extra_args = "--node-labels=node-role.sesacthon.io/api=my,workload=api,..."
+kubelet_extra_args = "--node-labels=node-role.kubernetes.io/api=my,workload=api,..."
 ```
 
 **user-data/common.sh에서 생성:**
 ```bash
 cat <<EOF >/etc/systemd/system/kubelet.service.d/10-node-labels.conf
 [Service]
-Environment="KUBELET_EXTRA_ARGS=--node-labels=node-role.sesacthon.io/api=my,..."
+Environment="KUBELET_EXTRA_ARGS=--node-labels=node-role.kubernetes.io/api=my,..."
 EOF
 ```
 
@@ -61,9 +61,9 @@ EOF
 
 | 이전 (에러 발생) | 수정 (정상 동작) |
 |---|---|
-| `node-role.sesacthon.io/api=my` | `sesacthon.io/node-role=api` |
-| `node-role.sesacthon.io/worker=storage` | `sesacthon.io/node-role=worker` |
-| `node-role.sesacthon.io/infrastructure=postgresql` | `sesacthon.io/node-role=infrastructure` |
+| `node-role.kubernetes.io/api=my` | `sesacthon.io/node-role=api` |
+| `node-role.kubernetes.io/worker=storage` | `sesacthon.io/node-role=worker` |
+| `node-role.kubernetes.io/infrastructure=postgresql` | `sesacthon.io/node-role=infrastructure` |
 
 **새로운 라벨 구조:**
 ```yaml
@@ -225,7 +225,7 @@ bash scripts/utilities/cleanup-deployment-artifacts.sh --cleanup-logs
 
 ## 🎯 요약
 
-1. **문제**: Kubernetes 1.24+에서 `node-role.sesacthon.io/*` 라벨 제한
+1. **문제**: Kubernetes 1.24+에서 `node-role.kubernetes.io/*` 라벨 제한
 2. **해결**: 커스텀 도메인 `sesacthon.io/*`로 변경
 3. **적용**: Terraform 코드 수정 + 기존 노드 재조인
 4. **예방**: 스크립트 개선 + 문서화

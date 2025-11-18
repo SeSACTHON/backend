@@ -5,7 +5,7 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "15"
-    sesacthon.io/required-secrets: alb-controller-values
+    kubernetes.io/required-secrets: alb-controller-values
 spec:
   project: platform
   source:

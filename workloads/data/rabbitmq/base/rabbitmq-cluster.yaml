@@ -4,8 +4,8 @@ metadata:
   name: rabbitmq-main
   namespace: rabbitmq
   labels:
-    app.sesacthon.io/name: rabbitmq-main
-    app.sesacthon.io/part-of: ecoeco-backend
+    app.kubernetes.io/name: rabbitmq-main
+    app.kubernetes.io/part-of: ecoeco-backend
     tier: integration
     role: messaging
 spec:
@@ -28,14 +28,14 @@ spec:
           metadata:
             labels:
               workload: message-queue
-              sesacthon.io/tier: integration
+              tier: integration
           spec:
             nodeSelector:
-              sesacthon.io/infra-type: rabbitmq
+              infra-type: rabbitmq
             tolerations:
-              - key: sesacthon.io/infrastructure
+              - key: domain
                 operator: Equal
-                value: "true"
+                value: integration
                 effect: NoSchedule
             affinity:
               podAntiAffinity:
@@ -44,14 +44,14 @@ spec:
                     podAffinityTerm:
                       labelSelector:
                         matchLabels:
-                          app.sesacthon.io/name: rabbitmq-main
-                      topologyKey: sesacthon.io/hostname
+                          app.kubernetes.io/name: rabbitmq-main
+                      topologyKey: kubernetes.io/hostname
             topologySpreadConstraints:
               - maxSkew: 1
-                topologyKey: topology.sesacthon.io/zone
+                topologyKey: topology.kubernetes.io/zone
                 whenUnsatisfiable: DoNotSchedule
                 labelSelector:
                   matchLabels:
-                    app.sesacthon.io/name: rabbitmq-main
+                    app.kubernetes.io/name: rabbitmq-main
 
 

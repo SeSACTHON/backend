@@ -30,8 +30,21 @@
 - name: ArgoCD namespace 생성 및 적용
   shell: |
     set -euo pipefail
-    kubectl create namespace {{ argocd_namespace }} --dry-run=client -o yaml \
-      | kubectl apply -f -
+    cat <<'EOF' | kubectl apply -f -
+    apiVersion: v1
+    kind: Namespace
+    metadata:
+      name: {{ argocd_namespace }}
+      labels:
+        kubernetes.io/metadata.name: {{ argocd_namespace }}
+        app.kubernetes.io/name: argocd
+        app.kubernetes.io/managed-by: ansible
+        app.kubernetes.io/part-of: ecoeco-platform
+        environment: {{ argocd_root_env }}
+        tier: platform
+        role: gitops
+        workload: gitops
+    EOF
   register: ns_apply
   changed_when: "'created' in ns_apply.stdout or 'configured' in ns_apply.stdout"
   args:
@@ -43,7 +56,7 @@
   changed_when: "'created' in argocd_install.stdout or 'configured' in argocd_install.stdout"
 
 - name: ArgoCD Pod가 Ready 될 때까지 대기
-  command: kubectl wait --for=condition=ready pod -l app.sesacthon.io/name=argocd-server -n {{ argocd_namespace }} --timeout=600s
+  command: kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n {{ argocd_namespace }} --timeout=600s
   when: argocd_install.changed
 
 - name: ArgoCD Service를 NodePort(HTTP 단일 포트)로 변경

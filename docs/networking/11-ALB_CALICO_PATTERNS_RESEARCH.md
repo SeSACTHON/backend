@@ -83,9 +83,9 @@ metadata:
   name: app-ingress
   annotations:
     sesacthon.io/ingress.class: alb
-    alb.ingress.sesacthon.io/scheme: internet-facing
-    alb.ingress.sesacthon.io/target-type: instance  # ⭐ 핵심
-    alb.ingress.sesacthon.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: instance  # ⭐ 핵심
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
 spec:
   rules:
   - host: example.com
@@ -146,7 +146,7 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   annotations:
-    alb.ingress.sesacthon.io/target-type: ip  # EKS만 가능
+    alb.ingress.kubernetes.io/target-type: ip  # EKS만 가능
 spec:
   # ... (Service는 ClusterIP 가능)
 ```
@@ -182,8 +182,8 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   annotations:
-    alb.ingress.sesacthon.io/target-type: instance
-    alb.ingress.sesacthon.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: instance
+    alb.ingress.kubernetes.io/scheme: internet-facing
 ```
 
 #### 3. Service: NodePort
@@ -276,7 +276,7 @@ ansible-playbook -i inventory/hosts site.yml
 ```yaml
 # ansible/playbooks/07-ingress-resources.yml
 annotations:
-  alb.ingress.sesacthon.io/target-type: instance  # ✅ 이미 올바름
+  alb.ingress.kubernetes.io/target-type: instance  # ✅ 이미 올바름
 ```
 
 ### 3. Service 타입 확인

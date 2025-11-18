@@ -4,7 +4,7 @@ metadata:
   name: postgres-main
   namespace: postgres
   labels:
-    app.sesacthon.io/name: postgresql
+    app.kubernetes.io/name: postgresql
     tier: data
 spec:
   teamId: platform
@@ -17,15 +17,15 @@ spec:
   volume:
     storageClass: gp3
   tolerations:
-    - key: sesacthon.io/infrastructure
+    - key: domain
       operator: Equal
-      value: "true"
+      value: data
       effect: NoSchedule
   nodeAffinity:
     requiredDuringSchedulingIgnoredDuringExecution:
       nodeSelectorTerms:
         - matchExpressions:
-            - key: sesacthon.io/infra-type
+            - key: infra-type
               operator: In
               values:
                 - postgresql

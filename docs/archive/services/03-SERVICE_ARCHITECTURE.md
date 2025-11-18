@@ -158,7 +158,7 @@ graph TB
    - Playbook: `label-nodes.yml`
    ```yaml
    # Master
-   - node-role.sesacthon.io/master
+   - node-role.kubernetes.io/master
    
    # API 노드 (6개)
    - workload=api

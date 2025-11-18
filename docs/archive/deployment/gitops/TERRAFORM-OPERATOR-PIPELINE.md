@@ -150,7 +150,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      node-role.sesacthon.io/worker: ""
+      node-role.kubernetes.io/worker: ""
   
   # Provider ID 자동 설정
   providerID:

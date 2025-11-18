@@ -79,7 +79,7 @@ Infrastructure 노드 (4개):
     - tier: infrastructure
     - phase: {1|4}
   taints:
-    - key: node-role.sesacthon.io/infrastructure
+    - key: node-role.kubernetes.io/infrastructure
       effect: NoSchedule
       (RabbitMQ, Monitoring 노드만)
 ```

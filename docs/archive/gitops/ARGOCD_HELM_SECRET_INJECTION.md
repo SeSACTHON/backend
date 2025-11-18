@@ -283,7 +283,7 @@ kubectl get externalsecret -n kube-system
 kubectl get secret alb-controller-values -n kube-system -o yaml
 
 # ALB Controller Pod가 env 주입받았는지 확인
-kubectl get pod -n kube-system -l app.sesacthon.io/name=aws-load-balancer-controller
+kubectl get pod -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller
 kubectl exec -n kube-system <pod> -- env | grep AWS_VPC_ID
 ```
 
