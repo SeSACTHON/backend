@@ -68,3 +68,7 @@ kubeconfig*.tmp
 bin/
 ci-artifacts/
 
+# Lint configs
+.flake8
+.pylintrc
+pyproject.toml
