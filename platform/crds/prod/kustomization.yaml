@@ -4,6 +4,7 @@ resources:
   - ../components/alb-controller/prod
   - ../components/external-secrets/prod
   - ../components/rabbitmq-operator/prod
+  - ../components/redis-operator/prod
   - ../components/postgres-operator/prod
   - ../components/prometheus-operator/prod
 
