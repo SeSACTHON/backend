@@ -59,25 +59,25 @@ k8s-api-auth   Ready    sesacthon.io/node-role=api,
                         phase=1
 ```
 
-**Deployment가 요구하는 nodeSelector** (구버전 manifest):
+**Deployment가 요구하는 nodeSelector** (표준 manifest):
 ```yaml
-# workloads/apis/auth/base/deployment.yaml (수정 전)
+# workloads/apis/auth/base/deployment.yaml
 spec:
   template:
     spec:
       nodeSelector:
-        node-role.kubernetes.io/api: auth  # ❌ 노드에 없는 라벨
+        service: auth  # ✅ Ansible 라벨과 일치
 ```
 
-**불일치 매핑 테이블**:
+**라벨 매핑 테이블**:
 
-| 리소스 | Ansible 라벨 (실제) | 구버전 Manifest | 결과 |
-|--------|-------------------|----------------|------|
-| API-auth | `sesacthon.io/service=auth` | `node-role.kubernetes.io/api: auth` | ❌ 불일치 |
-| API-my | `sesacthon.io/service=my` | `node-role.kubernetes.io/api: my` | ❌ 불일치 |
-| PostgreSQL | `sesacthon.io/infra-type=postgresql` | `node-role.kubernetes.io/infrastructure: postgresql` | ❌ 불일치 |
-| Redis | `sesacthon.io/infra-type=redis` | `node-role.kubernetes.io/infrastructure: redis` | ❌ 불일치 |
-| Worker-Storage | `sesacthon.io/worker-type=storage` | `node-role.kubernetes.io/worker: storage` | ❌ 불일치 |
+| 리소스 | Ansible 라벨 (실제) | Deployment nodeSelector | 결과 |
+|--------|-------------------|-------------------------|------|
+| API-auth | `sesacthon.io/service=auth` | `service: auth` | ✅ 일치 |
+| API-my | `sesacthon.io/service=my` | `service: my` | ✅ 일치 |
+| PostgreSQL | `sesacthon.io/infra-type=postgresql` | `infra-type: postgresql` | ✅ 일치 |
+| Redis | `sesacthon.io/infra-type=redis` | `infra-type: redis` | ✅ 일치 |
+| Worker-Storage | `sesacthon.io/worker-type=storage` | `worker-type: storage` | ✅ 일치 |
 
 **영향받는 서비스**: 전체 9개 (auth, my, scan, character, location, info, chat + PostgreSQL + Redis)
 
@@ -651,7 +651,7 @@ $ kubectl get applications -n argocd | grep Synced | wc -l
 # 로컬에서 수정하고 커밋했지만 클러스터에 반영 안 됨
 kubectl get deploy auth-api -n auth -o yaml | grep nodeSelector
       nodeSelector:
-        node-role.kubernetes.io/api: auth  # ❌ 구버전 라벨 (수정 전)
+        service: auth  # ✅ 표준 라벨 (반영되지 않으면 diff 지속)
 ```
 
 **ArgoCD Application 상태**:
@@ -1015,8 +1015,8 @@ Events:
 node_labels:
   k8s-api-auth: "--node-labels=... --register-with-taints=domain=auth:NoSchedule"
   k8s-api-my: "--node-labels=... --register-with-taints=domain=my:NoSchedule"
-  k8s-postgresql: "--node-labels=... --register-with-taints=sesacthon.io/infrastructure=true:NoSchedule"
-  k8s-redis: "--node-labels=... --register-with-taints=sesacthon.io/infrastructure=true:NoSchedule"
+  k8s-postgresql: "--node-labels=... --register-with-taints=domain=data:NoSchedule"
+  k8s-redis: "--node-labels=... --register-with-taints=domain=data:NoSchedule"
   # ... 모든 worker/infrastructure 노드에 taint
 ```
 
@@ -1025,8 +1025,9 @@ node_labels:
 tolerations:
   - key: CriticalAddonsOnly
     operator: Exists
-  - key: node-role.kubernetes.io/control-plane
-    operator: Exists
+  - key: role
+    operator: Equal
+    value: control-plane
     effect: NoSchedule
 # ⚠️ domain, sesacthon.io/infrastructure taint는 tolerate 안 함
 ```
@@ -1046,12 +1047,11 @@ kubectl patch deployment coredns -n kube-system --type merge -p '
       "spec": {
         "tolerations": [
           {"key": "node-role.kubernetes.io/control-plane", "operator": "Exists", "effect": "NoSchedule"},
-          {"key": "node-role.kubernetes.io/master", "operator": "Exists", "effect": "NoSchedule"},
+          {"key": "role", "operator": "Equal", "value": "control-plane", "effect": "NoSchedule"},
           {"key": "domain", "operator": "Exists", "effect": "NoSchedule"},
-          {"key": "sesacthon.io/infrastructure", "operator": "Exists", "effect": "NoSchedule"},
           {"key": "CriticalAddonsOnly", "operator": "Exists"},
-          {"key": "node.sesacthon.io/not-ready", "operator": "Exists", "effect": "NoExecute", "tolerationSeconds": 300},
-          {"key": "node.sesacthon.io/unreachable", "operator": "Exists", "effect": "NoExecute", "tolerationSeconds": 300}
+          {"key": "node.kubernetes.io/not-ready", "operator": "Exists", "effect": "NoExecute", "tolerationSeconds": 300},
+          {"key": "node.kubernetes.io/unreachable", "operator": "Exists", "effect": "NoExecute", "tolerationSeconds": 300}
         ]
       }
     }
@@ -1067,7 +1067,7 @@ kubectl taint nodes k8s-master node-role.kubernetes.io/control-plane:NoSchedule-
 
 #### Ansible 자동화
 
-`ansible/playbooks/02-master-init.yml`에 추가:
+`ansible/playbooks/tasks/cni-install.yml` 단계에 포함:
 
 ```yaml
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -1082,26 +1082,27 @@ kubectl taint nodes k8s-master node-role.kubernetes.io/control-plane:NoSchedule-
           "spec": {
             "tolerations": [
               {"key": "node-role.kubernetes.io/control-plane", "operator": "Exists", "effect": "NoSchedule"},
-              {"key": "node-role.kubernetes.io/master", "operator": "Exists", "effect": "NoSchedule"},
+              {"key": "role", "operator": "Equal", "value": "control-plane", "effect": "NoSchedule"},
               {"key": "domain", "operator": "Exists", "effect": "NoSchedule"},
-              {"key": "sesacthon.io/infrastructure", "operator": "Exists", "effect": "NoSchedule"},
               {"key": "CriticalAddonsOnly", "operator": "Exists"},
-              {"key": "node.sesacthon.io/not-ready", "operator": "Exists", "effect": "NoExecute", "tolerationSeconds": 300},
-              {"key": "node.sesacthon.io/unreachable", "operator": "Exists", "effect": "NoExecute", "tolerationSeconds": 300}
+              {"key": "node.kubernetes.io/not-ready", "operator": "Exists", "effect": "NoExecute", "tolerationSeconds": 300},
+              {"key": "node.kubernetes.io/unreachable", "operator": "Exists", "effect": "NoExecute", "tolerationSeconds": 300}
             ]
           }
         }
       }
     }'
-  become_user: "{{ kubectl_user }}"
   register: coredns_patched
-  changed_when: "'patched' in coredns_patched.stdout"
+  changed_when: "'patched' in (coredns_patched.stdout | default(''))"
   failed_when: false
 
-- name: CoreDNS Pod 재시작 대기
-  command: kubectl rollout status deployment coredns -n kube-system --timeout=120s
-  become_user: "{{ kubectl_user }}"
-  when: coredns_patched.changed
+- name: CoreDNS Pod 롤아웃 대기 (CNI 설치 후 검증)
+  command: kubectl rollout status deployment/coredns -n kube-system --timeout=300s
+  register: coredns_rollout_post_cni
+  until: coredns_rollout_post_cni.rc == 0
+  retries: 6
+  delay: 30
+  changed_when: false
 ```
 
 ### 검증 (실제 클러스터)
@@ -1334,9 +1335,16 @@ FAILED - RETRYING: 클러스터 조인 (10 retries left).
 ```bash
 sudo journalctl -u kubelet -n 20
 
-failed to validate kubelet flags: unknown 'kubernetes.io' or 'k8s.io' labels specified with --node-labels: [kubernetes.io/node-role kubernetes.io/worker-type]
---node-labels in the 'kubernetes.io' namespace must begin with an allowed prefix (kubelet.kubernetes.io, node.kubernetes.io) or be in the specifically allowed set (...)
+failed to validate kubelet flags: unknown reserved Kubernetes labels specified with --node-labels
+--node-labels in the 'kubernetes.io' namespace must begin with kubelet.kubernetes.io/node.kubernetes.io ...
 ```
+> 📎 **공식 근거**: Kubernetes 문서에서는 `kubernetes.io/`·`k8s.io/` prefix가 코어 컴포넌트 전용 예약 공간이며, 사용자나 자동화 도구가 이 prefix로 라벨을 추가할 경우 kubelet이 거부할 수 있다고 명시합니다.  
+>
+> ```
+> The kubernetes.io/ and k8s.io/ prefixes are reserved for Kubernetes core components.
+> ```
+>
+> 자세한 제약은 “[Labels › Restriction on labels](https://kubernetes.io/docs/concepts/overview/working-with-objects/labels/#restriction-on-labels)”에서 확인할 수 있습니다.
 
 ### 원인
 
@@ -1344,7 +1352,7 @@ Terraform/Ansible가 모든 노드에 다음과 같은 drop-in을 주입하고 �
 ```ini
 # /etc/systemd/system/kubelet.service.d/10-node-labels.conf
 [Service]
-Environment="KUBELET_EXTRA_ARGS=--node-labels=kubernetes.io/node-role=worker,kubernetes.io/worker-type=ai,workload=worker-ai,phase=4"
+Environment="KUBELET_EXTRA_ARGS=--node-labels=role=worker,worker-type=ai,workload=worker-ai,phase=4"
 ```
 Kubernetes 1.28부터는 `kubernetes.io/*`, `k8s.io/*` 네임스페이스가 **공식 허용 prefix/node.kubernetes.io/... 등**이 아니면 거부되며, kubelet이 기동하지 못해 `/etc/kubernetes/kubelet.conf` 가 생성되지 않습니다. 따라서 Ansible `join` 단계가 무한 대기 상태로 남습니다.
 
@@ -1357,8 +1365,8 @@ Kubernetes 1.28부터는 `kubernetes.io/*`, `k8s.io/*` 네임스페이스가 **�
 ### 해결 전략
 
 1. **라벨 네임스페이스 재설계**  
-   - 예: `node.sesacthon.io/role`, `service.sesacthon.io/name`, `infra.sesacthon.io/type`, `taint.sesacthon.io/class`  
-   - 표준 prefix(`node-role.kubernetes.io/*`, `node.kubernetes.io/*`)는 그대로 유지 가능 (kubelet 허용 목록에 포함)
+   - 예: `role=<api|worker|infrastructure>`, `service=<name>`, `infra-type=<kind>`, `taint=<domain>`  
+   - Kubernetes 예약 prefix(`kubelet.kubernetes.io/*`, `node.kubernetes.io/*`)는 불가피할 때만 사용
 2. **라벨 공급자 업데이트**  
    - Terraform `kubelet_extra_args` 맵  
    - `terraform/user-data/common.sh` drop-in  

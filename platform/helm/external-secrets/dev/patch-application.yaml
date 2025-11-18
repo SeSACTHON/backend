@@ -12,8 +12,12 @@ spec:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists
             effect: NoSchedule
+          - key: role
+            operator: Equal
+            value: control-plane
+            effect: NoSchedule
         nodeSelector:
-          node-role.kubernetes.io/control-plane: ""
+          role: control-plane
         controller:
           env:
             - name: AWS_REGION

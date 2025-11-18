@@ -23,12 +23,12 @@ spec:
                     requests:
                       storage: 50Gi
             tolerations:
-              - key: node-role.kubernetes.io/infrastructure
+              - key: domain
                 operator: Equal
-                value: "true"
+                value: observability
                 effect: NoSchedule
             nodeSelector:
-              node-role.kubernetes.io/infrastructure: monitoring
+              infra-type: monitoring
         grafana:
           enabled: false
         prometheusOperator:
@@ -36,12 +36,12 @@ spec:
             patch:
               enabled: true
           tolerations:
-            - key: node-role.kubernetes.io/infrastructure
+            - key: domain
               operator: Equal
-              value: "true"
+              value: observability
               effect: NoSchedule
           nodeSelector:
-            node-role.kubernetes.io/infrastructure: monitoring
+            infra-type: monitoring
         prometheus:
           prometheusSpec:
             replicas: 2
@@ -57,11 +57,11 @@ spec:
                     requests:
                       storage: 200Gi
             nodeSelector:
-              node-role.kubernetes.io/infrastructure: monitoring
+              infra-type: monitoring
             tolerations:
-              - key: node-role.kubernetes.io/infrastructure
+              - key: domain
                 operator: Equal
-                value: "true"
+                value: observability
                 effect: NoSchedule
             scrapeInterval: 30s
             evaluationInterval: 30s

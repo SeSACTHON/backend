@@ -133,7 +133,7 @@ kubectl config delete-user kubernetes-admin
 
 ## 🔧 문제 해결
 
-### 문제: "node-role.sesacthon.io 라벨 에러"
+### 문제: "reserved role label" 에러
 
 **증상:**
 ```
@@ -141,10 +141,10 @@ failed to validate kubelet flags: unknown 'sesacthon.io' or 'k8s.io' labels
 ```
 
 **원인:**
-Kubernetes 1.24+ 버전에서 `node-role.kubernetes.io/` prefix 라벨 제한
+Kubernetes 1.24+ 버전에서 Kubernetes 내부 role prefix가 제한됨
 
 **해결:**
-- ✅ 이미 `terraform/main.tf`에서 `sesacthon.io/` prefix로 수정됨
+- ✅ Terraform/Ansible이 `role=<api|worker|infrastructure>` 라벨만 사용하도록 수정됨
 - 새로 배포하면 자동으로 올바른 라벨 사용
 
 ---

@@ -7,11 +7,12 @@
 
 ### 변경 범위
 1. **Terraform (`terraform/main.tf`)**
-   - `local.kubelet_profiles`에서 `--node-labels` 구성을 `node-role.kubernetes.io/<role>=` + `domain`, `service`, `worker-type`, `infra-type`, `workload`, `tier`, `phase` 조합으로 재작성.
-   - 인프라 노드 taint를 `kubernetes.io/infrastructure=true` 대신 `domain=<data|integration|observability>` 구조로 통일.
+   - `local.kubelet_profiles`에서 `--node-labels` 구성을 `role=<...>` + `domain`, `service`, `worker-type`, `infra-type`, `workload`, `tier`, `phase` 조합으로 재작성하고 `role=control-plane` taint를 새로 정의.
+   - 인프라 노드 taint를 `domain=<data|integration|observability>` 구조로 통일.
 2. **Ansible**
    - `playbooks/tasks/fix-node-labels.yml`: Terraform과 동일한 `node_labels` 문자열 적용.
-   - `playbooks/02-master-init.yml`: CoreDNS toleration 패치에서 제거된 taint(`kubernetes.io/infrastructure`) 참조 삭제.
+   - `playbooks/02-master-init.yml`: 기본 control-plane taint(legacy)를 제거하고 `role=control-plane:NoSchedule` 커스텀 taint로 교체.
+   - `playbooks/tasks/cni-install.yml`: CoreDNS toleration 패치를 Calico 설치 이후 단계로 이동하고, `role=control-plane` 및 `domain=*` 기반으로만 toleration을 유지.
 3. **Workloads**
    - API Deployments(`workloads/apis/*/base/deployment.yaml`): `nodeSelector.kubernetes.io/service=*` → `nodeSelector.domain=*` 변경.
    - Data CRs:

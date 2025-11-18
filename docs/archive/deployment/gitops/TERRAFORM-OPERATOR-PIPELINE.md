@@ -150,7 +150,7 @@ metadata:
 spec:
   selector:
     matchLabels:
-      node-role.kubernetes.io/worker: ""
+      role: worker
   
   # Provider ID 자동 설정
   providerID:

@@ -32,11 +32,11 @@ spec:
             memory: 2Gi
         replicas: 2
         nodeSelector:
-          node-role.kubernetes.io/infrastructure: monitoring
+          infra-type: monitoring
         tolerations:
-          - key: node-role.kubernetes.io/infrastructure
+          - key: domain
             operator: Equal
-            value: "true"
+            value: observability
             effect: NoSchedule
         datasources:
           datasources.yaml:

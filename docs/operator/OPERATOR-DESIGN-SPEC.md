@@ -134,7 +134,7 @@ spec:
   # Node Selector (어떤 노드에 적용할지)
   selector:
     matchLabels:
-      node-role.kubernetes.io/worker: ""
+        role: worker
   
   # Provider ID 설정
   providerID:
@@ -647,7 +647,7 @@ nodeConfig:
   enabled: true
   selector:
     matchLabels:
-      node-role.kubernetes.io/worker: ""
+        role: worker
   
   providerID:
     enabled: true
@@ -794,7 +794,7 @@ spec:
 kubectl label node k8s-api-auth node-lifecycle.sesacthon.io/managed=true
 
 # 확인 후 나머지 노드
-kubectl label nodes -l node-role.kubernetes.io/worker node-lifecycle.sesacthon.io/managed=true
+kubectl label nodes -l role=worker node-lifecycle.sesacthon.io/managed=true
 ```
 
 **Step 4**: Ansible playbook 제거

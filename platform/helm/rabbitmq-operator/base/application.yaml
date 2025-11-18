@@ -20,12 +20,16 @@ spec:
             - op: add
               path: /spec/template/spec/nodeSelector
               value:
-                node-role.kubernetes.io/control-plane: ""
+                role: control-plane
             - op: add
               path: /spec/template/spec/tolerations
               value:
                 - key: node-role.kubernetes.io/control-plane
                   operator: Exists
+                  effect: NoSchedule
+                - key: role
+                  operator: Equal
+                  value: control-plane
                   effect: NoSchedule
   destination:
     server: https://kubernetes.default.svc

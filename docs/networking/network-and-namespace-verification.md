@@ -195,95 +195,99 @@ ssh master "ip -d link show vxlan.calico"
 #### **Phase 1: Core Services**
 ```yaml
 k8s-api-auth:
+  role: api
   workload: api
   domain: auth
   phase: "1"
-  node-role.kubernetes.io/api: auth
 
 k8s-api-my:
+  role: api
   workload: api
   domain: my
   phase: "1"
-  node-role.kubernetes.io/api: my
 
 k8s-postgresql:
+  role: infrastructure
   workload: database
   phase: "1"
-  node-role.kubernetes.io/infrastructure: postgresql
-  Taint: node-role.kubernetes.io/infrastructure=true:NoSchedule
+  infra-type: postgresql
+  Taint: domain=data:NoSchedule
 
 k8s-redis:
+  role: infrastructure
   workload: cache
   phase: "1"
-  node-role.kubernetes.io/infrastructure: redis
-  Taint: node-role.kubernetes.io/infrastructure=true:NoSchedule
+  infra-type: redis
+  Taint: domain=data:NoSchedule
 ```
 
 #### **Phase 2: Extended APIs**
 ```yaml
 k8s-api-scan:
+  role: api
   workload: api
   domain: scan
   phase: "2"
-  node-role.kubernetes.io/api: scan
 
 k8s-api-character:
+  role: api
   workload: api
   domain: character
   phase: "2"
-  node-role.kubernetes.io/api: character
 
 k8s-api-location:
+  role: api
   workload: api
   domain: location
   phase: "2"
-  node-role.kubernetes.io/api: location
 ```
 
 #### **Phase 3: Advanced APIs**
 ```yaml
 k8s-api-info:
+  role: api
   workload: api
   domain: info
   phase: "3"
-  node-role.kubernetes.io/api: info
 
 k8s-api-chat:
+  role: api
   workload: api
   domain: chat
   phase: "3"
-  node-role.kubernetes.io/api: chat
 ```
 
 #### **Phase 4: Workers & Infrastructure**
 ```yaml
 k8s-worker-storage:
+  role: worker
   workload: worker-storage
   worker-type: io-bound
   pool-type: eventlet
   domain: scan
   phase: "4"
-  node-role.kubernetes.io/worker: storage
 
 k8s-worker-ai:
+  role: worker
   workload: worker-ai
   worker-type: network-bound
   pool-type: prefork
   domain: ai
   phase: "4"
-  node-role.kubernetes.io/worker: ai
 
 k8s-rabbitmq:
+  role: infrastructure
   workload: message-queue
   phase: "4"
-  node-role.kubernetes.io/infrastructure: rabbitmq
-  Taint: node-role.kubernetes.io/infrastructure=true:NoSchedule
+  infra-type: rabbitmq
+  Taint: domain=integration:NoSchedule
 
 k8s-monitoring:
+  role: infrastructure
   workload: monitoring
   phase: "4"
-  node-role.kubernetes.io/infrastructure: monitoring
-  Taint: node-role.kubernetes.io/infrastructure=true:NoSchedule
+  infra-type: monitoring
+  Taint: domain=observability:NoSchedule
 ```
 
 ### **노드 토폴로지 요약**

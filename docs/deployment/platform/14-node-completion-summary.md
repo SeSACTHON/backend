@@ -79,9 +79,10 @@ Infrastructure 노드 (4개):
     - tier: infrastructure
     - phase: {1|4}
   taints:
-    - key: node-role.kubernetes.io/infrastructure
+    - key: domain
+      value: {data|integration|observability}
       effect: NoSchedule
-      (RabbitMQ, Monitoring 노드만)
+      (RabbitMQ, Monitoring 노드만 각 도메인 값 적용)
 ```
 
 ---

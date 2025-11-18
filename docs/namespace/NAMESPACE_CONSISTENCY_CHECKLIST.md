@@ -41,14 +41,14 @@
 | business-logic | `location` | `tier=business-logic`, `domain=location`, `role=api`, `app.kubernetes.io/part-of=ecoeco-backend` | Location/Map API | `k8s-api-location`, `domain=location:NoSchedule` |
 | business-logic | `info` | `tier=business-logic`, `domain=info`, `role=api`, `app.kubernetes.io/part-of=ecoeco-backend` | Recycle-Info API | `k8s-api-info`, `domain=info:NoSchedule` |
 | business-logic | `chat` | `tier=business-logic`, `domain=chat`, `role=api`, `app.kubernetes.io/part-of=ecoeco-backend` | Chat/LLM API | `k8s-api-chat`, `domain=chat:NoSchedule` |
-| data | `postgres` | `tier=data`, `data-type=postgres`, `role=database`, `app.kubernetes.io/part-of=ecoeco-backend` | `postgresql` CR, DB Secret | `k8s-postgresql`, `node-role.kubernetes.io/infrastructure=true:NoSchedule` |
-| data | `redis` | `tier=data`, `data-type=redis`, `role=cache`, `app.kubernetes.io/part-of=ecoeco-backend` | `RedisFailover` CR, Sentinel | `k8s-redis`, `node-role.kubernetes.io/infrastructure=true:NoSchedule` |
-| integration | `rabbitmq` | `tier=integration`, `role=messaging`, `app.kubernetes.io/part-of=ecoeco-backend` | RabbitMQ Cluster/Stream | `k8s-rabbitmq`, `node-role.kubernetes.io/infrastructure=true:NoSchedule` |
-| observability | `prometheus` | `tier=observability`, `role=metrics`, `app.kubernetes.io/part-of=ecoeco-backend` | kube-prometheus-stack (Prometheus/Alertmanager) | `k8s-monitoring`, `node-role.kubernetes.io/infrastructure=true:NoSchedule` |
-| observability | `grafana` | `tier=observability`, `role=dashboards`, `app.kubernetes.io/part-of=ecoeco-backend` | Grafana (helm/grafana) | `k8s-monitoring`, `node-role.kubernetes.io/infrastructure=true:NoSchedule` |
-| infrastructure | `platform-system` | `tier=infrastructure`, `app.kubernetes.io/part-of=ecoeco-platform` | External Secrets Operator 등 플랫폼 컨트롤러 | Control Plane (`k8s-master`), toleration `node-role.kubernetes.io/control-plane` |
-| infrastructure | `data-system` | `tier=infrastructure`, `app.kubernetes.io/part-of=ecoeco-platform` | Postgres/Redis Operators (Helm) | Control Plane (`k8s-master`), toleration `node-role.kubernetes.io/control-plane` |
-| infrastructure | `messaging-system` | `tier=infrastructure`, `app.kubernetes.io/part-of=ecoeco-platform` | RabbitMQ Operator/CRDs | Control Plane (`k8s-master`), toleration `node-role.kubernetes.io/control-plane` |
+| data | `postgres` | `tier=data`, `data-type=postgres`, `role=database`, `app.kubernetes.io/part-of=ecoeco-backend` | `postgresql` CR, DB Secret | `k8s-postgresql`, taint `domain=data:NoSchedule` |
+| data | `redis` | `tier=data`, `data-type=redis`, `role=cache`, `app.kubernetes.io/part-of=ecoeco-backend` | `RedisFailover` CR, Sentinel | `k8s-redis`, taint `domain=data:NoSchedule` |
+| integration | `rabbitmq` | `tier=integration`, `role=messaging`, `app.kubernetes.io/part-of=ecoeco-backend` | RabbitMQ Cluster/Stream | `k8s-rabbitmq`, taint `domain=integration:NoSchedule` |
+| observability | `prometheus` | `tier=observability`, `role=metrics`, `app.kubernetes.io/part-of=ecoeco-backend` | kube-prometheus-stack (Prometheus/Alertmanager) | `k8s-monitoring`, taint `domain=observability:NoSchedule` |
+| observability | `grafana` | `tier=observability`, `role=dashboards`, `app.kubernetes.io/part-of=ecoeco-backend` | Grafana (helm/grafana) | `k8s-monitoring`, taint `domain=observability:NoSchedule` |
+| infrastructure | `platform-system` | `tier=infrastructure`, `app.kubernetes.io/part-of=ecoeco-platform` | External Secrets Operator 등 플랫폼 컨트롤러 | Control Plane (`k8s-master`), toleration `role=control-plane:NoSchedule` |
+| infrastructure | `data-system` | `tier=infrastructure`, `app.kubernetes.io/part-of=ecoeco-platform` | Postgres/Redis Operators (Helm) | Control Plane (`k8s-master`), toleration `role=control-plane:NoSchedule` |
+| infrastructure | `messaging-system` | `tier=infrastructure`, `app.kubernetes.io/part-of=ecoeco-platform` | RabbitMQ Operator/CRDs | Control Plane (`k8s-master`), toleration `role=control-plane:NoSchedule` |
 
 
 **점검 항목**:

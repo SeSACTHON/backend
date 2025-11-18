@@ -15,12 +15,12 @@ spec:
             replicas: 1
             storage: {}
             tolerations:
-              - key: node-role.kubernetes.io/infrastructure
+              - key: domain
                 operator: Equal
-                value: "true"
+                value: observability
                 effect: NoSchedule
             nodeSelector:
-              node-role.kubernetes.io/infrastructure: monitoring
+              infra-type: monitoring
         grafana:
           enabled: false
         prometheusOperator:
@@ -30,22 +30,22 @@ spec:
           tls:
             enabled: false
           tolerations:
-            - key: node-role.kubernetes.io/infrastructure
+            - key: domain
               operator: Equal
-              value: "true"
+              value: observability
               effect: NoSchedule
           nodeSelector:
-            node-role.kubernetes.io/infrastructure: monitoring
+            infra-type: monitoring
         prometheus:
           prometheusSpec:
             replicas: 1
             retention: 15d
             nodeSelector:
-              node-role.kubernetes.io/infrastructure: monitoring
+              infra-type: monitoring
             tolerations:
-              - key: node-role.kubernetes.io/infrastructure
+              - key: domain
                 operator: Equal
-                value: "true"
+                value: observability
                 effect: NoSchedule
             serviceMonitorNamespaceSelector:
               matchExpressions:

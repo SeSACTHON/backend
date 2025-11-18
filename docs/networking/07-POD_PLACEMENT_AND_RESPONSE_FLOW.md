@@ -30,7 +30,7 @@
 - ✅ **Toleration 포함**: ArgoCD 공식 매니페스트는 기본적으로 **Master Node Toleration 포함**
 - ✅ **Master Node에 배치**: Control Plane Taint를 Tolerate하도록 설정됨
 
-**ArgoCD 공식 매니페스트의 Toleration**:
+**ArgoCD 매니페스트의 Toleration (기본 + 커스텀)**:
 ```yaml
 # ArgoCD Server Deployment (공식 매니페스트)
 spec:
@@ -40,6 +40,10 @@ spec:
       - key: node-role.kubernetes.io/master
         effect: NoSchedule
       - key: node-role.kubernetes.io/control-plane
+        effect: NoSchedule
+      - key: role
+        operator: Equal
+        value: control-plane
         effect: NoSchedule
 ```
 
@@ -116,8 +120,14 @@ kubectl get pods -n monitoring -o wide
     --set grafana.adminPassword={{ grafana_admin_password }}
     --set grafana.tolerations[0].key=node-role.kubernetes.io/control-plane
     --set grafana.tolerations[0].effect=NoSchedule
+    --set grafana.tolerations[1].key=role
+    --set grafana.tolerations[1].value=control-plane
+    --set grafana.tolerations[1].effect=NoSchedule
     --set prometheus.prometheusSpec.tolerations[0].key=node-role.kubernetes.io/control-plane
     --set prometheus.prometheusSpec.tolerations[0].effect=NoSchedule
+    --set prometheus.prometheusSpec.tolerations[1].key=role
+    --set prometheus.prometheusSpec.tolerations[1].value=control-plane
+    --set prometheus.prometheusSpec.tolerations[1].effect=NoSchedule
 ```
 
 #### Option 2: 수동 Patch
@@ -132,6 +142,11 @@ kubectl patch deployment prometheus-grafana -n monitoring --type=json -p='[
       {
         "key": "node-role.kubernetes.io/control-plane",
         "effect": "NoSchedule"
+      },
+      {
+        "key": "role",
+        "value": "control-plane",
+        "effect": "NoSchedule"
       }
     ]
   }
@@ -145,6 +160,11 @@ kubectl patch statefulset prometheus-prometheus -n monitoring --type=json -p='[
     "value": [
       {
         "key": "node-role.kubernetes.io/control-plane",
+        "effect": "NoSchedule"
+      },
+      {
+        "key": "role",
+        "value": "control-plane",
         "effect": "NoSchedule"
       }
     ]
@@ -422,7 +442,8 @@ spec:
 **구현**:
 ```yaml
 # ansible/playbooks/08-monitoring.yml
---set grafana.tolerations[0].key=node-role.kubernetes.io/control-plane
+--set grafana.tolerations[0].key=role
+--set grafana.tolerations[0].value=control-plane
 --set grafana.tolerations[0].effect=NoSchedule
 ```
 

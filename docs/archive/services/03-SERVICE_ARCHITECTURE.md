@@ -158,7 +158,7 @@ graph TB
    - Playbook: `label-nodes.yml`
    ```yaml
    # Master
-   - node-role.kubernetes.io/master
+   - role=control-plane
    
    # API 노드 (6개)
    - workload=api

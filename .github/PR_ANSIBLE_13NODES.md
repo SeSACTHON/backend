@@ -32,7 +32,7 @@ k8s-worker-ai ansible_host=... worker_type=network-bound
 ```yaml
 workload: api
 domain: {waste|auth|userinfo|location|recycle-info|chat-llm}
-node-role.kubernetes.io/api: {domain}
+role: api
 ```
 
 **Worker Nodes 라벨**:
@@ -40,14 +40,14 @@ node-role.kubernetes.io/api: {domain}
 workload: worker-{storage|ai}
 worker-type: {io-bound|network-bound}
 pool-type: {eventlet|prefork}
-node-role.kubernetes.io/worker: {storage|ai}
+role: worker
 ```
 
 **Infrastructure Nodes 라벨**:
 ```yaml
 workload: {message-queue|database|cache|monitoring}
-node-role.kubernetes.io/infrastructure: {type}
-Taint: node-role.kubernetes.io/infrastructure=true:NoSchedule
+role: infrastructure
+Taint: domain={integration|data|observability}:NoSchedule
 ```
 
 ### 3. CNI Playbook 업데이트

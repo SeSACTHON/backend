@@ -187,10 +187,14 @@ spec:
         createIngressClassResource: true
         defaultTargetType: instance
         nodeSelector:
-          node-role.kubernetes.io/control-plane: ""
+          role: control-plane
         tolerations:
           - key: node-role.kubernetes.io/control-plane
             operator: Exists
+            effect: NoSchedule
+          - key: role
+            operator: Equal
+            value: control-plane
             effect: NoSchedule
 ```
 

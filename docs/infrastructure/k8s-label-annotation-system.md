@@ -9,36 +9,47 @@
 ## 📋 노드 레이블 체계
 
 ### 공통 규칙
-- **역할(Role)**: `node-role.kubernetes.io/<role>= ""`
-  - `control-plane`, `api`, `worker`, `infrastructure`
-  - kubelet whitelist prefix이므로 값 없이 key만 사용
+- **역할(Role)**: `role=<control-plane|api|worker|infrastructure>`
+  - 모든 노드는 `role` 라벨만으로 상위 그룹을 식별
+  - Control Plane은 `role=control-plane` + `service=platform-system` 으로 고정
 - **도메인 분류**: `domain=<service>`
-  - 예: `domain=auth`, `domain=postgres`, `domain=monitoring`
-- **업무/계층 메타데이터**: `tier`, `role`, `phase`, `workload`
+  - 예: `domain=auth`, `domain=data`, `domain=observability`
+- **업무/계층 메타데이터**: `tier`, `phase`, `workload`
 - **세부 타입**
   - API 서비스: `service=<name>`
   - Worker: `worker-type=<storage|ai>`
   - Infrastructure: `infra-type=<postgresql|redis|rabbitmq|monitoring>`
 - **Taint/Toleration**
-  - `taint key=domain`, value는 도메인과 동일 (`domain=auth:NoSchedule`)
-  - 모든 관련 Deployment는 `nodeSelector.domain=<service>` 또는 동일한 `tolerations`를 가져야 함
+  - API/Data 노드: `domain=<service>:NoSchedule`
+  - Control Plane: `role=control-plane:NoSchedule`
+  - 모든 워크로드는 대응되는 `domain` 혹은 `role` 기반 toleration 을 명시
 
 ### 1️⃣ Control Plane
 
 ```yaml
 Labels:
-  node-role.kubernetes.io/control-plane: ""
-  tier: infrastructure
   role: control-plane
+  domain: control-plane
+  service: platform-system
+  tier: infrastructure
   phase: "0"
+  workload: control-plane
+Taints:
+  - key: role
+    value: control-plane
+    effect: NoSchedule
+  - key: node-role.kubernetes.io/control-plane  # Kubernetes 기본 taint (유지)
+    effect: NoSchedule
 ```
+
+> **NOTE**: Control-plane 전용 워크로드는 두 taint를 모두 tolerate 해야 하므로 `node-role.kubernetes.io/control-plane`와 `role=control-plane` toleration을 동시에 선언합니다.
 
 ### 2️⃣ API Nodes (7개, 도메인별)
 
 ```yaml
 # Phase 1
 k8s-api-auth:
-  node-role.kubernetes.io/api: ""
+  role: api
   domain: auth
   service: auth
   workload: api
@@ -46,7 +57,7 @@ k8s-api-auth:
   phase: "1"
 
 k8s-api-my:
-  node-role.kubernetes.io/api: ""
+  role: api
   domain: my
   service: my
   workload: api
@@ -55,7 +66,7 @@ k8s-api-my:
 
 # Phase 2
 k8s-api-scan:
-  node-role.kubernetes.io/api: ""
+  role: api
   domain: scan
   service: scan
   workload: api
@@ -63,7 +74,7 @@ k8s-api-scan:
   phase: "2"
 
 k8s-api-character:
-  node-role.kubernetes.io/api: ""
+  role: api
   domain: character
   service: character
   workload: api
@@ -71,7 +82,7 @@ k8s-api-character:
   phase: "2"
 
 k8s-api-location:
-  node-role.kubernetes.io/api: ""
+  role: api
   domain: location
   service: location
   workload: api
@@ -80,7 +91,7 @@ k8s-api-location:
 
 # Phase 3
 k8s-api-info:
-  node-role.kubernetes.io/api: ""
+  role: api
   domain: info
   service: info
   workload: api
@@ -88,7 +99,7 @@ k8s-api-info:
   phase: "3"
 
 k8s-api-chat:
-  node-role.kubernetes.io/api: ""
+  role: api
   domain: chat
   service: chat
   workload: api
@@ -100,7 +111,7 @@ k8s-api-chat:
 
 ```yaml
 k8s-worker-storage:
-  node-role.kubernetes.io/worker: ""
+  role: worker
   domain: worker-storage
   worker-type: storage
   workload: worker-storage
@@ -108,7 +119,7 @@ k8s-worker-storage:
   phase: "4"
 
 k8s-worker-ai:
-  node-role.kubernetes.io/worker: ""
+  role: worker
   domain: worker-ai
   worker-type: ai
   workload: worker-ai
@@ -120,7 +131,7 @@ k8s-worker-ai:
 
 ```yaml
 k8s-postgresql:
-  node-role.kubernetes.io/infrastructure: ""
+  role: infrastructure
   domain: data
   infra-type: postgresql
   workload: database
@@ -128,7 +139,7 @@ k8s-postgresql:
   phase: "1"
 
 k8s-redis:
-  node-role.kubernetes.io/infrastructure: ""
+  role: infrastructure
   domain: data
   infra-type: redis
   workload: cache
@@ -136,7 +147,7 @@ k8s-redis:
   phase: "1"
 
 k8s-rabbitmq:
-  node-role.kubernetes.io/infrastructure: ""
+  role: infrastructure
   domain: integration
   infra-type: rabbitmq
   workload: message-queue
@@ -144,7 +155,7 @@ k8s-rabbitmq:
   phase: "4"
 
 k8s-monitoring:
-  node-role.kubernetes.io/infrastructure: ""
+  role: infrastructure
   domain: observability
   infra-type: monitoring
   workload: monitoring
@@ -227,7 +238,7 @@ spec:
 
 | 항목                | 이전 값 (`sesacthon.io/*`)                                              | 신규 값 (표준 + domain)                                              |
 |---------------------|-------------------------------------------------------------------------|----------------------------------------------------------------------|
-| kubelet `--node-labels` | `--node-labels=sesacthon.io/node-role=api,sesacthon.io/service=auth,...` | `--node-labels=node-role.kubernetes.io/api=,domain=auth,service=auth,...` |
+| kubelet `--node-labels` | `--node-labels=sesacthon.io/node-role=api,sesacthon.io/service=auth,...` | `--node-labels=role=api,domain=auth,service=auth,...` |
 | API Deployment `nodeSelector` | `sesacthon.io/service: auth`                                        | `domain: auth` 또는 `service: auth`                                   |
 | Worker Deployment `nodeSelector` | `sesacthon.io/worker-type: storage`                                  | `worker-type: storage`                                               |
 | Infra Operator `nodeSelector`/affinity | `sesacthon.io/infra-type: redis/postgresql/...`                          | `infra-type: redis/postgresql/...`                                   |
@@ -594,13 +605,13 @@ kubectl get pods --all-namespaces -l phase=1
 kubectl get pods -n workers -l worker-type=io-bound
 
 # 4. 모든 API 노드 조회
-kubectl get nodes -l node-role.kubernetes.io/api
+kubectl get nodes -l role=api
 
 # 5. 특정 도메인의 HPA 상태 확인
 kubectl get hpa -n api -l domain=scan
 
 # 6. 모든 Infrastructure 노드 조회
-kubectl get nodes -l node-role.kubernetes.io/infrastructure
+kubectl get nodes -l role=infrastructure
 
 # 7. 특정 서비스의 노드 조회
 kubectl get nodes -l service=auth
@@ -623,14 +634,14 @@ kubectl get pods --all-namespaces -l prometheus.io/scrape=true
 
 ```yaml
 # 노드 라벨 핵심 키
-1. node-role.kubernetes.io/<role>  # 역할 (api, worker, infrastructure, control-plane)
+1. role          # 역할 (control-plane, api, worker, infrastructure)
 2. domain        # 도메인 분류 (auth, my, scan, character, location, info, chat, data, observability)
-3. service       # 서비스명 (auth, my, scan, ...)
+3. service       # 서비스명 (auth, my, scan, platform-system, ...)
 4. worker-type   # Worker 타입 (storage, ai)
 5. infra-type    # Infrastructure 타입 (postgresql, redis, rabbitmq, monitoring)
 6. workload      # Workload 타입 (api, worker-storage, worker-ai, database, cache, message-queue, monitoring)
 7. tier          # 계층 (business-logic, worker, data, platform, observability)
-8. phase         # 배포 단계 (1, 2, 3, 4)
+8. phase         # 배포 단계 (0, 1, 2, 3, 4)
 ```
 
 ### Pod Label 사용 우선순위
@@ -685,7 +696,7 @@ nodeSelector:
 ### Ansible이 설정하는 라벨 예시:
 
 ```bash
---node-labels=node-role.kubernetes.io/api=,domain=auth,service=auth,workload=api,tier=business-logic,phase=1
+--node-labels=role=api,domain=auth,service=auth,workload=api,tier=business-logic,phase=1
 ```
 
 ### Deployment가 사용하는 nodeSelector:
@@ -702,7 +713,7 @@ nodeSelector:
 ## 🚑 Troubleshooting 사례
 
 - **노드 라벨 ↔ nodeSelector 불일치**  
-  Troubleshooting 기록에 따르면 Ansible이 실제 노드에 `service`, `domain`, `infra-type` 라벨을 붙였음에도, Deployment가 `node-role.kubernetes.io/*` 같은 구 라벨을 참조하면서 9개 서비스가 모두 Pending 상태에 빠졌다. GitOps로 배포되는 모든 매니페스트는 이 문서의 표준 키 집합과 동기화되어야 한다.
+  Troubleshooting 기록에 따르면 Ansible이 실제 노드에 `service`, `domain`, `infra-type` 라벨을 붙였음에도, Deployment가 **폐기된 role prefix**를 참조하면서 9개 서비스가 모두 Pending 상태에 빠졌다. GitOps로 배포되는 모든 매니페스트는 이 문서의 표준 키 집합과 동기화되어야 한다.
 
 - **ArgoCD NetworkPolicy로 인한 DNS 차단**  
   ArgoCD 기본 설치본이 포함한 NetworkPolicy가 CoreDNS(10.96.0.10:53) 접근을 막으면서 Application Controller가 repo-server/redis DNS를 조회하지 못했다. Bootstrap 단계에서 NetworkPolicy를 제거하거나, `kubernetes.io/metadata.name=argocd` 네임스페이스 라벨과 namespaceSelector를 정합성 있게 관리해야 한다.
