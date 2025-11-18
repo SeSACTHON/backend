@@ -254,7 +254,7 @@ resource "aws_iam_policy" "alb_controller" {
 # IRSA Role for AWS Load Balancer Controller
 resource "aws_iam_role" "alb_controller" {
   count = var.enable_irsa ? 1 : 0
-  name = "${var.environment}-alb-controller"
+  name  = "${var.environment}-alb-controller"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"

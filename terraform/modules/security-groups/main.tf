@@ -1,311 +1,160 @@
-resource "aws_security_group" "master" {
-  name        = "${var.environment}-k8s-master-sg"
-  description = "Security group for Kubernetes Master node"
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Security Groups for Kubernetes Cluster
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+#
+# 설계 원칙:
+# 1. Security Group (AWS 인프라 레벨)
+#    - SSH 접근 제어
+#    - API Server 외부 접근
+#    - 노드 간 자유 통신 (self 규칙)
+#    - ALB -> 노드 트래픽
+#
+# 2. NetworkPolicy (Kubernetes Pod 레벨)
+#    - Pod 간 통신 세밀 제어
+#    - Tier별 격리 (business-logic, data)
+#    - DNS, Monitoring 예외 처리
+#
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 1. Kubernetes Cluster Security Group
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Master와 Worker 구분 없이 모든 클러스터 노드가 사용
+# 노드 간 통신은 self 규칙으로 전체 허용
+# Pod 간 세밀한 제어는 NetworkPolicy가 담당
+
+resource "aws_security_group" "k8s_cluster" {
+  name        = "${var.environment}-k8s-cluster-sg"
+  description = "Security group for Kubernetes cluster nodes (master & workers)"
   vpc_id      = var.vpc_id
 
-  # SSH
-  ingress {
-    description = "SSH from allowed CIDR"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_ssh_cidr]
-  }
-
-  # Kubernetes API Server
-  ingress {
-    description = "Kubernetes API"
-    from_port   = 6443
-    to_port     = 6443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # HTTP
-  ingress {
-    description = "HTTP"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # HTTPS
-  ingress {
-    description = "HTTPS"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # etcd server client API
-  ingress {
-    description = "etcd"
-    from_port   = 2379
-    to_port     = 2380
-    protocol    = "tcp"
-    self        = true
-  }
-
-  # Kubelet API (self)
-  ingress {
-    description = "Kubelet API self"
-    from_port   = 10250
-    to_port     = 10250
-    protocol    = "tcp"
-    self        = true
-  }
-
-  # kube-scheduler
-  ingress {
-    description = "kube-scheduler"
-    from_port   = 10259
-    to_port     = 10259
-    protocol    = "tcp"
-    self        = true
-  }
-
-  # kube-controller-manager
-  ingress {
-    description = "kube-controller-manager"
-    from_port   = 10257
-    to_port     = 10257
-    protocol    = "tcp"
-    self        = true
-  }
-
-  # NodePort Services (선택)
-  ingress {
-    description = "NodePort Services"
-    from_port   = 30000
-    to_port     = 32767
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  # VXLAN (Calico overlay network - Master self)
-  ingress {
-    description = "VXLAN for Calico"
-    from_port   = 4789
-    to_port     = 4789
-    protocol    = "udp"
-    self        = true
-  }
-
-  # Egress all
-  egress {
-    description = "Allow all outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   tags = {
-    Name = "${var.environment}-k8s-master-sg"
+    Name        = "${var.environment}-k8s-cluster-sg"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
   }
 }
 
-resource "aws_security_group" "worker" {
-  name        = "${var.environment}-k8s-worker-sg"
-  description = "Security group for Kubernetes Worker nodes"
-  vpc_id      = var.vpc_id
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Ingress Rules
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  # SSH
-  ingress {
-    description = "SSH from allowed CIDR"
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = [var.allowed_ssh_cidr]
-  }
-
-  # Kubelet API, NodePort
-  # Master SG는 별도 rule로 추가 (순환 참조 방지)
-
-  # Worker 간 통신 (Pod network)
-  ingress {
-    description = "Worker to worker communication"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    self        = true
-  }
-
-  # VXLAN (Calico overlay network)
-  ingress {
-    description = "VXLAN for Calico"
-    from_port   = 4789
-    to_port     = 4789
-    protocol    = "udp"
-    self        = true
-  }
-
-  # kube-proxy health check
-  ingress {
-    description = "kube-proxy health"
-    from_port   = 10256
-    to_port     = 10256
-    protocol    = "tcp"
-    self        = true
-  }
-
-  # Master to Worker (별도 rule로)
-
-  # Egress all
-  egress {
-    description = "Allow all outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = {
-    Name = "${var.environment}-k8s-worker-sg"
-  }
+# SSH 접근
+resource "aws_security_group_rule" "cluster_ssh" {
+  type              = "ingress"
+  from_port         = 22
+  to_port           = 22
+  protocol          = "tcp"
+  cidr_blocks       = [var.allowed_ssh_cidr]
+  security_group_id = aws_security_group.k8s_cluster.id
+  description       = "SSH from allowed CIDR"
 }
+
+# Kubernetes API Server (외부 접근)
+resource "aws_security_group_rule" "cluster_api" {
+  type              = "ingress"
+  from_port         = 6443
+  to_port           = 6443
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.k8s_cluster.id
+  description       = "Kubernetes API Server"
+}
+
+# NodePort Services (외부 접근)
+resource "aws_security_group_rule" "cluster_nodeport" {
+  type              = "ingress"
+  from_port         = 30000
+  to_port           = 32767
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.k8s_cluster.id
+  description       = "NodePort Services"
+}
+
+# 클러스터 내부 통신 (모든 프로토콜/포트 허용)
+# etcd, kubelet, kube-scheduler, kube-controller-manager, CNI 등
+resource "aws_security_group_rule" "cluster_internal" {
+  type              = "ingress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  self              = true
+  security_group_id = aws_security_group.k8s_cluster.id
+  description       = "Cluster internal communication (etcd, kubelet, CNI, etc.)"
+}
+
+# Egress: 모든 아웃바운드 허용
+resource "aws_security_group_rule" "cluster_egress" {
+  type              = "egress"
+  from_port         = 0
+  to_port           = 0
+  protocol          = "-1"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.k8s_cluster.id
+  description       = "Allow all outbound traffic"
+}
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 2. ALB Security Group
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# AWS Load Balancer Controller가 관리하는 ALB용
 
 resource "aws_security_group" "alb" {
   name        = "${var.environment}-alb-sg"
   description = "Security group for AWS Load Balancer Controller managed ALBs"
   vpc_id      = var.vpc_id
 
-  ingress {
-    description = "HTTP from internet"
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  ingress {
-    description = "HTTPS from internet"
-    from_port   = 443
-    to_port     = 443
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  egress {
-    description = "Allow all outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
   tags = {
-    Name = "${var.environment}-alb-sg"
+    Name        = "${var.environment}-alb-sg"
+    Environment = var.environment
+    ManagedBy   = "Terraform"
   }
 }
 
-# 순환 참조 방지를 위한 별도 Rule 생성
-
-# Worker -> Master API Server (6443)
-resource "aws_security_group_rule" "worker_to_master_api" {
-  type                     = "ingress"
-  from_port                = 6443
-  to_port                  = 6443
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.master.id
-  source_security_group_id = aws_security_group.worker.id
-  description              = "Kubernetes API from worker"
+# HTTP 인바운드
+resource "aws_security_group_rule" "alb_http" {
+  type              = "ingress"
+  from_port         = 80
+  to_port           = 80
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.alb.id
+  description       = "HTTP from internet"
 }
 
-# Master -> Worker Rules
-resource "aws_security_group_rule" "master_to_worker_kubelet" {
-  type                     = "ingress"
-  from_port                = 10250
-  to_port                  = 10252
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.master.id
-  source_security_group_id = aws_security_group.worker.id
-  description              = "Kubelet API from worker"
+# HTTPS 인바운드
+resource "aws_security_group_rule" "alb_https" {
+  type              = "ingress"
+  from_port         = 443
+  to_port           = 443
+  protocol          = "tcp"
+  cidr_blocks       = ["0.0.0.0/0"]
+  security_group_id = aws_security_group.alb.id
+  description       = "HTTPS from internet"
 }
 
-# Worker -> Master Rules
-resource "aws_security_group_rule" "worker_to_master_kubelet" {
-  type                     = "ingress"
-  from_port                = 10250
-  to_port                  = 10250
+# ALB -> Cluster 아웃바운드
+resource "aws_security_group_rule" "alb_to_cluster" {
+  type                     = "egress"
+  from_port                = 0
+  to_port                  = 65535
   protocol                 = "tcp"
-  security_group_id        = aws_security_group.worker.id
-  source_security_group_id = aws_security_group.master.id
-  description              = "Kubelet API from master"
+  security_group_id        = aws_security_group.alb.id
+  source_security_group_id = aws_security_group.k8s_cluster.id
+  description              = "To cluster nodes"
 }
 
-resource "aws_security_group_rule" "worker_nodeport" {
-  type                     = "ingress"
-  from_port                = 30000
-  to_port                  = 32767
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.worker.id
-  source_security_group_id = aws_security_group.master.id
-  description              = "NodePort from master"
-}
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 3. ALB -> Cluster 트래픽 허용
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-resource "aws_security_group_rule" "master_to_worker_all" {
+resource "aws_security_group_rule" "cluster_from_alb" {
   type                     = "ingress"
   from_port                = 0
-  to_port                  = 0
-  protocol                 = "-1"
-  security_group_id        = aws_security_group.worker.id
-  source_security_group_id = aws_security_group.master.id
-  description              = "All traffic from master"
-}
-
-# VXLAN for Calico (Master ↔ Worker)
-resource "aws_security_group_rule" "master_to_worker_vxlan" {
-  type                     = "ingress"
-  from_port                = 4789
-  to_port                  = 4789
-  protocol                 = "udp"
-  security_group_id        = aws_security_group.worker.id
-  source_security_group_id = aws_security_group.master.id
-  description              = "VXLAN from master (Calico)"
-}
-
-resource "aws_security_group_rule" "worker_to_master_vxlan" {
-  type                     = "ingress"
-  from_port                = 4789
-  to_port                  = 4789
-  protocol                 = "udp"
-  security_group_id        = aws_security_group.master.id
-  source_security_group_id = aws_security_group.worker.id
-  description              = "VXLAN from worker (Calico)"
-}
-
-# Calico Typha (Master ↔ Worker)
-resource "aws_security_group_rule" "master_to_worker_typha" {
-  type                     = "ingress"
-  from_port                = 5473
-  to_port                  = 5473
+  to_port                  = 65535
   protocol                 = "tcp"
-  security_group_id        = aws_security_group.worker.id
-  source_security_group_id = aws_security_group.master.id
-  description              = "Calico Typha from master"
+  security_group_id        = aws_security_group.k8s_cluster.id
+  source_security_group_id = aws_security_group.alb.id
+  description              = "Allow traffic from ALB"
 }
-
-resource "aws_security_group_rule" "worker_to_master_typha" {
-  type                     = "ingress"
-  from_port                = 5473
-  to_port                  = 5473
-  protocol                 = "tcp"
-  security_group_id        = aws_security_group.master.id
-  source_security_group_id = aws_security_group.worker.id
-  description              = "Calico Typha from worker"
-}
-
-# Calico Typha within workers
-resource "aws_security_group_rule" "worker_to_worker_typha" {
-  type              = "ingress"
-  from_port         = 5473
-  to_port           = 5473
-  protocol          = "tcp"
-  security_group_id = aws_security_group.worker.id
-  self              = true
-  description       = "Calico Typha between workers"
-}
-

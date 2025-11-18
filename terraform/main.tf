@@ -120,7 +120,7 @@ module "master" {
   instance_type        = "t3.large" # 8GB (Control Plane + Prometheus)
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[0]
-  security_group_ids   = [module.security_groups.master_sg_id]
+  security_group_ids   = [module.security_groups.cluster_sg_id]
   key_name             = aws_key_pair.k8s.key_name
   iam_instance_profile = aws_iam_instance_profile.k8s.name
 
@@ -152,7 +152,7 @@ module "api_auth" {
   instance_type        = "t3.micro" # 1GB
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[0]
-  security_group_ids   = [module.security_groups.worker_sg_id]
+  security_group_ids   = [module.security_groups.cluster_sg_id]
   key_name             = aws_key_pair.k8s.key_name
   iam_instance_profile = aws_iam_instance_profile.k8s.name
 
@@ -180,7 +180,7 @@ module "api_my" {
   instance_type        = "t3.micro" # 1GB
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[1]
-  security_group_ids   = [module.security_groups.worker_sg_id]
+  security_group_ids   = [module.security_groups.cluster_sg_id]
   key_name             = aws_key_pair.k8s.key_name
   iam_instance_profile = aws_iam_instance_profile.k8s.name
 
@@ -208,7 +208,7 @@ module "api_scan" {
   instance_type        = "t3.small" # 2GB
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[2]
-  security_group_ids   = [module.security_groups.worker_sg_id]
+  security_group_ids   = [module.security_groups.cluster_sg_id]
   key_name             = aws_key_pair.k8s.key_name
   iam_instance_profile = aws_iam_instance_profile.k8s.name
 
@@ -236,7 +236,7 @@ module "api_character" {
   instance_type        = "t3.micro" # 1GB
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[0]
-  security_group_ids   = [module.security_groups.worker_sg_id]
+  security_group_ids   = [module.security_groups.cluster_sg_id]
   key_name             = aws_key_pair.k8s.key_name
   iam_instance_profile = aws_iam_instance_profile.k8s.name
 
@@ -264,7 +264,7 @@ module "api_location" {
   instance_type        = "t3.micro" # 1GB
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[1]
-  security_group_ids   = [module.security_groups.worker_sg_id]
+  security_group_ids   = [module.security_groups.cluster_sg_id]
   key_name             = aws_key_pair.k8s.key_name
   iam_instance_profile = aws_iam_instance_profile.k8s.name
 
@@ -295,7 +295,7 @@ module "api_info" {
   instance_type        = "t3.micro" # 1GB
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[2]
-  security_group_ids   = [module.security_groups.worker_sg_id]
+  security_group_ids   = [module.security_groups.cluster_sg_id]
   key_name             = aws_key_pair.k8s.key_name
   iam_instance_profile = aws_iam_instance_profile.k8s.name
 
@@ -323,7 +323,7 @@ module "api_chat" {
   instance_type        = "t3.small" # 2GB
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[0]
-  security_group_ids   = [module.security_groups.worker_sg_id]
+  security_group_ids   = [module.security_groups.cluster_sg_id]
   key_name             = aws_key_pair.k8s.key_name
   iam_instance_profile = aws_iam_instance_profile.k8s.name
 
@@ -358,7 +358,7 @@ module "worker_storage" {
   instance_type        = "t3.small" # 2GB (I/O Bound - Eventlet Pool)
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[2]
-  security_group_ids   = [module.security_groups.worker_sg_id]
+  security_group_ids   = [module.security_groups.cluster_sg_id]
   key_name             = aws_key_pair.k8s.key_name
   iam_instance_profile = aws_iam_instance_profile.k8s.name
 
@@ -387,7 +387,7 @@ module "worker_ai" {
   instance_type        = "t3.small" # 2GB (Network Bound - Prefork Pool)
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[0]
-  security_group_ids   = [module.security_groups.worker_sg_id]
+  security_group_ids   = [module.security_groups.cluster_sg_id]
   key_name             = aws_key_pair.k8s.key_name
   iam_instance_profile = aws_iam_instance_profile.k8s.name
 
@@ -423,7 +423,7 @@ module "rabbitmq" {
   instance_type        = "t3.small" # 2GB (RabbitMQ only)
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[1]
-  security_group_ids   = [module.security_groups.worker_sg_id]
+  security_group_ids   = [module.security_groups.cluster_sg_id]
   key_name             = aws_key_pair.k8s.key_name
   iam_instance_profile = aws_iam_instance_profile.k8s.name
 
@@ -453,7 +453,7 @@ module "postgresql" {
   instance_type        = "t3.medium" # 4GB (도메인별 DB: auth, my, scan, character, location, info, chat)
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[0]
-  security_group_ids   = [module.security_groups.worker_sg_id]
+  security_group_ids   = [module.security_groups.cluster_sg_id]
   key_name             = aws_key_pair.k8s.key_name
   iam_instance_profile = aws_iam_instance_profile.k8s.name
 
@@ -480,7 +480,7 @@ module "redis" {
   instance_type        = "t3.small" # 2GB (Redis only)
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[1]
-  security_group_ids   = [module.security_groups.worker_sg_id]
+  security_group_ids   = [module.security_groups.cluster_sg_id]
   key_name             = aws_key_pair.k8s.key_name
   iam_instance_profile = aws_iam_instance_profile.k8s.name
 
@@ -508,7 +508,7 @@ module "monitoring" {
   instance_type        = "t3.medium" # 4GB (Prometheus + Grafana) - Optimized for 14-node cluster
   ami_id               = data.aws_ami.ubuntu.id
   subnet_id            = module.vpc.public_subnet_ids[1]
-  security_group_ids   = [module.security_groups.worker_sg_id]
+  security_group_ids   = [module.security_groups.cluster_sg_id]
   key_name             = aws_key_pair.k8s.key_name
   iam_instance_profile = aws_iam_instance_profile.k8s.name
 

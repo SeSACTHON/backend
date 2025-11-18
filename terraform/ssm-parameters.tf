@@ -66,11 +66,11 @@ resource "aws_ssm_parameter" "alb_sg_id" {
   }
 }
 
-resource "aws_ssm_parameter" "worker_sg_id" {
-  name        = "/sesacthon/${var.environment}/network/worker-sg-id"
+resource "aws_ssm_parameter" "cluster_sg_id" {
+  name        = "/sesacthon/${var.environment}/network/cluster-sg-id"
   type        = "String"
-  value       = module.security_groups.worker_sg_id
-  description = "Worker nodes Security Group ID"
+  value       = module.security_groups.cluster_sg_id
+  description = "Kubernetes cluster nodes Security Group ID"
   tags = {
     ManagedBy   = "terraform"
     Scope       = "network"

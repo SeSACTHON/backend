@@ -1,31 +1,7 @@
 # ArgoCD 설치
 ---
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 1. CNI Pre-check (Helm과 동일한 Calico 구성 보장)
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-- name: Calico DaemonSet 확인
-  command: kubectl get daemonset calico-node -n calico-system
-  register: calico_daemonset_check
-  changed_when: false
-
-- name: Calico DaemonSet 없으면 중단
-  fail:
-    msg: "Calico DaemonSet이 존재하지 않습니다. ansible/playbooks/04-cni-install.yml 단계에서 Tigera Operator 설치가 필요합니다."
-  when: calico_daemonset_check.rc != 0
-
-- name: Calico Pod Ready 대기
-  command: kubectl wait --for=condition=ready pod -l k8s-app=calico-node -n calico-system --timeout=300s --all
-
-- name: 노드 Ready 상태 확인
-  shell: kubectl get nodes --no-headers | grep -v " Ready " | wc -l
-  register: notready_nodes
-  changed_when: false
-  failed_when: notready_nodes.stdout | int > 0
-  retries: 6
-  delay: 10
-
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 2. ArgoCD 설치
+# 1. ArgoCD 설치
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 - name: ArgoCD namespace 생성 및 적용
   shell: |

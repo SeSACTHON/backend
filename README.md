@@ -1,5 +1,7 @@
 # Eco² Backend
 
+> **Version**: 0.7.4 | [Changelog](CHANGELOG.md)
+
 Self-managed Kubernetes 기반으로 Terraform · Ansible · ArgoCD · Atlantis를 결합해 운영하는 14-Node 마이크로서비스 플랫폼입니다.  
 AI 폐기물 분류·지도·챗봇 등 도메인 API와 데이터 계층, GitOps 파이프라인을 하나의 리포지토리에서 관리합니다.
 

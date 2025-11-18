@@ -438,19 +438,25 @@ output "private_subnet_ids" {
   value       = module.vpc.private_subnet_ids
 }
 
-output "master_security_group_id" {
-  description = "Master 노드 Security Group ID"
-  value       = module.security_groups.master_sg_id
-}
-
-output "worker_security_group_id" {
-  description = "Worker 노드 Security Group ID"
-  value       = module.security_groups.worker_sg_id
+output "cluster_security_group_id" {
+  description = "클러스터 노드 Security Group ID (master & worker 통합)"
+  value       = module.security_groups.cluster_sg_id
 }
 
 output "alb_security_group_id" {
   description = "ALB용 Security Group ID"
   value       = module.security_groups.alb_sg_id
+}
+
+# 하위 호환성을 위한 별칭 (deprecated)
+output "master_security_group_id" {
+  description = "[DEPRECATED] Use cluster_security_group_id instead"
+  value       = module.security_groups.cluster_sg_id
+}
+
+output "worker_security_group_id" {
+  description = "[DEPRECATED] Use cluster_security_group_id instead"
+  value       = module.security_groups.cluster_sg_id
 }
 
 output "aws_region" {

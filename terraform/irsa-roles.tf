@@ -25,7 +25,7 @@ data "aws_caller_identity" "current" {}
 
 resource "aws_iam_role" "external_secrets" {
   count = var.enable_irsa ? 1 : 0
-  name = "${var.environment}-external-secrets-operator"
+  name  = "${var.environment}-external-secrets-operator"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -52,8 +52,8 @@ resource "aws_iam_role" "external_secrets" {
 
 resource "aws_iam_role_policy" "external_secrets_ssm" {
   count = var.enable_irsa ? 1 : 0
-  name = "SSMParameterStoreRead"
-  role = aws_iam_role.external_secrets[0].id
+  name  = "SSMParameterStoreRead"
+  role  = aws_iam_role.external_secrets[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -85,7 +85,7 @@ resource "aws_iam_role_policy" "external_secrets_ssm" {
 
 resource "aws_iam_role" "external_dns" {
   count = var.enable_irsa ? 1 : 0
-  name = "${var.environment}-external-dns"
+  name  = "${var.environment}-external-dns"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -112,8 +112,8 @@ resource "aws_iam_role" "external_dns" {
 
 resource "aws_iam_role_policy" "external_dns_route53" {
   count = var.enable_irsa ? 1 : 0
-  name = "Route53ChangeRecords"
-  role = aws_iam_role.external_dns[0].id
+  name  = "Route53ChangeRecords"
+  role  = aws_iam_role.external_dns[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -144,7 +144,7 @@ resource "aws_iam_role_policy" "external_dns_route53" {
 
 resource "aws_iam_role" "postgres_operator" {
   count = var.enable_irsa ? 1 : 0
-  name = "${var.environment}-postgres-operator"
+  name  = "${var.environment}-postgres-operator"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -166,8 +166,8 @@ resource "aws_iam_role" "postgres_operator" {
 
 resource "aws_iam_role_policy" "postgres_s3_backup" {
   count = var.enable_irsa ? 1 : 0
-  name = "S3BackupAccess"
-  role = aws_iam_role.postgres_operator[0].id
+  name  = "S3BackupAccess"
+  role  = aws_iam_role.postgres_operator[0].id
 
   policy = jsonencode({
     Version = "2012-10-17"
