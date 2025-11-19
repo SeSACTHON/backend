@@ -1,41 +1,103 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: dev-redis-operator
+  name: dev-redis
   namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "28"
+  labels:
+    env: dev
+    tier: data
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
 spec:
-  project: dev
+  project: default
   source:
-    repoURL: https://ot-container-kit.github.io/helm-charts
-    chart: redis-operator
-    targetRevision: 0.22.2
+    repoURL: https://charts.bitnami.com/bitnami
+    targetRevision: 18.0.0  # Redis 7.2.x
+    chart: redis
     helm:
-      skipCrds: true
-      releaseName: dev-redis-operator
-      valuesObject:
-        redisOperator:
-          watchNamespace: ""
-        service:
-          namespace: data-system
-        nodeSelector:
-          role: control-plane
-        tolerations:
-          - key: node-role.kubernetes.io/control-plane
-            operator: Exists
-            effect: NoSchedule
-          - key: role
-            operator: Equal
-            value: control-plane
-            effect: NoSchedule
+      values: |
+        global:
+          storageClass: gp3
+          redis:
+            password: ""
+        
+        architecture: replication
+        
+        auth:
+          enabled: false
+          sentinel: false
+        
+        master:
+          count: 1
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          podSecurityContext:
+            fsGroup: 1001
+            runAsUser: 1001
+          containerSecurityContext:
+            runAsUser: 1001
+          # 중요: EBS 볼륨 권한 자동 수정을 위해 initContainer 활성화
+          volumePermissions:
+            enabled: true
+          
+        replica:
+          replicaCount: 2
+          resources:
+            requests:
+              cpu: 200m
+              memory: 512Mi
+            limits:
+              cpu: 500m
+              memory: 1Gi
+          podSecurityContext:
+            fsGroup: 1001
+            runAsUser: 1001
+          containerSecurityContext:
+            runAsUser: 1001
+          volumePermissions:
+            enabled: true
+
+        sentinel:
+          enabled: true
+          masterSet: mymaster
+          quorum: 2
+          
+        metrics:
+          enabled: false
+          
+        commonLabels:
+          tier: data
+          infra-type: redis
+          
+        # Node Scheduling
+        master:
+          nodeSelector:
+            infra-type: redis
+          tolerations:
+            - key: domain
+              operator: Equal
+              value: data
+              effect: NoSchedule
+        
+        replica:
+          nodeSelector:
+            infra-type: redis
+          tolerations:
+            - key: domain
+              operator: Equal
+              value: data
+              effect: NoSchedule
   destination:
     server: https://kubernetes.default.svc
-    namespace: data-system
+    namespace: redis
   syncPolicy:
     automated:
       prune: true
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
-

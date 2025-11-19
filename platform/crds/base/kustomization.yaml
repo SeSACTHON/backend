@@ -6,12 +6,6 @@ resources:
 
   # External Secrets Operator CRDs
   - https://raw.githubusercontent.com/external-secrets/external-secrets/v0.9.11/deploy/crds/bundle.yaml
-  # Redis Operator CRDs
-  - https://raw.githubusercontent.com/OT-CONTAINER-KIT/redis-operator/main/config/crd/bases/redis.redis.opstreelabs.in_redis.yaml
-  - https://raw.githubusercontent.com/OT-CONTAINER-KIT/redis-operator/main/config/crd/bases/redis.redis.opstreelabs.in_redisclusters.yaml
-  - https://raw.githubusercontent.com/OT-CONTAINER-KIT/redis-operator/main/config/crd/bases/redis.redis.opstreelabs.in_redisreplications.yaml
-  - https://raw.githubusercontent.com/OT-CONTAINER-KIT/redis-operator/main/config/crd/bases/redis.redis.opstreelabs.in_redissentinels.yaml
-
   # Postgres Operator CRDs
   - https://raw.githubusercontent.com/zalando/postgres-operator/v1.10.0/manifests/postgresql.crd.yaml
   - https://raw.githubusercontent.com/zalando/postgres-operator/v1.10.0/manifests/operatorconfiguration.crd.yaml
