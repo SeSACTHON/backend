@@ -3,5 +3,7 @@ kind: Kustomization
 resources:
 - service-accounts.yaml
 - cluster-roles.yaml
+- cluster-rolebindings.yaml
 - namespaced-roles.yaml
+- namespaced-rolebindings.yaml
 - storage-class.yaml
