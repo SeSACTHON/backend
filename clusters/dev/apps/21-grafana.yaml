@@ -38,14 +38,11 @@ spec:
             memory: 1Gi
         replicas: 1
         nodeSelector:
-          role: control-plane
+          infra-type: monitoring
         tolerations:
-          - key: node-role.kubernetes.io/control-plane
-            operator: Exists
-            effect: NoSchedule
-          - key: role
+          - key: domain
             operator: Equal
-            value: control-plane
+            value: observability
             effect: NoSchedule
         datasources:
           datasources.yaml:
