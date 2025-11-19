@@ -13,6 +13,7 @@ spec:
   source:
     repoURL: oci://registry-1.docker.io/bitnamicharts
     chart: redis
+    targetRevision: 20.2.1
     helm:
       values: |
         global:
