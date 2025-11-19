@@ -35,7 +35,7 @@
   command: kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=argocd-server -n {{ argocd_namespace }} --timeout=600s
   when: argocd_install.changed
 
-- name: ArgoCD 워크로드를 control-plane 노드에 고정
+- name: ArgoCD 워크로드를 control-plane 노드에 고정 및 설정
   vars:
     argocd_control_plane_patch:
       spec:
@@ -44,6 +44,9 @@
             nodeSelector:
               role: "control-plane"
             tolerations:
+              - key: "node-role.kubernetes.io/control-plane"
+                operator: "Exists"
+                effect: "NoSchedule"
               - key: "role"
                 operator: "Equal"
                 value: "control-plane"
@@ -58,10 +61,28 @@
     - { kind: deployment,  name: argocd-repo-server }
     - { kind: deployment,  name: argocd-dex-server }
     - { kind: deployment,  name: argocd-redis }
+    - { kind: deployment,  name: argocd-notifications-controller }
     - { kind: statefulset, name: argocd-application-controller }
   register: argocd_control_plane_result
   changed_when: "'patched' in argocd_control_plane_result.stdout"
+  failed_when: >
+    argocd_control_plane_result.rc != 0 and
+    'NotFound' not in argocd_control_plane_result.stderr
   when: argocd_install is succeeded
+
+- name: ArgoCD Server를 insecure 모드로 설정 (ALB HTTPS 종료 대응)
+  command: >
+    kubectl -n {{ argocd_namespace }}
+    patch deployment argocd-server
+    --type json
+    -p '[{"op": "replace", "path": "/spec/template/spec/containers/0/command", "value": ["argocd-server", "--insecure"]}]'
+  register: argocd_insecure_result
+  changed_when: "'patched' in argocd_insecure_result.stdout"
+  when: argocd_install is succeeded
+
+- name: ArgoCD Server 파드 재시작 대기 (insecure 모드 적용)
+  command: kubectl rollout status deployment argocd-server -n {{ argocd_namespace }} --timeout=300s
+  when: argocd_insecure_result is changed
 
 - name: ArgoCD Service를 NodePort(HTTP 단일 포트)로 변경
   shell: >
