@@ -14,7 +14,7 @@ spec:
     image: quay.io/opstree/redis-sentinel:7.2.4
     imagePullPolicy: IfNotPresent
   nodeSelector:
-    kubernetes.io/hostname: k8s-redis
+    infra-type: redis
   tolerations:
     - key: domain
       operator: Equal
