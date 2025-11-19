@@ -33,7 +33,7 @@ spec:
             containers:
               - name: rabbitmq # Required by CRD to modify pod spec fields
             nodeSelector:
-              infra-type: rabbitmq
+              kubernetes.io/hostname: k8s-rabbitmq
             tolerations:
               - key: domain
                 operator: Equal

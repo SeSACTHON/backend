@@ -15,7 +15,7 @@ spec:
     enabled: false
     image: oliver006/redis_exporter:v1.80.0
   nodeSelector:
-    infra-type: redis
+    kubernetes.io/hostname: k8s-redis
   tolerations:
     - key: domain
       operator: Equal

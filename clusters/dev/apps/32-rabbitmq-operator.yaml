@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://github.com/rabbitmq/cluster-operator.git
     targetRevision: v1.11.0
-    path: config/default
+    path: config/installation
     kustomize:
       patches:
         - target:
