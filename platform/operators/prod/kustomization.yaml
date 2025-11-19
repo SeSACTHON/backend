@@ -3,4 +3,3 @@ kind: Kustomization
 namespace: rabbitmq-system
 resources:
   - ../base
-

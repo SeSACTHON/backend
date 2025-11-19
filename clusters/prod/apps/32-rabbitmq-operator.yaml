@@ -10,7 +10,7 @@ spec:
   source:
     repoURL: https://github.com/eco2-team/backend.git
     targetRevision: main
-    path: platform/operators/rabbitmq/prod
+    path: platform/operators/prod
   destination:
     server: https://kubernetes.default.svc
     namespace: rabbitmq-system

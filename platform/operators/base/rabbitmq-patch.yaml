@@ -2,7 +2,6 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: operator
-  namespace: system
 spec:
   template:
     spec:
@@ -17,4 +16,6 @@ spec:
           operator: Equal
           value: control-plane
           effect: NoSchedule
-
+      containers:
+        - name: operator
+          image: rabbitmqoperator/cluster-operator:1.11.0
