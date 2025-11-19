@@ -14,12 +14,6 @@ spec:
   redisExporter:
     enabled: false
     image: oliver006/redis_exporter:v1.80.0
-  redisConfig:
-    additionalRedisConfig: |
-      appendonly no
-      save 900 1
-      save 300 10
-      save 60 10000
   nodeSelector:
     infra-type: redis
   tolerations:
