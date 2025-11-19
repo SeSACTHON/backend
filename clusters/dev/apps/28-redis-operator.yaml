@@ -12,6 +12,7 @@ spec:
     chart: redis-operator
     targetRevision: 0.22.2
     helm:
+      skipCrds: true
       releaseName: dev-redis-operator
       valuesObject:
         redisOperator:

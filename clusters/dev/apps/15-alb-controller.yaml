@@ -12,6 +12,7 @@ spec:
     chart: aws-load-balancer-controller
     targetRevision: 1.7.1
     helm:
+      skipCrds: true
       releaseName: dev-aws-load-balancer-controller
       valuesObject:
         clusterName: sesacthon-dev

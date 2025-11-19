@@ -12,6 +12,7 @@ spec:
     chart: kube-prometheus-stack
     targetRevision: 56.21.1
     helm:
+      skipCrds: true
       releaseName: prod-kube-prometheus-stack
       valuesObject:
         fullnameOverride: kube-prometheus-stack

@@ -12,6 +12,7 @@ spec:
     targetRevision: v1.10.0
     path: charts/postgres-operator
     helm:
+      skipCrds: true
       releaseName: dev-postgres-operator
       valuesObject:
         nodeSelector:
