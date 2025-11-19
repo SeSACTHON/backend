@@ -60,15 +60,15 @@
    ```
 
 2. **StorageClass 수정** (`workloads/rbac-storage/base/storage-class.yaml`):
-   ```yaml
-   provisioner: ebs.csi.aws.com
-   parameters:
-     type: gp3
-     iops: "3000"
-     throughput: "125"
-     encrypted: "true"
-     csi.storage.k8s.io/fstype: ext4
-   ```
+```yaml
+provisioner: ebs.csi.aws.com
+parameters:
+  type: gp3
+  iops: "3000"
+  throughput: "125"
+  encrypted: "true"
+  csi.storage.k8s.io/fstype: ext4
+```
 
 3. **Redis Cluster 설정 수정** (`platform/cr/base/redis-cluster.yaml`):
    - nodeSelector: `kubernetes.io/hostname: k8s-redis` → `infra-type: redis`
@@ -79,6 +79,12 @@
 4. **RabbitMQ Cluster 설정 수정** (`platform/cr/base/rabbitmq-cluster.yaml`):
    - nodeSelector: `kubernetes.io/hostname: k8s-rabbitmq` → `infra-type: rabbitmq`
    - secretBackend 제거 (ExternalSecret이 없어 diff 발생)
+5. **RabbitMQ Operator 배포 방식 변경**:
+   - Upstream `config/installation`는 namespace/crd/rbac까지 한 번에 생성하지만, 우리 환경에서는 이미 각각을 별도 App에서 관리
+   - `platform/operators/rabbitmq/` 디렉터리를 추가해 Operator Deployment만 커스텀하여 관리
+   - 이미지 고정: `rabbitmqoperator/cluster-operator:1.11.0`
+   - nodeSelector/tolerations 적용해 control-plane 노드에 스케줄
+   - ArgoCD Application은 이제 로컬 경로(`platform/operators/rabbitmq`)를 사용
 
 ### 결과
 - ✅ EBS CSI Driver 설치 완료 (controller 2 pods, node daemonset 14 pods)
