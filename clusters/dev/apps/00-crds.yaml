@@ -5,6 +5,7 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "0"
+    argocd.argoproj.io/refresh: hard
 spec:
   project: dev
   source:
@@ -20,4 +21,10 @@ spec:
       selfHeal: true
     syncOptions:
       - Replace=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
 
