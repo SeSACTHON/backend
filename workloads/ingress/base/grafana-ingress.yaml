@@ -5,7 +5,7 @@ metadata:
   namespace: grafana
   annotations:
     alb.ingress.kubernetes.io/scheme: internet-facing
-    alb.ingress.kubernetes.io/target-type: instance
+    alb.ingress.kubernetes.io/target-type: ip
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
     # ACM Certificate ARN은 dev/prod overlay에서 주입
     alb.ingress.kubernetes.io/group.name: ecoeco-main

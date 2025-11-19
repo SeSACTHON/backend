@@ -22,9 +22,8 @@ spec:
           create: true
           name: grafana
         service:
-          type: NodePort
+          type: ClusterIP
           port: 80
-          nodePort: 30300
         ingress:
           enabled: false
         persistence:
