@@ -5,4 +5,3 @@ resources:
 patches:
   - path: postgres-patch.yaml
   - path: redis-patch.yaml
-  - path: rabbitmq-patch.yaml
