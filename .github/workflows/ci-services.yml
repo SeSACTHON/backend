@@ -20,6 +20,14 @@ on:
       - "scripts/**"
       - ".github/workflows/ci-services.yml"
   workflow_dispatch:
+    inputs:
+      force_all:
+        description: "모든 API 서비스를 강제로 빌드/푸시"
+        type: boolean
+        default: false
+      target_services:
+        description: "콤마로 구분된 서비스 이름 목록 (예: auth,my)"
+        required: false
 
 permissions:
   contents: read
@@ -100,38 +108,61 @@ jobs:
       - name: Prepare service matrix
         id: prepare
         run: |
-          if [ "${{ steps.changes.outputs.any_changed }}" != "true" ]; then
-            echo "has_changes=false" >> "$GITHUB_OUTPUT"
-            echo 'services=[]' >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
           python3 <<'PYEOF'
           import json
           import os
+          import sys
 
           files = os.environ.get("CHANGED_FILES", "").split()
-          services = []
+          any_changed = os.environ.get("ANY_CHANGED", "false").lower() == "true"
+          event_name = os.environ.get("EVENT_NAME", "")
+          force_all = os.environ.get("FORCE_ALL", "false").lower() == "true"
+          target_services = [
+              s.strip() for s in os.environ.get("TARGET_SERVICES", "").split(",") if s.strip()
+          ]
 
-          for path in files:
-              parts = path.split("/")
-              if len(parts) >= 2 and parts[0] == "services":
-                  svc = parts[1]
-                  service_path = os.path.join("services", svc)
-                  if not os.path.isdir(service_path):
-                      continue
-                  if svc and svc not in services:
-                      services.append(svc)
+          services = []
+          service_root = "services"
+          all_services = sorted(
+              [
+                  entry
+                  for entry in os.listdir(service_root)
+                  if os.path.isdir(os.path.join(service_root, entry))
+              ]
+          )
+
+          if event_name == "workflow_dispatch":
+              if force_all:
+                  services = all_services
+              elif target_services:
+                  invalid = [svc for svc in target_services if svc not in all_services]
+                  if invalid:
+                      sys.stderr.write(f"Unknown services: {', '.join(invalid)}\n")
+                      sys.exit(1)
+                  services = target_services
+
+          if not services and any_changed:
+              for path in files:
+                  parts = path.split("/")
+                  if len(parts) >= 2 and parts[0] == "services":
+                      svc = parts[1]
+                      if svc and svc in all_services and svc not in services:
+                          services.append(svc)
 
           with open(os.environ["GITHUB_OUTPUT"], "a") as out:
-              if not services:
-                  out.write("has_changes=false\n")
-                  out.write("services=[]\n")
-              else:
+              if services:
                   out.write("has_changes=true\n")
                   out.write(f"services={json.dumps(services)}\n")
+              else:
+                  out.write("has_changes=false\n")
+                  out.write("services=[]\n")
           PYEOF
         env:
           CHANGED_FILES: ${{ steps.changes.outputs.all_changed_files }}
+          ANY_CHANGED: ${{ steps.changes.outputs.any_changed }}
+          EVENT_NAME: ${{ github.event_name }}
+          FORCE_ALL: ${{ github.event.inputs.force_all || 'false' }}
+          TARGET_SERVICES: ${{ github.event.inputs.target_services || '' }}
 
   api-quality:
     name: 🧪 API Lint & Test
