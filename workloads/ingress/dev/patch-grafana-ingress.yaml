@@ -10,6 +10,7 @@ metadata:
     external-dns.alpha.kubernetes.io/managed-by: external-dns
     # Force ALB Controller to reconcile on every update
     meta.helm.sh/release-namespace: grafana
+    alb.ingress.kubernetes.io/target-group-attributes: stickiness.enabled=true,stickiness.lb_cookie.duration_seconds=86400
 spec:
   rules:
     - host: grafana.dev.growbin.app

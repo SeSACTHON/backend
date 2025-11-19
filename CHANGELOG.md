@@ -7,6 +7,34 @@ Eco² Backend 프로젝트의 모든 주목할 만한 변경사항을 기록합�
 
 ---
 
+## [0.7.5] - 2025-11-19
+
+### Fixed
+- **ArgoCD Deployment CrashLoopBackOff 문제 해결**
+  - Ansible의 Deployment 직접 패치 방식이 command/args 충돌 유발
+  - ConfigMap(`argocd-cmd-params-cm`) 기반 설정으로 전환
+  - `server.insecure=true` 표준 방식 적용
+  - `docs/troubleshooting/ARGOCD_DEPLOYMENT_ISSUES.md` 추가
+
+- **ArgoCD ERR_TOO_MANY_REDIRECTS 문제 해결**
+  - ALB HTTPS 종료 환경에서 무한 리디렉션 루프 발생
+  - insecure 모드 적용으로 HTTP 트래픽 정상 처리
+  - Ingress `backend-protocol: HTTP` annotation 문서화
+
+### Changed
+- **Ansible ArgoCD Role 전면 개선** (`ansible/roles/argocd/tasks/main.yml`)
+  - Deployment 직접 패치 제거 (비표준 방식)
+  - ConfigMap 생성/패치/검증 단계 추가
+  - 멱등성 보장 및 에러 핸들링 강화
+  - 재시작 프로세스 명시화 (rollout restart + rollout status)
+
+### Added
+- ArgoCD insecure 모드 설정 검증 단계
+- ConfigMap 존재 여부 확인 및 자동 생성 로직
+- 트러블슈팅 가이드 참조 (`LOCAL_CLUSTER_BOOTSTRAP.md`)
+
+---
+
 ## [0.7.4] - 2025-11-18
 
 ### Added

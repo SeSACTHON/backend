@@ -70,19 +70,50 @@
     'NotFound' not in argocd_control_plane_result.stderr
   when: argocd_install is succeeded
 
+- name: ArgoCD cmd-params ConfigMap 존재 확인
+  command: kubectl get configmap argocd-cmd-params-cm -n {{ argocd_namespace }}
+  register: configmap_check
+  failed_when: false
+  changed_when: false
+  when: argocd_install is succeeded
+
+- name: ArgoCD cmd-params ConfigMap 생성 (없을 경우)
+  shell: |
+    kubectl create configmap argocd-cmd-params-cm -n {{ argocd_namespace }} \
+      --from-literal=server.insecure=true
+  register: configmap_create
+  changed_when: "'created' in configmap_create.stdout"
+  when:
+    - argocd_install is succeeded
+    - configmap_check.rc != 0
+
 - name: ArgoCD Server를 insecure 모드로 설정 (ALB HTTPS 종료 대응)
   command: >
     kubectl -n {{ argocd_namespace }}
-    patch deployment argocd-server
-    --type json
-    -p '[{"op": "replace", "path": "/spec/template/spec/containers/0/command", "value": ["argocd-server", "--insecure"]}]'
+    patch configmap argocd-cmd-params-cm
+    --type merge
+    -p '{"data":{"server.insecure":"true"}}'
   register: argocd_insecure_result
-  changed_when: "'patched' in argocd_insecure_result.stdout"
-  when: argocd_install is succeeded
+  changed_when: "'patched' in argocd_insecure_result.stdout or 'configured' in argocd_insecure_result.stdout"
+  when:
+    - argocd_install is succeeded
+    - configmap_check.rc == 0
+
+- name: ArgoCD Server 파드 재시작 (insecure 모드 적용)
+  command: kubectl rollout restart deployment argocd-server -n {{ argocd_namespace }}
+  when: argocd_insecure_result is changed or configmap_create is changed
 
 - name: ArgoCD Server 파드 재시작 대기 (insecure 모드 적용)
   command: kubectl rollout status deployment argocd-server -n {{ argocd_namespace }} --timeout=300s
-  when: argocd_insecure_result is changed
+  when: argocd_insecure_result is changed or configmap_create is changed
+
+- name: ArgoCD insecure 모드 설정 검증
+  shell: |
+    kubectl get configmap argocd-cmd-params-cm -n {{ argocd_namespace }} -o jsonpath='{.data.server\.insecure}'
+  register: insecure_verify
+  changed_when: false
+  failed_when: insecure_verify.stdout != "true"
+  when: argocd_install is succeeded
 
 - name: ArgoCD Service를 NodePort(HTTP 단일 포트)로 변경
   shell: >

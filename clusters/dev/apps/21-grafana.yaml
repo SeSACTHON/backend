@@ -22,8 +22,9 @@ spec:
           create: true
           name: grafana
         service:
-          type: ClusterIP
+          type: NodePort
           port: 80
+          nodePort: 30300
         ingress:
           enabled: false
         persistence:
@@ -37,11 +38,14 @@ spec:
             memory: 1Gi
         replicas: 1
         nodeSelector:
-          infra-type: monitoring
+          role: control-plane
         tolerations:
-          - key: domain
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+          - key: role
             operator: Equal
-            value: observability
+            value: control-plane
             effect: NoSchedule
         datasources:
           datasources.yaml:

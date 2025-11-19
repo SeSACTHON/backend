@@ -9,6 +9,7 @@ docs/
 └── troubleshooting/
     ├── README.md                         # 이 파일 (Navigation Hub)
     ├── TROUBLESHOOTING.md                # ⚡ Rapid Diagnostics Runbook
+    ├── ARGOCD_DEPLOYMENT_ISSUES.md       # 🔥 ArgoCD 배포 문제 (2025-11-19)
     ├── ansible-label-sync.md             # 🔥 Ansible 라벨 동기화 (2025-11-16)
     ├── argocd-applicationset-patterns.md # 🔥 ApplicationSet 패턴 (2025-11-16)
     ├── gitops-deployment.md              # GitOps 배포 문제
@@ -27,7 +28,7 @@ docs/
 | 카테고리 | 즉시 확인 | 세부 문서 |
 |----------|-----------|-----------|
 | 클러스터 전체 영향 | 노드 NotReady / CoreDNS Pending / Pod 스케줄링 실패 / ArgoCD DNS Timeout | `ansible-label-sync.md` |
-| ArgoCD / GitOps | Application Unknown / OutOfSync / root-app 실패 / AppProject 누락 | `argocd-applicationset-patterns.md`, `ansible-label-sync.md` |
+| ArgoCD / GitOps | **CrashLoopBackOff** / **ERR_TOO_MANY_REDIRECTS** / Application Unknown / OutOfSync / root-app 실패 / AppProject 누락 | **`ARGOCD_DEPLOYMENT_ISSUES.md`**, `argocd-applicationset-patterns.md`, `ansible-label-sync.md` |
 | Infrastructure | ALB Controller / GHCR Pull / Kustomize 구조 / VPC 삭제 / CloudFront | `gitops-deployment.md`, `cluster-cases.md`, `terraform-issues.md`, `vpc-deletion-issues.md`, `cloudfront-issues.md` |
 | Application | ArgoCD 리디렉션 / Prometheus 메모리 / Atlantis CrashLoop | `argocd-ingress-issues.md`, `monitoring-issues.md`, `atlantis-issues.md` |
 | CNI/Calico | Operator vs Helm 충돌, VXLAN 구성, **Typha 포트 5473** | `calico-operator-helm-conflict.md`, `ansible-label-sync.md#3`, **`CALICO_TYPHA_PORT_5473_ISSUE.md`** |
@@ -36,9 +37,24 @@ docs/
 
 ---
 
-## 🔥 최신 문제 (2025-11-18)
+## 🔥 최신 문제 (2025-11-19)
 
-### [CALICO_TYPHA_PORT_5473_ISSUE.md](./CALICO_TYPHA_PORT_5473_ISSUE.md) ⭐ NEW
+### [ARGOCD_DEPLOYMENT_ISSUES.md](./ARGOCD_DEPLOYMENT_ISSUES.md) ⭐ NEW
+**ArgoCD 배포 시 CrashLoopBackOff 및 리디렉션 루프 문제**
+
+해결된 문제:
+1. **CrashLoopBackOff**: Ansible의 Deployment 직접 패치로 command/args 충돌 발생
+2. **ERR_TOO_MANY_REDIRECTS**: ALB HTTPS 종료 환경에서 무한 리디렉션 루프
+3. ConfigMap 기반 insecure 모드 설정 부재
+4. Ingress backend-protocol annotation 누락
+
+**특징**: ✅ 실제 에러 로그 포함, ✅ Ansible Role 개선 방법, ✅ 예방 조치 문서화, ✅ 검증 체크리스트
+
+**관련 문서**: [Local Cluster Bootstrap](../deployment/LOCAL_CLUSTER_BOOTSTRAP.md)
+
+---
+
+### [CALICO_TYPHA_PORT_5473_ISSUE.md](./CALICO_TYPHA_PORT_5473_ISSUE.md)
 **Calico Typha 포트(5473) 연결 실패 문제**
 
 해결된 문제:
@@ -118,8 +134,10 @@ kubectl logs <pod-name> -n <namespace> --tail=50
 
 **Ansible 관련**:
 - → `ansible-label-sync.md`
+- → `ARGOCD_DEPLOYMENT_ISSUES.md` (ArgoCD Role 개선)
 
 **ArgoCD 관련**:
+- → `ARGOCD_DEPLOYMENT_ISSUES.md` (배포 문제)
 - → `argocd-applicationset-patterns.md`
 - → `ansible-label-sync.md` (Bootstrap)
 
@@ -177,14 +195,21 @@ sleep 30 && kubectl get pods -n kube-system -l k8s-app=kube-dns
 
 ## 📊 통계
 
-**문서 개수**: 9개 (2025-11-18 기준)  
-**해결된 문제**: 27개  
-**실제 클러스터 검증**: 4개 문서  
-**Ansible 자동화 개선**: 126줄  
+**문서 개수**: 10개 (2025-11-19 기준)  
+**해결된 문제**: 31개  
+**실제 클러스터 검증**: 5개 문서  
+**Ansible 자동화 개선**: 150줄+  
 
 ---
 
 ## 🔄 변경 이력
+
+### 2025-11-19
+- ✅ **ARGOCD_DEPLOYMENT_ISSUES.md 생성** (CrashLoopBackOff, 리디렉션 루프)
+- ✅ **Ansible ArgoCD Role 전면 개선** (ConfigMap 기반, 멱등성 보장)
+- ✅ LOCAL_CLUSTER_BOOTSTRAP.md 트러블슈팅 가이드 링크 추가
+- ✅ CHANGELOG.md v0.7.5 버전 업데이트
+- ✅ VERSION 파일 업데이트 (0.7.4 → 0.7.5)
 
 ### 2025-11-18
 - ✅ **CALICO_TYPHA_PORT_5473_ISSUE.md 생성** (실제 에러 로그, 네트워크 진단)

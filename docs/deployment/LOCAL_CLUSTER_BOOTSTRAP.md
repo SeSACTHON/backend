@@ -61,7 +61,6 @@ terraform output -raw kubeconfig > ~/.kube/sesacthon-dev  # 필요 시
 ```bash
 cd ../ansible
 ansible-galaxy install -r requirements.yml  # 필요한 경우
-ANSIBLE_HOST_KEY_CHECKING=False ansible-playbook -i inventory/hosts.ini site.yml
 ```
 
 - 주요 작업 순서:
@@ -104,7 +103,9 @@ argocd app get dev-root   # argocd CLI 사용 시
 | 25/35 | Data Operators / CR | `kubectl get postgres -A`, `kubectl get redisfailover -A` |
 | 60/70 | API + Ingress | `kubectl get deploy -n auth`, `kubectl get ingress -A` |
 
-> Sync 중 CrashLoop가 발생하면 `docs/troubleshooting/TROUBLESHOOTING.md` 18.x~20.x 항목을 참조한다.
+> **트러블슈팅 가이드**:
+> - ArgoCD 배포 문제 (CrashLoopBackOff, 리디렉션 오류): `docs/troubleshooting/ARGOCD_DEPLOYMENT_ISSUES.md`
+> - 기타 Sync Wave 문제: `docs/troubleshooting/TROUBLESHOOTING.md` 18.x~20.x 항목
 
 ### Step 5. Post-check & 로컬 개발용 설정
 
