@@ -32,15 +32,15 @@ services/
 
 ## 2. 서비스 요약
 
-| Service | Namespace | 주요 역할 | GHCR 이미지 |
-|---------|-----------|-----------|-------------|
-| `auth` | `auth` | JWT 발급, 토큰 리프레시, 블랙리스트 | `ghcr.io/sesacthon/auth-api` |
-| `my` | `my` | 프로필/포인트/활동 관리 | `ghcr.io/sesacthon/my-api` |
-| `scan` | `scan` | 이미지 분류 작업(비동기 파이프라인 연동 예정) | `ghcr.io/sesacthon/scan-api` |
-| `character` | `character` | 사용자 캐릭터 분석·히스토리 | `ghcr.io/sesacthon/character-api` |
-| `location` | `location` | 근처 수거함·센터 탐색, 좌표 변환 | `ghcr.io/sesacthon/location-api` |
-| `info` | `info` | 재활용 정보·FAQ 제공 | `ghcr.io/sesacthon/info-api` |
-| `chat` | `chat` | GPT-4o-mini 챗봇, 피드백 수집 | `ghcr.io/sesacthon/chat-api` |
+| Service | Namespace | 주요 역할 | Docker Hub 이미지 |
+|---------|-----------|-----------|-------------------|
+| `auth` | `auth` | JWT 발급, 토큰 리프레시, 블랙리스트 | `docker.io/mng990/eco2:auth-{env}-latest` |
+| `my` | `my` | 프로필/포인트/활동 관리 | `docker.io/mng990/eco2:my-{env}-latest` |
+| `scan` | `scan` | 이미지 분류 작업(비동기 파이프라인 연동 예정) | `docker.io/mng990/eco2:scan-{env}-latest` |
+| `character` | `character` | 사용자 캐릭터 분석·히스토리 | `docker.io/mng990/eco2:character-{env}-latest` |
+| `location` | `location` | 근처 수거함·센터 탐색, 좌표 변환 | `docker.io/mng990/eco2:location-{env}-latest` |
+| `info` | `info` | 재활용 정보·FAQ 제공 | `docker.io/mng990/eco2:info-{env}-latest` |
+| `chat` | `chat` | GPT-4o-mini 챗봇, 피드백 수집 | `docker.io/mng990/eco2:chat-{env}-latest` |
 
 모든 서비스는 `/api/v1/health` 와 `/api/v1/metrics` 를 노출하여 Prometheus(ServiceMonitor)에서 namespace 단위로 상태를 수집할 수 있도록 구성했다.
 
@@ -65,8 +65,8 @@ uvicorn app.main:app --reload --port 8000
 GitHub Actions는 변경된 서비스만 빌드/푸시 한다. 수동으로 검사하고 싶다면 다음과 같이 실행한다.
 
 ```bash
-docker build -t ghcr.io/sesacthon/auth-api:dev services/auth
-docker run --rm -p 8080:8000 ghcr.io/sesacthon/auth-api:dev
+docker build -t docker.io/mng990/eco2:auth-dev-latest services/auth
+docker run --rm -p 8080:8000 docker.io/mng990/eco2:auth-dev-latest
 ```
 
 ## 5. 다음 작업

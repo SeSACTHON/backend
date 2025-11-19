@@ -5,15 +5,14 @@ Argo CD App-of-Apps가 참조하는 경로는 `clusters/{env}/apps/*.yaml` 파�
 
 | Wave | Path | 목적 |
 |------|------|------|
-| 0 / 2 | `namespaces/{base,dev,prod}` | 비즈니스/데이터/플랫폼 네임스페이스 정의 |
-| 3 | `rbac-storage/{base,dev,prod}` | 공통 ServiceAccount, ClusterRole, StorageClass |
-| 5-6 | `network-policies/{base,dev,prod}` | Tier 기반 기본 차단 + 허용 정책 |
-| 11 | `secrets/external-secrets/{base,dev,prod}` | SSM → Kubernetes Secret 동기화 (ExternalSecrets CR) |
-| 20+ | `ingress/apps/{base,env}` | ALB Ingress, ExternalDNS annotation, 환경별 인증서 |
-| 35 | `data/postgres/*`, `data/redis/*` | Operator가 소비할 Postgres/Redis CR 선언 |
-| 60 | `apis/<domain>/{base,env}` | 각 API Deployment/Service/ConfigMap/Secret 템플릿 |
+| 02 | `namespaces/{base,dev,prod}` | 비즈니스/데이터/플랫폼 Namespace 정의 |
+| 03 | `rbac-storage/{base,dev,prod}` | ServiceAccount, ClusterRole, dockerhub-secret, `gp3` StorageClass |
+| 06 | `network-policies/{base,dev,prod}` | Tier 기반 기본 차단 + 허용 정책 |
+| 11 | `secrets/external-secrets/{base,dev,prod}` | SSM Parameter / Secrets Manager → Kubernetes Secret |
+| 60 | `apis/<domain>/{base,env}` | 도메인별 Deployment/Service/ConfigMap 템플릿 |
+| 70 | `ingress/{base,env}` | API / ArgoCD / Grafana Ingress + ExternalDNS annotation |
 
-> Helm Chart는 `platform/helm/**`에서 관리합니다. (예: Calico, ALB Controller, kube-prometheus-stack 등)
+> 데이터 CR(`platform/cr/**`)과 CRD(`platform/crds/**`)는 플랫폼 계층에서 관리하며, Helm 리소스는 모두 `clusters/{env}/apps/*.yaml`의 upstream chart 정의를 사용합니다.
 
 ## 로컬 검증 예시
 
@@ -36,7 +35,7 @@ kustomize build workloads/apis/auth/dev
 5. `argocd app diff` → `argocd app sync`로 반영
 
 ## 참고
-- Helm 리소스: `platform/helm/<component>/app.yaml` (Argo CD ApplicationSet/Helm values)  
+- 플랫폼 Helm 리소스: `clusters/{env}/apps/1*-*.yaml` (upstream chart 정의)  
 - 문제 발생 시 `docs/troubleshooting/TROUBLESHOOTING.md`와 `docs/deployment/LOCAL_CLUSTER_BOOTSTRAP.md` 내 Kustomize/Namespace 섹션을 참고하세요.  
 - 민감 값은 Terraform → SSM → ExternalSecret 경로로 주입되며, Kustomize 템플릿에는 literal 비밀번호를 두지 않습니다.
 
