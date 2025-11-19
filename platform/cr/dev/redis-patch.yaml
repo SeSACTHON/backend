@@ -15,6 +15,7 @@ spec:
   storage:
     volumeClaimTemplate:
       spec:
+        storageClassName: gp3
         resources:
           requests:
             storage: 10Gi

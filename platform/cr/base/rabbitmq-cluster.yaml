@@ -9,9 +9,6 @@ metadata:
     tier: integration
     role: messaging
 spec:
-  secretBackend:
-    externalSecret:
-      name: rabbitmq-default-user
   rabbitmq:
     additionalPlugins:
       - rabbitmq_prometheus
@@ -33,7 +30,7 @@ spec:
             containers:
               - name: rabbitmq # Required by CRD to modify pod spec fields
             nodeSelector:
-              kubernetes.io/hostname: k8s-rabbitmq
+              infra-type: rabbitmq
             tolerations:
               - key: domain
                 operator: Equal

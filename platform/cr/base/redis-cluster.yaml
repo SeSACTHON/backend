@@ -9,13 +9,13 @@ metadata:
 spec:
   clusterSize: 3
   kubernetesConfig:
-    image: quay.io/opstree/redis:7.2.4
+    image: quay.io/opstree/redis:v7.0.15
     imagePullPolicy: IfNotPresent
   redisExporter:
     enabled: false
     image: oliver006/redis_exporter:v1.80.0
   nodeSelector:
-    kubernetes.io/hostname: k8s-redis
+    infra-type: redis
   tolerations:
     - key: domain
       operator: Equal
@@ -23,9 +23,8 @@ spec:
       effect: NoSchedule
   storage:
     volumeClaimTemplate:
-      metadata:
-        name: redis-data
       spec:
+        storageClassName: gp3
         accessModes:
           - ReadWriteOnce
         resources:
