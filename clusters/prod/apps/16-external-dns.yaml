@@ -28,7 +28,7 @@ spec:
           - service
         extraArgs:
           - --aws-zone-type=public
-          - --aws-prefer-cname=true
+          - --aws-prefer-cname
           - '--annotation-filter=external-dns.alpha.kubernetes.io/managed-by in (external-dns)'
         env:
           - name: AWS_REGION
