@@ -11,8 +11,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: https://charts.bitnami.com/bitnami
-    targetRevision: 20.2.1  # Redis 7.4.x
+    repoURL: oci://registry-1.docker.io/bitnamicharts
     chart: redis
     helm:
       values: |
@@ -20,13 +19,13 @@ spec:
           storageClass: gp3
           redis:
             password: ""
-        
+
         architecture: replication
-        
+
         auth:
           enabled: false
           sentinel: false
-        
+
         master:
           count: 1
           resources:
@@ -44,7 +43,14 @@ spec:
           # 중요: EBS 볼륨 권한 자동 수정을 위해 initContainer 활성화
           volumePermissions:
             enabled: true
-          
+          nodeSelector:
+            infra-type: redis
+          tolerations:
+            - key: domain
+              operator: Equal
+              value: data
+              effect: NoSchedule
+
         replica:
           replicaCount: 2
           resources:
@@ -61,37 +67,25 @@ spec:
             runAsUser: 1001
           volumePermissions:
             enabled: true
+          nodeSelector:
+            infra-type: redis
+          tolerations:
+            - key: domain
+              operator: Equal
+              value: data
+              effect: NoSchedule
 
         sentinel:
           enabled: true
           masterSet: mymaster
           quorum: 2
-          
+
         metrics:
           enabled: false
-          
+
         commonLabels:
           tier: data
           infra-type: redis
-          
-        # Node Scheduling
-        master:
-          nodeSelector:
-            infra-type: redis
-          tolerations:
-            - key: domain
-              operator: Equal
-              value: data
-              effect: NoSchedule
-        
-        replica:
-          nodeSelector:
-            infra-type: redis
-          tolerations:
-            - key: domain
-              operator: Equal
-              value: data
-              effect: NoSchedule
   destination:
     server: https://kubernetes.default.svc
     namespace: redis
