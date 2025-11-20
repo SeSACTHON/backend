@@ -47,8 +47,6 @@ spec:
               port: 8000
             initialDelaySeconds: 10
             periodSeconds: 5
-      imagePullSecrets:
-        - name: dockerhub-secret
       nodeSelector:
         domain: auth
       tolerations:
