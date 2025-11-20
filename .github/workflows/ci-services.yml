@@ -7,7 +7,7 @@ on:
       - develop
       - refactor/gitops-sync-wave
     paths:
-      - "services/**"
+      - "domain/**"
       - "scripts/**"
       - ".github/workflows/ci-services.yml"
   pull_request:
@@ -16,7 +16,7 @@ on:
       - develop
       - refactor/gitops-sync-wave
     paths:
-      - "services/**"
+      - "domain/**"
       - "scripts/**"
       - ".github/workflows/ci-services.yml"
   workflow_dispatch:
@@ -103,7 +103,7 @@ jobs:
         uses: tj-actions/changed-files@v45
         with:
           files: |
-            services/**
+            domain/**
 
       - name: Prepare service matrix
         id: prepare
@@ -122,12 +122,13 @@ jobs:
           ]
 
           services = []
-          service_root = "services"
+          service_root = "domain"
           all_services = sorted(
               [
                   entry
                   for entry in os.listdir(service_root)
                   if os.path.isdir(os.path.join(service_root, entry))
+                  and not entry.startswith("_")
               ]
           )
 
@@ -144,7 +145,7 @@ jobs:
           if not services and any_changed:
               for path in files:
                   parts = path.split("/")
-                  if len(parts) >= 2 and parts[0] == "services":
+                  if len(parts) >= 2 and parts[0] == "domain":
                       svc = parts[1]
                       if svc and svc in all_services and svc not in services:
                           services.append(svc)
@@ -192,18 +193,18 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install black==24.4.2 ruff==0.6.9 pytest==8.3.3
-          pip install -r services/${{ matrix.service }}/requirements.txt
+          pip install -r domain/${{ matrix.service }}/requirements.txt
 
       - name: Black (format check)
-        run: black --check services/${{ matrix.service }}
+        run: black --check domain/${{ matrix.service }}
 
       - name: Ruff lint
-        run: ruff check services/${{ matrix.service }}
+        run: ruff check domain/${{ matrix.service }}
 
       - name: Pytest
-        working-directory: services/${{ matrix.service }}
+        working-directory: domain/${{ matrix.service }}
         env:
-          PYTHONPATH: ${{ github.workspace }}/services/${{ matrix.service }}
+          PYTHONPATH: ${{ github.workspace }}/domain/${{ matrix.service }}
         run: pytest
 
   api-build-push:
@@ -273,8 +274,8 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: services/${{ matrix.service }}
-          file: services/${{ matrix.service }}/Dockerfile
+          context: .
+          file: domain/${{ matrix.service }}/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
 
