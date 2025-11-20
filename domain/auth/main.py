@@ -35,7 +35,9 @@ def create_app() -> FastAPI:
         allow_headers=["*"],
     )
 
+    # Health 엔드포인트는 루트 레벨에 마운트 (Kubernetes probes용)
     app.include_router(health_router)
+    # API 엔드포인트는 /api/v1 prefix 사용
     app.include_router(api_router)
     return app
 
