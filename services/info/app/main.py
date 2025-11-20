@@ -8,7 +8,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Info API",
         description="Recycling information catalog service",
-        version="0.7.3",
+        version="0.2.0",
     )
 
     app.add_middleware(

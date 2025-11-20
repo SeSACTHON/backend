@@ -8,7 +8,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Location API",
         description="Geospatial lookup for recycling facilities",
-        version="0.7.3",
+        version="0.2.0",
     )
 
     app.add_middleware(

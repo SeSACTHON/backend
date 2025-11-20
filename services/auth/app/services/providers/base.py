@@ -56,4 +56,3 @@ class OAuthProvider(ABC):
         tokens: dict,
     ) -> OAuthProfile:
         raise NotImplementedError
-

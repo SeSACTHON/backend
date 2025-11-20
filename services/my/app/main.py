@@ -8,7 +8,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="My API",
         description="User profile and rewards service",
-        version="0.7.3",
+        version="0.2.0",
     )
 
     app.add_middleware(
