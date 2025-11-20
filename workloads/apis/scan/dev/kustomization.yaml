@@ -4,7 +4,7 @@ resources:
 - ../base
 images:
 - name: docker.io/mng990/eco2
-  newTag: scan-dev-latest
+  newTag: scan-api-dev-latest
 labels:
 - includeSelectors: true
   pairs:
