@@ -1,6 +1,6 @@
 from typing import Annotated, Optional
 
-from fastapi import APIRouter, Cookie, Depends, Request, Response
+from fastapi import Cookie, Depends, Request, Response
 from fastapi.responses import RedirectResponse
 
 from domain.auth.api.v1.router import (
@@ -12,7 +12,6 @@ from domain.auth.api.v1.router import (
 )
 from domain.auth.core.config import get_settings
 from domain.auth.schemas.auth import (
-    AuthorizationResponse,
     AuthorizationSuccessResponse,
     LoginData,
     LoginSuccessResponse,
@@ -20,7 +19,6 @@ from domain.auth.schemas.auth import (
     LogoutSuccessResponse,
     OAuthAuthorizeParams,
     OAuthLoginRequest,
-    User,
     UserSuccessResponse,
 )
 from domain.auth.services.auth import ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME, AuthService
