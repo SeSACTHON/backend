@@ -1,36 +1,31 @@
-from fastapi import APIRouter, Depends
+from fastapi import Depends, status
 
-from app.schemas.character import (
-    CharacterAnalysisRequest,
-    CharacterProfile,
-    CharacterHistoryEntry,
+from app.api.v1.router import character_router
+from app.service.user_character import UserCharacterService, get_user_character_service
+from app.schemas import (
+    CharacterRewardRequest,
+    CharacterRewardResult,
+    UserCharacterWithDetail,
 )
-from app.services.character import CharacterService
-
-router = APIRouter(prefix="/character", tags=["character"])
 
 
-@router.post("/analyze", response_model=CharacterProfile, summary="Analyze user to character")
-async def analyze_user(
-    payload: CharacterAnalysisRequest,
-    service: CharacterService = Depends(),
+@character_router.post(
+    "/ownerships",
+    response_model=CharacterRewardResult,
+    status_code=status.HTTP_201_CREATED,
+    summary="Grant a character instance based on waste classification",
+)
+async def grant_character(
+    payload: CharacterRewardRequest,
+    service: UserCharacterService = Depends(get_user_character_service),
 ):
-    return await service.analyze(payload)
+    return await service.grant_character(payload)
 
 
-@router.get(
-    "/history/{user_id}",
-    response_model=list[CharacterHistoryEntry],
-    summary="List character evolution history",
+@character_router.get(
+    "/me",
+    response_model=list[UserCharacterWithDetail],
+    summary="List characters owned by the current user",
 )
-async def history(user_id: str, service: CharacterService = Depends()):
-    return await service.history(user_id)
-
-
-@router.get(
-    "/catalog",
-    response_model=list[CharacterProfile],
-    summary="Available character catalog",
-)
-async def catalog(service: CharacterService = Depends()):
-    return await service.catalog()
+async def owned_characters(service: UserCharacterService = Depends(get_user_character_service)):
+    return await service.owned_characters()

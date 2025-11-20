@@ -1,1 +1,1 @@
-"""character app/models package"""
+"""character app/db package"""

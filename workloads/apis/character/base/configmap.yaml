@@ -6,4 +6,5 @@ metadata:
 data:
   LOG_LEVEL: "INFO"
   ENVIRONMENT: "base"
+  CHARACTER_DATABASE_URL: "postgresql+asyncpg://sesacthon:sesacthon@postgres-cluster.postgres.svc.cluster.local:5432/sesacthon"
 
