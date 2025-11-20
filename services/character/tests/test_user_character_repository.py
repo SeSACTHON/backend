@@ -9,7 +9,7 @@ SERVICE_ROOT = Path(__file__).resolve().parents[1]
 if str(SERVICE_ROOT) not in sys.path:
     sys.path.append(str(SERVICE_ROOT))
 
-from app.models.user_character import UserCharacter
+from app.database.models.user_character import UserCharacter
 from app.repositories.user_character import UserCharacterRepository
 
 

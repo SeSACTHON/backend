@@ -7,10 +7,10 @@ from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.database.models.character import Character
+from app.database.models.user_character import UserCharacter
+from app.database.session import get_db_session
 from app.dependencies.security import access_token_dependency
-from app.models.character import Character
-from app.models.session import get_db_session
-from app.models.user_character import UserCharacter
 from services._shared.security import TokenPayload
 
 

@@ -2,13 +2,16 @@ from __future__ import annotations
 
 import uuid
 from datetime import datetime
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import String, UniqueConstraint, DateTime, func
+from sqlalchemy import DateTime, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base
+from app.database.base import Base
+
+if TYPE_CHECKING:  # pragma: no cover
+    from app.database.models.user_character import UserCharacter
 
 
 class Character(Base):

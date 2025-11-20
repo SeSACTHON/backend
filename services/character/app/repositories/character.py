@@ -6,8 +6,8 @@ from fastapi import Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.character import Character
-from app.models.session import get_db_session
+from app.database.models.character import Character
+from app.database.session import get_db_session
 
 
 class CharacterRepository:

@@ -6,8 +6,8 @@ from datetime import datetime
 from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, UUID as SAUUID, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from app.models.base import Base
-from app.models.character import Character
+from app.database.base import Base
+from app.database.models.character import Character
 
 
 class UserCharacter(Base):
