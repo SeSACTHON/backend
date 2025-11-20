@@ -1,14 +1,14 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.endpoints import api_router, health_router
+from app.api.v1.router import api_router, health_router
 
 
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Character API",
         description="Character analysis and storytelling service",
-        version="0.2.0",
+        version="0.8.0",
     )
 
     app.add_middleware(

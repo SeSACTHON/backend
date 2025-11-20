@@ -5,11 +5,12 @@ metadata:
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "35"
+    argocd.argoproj.io/refresh: hard
 spec:
   project: dev
   source:
     repoURL: https://github.com/eco2-team/backend.git
-    targetRevision: refactor/gitops-sync-wave
+    targetRevision: develop
     path: platform/cr/dev
   destination:
     server: https://kubernetes.default.svc
@@ -18,3 +19,9 @@ spec:
     automated:
       prune: true
       selfHeal: true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

@@ -1,15 +1,13 @@
-from fastapi import APIRouter
+from app.api.v1.router import health_router
 
 SERVICE_NAME = "character"
 
-router = APIRouter(tags=["health"])
 
-
-@router.get("/health")
+@health_router.get("/health")
 async def health():
     return {"status": "healthy", "service": f"{SERVICE_NAME}-api"}
 
 
-@router.get("/ready")
+@health_router.get("/ready")
 async def readiness():
     return {"status": "ready", "service": f"{SERVICE_NAME}-api"}

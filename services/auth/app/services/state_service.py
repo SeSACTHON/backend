@@ -18,8 +18,7 @@ from app.core.security import (
 )
 
 
-class OAuthStateData(dict):
-    ...
+class OAuthStateData(dict): ...
 
 
 class OAuthStateStore:
@@ -64,4 +63,3 @@ class OAuthStateStore:
     @staticmethod
     def _key(state: str) -> str:
         return f"oauth:state:{state}"
-

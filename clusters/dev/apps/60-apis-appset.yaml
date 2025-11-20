@@ -29,17 +29,17 @@ spec:
       namespace: argocd
       labels:
         tier: business-logic
-        domain: "{{name}}"
-        phase: "{{phase}}"
+        domain: {{name}}
+        phase: {{phase}}
     spec:
       project: dev
       source:
         repoURL: https://github.com/eco2-team/backend.git
-        targetRevision: refactor/gitops-sync-wave
+        targetRevision: develop
         path: workloads/apis/{{name}}/dev
       destination:
         server: https://kubernetes.default.svc
-        namespace: "{{name}}"
+        namespace: {{name}}
       syncPolicy:
         automated:
           prune: true

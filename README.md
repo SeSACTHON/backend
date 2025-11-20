@@ -166,12 +166,14 @@ kubectl get applications -n argocd
 
 ## Troubleshooting Highlights
 
-| 이슈 | 요약 | 문서 |
-|------|------|------|
-| ALB HTTPS→HTTP NAT | `backend-protocol: HTTP` + HTTPS-only listener + HTTP NodePort | `docs/troubleshooting/TROUBLESHOOTING.md#8-argocd-리디렉션-루프-문제` |
-| Namespace 중복 정의 | `workloads/namespaces/{env}` 한 곳에서 단일 관리 | `workloads/namespaces/README.md` |
-| Atlantis 배포 | PR 기반 Terraform plan/apply 자동화 (Atlantis) | `docs/architecture/gitops/ATLANTIS_TERRAFORM_FLOW.md` |
-| GitOps/Cluster Health Check | `scripts/diagnostics/gitops_cluster_health.sh` 실행 · kubectl 기반 상태 요약 | README – Getting Started |
+| 이슈 | 증상 & 해결 | 문서 |
+|------|------------|------|
+| ALB HTTPS→HTTP NAT | `backend-protocol: HTTP` + HTTPS-only listener + HTTP NodePort | `docs/
+troubleshooting/TROUBLESHOOTING.md#8-argocd-리디렉션-루프-문제` |
+| **Calico Typha 포트 차단** | Master ↔ Worker 노드 간 5473/TCP 연결 실패 → Security Group에 Calico Typha 포트 규칙 추가 | `docs/troubleshooting/CALICO_TYPHA_PORT_5473_ISSUE.md` |
+| **Redis PVC Pending** | EBS CSI Driver 미설치로 PVC 생성 실패 → `ebs.csi.aws.com` Provisioner + `gp3` StorageClass 설정 | `docs/troubleshooting/2025-11-19-rabbitmq-redis.md#2` |
+| **CRD 이중 적용** | Helm Chart 내장 CRD와 충돌 → `skipCrds: true` + `platform/crds/{env}` 단일 관리 | `docs/troubleshooting/2025-11-19-rabbitmq-redis.md#4` |
+| **Ansible Bootstrap 실패** | 노드 라벨/taint 불일치로 Pod Pending → `fix-node-labels.yml` 실행 + kubeadm 재설정 | `docs/troubleshooting/ansible-label-sync.md` |
 
 ---
 

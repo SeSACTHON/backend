@@ -39,4 +39,3 @@ class User(Base):
         onupdate=func.now(),
     )
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-

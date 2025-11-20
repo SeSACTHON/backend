@@ -9,7 +9,7 @@ spec:
   project: dev
   source:
     repoURL: https://github.com/eco2-team/backend.git
-    targetRevision: refactor/gitops-sync-wave
+    targetRevision: develop
     path: workloads/ingress/dev
   destination:
     server: https://kubernetes.default.svc

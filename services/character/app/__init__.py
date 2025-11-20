@@ -1,0 +1,1 @@
+"""Character service application package."""

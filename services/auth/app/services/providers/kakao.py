@@ -89,4 +89,3 @@ class KakaoOAuthProvider(OAuthProvider):
             name=profile.get("nickname"),
             profile_image_url=profile.get("profile_image_url"),
         )
-

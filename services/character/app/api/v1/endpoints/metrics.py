@@ -1,10 +1,9 @@
-from fastapi import APIRouter, Depends
+from fastapi import Depends
 
-from app.services.character import CharacterService
+from app.api.v1.router import metrics_router
+from app.service import CharacterService
 
-router = APIRouter(prefix="/metrics", tags=["metrics"])
 
-
-@router.get("/", summary="Character service metrics snapshot")
+@metrics_router.get("/", summary="Character service metrics snapshot")
 async def metrics(service: CharacterService = Depends()):
     return await service.metrics()

@@ -32,4 +32,3 @@ class LoginAudit(Base):
         nullable=False,
         server_default=func.now(),
     )
-

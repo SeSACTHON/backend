@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
@@ -81,4 +80,3 @@ class UserTokenStore:
     @staticmethod
     def _meta_key(jti: str) -> str:
         return f"user_token:{jti}"
-

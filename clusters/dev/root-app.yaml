@@ -10,7 +10,7 @@ spec:
   project: dev
   source:
     repoURL: https://github.com/eco2-team/backend.git
-    targetRevision: refactor/gitops-sync-wave
+    targetRevision: develop
     path: clusters/dev/apps
     directory:
       recurse: true
@@ -23,4 +23,11 @@ spec:
       selfHeal: true
     syncOptions:
       - CreateNamespace=true
+  ignoreDifferences:
+    - group: argoproj.io
+      kind: Application
+      jsonPointers:
+        - /metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration
+        - /metadata/managedFields
+        - /metadata/generation
 

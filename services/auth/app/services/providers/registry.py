@@ -20,23 +20,29 @@ class ProviderRegistry:
             "kakao": KakaoOAuthProvider(
                 client_id=self.settings.kakao_client_id,
                 client_secret=self.settings.kakao_client_secret,
-                redirect_uri=str(self.settings.kakao_redirect_uri)
-                if self.settings.kakao_redirect_uri
-                else None,
+                redirect_uri=(
+                    str(self.settings.kakao_redirect_uri)
+                    if self.settings.kakao_redirect_uri
+                    else None
+                ),
             ),
             "google": GoogleOAuthProvider(
                 client_id=self.settings.google_client_id,
                 client_secret=self.settings.google_client_secret,
-                redirect_uri=str(self.settings.google_redirect_uri)
-                if self.settings.google_redirect_uri
-                else None,
+                redirect_uri=(
+                    str(self.settings.google_redirect_uri)
+                    if self.settings.google_redirect_uri
+                    else None
+                ),
             ),
             "naver": NaverOAuthProvider(
                 client_id=self.settings.naver_client_id,
                 client_secret=self.settings.naver_client_secret,
-                redirect_uri=str(self.settings.naver_redirect_uri)
-                if self.settings.naver_redirect_uri
-                else None,
+                redirect_uri=(
+                    str(self.settings.naver_redirect_uri)
+                    if self.settings.naver_redirect_uri
+                    else None
+                ),
             ),
         }
 
@@ -45,4 +51,3 @@ class ProviderRegistry:
         if key not in self.providers:
             raise ValueError(f"Unsupported provider: {provider}")
         return self.providers[key]
-
