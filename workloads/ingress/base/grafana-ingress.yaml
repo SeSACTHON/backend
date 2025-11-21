@@ -1,0 +1,39 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: grafana-ingress
+  namespace: grafana
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: instance
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTPS": 443}]'
+    # ACM Certificate ARN - 환경별 kustomize로 주입
+    alb.ingress.kubernetes.io/certificate-arn: PLACEHOLDER_ACM_ARN
+    alb.ingress.kubernetes.io/group.name: ecoeco-main
+    alb.ingress.kubernetes.io/group.order: "30"
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-path: /api/health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/success-codes: "200"
+    external-dns.alpha.kubernetes.io/managed-by: external-dns
+  labels:
+    app.kubernetes.io/name: grafana-ingress
+spec:
+  ingressClassName: alb
+  rules:
+    - host: grafana.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  number: 80
+
+
+
