@@ -7,3 +7,4 @@ resources:
 - grafana-ingress.yaml
 - default-backend.yaml
 - service-proxies.yaml
+- service-health.yaml
