@@ -4,8 +4,8 @@ metadata:
   name: auth-api
   namespace: default
 spec:
-  type: ExternalName
-  externalName: auth-api.auth.svc.cluster.local
+  type: ClusterIP
+  clusterIP: None  # Headless service
   ports:
     - port: 8000
       targetPort: 8000
@@ -13,13 +13,26 @@ spec:
       name: http
 ---
 apiVersion: v1
+kind: Endpoints
+metadata:
+  name: auth-api
+  namespace: default
+subsets:
+  - addresses:
+      - ip: 192.168.141.38  # auth Pod IP (사용자 제공)
+    ports:
+      - port: 8000
+        protocol: TCP
+        name: http
+---
+apiVersion: v1
 kind: Service
 metadata:
   name: my-api
   namespace: default
 spec:
-  type: ExternalName
-  externalName: my-api.my.svc.cluster.local
+  type: ClusterIP
+  clusterIP: None
   ports:
     - port: 8000
       targetPort: 8000
@@ -32,8 +45,8 @@ metadata:
   name: scan-api
   namespace: default
 spec:
-  type: ExternalName
-  externalName: scan-api.scan.svc.cluster.local
+  type: ClusterIP
+  clusterIP: None
   ports:
     - port: 8000
       targetPort: 8000
@@ -46,8 +59,8 @@ metadata:
   name: character-api
   namespace: default
 spec:
-  type: ExternalName
-  externalName: character-api.character.svc.cluster.local
+  type: ClusterIP
+  clusterIP: None
   ports:
     - port: 8000
       targetPort: 8000
@@ -60,8 +73,8 @@ metadata:
   name: location-api
   namespace: default
 spec:
-  type: ExternalName
-  externalName: location-api.location.svc.cluster.local
+  type: ClusterIP
+  clusterIP: None
   ports:
     - port: 8000
       targetPort: 8000
@@ -74,8 +87,8 @@ metadata:
   name: info-api
   namespace: default
 spec:
-  type: ExternalName
-  externalName: info-api.info.svc.cluster.local
+  type: ClusterIP
+  clusterIP: None
   ports:
     - port: 8000
       targetPort: 8000
@@ -88,8 +101,8 @@ metadata:
   name: chat-api
   namespace: default
 spec:
-  type: ExternalName
-  externalName: chat-api.chat.svc.cluster.local
+  type: ClusterIP
+  clusterIP: None
   ports:
     - port: 8000
       targetPort: 8000

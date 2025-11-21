@@ -73,10 +73,3 @@ spec:
                 name: chat-api
                 port:
                   number: 8000
-          - path: /health
-            pathType: Exact
-            backend:
-              service:
-                name: health
-                port:
-                  number: 8000
