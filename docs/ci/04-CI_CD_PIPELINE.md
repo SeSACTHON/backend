@@ -130,7 +130,7 @@ graph LR
 #### 2단계: 경로 필터링
 - **도구**: `dorny/paths-filter@v2`
 - **필터 대상**
-  - 백엔드 코드: `services/**`, `Dockerfile`
+  - 백엔드 코드: `domains/**`, `Dockerfile`
   - 인프라: `terraform/**`, `ansible/**`
   - 문서: `docs/**`, `*.md`
 
@@ -985,7 +985,7 @@ jobs:
         with:
           filters: |
             backend:
-              - 'services/**'
+              - 'domains/**'
               - 'Dockerfile'
 
   build:

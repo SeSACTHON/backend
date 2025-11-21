@@ -46,7 +46,7 @@ commit-filter (chore/docs 여부) ─┬─> skip-notice (요약만 남김)
                                  │
                                  └─> quality-gate (Terraform / Helm / Kustomize)
                                          ↓
-                                 detect-api-changes (services/** diff)
+                                 detect-api-changes (domains/** diff)
                                          ↓
                          ┌───────────────┴───────────────┐
                          │                               │
@@ -61,7 +61,7 @@ commit-filter (chore/docs 여부) ─┬─> skip-notice (요약만 남김)
   - Terraform fmt/validate, Helm lint, Kustomize build를 실행해 GitOps 매니페스트 유효성을 확보한다.
 
 - **detect-api-changes Job**  
-  - `tj-actions/changed-files` 로 `services/**` 경로를 스캔, 변경된 서비스 목록(JSON)과 `has_changes` 플래그를 출력한다.
+  - `tj-actions/changed-files` 로 `domains/**` 경로를 스캔, 변경된 서비스 목록(JSON)과 `has_changes` 플래그를 출력한다.
 
 - **api-quality Job**  
   - 변경된 서비스만 matrix로 분기해 `black --check`, `ruff check`, `pytest` 를 실행한다.  

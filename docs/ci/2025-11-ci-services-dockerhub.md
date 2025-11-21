@@ -41,7 +41,7 @@ on:
       - develop
       - refactor/gitops-sync-wave
     paths:
-      - "services/**"
+      - "domains/**"
       - "scripts/**"
       - ".github/workflows/ci-services.yml"
   pull_request:
@@ -95,8 +95,8 @@ Buildx는 `steps.meta.outputs.tags` 값을 그대로 사용해 멀티 태그 푸
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: services/${{ matrix.service }}
-          file: services/${{ matrix.service }}/Dockerfile
+          context: domains/${{ matrix.service }}
+          file: domains/${{ matrix.service }}/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
 ```
