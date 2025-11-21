@@ -29,11 +29,8 @@ spec:
                 adminPasswordKey: postgres-password
                 userPasswordKey: password
 
-        # PostgreSQL 이미지 - 공식 PostgreSQL 이미지 사용
-        image:
-          registry: docker.io
-          repository: postgres
-          tag: "16"
+        # PostgreSQL 이미지 - Chart의 기본 이미지 사용
+        # Bitnami Helm Chart가 자동으로 호환되는 이미지 선택
 
         architecture: replication
 
