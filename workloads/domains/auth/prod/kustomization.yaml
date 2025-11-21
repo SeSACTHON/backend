@@ -12,3 +12,4 @@ labels:
 patches:
 - path: patch-configmap.yaml
 - path: patch-deployment.yaml
+- path: patch-ingress.yaml
