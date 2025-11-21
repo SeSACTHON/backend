@@ -1,6 +1,7 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
-  - postgres-cluster.yaml
+  # Redis Sentinel은 Redis Operator에서 관리
+  # Redis 관련 CR은 별도로 추가 가능
 
 
