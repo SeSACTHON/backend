@@ -18,9 +18,9 @@ if config.config_file_name is not None:
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-from domain.auth.database.base import Base
-from domain.auth.models.user import User  # noqa: F401
-from domain.auth.models.login_audit import LoginAudit  # noqa: F401
+from domain.auth.database.base import Base  # noqa: E402
+from domain.auth.models.user import User  # noqa: F401, E402
+from domain.auth.models.login_audit import LoginAudit  # noqa: F401, E402
 
 target_metadata = Base.metadata
 
