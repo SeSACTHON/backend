@@ -1,7 +1,8 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-resources:
-  # Redis Sentinel은 Redis Operator에서 관리
-  # Redis 관련 CR은 별도로 추가 가능
+# Redis Sentinel은 Redis Operator에서 관리
+# PostgreSQL은 Helm Chart로 관리 (clusters/dev/apps/27-postgresql.yaml)
+# 현재 이 디렉토리에는 Custom Resources가 없음
+resources: []
 
 
