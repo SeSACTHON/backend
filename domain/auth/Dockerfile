@@ -19,10 +19,11 @@ COPY domain/auth /app/domain/auth
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8000/api/v1/auth/health')"
+    CMD python -c "import httpx; httpx.get('http://localhost:8000/health')"
 
 EXPOSE 8000
 
-# DB 초기화 후 서버 시작
-CMD python -m domain.auth.init_db && \
-    uvicorn domain.auth.main:app --host 0.0.0.0 --port 8000
+# Alembic 마이그레이션 실행 후 서버 시작
+WORKDIR /app/domain/auth
+CMD alembic upgrade head && \
+    cd /app && uvicorn domain.auth.main:app --host 0.0.0.0 --port 8000
