@@ -33,7 +33,7 @@ spec:
 
         image:
           registry: docker.io
-          repository: bitnami/postgresql
+          repository: bitnamilegacy/postgresql
           tag: 16.4.0-debian-12-r13
 
         architecture: standalone
