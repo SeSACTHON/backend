@@ -8,10 +8,8 @@ data:
   ENVIRONMENT: "base"
   AUTH_FRONTEND_URL: "https://frontend-beta-gray-c44lrfj3n1.vercel.app"
   AUTH_JWT_ALGORITHM: "HS256"
-  AUTH_JWT_ISSUER: "eco2-auth"
-  AUTH_JWT_AUDIENCE: "eco2-clients"
+  AUTH_JWT_ISSUER: "sesacthon-auth"
+  AUTH_JWT_AUDIENCE: "sesacthon-clients"
   AUTH_ACCESS_TOKEN_EXP_MINUTES: "15"
   AUTH_REFRESH_TOKEN_EXP_MINUTES: "20160"
-  AUTH_REDIS_BLACKLIST_URL: "redis://dev-redis.redis.svc.cluster.local:6379/0"
-  AUTH_REDIS_OAUTH_STATE_URL: "redis://dev-redis.redis.svc.cluster.local:6379/3"
 

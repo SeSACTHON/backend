@@ -10,20 +10,20 @@ class Settings(BaseSettings):
     environment: str = "local"
     api_v1_prefix: str = "/api/v1"
 
-    database_url: str = (
-        "postgresql+asyncpg://sesacthon:sesacthon@postgres-cluster.postgres.svc.cluster.local:5432/sesacthon"
-    )
+    # Database connection (no default - must be provided via env)
+    database_url: str
 
-    redis_blacklist_url: str = "redis://redis-cluster.redis.svc.cluster.local:6379/0"
-    redis_oauth_state_url: str = "redis://redis-cluster.redis.svc.cluster.local:6379/3"
+    # Redis connections (no defaults - must be provided via env)
+    redis_blacklist_url: str
+    redis_oauth_state_url: str
 
     oauth_state_ttl_seconds: int = 600
     oauth_redirect_template: str = "http://localhost:8000/api/v1/auth/{provider}/callback"
 
     jwt_secret_key: str = "change-me"
     jwt_algorithm: str = "HS256"
-    jwt_issuer: str = "eco2-auth"
-    jwt_audience: str = "eco2-clients"
+    jwt_issuer: str = "sesacthon-auth"
+    jwt_audience: str = "sesacthon-clients"
     access_token_exp_minutes: int = 15
     refresh_token_exp_minutes: int = 60 * 24 * 14
 
