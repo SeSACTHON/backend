@@ -1,20 +1,37 @@
 apiVersion: argoproj.io/v1alpha1
-kind: Application
+kind: ApplicationSet
 metadata:
   name: prod-ingress
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "70"
 spec:
-  project: prod
-  source:
-    repoURL: https://github.com/eco2-team/backend.git
-    targetRevision: main
-    path: workloads/ingress/prod
-  destination:
-    server: https://kubernetes.default.svc
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
+  generators:
+  - list:
+      elements:
+      - name: auth
+        namespace: auth
+      - name: argocd
+        namespace: argocd
+      - name: grafana
+        namespace: grafana
+  template:
+    metadata:
+      name: prod-ingress-{{name}}
+      namespace: argocd
+    spec:
+      project: prod
+      source:
+        repoURL: https://github.com/eco2-team/backend.git
+        targetRevision: main
+        path: workloads/ingress/{{name}}/prod
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
 
