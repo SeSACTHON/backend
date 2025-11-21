@@ -8,8 +8,35 @@ patches:
 - path: patch-argocd-ingress.yaml
 - path: patch-grafana-ingress.yaml
 
-# replacements는 Secret이 있어야 동작하므로 제거
-# ACM ARN은 base에서 PLACEHOLDER로 유지하거나
-# AWS Load Balancer Controller가 ALB group level에서 관리
+replacements:
+- source:
+    kind: Secret
+    name: ingress-acm-arn
+    namespace: argocd
+    fieldPath: data.certificate-arn
+  targets:
+  - select:
+      kind: Ingress
+      name: argocd-ingress
+      namespace: argocd
+    fieldPaths:
+    - metadata.annotations.[alb.ingress.kubernetes.io/certificate-arn]
+    options:
+      delimiter: ''
+
+- source:
+    kind: Secret
+    name: ingress-acm-arn
+    namespace: grafana
+    fieldPath: data.certificate-arn
+  targets:
+  - select:
+      kind: Ingress
+      name: grafana-ingress
+      namespace: grafana
+    fieldPaths:
+    - metadata.annotations.[alb.ingress.kubernetes.io/certificate-arn]
+    options:
+      delimiter: ''
 
 
