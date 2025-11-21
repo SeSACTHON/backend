@@ -4,26 +4,13 @@ metadata:
   name: auth-api
   namespace: default
 spec:
-  type: ClusterIP
-  clusterIP: None  # Headless service
+  type: ExternalName
+  externalName: auth-api.auth.svc.cluster.local
   ports:
     - port: 8000
       targetPort: 8000
       protocol: TCP
       name: http
----
-apiVersion: v1
-kind: Endpoints
-metadata:
-  name: auth-api
-  namespace: default
-subsets:
-  - addresses:
-      - ip: 192.168.141.38  # auth Pod IP (사용자 제공)
-    ports:
-      - port: 8000
-        protocol: TCP
-        name: http
 ---
 apiVersion: v1
 kind: Service
