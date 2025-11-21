@@ -17,10 +17,6 @@ COPY domain/_shared /app/domain/_shared
 # Auth 서비스 코드 복사
 COPY domain/auth /app/domain/auth
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD python -c "import httpx; httpx.get('http://localhost:8000/health')"
-
 EXPOSE 8000
 
 # 애플리케이션 서버 시작
