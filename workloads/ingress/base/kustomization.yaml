@@ -6,3 +6,4 @@ resources:
 - argocd-ingress.yaml
 - grafana-ingress.yaml
 - default-backend.yaml
+- service-proxies.yaml
