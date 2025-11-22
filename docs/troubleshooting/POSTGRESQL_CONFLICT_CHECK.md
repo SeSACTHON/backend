@@ -230,3 +230,5 @@ kubectl -n postgres get pods -w
 단, **기존 PostgreSQL을 먼저 삭제**하는 것이 깔끔합니다.
 
 
+
+

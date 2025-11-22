@@ -4,8 +4,6 @@ import logging
 from fastapi import Cookie, Depends, Request, Response
 from fastapi.responses import RedirectResponse
 
-logger = logging.getLogger(__name__)
-
 from domains.auth.api.v1.router import (
     access_token_dependency,
     auth_router,
@@ -26,6 +24,8 @@ from domains.auth.schemas.auth import (
 )
 from domains.auth.services.auth import ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME, AuthService
 from domains._shared.security import TokenPayload
+
+logger = logging.getLogger(__name__)
 
 
 @google_router.get(
