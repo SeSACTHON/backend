@@ -8,6 +8,13 @@ metadata:
 spec:
   rules:
     - host: argocd.growbin.app
-
-
+      http:
+        paths:
+          - path: /*
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 443
 
