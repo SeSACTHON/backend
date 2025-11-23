@@ -36,8 +36,8 @@ Tier 0 Monitoring  : Prometheus, Grafana, Alerter Manager, ArgoCD
 Cluster  : kubeadm Self-Managed (14 Nodes)
 GitOps   :
   Layer0 - Terraform (AWS 인프라)
-  Layer1 - Ansible (kubeadm, CNI, Add-ons)
-  Layer2 - ArgoCD App-of-Apps + Kustomize/Helm
+  Layer1 - Ansible (kubeadm, CNI)
+  Layer2 - ArgoCD App-of-Apps Sync-wave + Kustomize/Helm
   Layer3 - GitHub Actions + Docker Hub
 Domains  : auth, my, scan, character, location, info, chat
 Data     : PostgreSQL, Redis, RabbitMQ (paused), Monitoring stack
