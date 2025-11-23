@@ -76,22 +76,22 @@ async def google_callback(
     code: str,
     state: str,
     request: Request,
-    response: Response,
     service: Annotated[AuthService, Depends()],
 ):
     """Google OAuth 콜백을 처리하고 세션 쿠키를 설정합니다."""
     settings = get_settings()
+    success_response = RedirectResponse(url=settings.frontend_url)
     try:
         payload = OAuthLoginRequest(code=code, state=state)
         await service.login_with_provider(
             "google",
             payload,
-            response=response,
+            response=success_response,
             user_agent=request.headers.get("user-agent"),
             ip_address=request.client.host if request.client else None,
         )
         # 성공 시 프론트엔드 홈으로 리다이렉트
-        return RedirectResponse(url=settings.frontend_url)
+        return success_response
     except Exception as e:
         # OAuth 실패 시 프론트엔드 로그인 페이지로 리다이렉트
         logger.error(f"Google OAuth callback failed: {type(e).__name__}: {str(e)}", exc_info=True)
@@ -106,22 +106,22 @@ async def kakao_callback(
     code: str,
     state: str,
     request: Request,
-    response: Response,
     service: Annotated[AuthService, Depends()],
 ):
     """Kakao OAuth 콜백을 처리하고 세션 쿠키를 설정합니다."""
     settings = get_settings()
+    success_response = RedirectResponse(url=settings.frontend_url)
     try:
         payload = OAuthLoginRequest(code=code, state=state)
         await service.login_with_provider(
             "kakao",
             payload,
-            response=response,
+            response=success_response,
             user_agent=request.headers.get("user-agent"),
             ip_address=request.client.host if request.client else None,
         )
         # 성공 시 프론트엔드 홈으로 리다이렉트
-        return RedirectResponse(url=settings.frontend_url)
+        return success_response
     except Exception as e:
         # OAuth 실패 시 프론트엔드 로그인 페이지로 리다이렉트
         logger.error(f"Kakao OAuth callback failed: {type(e).__name__}: {str(e)}", exc_info=True)
@@ -136,22 +136,22 @@ async def naver_callback(
     code: str,
     state: str,
     request: Request,
-    response: Response,
     service: Annotated[AuthService, Depends()],
 ):
     """Naver OAuth 콜백을 처리하고 세션 쿠키를 설정합니다."""
     settings = get_settings()
+    success_response = RedirectResponse(url=settings.frontend_url)
     try:
         payload = OAuthLoginRequest(code=code, state=state)
         await service.login_with_provider(
             "naver",
             payload,
-            response=response,
+            response=success_response,
             user_agent=request.headers.get("user-agent"),
             ip_address=request.client.host if request.client else None,
         )
         # 성공 시 프론트엔드 홈으로 리다이렉트
-        return RedirectResponse(url=settings.frontend_url)
+        return success_response
     except Exception as e:
         # OAuth 실패 시 프론트엔드 로그인 페이지로 리다이렉트
         logger.error(f"Naver OAuth callback failed: {type(e).__name__}: {str(e)}", exc_info=True)
