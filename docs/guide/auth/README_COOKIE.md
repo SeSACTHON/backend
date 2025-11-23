@@ -9,7 +9,7 @@ ACCESS_COOKIE_NAME = "s_access"
 REFRESH_COOKIE_NAME = "s_refresh"
 COOKIE_PATH = "/"
 COOKIE_SAMESITE = "lax"
-COOKIE_DOMAIN = None  # None: 현재 도메인만, ".dev.growbin.app": 서브도메인 공유
+COOKIE_DOMAIN = ".growbin.app"  # None: 현재 도메인만, ".dev.growbin.app": 서브도메인 공유
 ```
 
 ### 쿠키 속성
@@ -22,42 +22,30 @@ COOKIE_DOMAIN = None  # None: 현재 도메인만, ".dev.growbin.app": 서브도
 
 ## Domain 설정
 
-### Case 1: 프론트엔드와 백엔드가 같은 도메인 (기본값)
+### Case 1: 공용 도메인 (현재 기본)
 
 ```python
-COOKIE_DOMAIN = None
+COOKIE_DOMAIN = ".growbin.app"
 ```
 
-- 백엔드: `api.dev.growbin.app`
-- 프론트엔드: `api.dev.growbin.app`
-- 쿠키는 `api.dev.growbin.app`에만 바인딩됨
+- dev: `api.dev.growbin.app`, `frontend.dev.growbin.app`
+- prod: `api.growbin.app`, `growbin.app`
+- 하나의 쿠키로 모든 `*.growbin.app` 서브도메인 접근 가능
 
-### Case 2: 프론트엔드가 별도 서브도메인
-
-```python
-COOKIE_DOMAIN = ".dev.growbin.app"
-```
-
-- 백엔드: `api.dev.growbin.app`
-- 프론트엔드: `console.dev.growbin.app` 또는 `dev.growbin.app`
-- 쿠키가 모든 `*.dev.growbin.app` 서브도메인에서 공유됨
-
-**주의**: `domain` 앞에 `.`(점)을 붙여야 서브도메인 공유가 가능합니다.
-
-### Case 3: 환경별 분리
+### Case 2: 환경별 세분화
 
 ```python
-# ConfigMap 또는 환경변수로 주입
 import os
-COOKIE_DOMAIN = os.getenv("COOKIE_DOMAIN", None)
+COOKIE_DOMAIN = os.getenv("COOKIE_DOMAIN", ".growbin.app")
 ```
 
-- dev: `COOKIE_DOMAIN=".dev.growbin.app"`
-- prod: `COOKIE_DOMAIN=".growbin.app"`
+- dev만 `.dev.growbin.app` 으로 제한하고 싶다면 ConfigMap/Secret에서 값을 덮어쓰면 됩니다.
+
+> `domain` 앞에 반드시 `.`(점)을 붙여야 하위 서브도메인이 모두 포함됩니다.
 
 ## CORS 설정
 
-`domains/auth/main.py`에서 CORS 미들웨어가 설정되어 있습니다:
+`domains/auth/main.py`에서 기본적으로 전체 허용으로 등록되어 있습니다 (개발 편의성 목적):
 
 ```python
 app.add_middleware(
@@ -137,7 +125,7 @@ kubectl logs -n auth -l app=auth-api --tail=100 -f | grep -i cookie
 
 1. **HTTPS 미사용**
    - `secure=True`이므로 HTTP에서는 쿠키가 설정되지 않음
-   - 로컬 개발 시 `secure=False`로 임시 변경 (운영 금지)
+   - 로컬 Docker 개발에서만 `secure=False`를 임시 허용하고, 운영/스테이징은 반드시 HTTPS 사용
 
 2. **Domain 불일치**
    - 프론트엔드가 `console.dev.growbin.app`인데 domain이 `api.dev.growbin.app`로 고정

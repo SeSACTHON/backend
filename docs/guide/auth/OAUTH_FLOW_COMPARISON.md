@@ -1,9 +1,42 @@
 # OAuth 로그인 플로우 비교
 
-## 📋 버전 1: JSON 응답 방식 (현재 버전)
+## ✅ 현재 동작 (v0.8.0 이상)
+
+- 모든 콜백(`google/kakao/naver`)은 성공 시 `Settings.frontend_url` 로 302 리다이렉트, 실패 시 `Settings.oauth_failure_redirect_url` 로 리다이렉트합니다.
+- 쿠키(`s_access`, `s_refresh`)는 콜백 내부에서 이미 설정되므로, 프론트는 리다이렉트 이후 `/api/v1/auth/me` 를 호출해 로그인 상태를 확인하기만 하면 됩니다.
+
+### 전체 절차
+
+```
+[사용자] -- 1. 로그인 버튼 클릭
+[프론트엔드] -- 2. GET /api/v1/auth/{provider}
+[백엔드] -- 3. { authorization_url, state, expires_at } 응답
+[프론트엔드] -- 4. window.location.href = authorization_url
+[프로바이더] -- 5. 사용자 동의 후 /callback?code=...&state=...
+[백엔드] -- 6. 로그인 처리 + 쿠키 설정
+[백엔드] -- 7. 302 Redirect → {frontend_url} (실패 시 {frontend_url}/login?error=oauth_failed)
+[프론트엔드] -- 8. /api/v1/auth/me 호출 → 세션 확인
+```
+
+### 성공 시 응답 예시
+```
+HTTP/1.1 307 Temporary Redirect
+Location: https://frontend.dev.growbin.app/
+Set-Cookie: s_access=...; HttpOnly; Secure; SameSite=Lax; Domain=.growbin.app
+Set-Cookie: s_refresh=...; HttpOnly; Secure; SameSite=Lax; Domain=.growbin.app
+```
+
+### 프론트 체크리스트
+- 로그인 버튼 → `/api/v1/auth/{provider}` 호출 후 `authorization_url` 로 이동
+- 홈/대시보드 진입 시 `/api/v1/auth/me` 호출 (`credentials: 'include'`)
+- 401 수신 시 `/api/v1/auth/refresh` → 재시도 (자세한 내용은 `FRONTEND_AUTH_GUIDE.md`)
+
+---
+
+## 📋 레거시: JSON 응답 방식
 
 ### 특징
-- 콜백 엔드포인트가 **JSON 응답**을 반환
+- 콜백 엔드포인트가 **JSON 응답**을 반환 (v0.8.0 이전 기본값)
 - 프론트엔드가 콜백 URL을 직접 호출하여 결과를 처리
 - SPA(React, Vue 등)에 적합
 
@@ -180,42 +213,18 @@ async def naver_callback(code: str, state: str, ...):
     return LoginSuccessResponse(data=LoginData(user=user))
 ```
 
-**수정 후 (리다이렉트):**
+이 방식은 현재 기본값이 아니지만, 필요 시 `FRONTEND_REDIRECT_URL` 환경 변수를 비워 두고 반환 값을 JSON 으로 유지하도록 커스텀할 수 있습니다.
+
+**현재 기본 (리다이렉트):**
 ```python
 @naver_router.get("/callback")
-async def naver_callback(
-    code: Optional[str] = None,
-    state: Optional[str] = None,
-    error: Optional[str] = None,
-    ...
-):
-    # 사용자가 거부한 경우
-    if error:
-        return RedirectResponse(
-            url=f"http://localhost:3000/login/error?message={error}",
-            status_code=302
-        )
-    
-    # 필수 파라미터 없음
-    if not code or not state:
-        return RedirectResponse(
-            url="http://localhost:3000/login/error?message=Missing parameters",
-            status_code=302
-        )
-    
+async def naver_callback(...):
+    settings = get_settings()
     try:
-        user = await service.login_with_provider(...)
-        # 성공 - 프론트엔드로 리다이렉트
-        return RedirectResponse(
-            url="http://localhost:3000/login/success",
-            status_code=302
-        )
-    except Exception as e:
-        # 실패 - 에러 페이지로 리다이렉트
-        return RedirectResponse(
-            url=f"http://localhost:3000/login/error?message={str(e)}",
-            status_code=302
-        )
+        await service.login_with_provider(...)
+        return RedirectResponse(url=settings.frontend_url)
+    except Exception:
+        return RedirectResponse(url=settings.oauth_failure_redirect_url)
 ```
 
 ### 프론트엔드 구현 예시
@@ -269,13 +278,12 @@ displayError(errorMessage);
 ## 🎯 권장 사항
 
 ### 프로덕션 환경
-→ **버전 2 (리다이렉트 방식)** 추천
-- 사용자가 JSON을 보지 않음
-- 더 나은 UX
+→ **리다이렉트 방식 (현재 기본값)** 추천
+- 사용자가 JSON을 직접 보지 않음
+- 성공/실패 UX가 일관됨
 
 ### 개발/테스트 환경
-→ **버전 1 (JSON 응답)** 추천
-- API 응답을 직접 확인 가능
+→ JSON 응답 모드(레거시)를 일시적으로 유지하고 싶다면 `FRONTEND_REDIRECT_URL` 환경 변수를 비워 두고, 콜백에서 `LoginSuccessResponse` 를 반환하도록 코드를 유지하면 됩니다.
 - 디버깅 용이
 
 ### 구현 방법
