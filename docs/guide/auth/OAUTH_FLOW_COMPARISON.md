@@ -33,13 +33,6 @@ Set-Cookie: s_refresh=...; HttpOnly; Secure; SameSite=Lax; Domain=.growbin.app
 
 ---
 
-## 📋 레거시: JSON 응답 방식
-
-### 특징
-- 콜백 엔드포인트가 **JSON 응답**을 반환 (v0.8.0 이전 기본값)
-- 프론트엔드가 콜백 URL을 직접 호출하여 결과를 처리
-- SPA(React, Vue 등)에 적합
-
 ### 전체 절차
 
 ```
@@ -320,10 +313,10 @@ http://localhost:8000/api/v1/auth/google/callback
 http://localhost:8000/api/v1/auth/kakao/callback
 ```
 
-**프로덕션:**
+**배포:**
 ```
-https://api.growbin.app/api/v1/auth/naver/callback
-https://api.growbin.app/api/v1/auth/google/callback
-https://api.growbin.app/api/v1/auth/kakao/callback
+https://dev.api.growbin.app/api/v1/auth/naver/callback
+https://dev.api.growbin.app/api/v1/auth/google/callback
+https://dev.api.growbin.app/api/v1/auth/kakao/callback
 ```
 
