@@ -174,6 +174,7 @@ backend/
 - [이코에코 인프라 구축기 #2 GitOps: Ansible 의존성 줄이기](https://rooftopsnow.tistory.com/10)
 - [이코에코 인프라 구축기 #3 GitOps: 네트워크 트러블슈팅](https://rooftopsnow.tistory.com/11)
 - [이코에코 인프라 구축기 #4 GitOps: Operator vs Helm-charts](https://rooftopsnow.tistory.com/12)
+- [이코에코 인프라 구축기 #5 GitOps: Sync-wave](https://rooftopsnow.tistory.com/13)
 
 ---
 
