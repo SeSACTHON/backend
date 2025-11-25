@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/location"
     redis_url: str = "redis://localhost:6379/5"
     metrics_cache_ttl_seconds: int = 60
+    auth_disabled: bool = Field(
+        False,
+        validation_alias=AliasChoices("LOCATION_AUTH_DISABLED"),
+    )
     jwt_secret_key: str = Field(
         "change-me",
         validation_alias=AliasChoices("LOCATION_JWT_SECRET_KEY", "AUTH_JWT_SECRET_KEY"),
@@ -37,4 +41,3 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     return Settings()
-
