@@ -73,13 +73,12 @@ class ZeroWasteRepository:
 
     @staticmethod
     def _haversine_expr(latitude: float, longitude: float):
-        cosine = (
-            func.cos(func.radians(latitude))
-            * func.cos(func.radians(ZeroWasteSite.lat))
-            * func.cos(func.radians(ZeroWasteSite.lon) - func.radians(longitude))
-            + func.sin(func.radians(latitude)) * func.sin(func.radians(ZeroWasteSite.lat))
+        cosine = func.cos(func.radians(latitude)) * func.cos(
+            func.radians(ZeroWasteSite.lat)
+        ) * func.cos(func.radians(ZeroWasteSite.lon) - func.radians(longitude)) + func.sin(
+            func.radians(latitude)
+        ) * func.sin(
+            func.radians(ZeroWasteSite.lat)
         )
         clamped = func.least(1.0, func.greatest(-1.0, cosine))
         return (6371.0 * func.acos(clamped)).label("distance_km")
-
-

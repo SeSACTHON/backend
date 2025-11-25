@@ -43,4 +43,3 @@ __all__ = [
     "metrics_router",
     "access_token_dependency",
 ]
-

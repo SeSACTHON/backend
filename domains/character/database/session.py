@@ -1,14 +1,16 @@
+from __future__ import annotations
+
 from collections.abc import AsyncIterator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from domains.location.core.config import get_settings
+from domains.character.core import get_settings
 
 settings = get_settings()
 
 engine = create_async_engine(
     settings.database_url,
-    echo=False,
+    echo=settings.database_echo,
     pool_pre_ping=True,
 )
 

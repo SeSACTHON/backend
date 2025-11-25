@@ -49,4 +49,3 @@ def limit_from_zoom(zoom: int | None) -> int:
         if zoom >= level:
             return ZOOM_LIMIT_TABLE[level]
     return 50
-

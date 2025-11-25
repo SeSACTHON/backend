@@ -48,3 +48,5 @@ docker compose -f domains/location/docker-compose.location-local.yml down -v
 
 필요 시 `docker compose exec db psql -U location -d location` 으로 DB에 접속해 직접 데이터를 조회할 수 있습니다.
 
+
+

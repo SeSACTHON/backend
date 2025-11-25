@@ -28,8 +28,7 @@ async def init_db() -> int:
         async with engine.begin() as conn:
             exists = await conn.scalar(
                 text(
-                    "SELECT 1 FROM information_schema.schemata "
-                    "WHERE schema_name = :schema_name"
+                    "SELECT 1 FROM information_schema.schemata " "WHERE schema_name = :schema_name"
                 ),
                 {"schema_name": "auth"},
             )
@@ -65,4 +64,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

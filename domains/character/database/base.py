@@ -2,6 +2,6 @@ from sqlalchemy.orm import DeclarativeBase
 
 
 class Base(DeclarativeBase):
-    """Declarative base for Location ORM models."""
+    """Declarative base for Character service models."""
 
     pass

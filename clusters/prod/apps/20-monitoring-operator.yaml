@@ -4,7 +4,7 @@ metadata:
   name: prod-kube-prom-stack
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "20"
+    argocd.argoproj.io/sync-wave: '20'
 spec:
   project: prod
   source:
@@ -26,15 +26,15 @@ spec:
                 spec:
                   storageClassName: gp3
                   accessModes:
-                    - ReadWriteOnce
+                  - ReadWriteOnce
                   resources:
                     requests:
                       storage: 50Gi
             tolerations:
-              - key: domain
-                operator: Equal
-                value: observability
-                effect: NoSchedule
+            - key: domain
+              operator: Equal
+              value: observability
+              effect: NoSchedule
             nodeSelector:
               infra-type: monitoring
         grafana:
@@ -44,10 +44,10 @@ spec:
             patch:
               enabled: true
           tolerations:
-            - key: domain
-              operator: Equal
-              value: observability
-              effect: NoSchedule
+          - key: domain
+            operator: Equal
+            value: observability
+            effect: NoSchedule
           nodeSelector:
             infra-type: monitoring
         prometheus:
@@ -60,37 +60,37 @@ spec:
                 spec:
                   storageClassName: gp3
                   accessModes:
-                    - ReadWriteOnce
+                  - ReadWriteOnce
                   resources:
                     requests:
                       storage: 200Gi
             nodeSelector:
               infra-type: monitoring
             tolerations:
-              - key: domain
-                operator: Equal
-                value: observability
-                effect: NoSchedule
+            - key: domain
+              operator: Equal
+              value: observability
+              effect: NoSchedule
             scrapeInterval: 30s
             evaluationInterval: 30s
             serviceMonitorNamespaceSelector:
               matchExpressions:
-                - key: kubernetes.io/metadata.name
-                  operator: In
-                  values:
-                    - auth
-                    - my
-                    - scan
-                    - character
-                    - location
-                    - info
-                    - chat
-                    - postgres
-                    - redis
-                    - rabbitmq
-                    - grafana
-                    - prometheus
-                    - default
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                - auth
+                - my
+                - scan
+                - character
+                - location
+                - image
+                - chat
+                - postgres
+                - redis
+                - rabbitmq
+                - grafana
+                - prometheus
+                - default
   destination:
     server: https://kubernetes.default.svc
     namespace: prometheus
@@ -99,6 +99,5 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
-      - ServerSideApply=true
-
+    - CreateNamespace=true
+    - ServerSideApply=true

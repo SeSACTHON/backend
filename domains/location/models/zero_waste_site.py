@@ -29,4 +29,3 @@ class ZeroWasteSite(Base):
     place_key: Mapped[Optional[str]] = mapped_column(String(64))
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
-

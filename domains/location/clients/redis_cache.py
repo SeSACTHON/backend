@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from typing import Any
 
 import redis.asyncio as redis
@@ -35,4 +34,3 @@ class RedisCache:
         if cls._client:
             await cls._client.close()
             cls._client = None
-
