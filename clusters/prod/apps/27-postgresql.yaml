@@ -66,21 +66,6 @@ spec:
           volumePermissions:
             enabled: true
 
-          initdb:
-            scripts:
-              00-init-extensions.sql: |
-                -- 지리공간 확장 설치 (superuser 권한 필요)
-                CREATE EXTENSION IF NOT EXISTS cube;
-                CREATE EXTENSION IF NOT EXISTS earthdistance;
-              01-init-schemas.sql: |
-                -- auth 서비스용 스키마 생성
-                CREATE SCHEMA IF NOT EXISTS auth;
-
-                -- sesacthon 사용자에게 auth 스키마 권한 부여
-                GRANT ALL PRIVILEGES ON SCHEMA auth TO sesacthon;
-                GRANT ALL PRIVILEGES ON DATABASE sesacthon TO sesacthon;
-                GRANT ALL PRIVILEGES ON SCHEMA public TO sesacthon;
-
           nodeSelector:
             domain: data
 

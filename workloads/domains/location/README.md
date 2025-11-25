@@ -13,8 +13,8 @@ Location 도메인 API 서비스 Kustomize 구조.
 초기 배포 시 DB/데이터 시드를 위해 다음 Job 이 순차적으로 실행되며,
 `argocd.argoproj.io/sync-wave`를 통해 `location-api` Deployment 보다 먼저 완료된다.
 
-1. `location-keco-import` (wave -40): KECO 원본 데이터 및 확장 설치
-2. `location-db-bootstrap` (wave -30): 제로웨이스트 데이터 적재
+1. `location-keco-import` (wave -40): KECO 원본 데이터 적재 (확장은 db-bootstrap Job이 설치)
+2. `location-db-bootstrap` (wave -30): cube/earthdistance 확장 설치 + location 스키마 생성
 3. `location-common-build` (wave -20): 정규화 CSV 생성
 4. `location-common-import` (wave -10): 정규화 테이블 적재
 
