@@ -123,4 +123,14 @@ curl -i "http://127.0.0.1:8010/api/v1/locations/centers?lat=37.5665&lon=126.9780
 - [ ] 프론트엔드 운영시간 UI 업데이트
 - [ ] 정기적 데이터 갱신을 위한 CronJob 추가 검토
 - [ ] 성능 최적화 (Redis 캐싱, 인덱스 튜닝)
+## ✅ 체크리스트
+- [x] feature/location-service 브랜치 4개 커밋으로 논리적 단위 분리
+- [x] GitHub에 브랜치 push 완료
+- [ ] GitHub PR 생성 후 리뷰 요청
+- [ ] ArgoCD dev 환경 sync 및 Job 성공 확인
+- [ ] API 엔드포인트 스모크 테스트 (health, centers)
+
+## 📌 참고
+- 관련 문서: `docs/development/location/DATA_PIPELINE.md`, `workloads/domains/location/README.md`
+- 운영시간 응답 구조 변경으로 클라이언트(프론트엔드) 측 업데이트 필요
 
