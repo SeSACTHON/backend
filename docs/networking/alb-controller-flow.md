@@ -44,6 +44,7 @@ graph TD
     IngressData --> Node2["노드 B<br/>k8s-api-domain-2"]:::node
     Node2 -->|ClusterIP 8000| Pod2["domain-api Pod #2"]:::pod
     Pod2 -->|응답| ClientRight
+
     classDef client fill:#BFDBFE,stroke:#1D4ED8,color:#111;
     classDef alb fill:#FECACA,stroke:#B91C1C,color:#111;
     classDef tg fill:#FBCFE8,stroke:#BE185D,color:#111;
