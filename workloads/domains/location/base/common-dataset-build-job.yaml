@@ -9,6 +9,8 @@ metadata:
     domain: location
   annotations:
     argocd.argoproj.io/sync-wave: '-20'
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: HookSucceeded
 spec:
   backoffLimit: 3
   template:
