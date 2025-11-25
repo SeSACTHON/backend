@@ -4,7 +4,7 @@ resources:
 - ../base
 images:
 - name: docker.io/mng990/eco2
-  newTag: location-api-dev-605064
+  newTag: location-api-dev-9d3fe5
 labels:
 - includeSelectors: true
   pairs:
