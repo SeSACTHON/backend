@@ -4,7 +4,7 @@ metadata:
   name: dev-kube-prom-stack
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "20"
+    argocd.argoproj.io/sync-wave: '20'
 spec:
   project: dev
   source:
@@ -23,10 +23,10 @@ spec:
             replicas: 1
             storage: {}
             tolerations:
-              - key: domain
-                operator: Equal
-                value: observability
-                effect: NoSchedule
+            - key: domain
+              operator: Equal
+              value: observability
+              effect: NoSchedule
             nodeSelector:
               infra-type: monitoring
         grafana:
@@ -38,10 +38,10 @@ spec:
           tls:
             enabled: false
           tolerations:
-            - key: domain
-              operator: Equal
-              value: observability
-              effect: NoSchedule
+          - key: domain
+            operator: Equal
+            value: observability
+            effect: NoSchedule
           nodeSelector:
             infra-type: monitoring
         prometheus:
@@ -51,28 +51,28 @@ spec:
             nodeSelector:
               infra-type: monitoring
             tolerations:
-              - key: domain
-                operator: Equal
-                value: observability
-                effect: NoSchedule
+            - key: domain
+              operator: Equal
+              value: observability
+              effect: NoSchedule
             serviceMonitorNamespaceSelector:
               matchExpressions:
-                - key: kubernetes.io/metadata.name
-                  operator: In
-                  values:
-                    - auth
-                    - my
-                    - scan
-                    - character
-                    - location
-                    - info
-                    - chat
-                    - postgres
-                    - redis
-                    - rabbitmq
-                    - grafana
-                    - prometheus
-                    - default
+              - key: kubernetes.io/metadata.name
+                operator: In
+                values:
+                - auth
+                - my
+                - scan
+                - character
+                - location
+                - image
+                - chat
+                - postgres
+                - redis
+                - rabbitmq
+                - grafana
+                - prometheus
+                - default
             serviceMonitorSelectorNilUsesHelmValues: false
             additionalScrapeConfigsSecret:
               enabled: false
@@ -84,6 +84,5 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
-      - ServerSideApply=true
-
+    - CreateNamespace=true
+    - ServerSideApply=true

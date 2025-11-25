@@ -27,8 +27,9 @@ class Settings(BaseSettings):
     access_token_exp_minutes: int = 15
     refresh_token_exp_minutes: int = 60 * 24 * 14
 
-    # Frontend URL
-    frontend_url: str = "https://frontend-beta-gray-c44lrfj3n1.vercel.app"
+    # Frontend / Cookie domains
+    frontend_url: str = "https://frontend.dev.growbin.app"
+    cookie_domain: Optional[str] = ".dev.growbin.app"
 
     # OAuth failure redirect
     @property

@@ -1,0 +1,49 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: location-keco-import
+  namespace: location
+  labels:
+    app: location-api
+    tier: business-logic
+    domain: location
+  annotations:
+    argocd.argoproj.io/sync-wave: '-40'
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: location-api
+        tier: business-logic
+        domain: location
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: import-keco-sites
+        image: docker.io/mng990/eco2:location-api-latest
+        imagePullPolicy: Always
+        command:
+        - python
+        - -m
+        - domains.location.jobs.import_keco_sites
+        env:
+        - name: LOCATION_DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: location-secret
+              key: LOCATION_DATABASE_URL
+        envFrom:
+        - configMapRef:
+            name: location-config
+        - secretRef:
+            name: location-secret
+      imagePullSecrets:
+      - name: dockerhub-secret
+      nodeSelector:
+        domain: location
+      tolerations:
+      - key: domain
+        operator: Equal
+        value: location
+        effect: NoSchedule
