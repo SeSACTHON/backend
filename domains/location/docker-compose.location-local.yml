@@ -53,32 +53,17 @@ services:
       import-keco:
         condition: service_completed_successfully
 
-  common-build:
+  common-sync:
     build:
       context: ../..
       dockerfile: domains/location/Dockerfile
-    container_name: location-local-common-build
+    container_name: location-local-common-sync
     restart: no
-    command: [python, -m, domains.location.jobs.build_common_dataset, --output-csv, /shared/location_common_dataset.csv]
-    volumes:
-    - location-common-dataset:/shared
-    depends_on:
-      bootstrap-zero-waste:
-        condition: service_completed_successfully
-
-  common-import:
-    build:
-      context: ../..
-      dockerfile: domains/location/Dockerfile
-    container_name: location-local-common-import
-    restart: no
-    command: [python, -m, domains.location.jobs.import_common_locations, --csv-path, /shared/location_common_dataset.csv]
+    command: [python, -m, domains.location.jobs.sync_common_dataset]
     environment:
       LOCATION_DATABASE_URL: postgresql+asyncpg://location:location@db:5432/location
-    volumes:
-    - location-common-dataset:/shared
     depends_on:
-      common-build:
+      bootstrap-zero-waste:
         condition: service_completed_successfully
 
   api:
@@ -95,11 +80,9 @@ services:
     depends_on:
       redis:
         condition: service_started
-      common-import:
+      common-sync:
         condition: service_completed_successfully
 
 volumes:
   location-db-data:
-    driver: local
-  location-common-dataset:
     driver: local

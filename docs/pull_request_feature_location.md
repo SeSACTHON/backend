@@ -32,12 +32,10 @@
 - KECO 데이터: 요일별 파싱 후 현재 시각 기준 상태 결정 (예: `{"status":"closed","start":"12:00","end":"18:00"}`)
 
 ### 4. Kubernetes Job 기반 DB 부트스트랩 파이프라인
-- `workloads/domains/location/base/`: 4개 Job 매니페스트 추가
+- `workloads/domains/location/base/`: Job 매니페스트
   - `keco-import-job.yaml` (sync-wave: -40)
   - `db-bootstrap-job.yaml` (sync-wave: -30)
-  - `common-dataset-build-job.yaml` (sync-wave: -20)
-  - `common-dataset-import-job.yaml` (sync-wave: -10)
-- `common-dataset-pvc.yaml` (sync-wave: -35): 정규화 데이터셋 공유를 위한 PVC
+  - `common-dataset-sync-job.yaml` (sync-wave: 10) – 정규화 데이터셋 생성 후 즉시 DB 업서트
 - `README.md`: 부트스트랩 Job 순서 및 재실행 가이드 문서화
 - ArgoCD sync-wave 설정으로 Deployment 이전 순차 실행 보장
 

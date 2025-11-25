@@ -30,24 +30,23 @@
 | 스크립트 | 기능 |
 | --- | --- |
 | `domains/location/jobs/import_zero_waste_locations.py` | 제로웨이스트 CSV → `location_zero_waste_sites` (기존) |
-| `domains/location/jobs/import_keco_sites.py` | KECO CSV → `location_keco_sites` (CSV 탐색/정규화 로직을 제로웨이스트와 동일 유틸 기반으로 통합) |
+| `domains/location/jobs/import_keco_sites.py` | KECO CSV → `location_keco_sites` |
 | `domains/location/jobs/build_common_dataset.py` | 두 CSV → 공통 스키마 CSV (`location_common_dataset.csv`) |
 | `domains/location/jobs/import_common_locations.py` | 공통 CSV → `location_normalized_sites` |
+| `domains/location/jobs/sync_common_dataset.py` | 두 CSV를 즉시 정규화 후 `location_normalized_sites`에 업서트 (K8s Job에서 사용) |
 
 > 모든 스크립트는 `--batch-size`, `--csv-path`, `--database-url` 옵션을 지원하여 로컬/CI/Job 어디서든 동일하게 실행됩니다.
 
-## Kubernetes Job & PVC
+## Kubernetes Job
 
 | 파일 | 역할 | Hook Weight |
 | --- | --- | --- |
-| `workloads/domains/location/base/keco-import-job.yaml` | KECO Raw 적재 | 5 |
-| `workloads/domains/location/base/db-bootstrap-job.yaml` | 제로웨이스트 Raw 적재 | 10 |
-| `workloads/domains/location/base/common-dataset-build-job.yaml` | PVC에 공통 CSV 생성 (`/shared/location_common_dataset.csv`) | 15 |
-| `workloads/domains/location/base/common-dataset-import-job.yaml` | 공통 CSV → `location_normalized_sites` | 20 |
-| `workloads/domains/location/base/common-dataset-pvc.yaml` | PVC(`location-common-dataset`, 1Gi) 정의 | - |
+| `workloads/domains/location/base/keco-import-job.yaml` | KECO Raw 적재 | -40 |
+| `workloads/domains/location/base/db-bootstrap-job.yaml` | cube/earthdistance 확장 설치 + location 스키마 생성 | -30 |
+| `workloads/domains/location/base/common-dataset-sync-job.yaml` | 두 CSV를 정규화 후 즉시 DB 업서트 | 10 |
 
-- PVC는 RWO 모드로 마운트되어 빌더 Job과 Import Job이 같은 CSV를 공유합니다.
-- PostSync Hook weight 순서에 따라 의존 관계가 강제됩니다.
+- PVC 의존성을 제거하고 단일 Job에서 빌드+임포트를 수행합니다.
+- Hook weight를 통해 Deployment가 올라가기 전에 모든 데이터가 준비됩니다.
 
 ## 문서 참고
 

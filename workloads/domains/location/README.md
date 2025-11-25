@@ -15,8 +15,7 @@ Location 도메인 API 서비스 Kustomize 구조.
 
 1. `location-keco-import` (wave -40): KECO 원본 데이터 적재 (확장은 db-bootstrap Job이 설치)
 2. `location-db-bootstrap` (wave -30): cube/earthdistance 확장 설치 + location 스키마 생성
-3. `location-common-build` (wave -20): 정규화 CSV 생성
-4. `location-common-import` (wave -10): 정규화 테이블 적재
+3. `location-common-sync` (wave 10): 정규화 데이터셋 생성 후 즉시 DB 업서트 (PVC 미사용)
 
 Job 이 성공하면 `Completed` 상태로 남고, 필요 시 `kubectl delete job <name>` 후 ArgoCD sync 를 재실행하면 다시 수행된다.
 

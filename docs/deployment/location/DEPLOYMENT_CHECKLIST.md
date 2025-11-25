@@ -20,8 +20,7 @@
 3. `dev-apis` / `prod-apis` ApplicationSet 동기화 → 다음 Job이 순차 실행
    - `location-keco-import`
    - `location-db-bootstrap`
-   - `location-common-build`
-   - `location-common-import`
+   - `location-common-sync`
 4. `location-api` Deployment 롤아웃 완료 대기
 
 ## 4. 배포 후 검증
