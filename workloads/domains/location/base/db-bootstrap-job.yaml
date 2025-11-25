@@ -19,6 +19,38 @@ spec:
         domain: location
     spec:
       restartPolicy: Never
+      initContainers:
+      - name: install-extensions
+        image: postgres:16
+        command:
+        - sh
+        - -c
+        - |
+          set -euo pipefail
+          echo "📦 Installing cube/earthdistance extensions..."
+          PGPASSWORD="${POSTGRES_PASSWORD}" psql "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:5432/${POSTGRES_DB}" -c "CREATE EXTENSION IF NOT EXISTS cube;"
+          PGPASSWORD="${POSTGRES_PASSWORD}" psql "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:5432/${POSTGRES_DB}" -c "CREATE EXTENSION IF NOT EXISTS earthdistance;"
+        env:
+        - name: POSTGRES_HOST
+          valueFrom:
+            secretKeyRef:
+              name: location-secret
+              key: POSTGRES_HOST
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: location-secret
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: location-secret
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: location-secret
+              key: POSTGRES_DB
       containers:
       - name: db-bootstrap
         image: docker.io/mng990/eco2:location-api-latest
@@ -26,13 +58,28 @@ spec:
         command:
         - python
         - -m
-        - domains.location.jobs.import_zero_waste_locations
+        - domains.location.jobs.init_db
         env:
-        - name: LOCATION_DATABASE_URL
+        - name: POSTGRES_HOST
           valueFrom:
             secretKeyRef:
               name: location-secret
-              key: LOCATION_DATABASE_URL
+              key: POSTGRES_HOST
+        - name: POSTGRES_USER
+          valueFrom:
+            secretKeyRef:
+              name: location-secret
+              key: POSTGRES_USER
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: location-secret
+              key: POSTGRES_PASSWORD
+        - name: POSTGRES_DB
+          valueFrom:
+            secretKeyRef:
+              name: location-secret
+              key: POSTGRES_DB
         envFrom:
         - configMapRef:
             name: location-config

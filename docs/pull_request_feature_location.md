@@ -6,6 +6,11 @@
 - 운영시간 API 응답 구조 개선 (실시간 상태 판단)
 - Kubernetes Job 기반 DB 부트스트랩 파이프라인 구성
 
+## 🔍 관련 이슈
+- Location 서비스 초기 구현 및 배포 준비
+- KECO/제로웨이스트 데이터 통합 및 정규화
+- 지리 공간 쿼리 지원을 위한 PostgreSQL 확장 설정
+
 ## 🔧 상세 내용
 
 ### 1. 쿠키 기반 인증 전환 및 KST 타임존 설정
@@ -36,6 +41,12 @@
 - `README.md`: 부트스트랩 Job 순서 및 재실행 가이드 문서화
 - ArgoCD sync-wave 설정으로 Deployment 이전 순차 실행 보장
 
+### 5. 코드 품질 및 CI 개선
+- Black 포맷 적용 (auth, location, character 도메인 27개 파일)
+- ApplicationSet 템플릿 따옴표 수정 (double → single quotes)
+- Placeholder 테스트 추가하여 pytest 수집 통과
+- CI ApplicationSet generate 단계 제거 (중복 검증 제거)
+
 ## 🧪 테스트
 ```bash
 # 로컬 테스트 (auth disabled)
@@ -59,6 +70,59 @@ curl -i "http://127.0.0.1:8010/api/v1/locations/centers?lat=37.5665&lon=126.9780
 - 신규 DB 환경: 초기 sync로 확장 설치 + 스키마 생성 + 데이터 적재 자동 완료
 - 기존 DB 환경: Job 재실행 필요시 `kubectl delete job -n location <job-name>` 후 sync
 
+## ⚠️ Breaking Changes
+- **API 응답 구조 변경**: `hours` 필드 제거 → `operating_hours` 객체 추가
+  ```json
+  // Before
+  { "hours": "화 11:00 ~ 14:00; 임시휴무 전체휴무" }
+  
+  // After
+  { 
+    "operating_hours": {
+      "status": "closed",
+      "start": "11:00",
+      "end": "14:00"
+    }
+  }
+  ```
+- **프론트엔드 업데이트 필요**: 운영시간 표시 로직 변경 필요
+
+## ✅ 체크리스트
+- [x] 코드 리뷰 완료 (self-review)
+- [x] 테스트 완료 (로컬 Docker Compose 환경)
+- [x] 문서 업데이트 완료
+  - [x] `workloads/domains/location/README.md`: 부트스트랩 Job 가이드
+  - [x] `docs/development/location/DATA_PIPELINE.md`: 데이터 파이프라인 설명
+  - [x] `docs/data/location/common-schema.md`: 정규화 스키마 문서
+- [x] Breaking changes 문서화 완료 (API 응답 구조 변경)
+- [x] CI/CD 파이프라인 통과
+  - [x] Black/Ruff 린트
+  - [x] ApplicationSet 검증
+  - [x] Pytest (placeholder 테스트)
+
+## 📝 추가 정보
+
+### 커밋 히스토리
+- 총 **15개 커밋**을 논리적 단위로 분리:
+  1. 쿠키 인증 + KST 설정
+  2. PostgreSQL 확장 자동 설치
+  3. 운영시간 API 개선
+  4. K8s Job 부트스트랩
+  5. 린트/포맷 수정 (5개 커밋)
+  6. CI 개선 (4개 커밋)
+
+### 배포 순서
+1. ArgoCD에서 location 애플리케이션 sync
+2. Job 순차 실행 (약 2-3분 소요):
+   - keco-import → db-bootstrap → common-build → common-import
+3. Job 완료 후 location-api Deployment 자동 롤아웃
+4. Health check 및 API 엔드포인트 검증
+
+### 향후 작업
+- [ ] Location API 통합 테스트 구현 (현재 placeholder만 존재)
+- [ ] 프론트엔드 운영시간 UI 업데이트
+- [ ] 정기적 데이터 갱신을 위한 CronJob 추가 검토
+- [ ] 성능 최적화 (Redis 캐싱, 인덱스 튜닝)
 ## ✅ 체크리스트
 - [x] feature/location-service 브랜치 4개 커밋으로 논리적 단위 분리
 - [x] GitHub에 브랜치 push 완료
