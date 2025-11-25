@@ -1,0 +1,62 @@
+## ALB Controller 구성 흐름
+
+```mermaid
+graph TD
+    subgraph "Kubernetes Cluster"
+        Ingress[["Ingress<br/>domain-ingress"]]:::ing
+        ALBCtrl{{"AWS Load Balancer Controller"}}:::ctrl
+    end
+
+    subgraph "AWS"
+        AWSAPI[(AWS ELB/TargetGroup API)]:::aws
+        ALB["ALB (HTTPS Listener)"]:::alb
+        TG["Target Group<br/>instance 모드"]:::tg
+    end
+
+    Ingress -->|매니페스트 감시| ALBCtrl
+    ALBCtrl -->|IAM Role로 API 호출<br/>(Create/Update Listener/Rules/TG)| AWSAPI
+    AWSAPI -->|리스너/규칙 생성| ALB
+    AWSAPI -->|노드 IP:NodePort 등록| TG
+    ALBCtrl -->|상태 확인| AWSAPI
+
+    classDef ing fill:#FDE68A,stroke:#C78200,color:#111;
+    classDef ctrl fill:#FBBF24,stroke:#92400E,color:#111;
+    classDef aws fill:#BFDBFE,stroke:#1D4ED8,color:#111;
+    classDef alb fill:#FDBA74,stroke:#C2410C,color:#111;
+    classDef tg fill:#F9A8D4,stroke:#BE185D,color:#111;
+```
+
+## 실시간 트래픽 경로
+
+```mermaid
+graph TD
+    subgraph "Data Plane"
+        Client["사용자(Client)"]:::client
+        ALBData["ALB"]:::alb
+        TGData["Target Group"]:::tg
+        IngressData["Ingress<br/>domain-ingress"]:::ing
+        Node1["노드 A<br/>k8s-api-domain"]:::node
+        Node2["노드 B<br/>k8s-api-domain-2"]:::node
+        Pod1["domain-api Pod #1"]:::pod
+        Pod2["domain-api Pod #2"]:::pod
+    end
+
+    Client -->|HTTPS 443| ALBData
+    ALBData -->|라우팅| TGData
+    TGData -->|NodePort 31666| IngressData
+    IngressData --> Node1
+    IngressData --> Node2
+    Node1 -->|ClusterIP 8000| Pod1
+    Node2 -->|ClusterIP 8000| Pod2
+
+    Pod1 -->|응답| Client
+    Pod2 -->|응답| Client
+
+    classDef client fill:#BFDBFE,stroke:#1D4ED8,color:#111;
+    classDef alb fill:#FDBA74,stroke:#C2410C,color:#111;
+    classDef tg fill:#F9A8D4,stroke:#BE185D,color:#111;
+    classDef ing fill:#FDE68A,stroke:#C78200,color:#111;
+    classDef node fill:#C7D2FE,stroke:#4338CA,color:#111;
+    classDef pod fill:#A7F3D0,stroke:#047857,color:#111;
+```
+
