@@ -6,8 +6,16 @@ graph TD
         Ingress[["Ingress<br/>domain-ingress"]]:::ing
         Service[["Service & Endpoints<br/>(location-api)"]]:::svc
         subgraph NodesGroup["노드 목록"]
-            Nodes[(k8s-api-domain*)]:::node
-            Pods[(domain-api Pods)]:::pod
+            Node1Box((노드 A<br/>k8s-api-domain)):::node
+            Pod1((Pod #1)):::pod
+            Pod2((Pod #2)):::pod
+            Node2Box((노드 B<br/>k8s-api-domain-2)):::node
+            Pod3((Pod #3)):::pod
+            Pod4((Pod #4)):::pod
+            Node1Box --- Pod1
+            Node1Box --- Pod2
+            Node2Box --- Pod3
+            Node2Box --- Pod4
         end
         ALBCtrl{{"AWS Load Balancer Controller"}}:::ctrl
     end
