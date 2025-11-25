@@ -24,29 +24,36 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
+from domains.location.database.extensions import ensure_geospatial_extensions
+
 
 DEFAULT_CSV_BASENAME = "제로웨이스트 지도 데이터.csv"
 
 
 def _resolve_default_csv() -> Path:
     base_dir = Path(__file__).resolve().parent.parent
-    primary = base_dir / DEFAULT_CSV_BASENAME
-    if primary.exists():
-        return primary
-
-    # macOS에서 NFD로 저장된 경우를 대비해 정규화된 파일명을 탐색
-    decomposed = base_dir / unicodedata.normalize("NFD", DEFAULT_CSV_BASENAME)
-    if decomposed.exists():
-        return decomposed
-
-    for candidate in base_dir.glob("*.csv"):
-        normalized = unicodedata.normalize("NFC", candidate.name)
-        if "제로웨이스트" in normalized and "지도" in normalized:
+    candidates: list[Path] = [
+        base_dir / DEFAULT_CSV_BASENAME,
+        base_dir / unicodedata.normalize("NFD", DEFAULT_CSV_BASENAME),
+        base_dir / "data" / DEFAULT_CSV_BASENAME,
+        base_dir / "data" / unicodedata.normalize("NFD", DEFAULT_CSV_BASENAME),
+    ]
+    for candidate in candidates:
+        if candidate.exists():
             return candidate
 
+    search_roots = [base_dir, base_dir / "data"]
+    for root in search_roots:
+        if not root.exists():
+            continue
+        for csv_file in root.glob("*.csv"):
+            normalized = unicodedata.normalize("NFC", csv_file.name)
+            if "제로웨이스트" in normalized and "지도" in normalized:
+                return csv_file
+
     raise FileNotFoundError(
-        f"CSV file not found under {base_dir}. "
-        "Ensure the dataset CSV is present next to Dockerfile."
+        f"CSV file not found under {base_dir} (or its data/ subdirectory). "
+        "Ensure the dataset CSV is present alongside the Dockerfile or in the data folder."
     )
 
 
@@ -143,12 +150,10 @@ def transform_row(row: dict[str, str]) -> dict[str, Any]:
 
 
 async def ensure_schema(engine: AsyncEngine) -> None:
+    await ensure_geospatial_extensions(engine)
     async with engine.begin() as conn:
         exists = await conn.scalar(
-            text(
-                "SELECT 1 FROM information_schema.schemata "
-                "WHERE schema_name = :schema_name"
-            ),
+            text("SELECT 1 FROM information_schema.schemata " "WHERE schema_name = :schema_name"),
             {"schema_name": "location"},
         )
         if exists:
@@ -174,7 +179,9 @@ async def upsert_batch(engine: AsyncEngine, batch: list[dict[str, Any]]) -> None
         if column.name != "seq"
     }
     async with engine.begin() as conn:
-        await conn.execute(stmt.on_conflict_do_update(index_elements=[zero_waste_table.c.seq], set_=update_columns))
+        await conn.execute(
+            stmt.on_conflict_do_update(index_elements=[zero_waste_table.c.seq], set_=update_columns)
+        )
 
 
 def resolve_database_url(cli_value: str | None) -> str:
@@ -224,4 +231,3 @@ async def main() -> None:
 
 if __name__ == "__main__":
     asyncio.run(main())
-
