@@ -4,6 +4,9 @@
 graph TD
     subgraph "Kubernetes Cluster"
         Ingress[["Ingress<br/>domain-ingress"]]:::ing
+        Service[["Service & Endpoints<br/>(location-api)"]]:::svc
+        Nodes[(노드 목록<br/>k8s-api-domain*)]:::node
+        Pods[(Pods<br/>domain-api)]:::pod
         ALBCtrl{{"AWS Load Balancer Controller"}}:::ctrl
     end
 
@@ -13,6 +16,9 @@ graph TD
         TG["Target Group<br/>instance 모드"]:::tg
     end
 
+    Ingress -->|Service 참조| Service
+    Service -->|Endpoints 생성| Nodes
+    Service -->|Pods 추적| Pods
     Ingress -->|매니페스트 감시| ALBCtrl
     ALBCtrl -->|IAM Role로 API 호출<br/>(Create/Update Listener/Rules/TG)| AWSAPI
     AWSAPI -->|리스너/규칙 생성| ALB
@@ -20,6 +26,9 @@ graph TD
     ALBCtrl -->|상태 확인| AWSAPI
 
     classDef ing fill:#FEF3C7,stroke:#D97706,color:#111;
+    classDef svc fill:#FDE68A,stroke:#B45309,color:#111;
+    classDef node fill:#E0E7FF,stroke:#4338CA,color:#111;
+    classDef pod fill:#A7F3D0,stroke:#047857,color:#111;
     classDef ctrl fill:#FCD34D,stroke:#B45309,color:#111;
     classDef aws fill:#DBEAFE,stroke:#1D4ED8,color:#111;
     classDef alb fill:#FECACA,stroke:#B91C1C,color:#111;
