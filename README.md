@@ -117,11 +117,11 @@ Ingress  : Route53 + CloudFront + ALB → SG (AWS Nodes) -> Calico NetworkPolicy
 
 ![B13B764A-E597-4691-93F4-56F5C9FC0AB1](https://github.com/user-attachments/assets/1dc545ab-93db-4990-8a48-4df4dfb7adf0)
 
-“포지션(part-of) → 계층(tier) → 역할(role)” 순으로 라벨을 붙인 뒤 네임스페이스로 매핑합니다.
-Taint/Tolerance를 활용해 라벨과 매칭되는 노드로 파드의 배치가 제한되며, 계층별 network policy 격리가 적용됩니다. (Monitoring 제외, 상위 계층은 단일 하위 계층만 의존)
-이코에코(Eco²)에서 라벨이 컨트롤 포인트를 맡으며, 도메인/역할/책임/계층 추상화를 통해 개발 및 운영 복잡도를 낮춥니다.
+- “포지션(part-of) → 계층(tier) → 역할(role)” 순으로 라벨을 붙인 뒤 네임스페이스로 매핑합니다.
+- Taint/Tolerance를 활용해 라벨과 매칭되는 노드로 파드의 배치가 제한되며, 계층별 network policy 격리가 적용됩니다. (Monitoring 제외, 상위 계층은 단일 하위 계층만 의존)
+- 이코에코(Eco²)에서 라벨이 컨트롤 포인트를 맡으며, 도메인/역할/책임/계층 추상화를 통해 개발 및 운영 복잡도를 낮춥니다.
 
-### 관계 설명
+### 상세 설명
 1. **app.kubernetes.io/part-of**  
    - `ecoeco-backend`: 업무 도메인(API)와 그에 붙은 데이터/관측 리소스.  
    - `ecoeco-platform`: 플랫폼 자체를 관리하는 인프라/오퍼레이터 네임스페이스.
@@ -140,8 +140,6 @@ Taint/Tolerance를 활용해 라벨과 매칭되는 노드로 파드의 배치�
 4. **domain / data-type**  
    - `domain` 라벨로 실제 서비스(예: `auth`, `location`)를 식별.  
    - 데이터 계층은 `data-type`으로 DB 종류까지 표기(`postgres`, `redis`).  
-
-이 구조 덕분에 `kubectl`이나 ArgoCD 필터링 시 “제품군→계층→역할→도메인”으로 세분화된 셀렉터를 바로 사용할 수 있습니다.
 
 ---
 
