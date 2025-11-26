@@ -187,4 +187,5 @@ class ImageService:
             "cdn_domain": str(self.settings.cdn_domain),
             "presign_expires_seconds": self.settings.presign_expires_seconds,
             "allowed_channels": list(self.settings.allowed_targets),
+            "auth_required": not self.settings.auth_disabled,
         }
