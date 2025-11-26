@@ -163,6 +163,37 @@ backend/
 
 ---
 
+### Namespace + Label Layout
+
+![B13B764A-E597-4691-93F4-56F5C9FC0AB1](https://github.com/user-attachments/assets/1dc545ab-93db-4990-8a48-4df4dfb7adf0)
+
+라벨을 “어느 제품군(part-of) → 어떤 계층(tier) → 어떤 역할(role) → 상세 도메인(domain/data-type)” 순으로 붙인 뒤 실제 네임스페이스 명으로 매핑합니다.
+Taint/Tolerance를 활용해 매칭되는 노드로 파드가 배치되며, 계층별 network policy 격리가 적용됩니다. (Monitoring 제외, 상위 계층은 단일 하위 계층만 의존)
+
+### 관계 설명
+1. **app.kubernetes.io/part-of**  
+   - `ecoeco-backend`: 업무 도메인(API)와 그에 붙은 데이터/관측 리소스.  
+   - `ecoeco-platform`: 플랫폼 자체를 관리하는 인프라/오퍼레이터 네임스페이스.
+
+2. **tier**  
+   - 백엔드 전용 네임스페이스는 대부분 `business-logic`.  
+   - 데이터 계층(`data`)과 관측(`observability`)도 같은 제품군(`ecoeco-backend`) 안에 포함.  
+   - 플랫폼 계층은 `infrastructure`.
+
+3. **role**  
+   - 비즈니스 로직 네임스페이스는 공통적으로 `role: api`.  
+   - 데이터 계층 내에서도 `database`, `cache`, `messaging`처럼 분리.  
+   - 관측 계층은 `metrics`, `dashboards`.  
+   - 플랫폼 계층은 `platform-core` 혹은 `operators`.
+
+4. **domain / data-type**  
+   - `domain` 라벨로 실제 서비스(예: `auth`, `location`)를 식별.  
+   - 데이터 계층은 `data-type`으로 DB 종류까지 표기(`postgres`, `redis`).  
+
+이 구조 덕분에 `kubectl`이나 ArgoCD 필터링 시 “제품군→계층→역할→도메인”으로 세분화된 셀렉터를 바로 사용할 수 있습니다.
+
+---
+
 ## Release Highlights (v0.8.0)
 
 - **OAuth 플로우 안정화 (2025-11-20 ~ 2025-11-23)**
