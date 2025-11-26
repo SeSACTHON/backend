@@ -1,10 +1,11 @@
 from fastapi import APIRouter
 
-from domains.image.api.v1.endpoints import health, image, metrics
+from domains.image.api.v1.endpoints import docs, health, image, metrics
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(image.router)
 api_router.include_router(metrics.router)
+api_router.include_router(docs.router)
 
 health_router = APIRouter()
 health_router.include_router(health.router)

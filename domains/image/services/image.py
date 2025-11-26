@@ -68,6 +68,10 @@ class PendingUploadChannelMismatchError(Exception):
     """Raised when the callback channel and stored channel differ."""
 
 
+class PendingUploadPermissionDeniedError(Exception):
+    """Raised when the upload session belongs to another user."""
+
+
 class ImageService:
     def __init__(
         self,
@@ -86,6 +90,8 @@ class ImageService:
         self,
         channel: ImageChannel,
         request: ImageUploadRequest,
+        *,
+        uploader_id: str,
     ) -> ImageUploadResponse:
         key = self._build_object_key(channel.value, request.filename)
         params = {
@@ -103,7 +109,7 @@ class ImageService:
         cdn_url = self._compose_cdn_url(key)
         pending = PendingUpload(
             channel=channel,
-            uploader_id=request.uploader_id,
+            uploader_id=uploader_id,
             metadata=request.metadata,
             content_type=request.content_type,
             cdn_url=cdn_url,
@@ -122,12 +128,16 @@ class ImageService:
         self,
         channel: ImageChannel,
         request: ImageUploadCallbackRequest,
+        *,
+        uploader_id: str,
     ) -> ImageUploadFinalizeResponse:
         pending = await self._load_pending_upload(request.key)
         if pending is None:
             raise PendingUploadNotFoundError
         if pending.channel != channel:
             raise PendingUploadChannelMismatchError
+        if pending.uploader_id != uploader_id:
+            raise PendingUploadPermissionDeniedError
 
         await self._delete_pending_upload(request.key)
 

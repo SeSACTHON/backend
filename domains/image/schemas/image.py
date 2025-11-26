@@ -19,7 +19,10 @@ class ImageUploadRequest(BaseModel):
         min_length=1,
         max_length=255,
     )
-    uploader_id: str = Field(..., min_length=1, max_length=255)
+    uploader_id: Optional[str] = Field(
+        default=None,
+        description="Optional user identifier (validated against login session)",
+    )
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
     @field_validator("filename")
@@ -29,6 +32,16 @@ class ImageUploadRequest(BaseModel):
         if not normalized:
             raise ValueError("filename must not be empty")
         return normalized
+
+    @field_validator("uploader_id")
+    @classmethod
+    def _normalize_uploader(cls, value: Optional[str]) -> Optional[str]:
+        if value is None:
+            return value
+        trimmed = value.strip()
+        if not trimmed:
+            raise ValueError("uploader_id must not be empty")
+        return trimmed
 
 
 class ImageUploadResponse(BaseModel):
