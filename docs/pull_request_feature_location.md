@@ -4,6 +4,7 @@
 - Location 서비스 쿠키 기반 인증 전환 및 KST 타임존 설정
 - PostgreSQL cube/earthdistance 확장 자동 설치 로직 구현
 - 운영시간 API 응답 구조 개선 (실시간 상태 판단)
+- 위치 응답 스키마에 `store_category` / `pickup_categories` 추가 및 `collection_items` 제거
 - Kubernetes Job 기반 DB 부트스트랩 파이프라인 구성
 
 ## 🔍 관련 이슈
@@ -24,12 +25,41 @@
 - `import_common_locations.py`: 스키마 생성 전 `cube`, `earthdistance` 확장 자동 설치
 - 지리 공간 쿼리(`ll_to_earth`, `earth_distance`) 정상 동작 보장
 
-### 3. 운영시간 API 응답 구조 개선
+### 3. 운영시간 및 카테고리 응답 구조 개선
 - `schemas/location.py`: `operating_hours` 객체 추가 (`status`, `start`, `end`), 기존 `hours` 필드 제거
 - `services/location.py`: KST 기준 당일 요일의 운영시간 파싱 및 현재 시각 기준 실시간 상태(`open`/`closed`) 판단
+- `schemas/location.py`: `store_category`(단일 enum)와 `pickup_categories`(enum 배열) 필수 필드 추가, `collection_items` 제거
+- `services/location.py`: 카테고리 분류 로직을 응답에 직접 매핑하고, 매칭 실패 시 `general`을 기본값으로 반환
 - `domain/entities.py`, `models/normalized_site.py`, `repositories/normalized_site_repository.py`: `clct_item_cn` 필드 추가
 - 제로웨이스트 데이터: `operating_hours: null`
 - KECO 데이터: 요일별 파싱 후 현재 시각 기준 상태 결정 (예: `{"status":"closed","start":"12:00","end":"18:00"}`)
+
+#### JSON 응답 변경 예시
+```json
+// Before
+{
+  "id": 101,
+  "name": "Zero Waste Lab",
+  "distance_km": 0.42,
+  "distance_text": "420m",
+  "hours": "화 11:00 ~ 14:00; 임시휴무 전체휴무",
+  "collection_items": ["투명 PET", "플라스틱"]
+}
+
+// After
+{
+  "id": 101,
+  "name": "Zero Waste Lab",
+  "distance_km": 0.42,
+  "distance_text": "420m",
+  "store_category": "refill_zero",
+  "pickup_categories": ["clear_pet", "plastic"],
+  "is_holiday": false,
+  "is_open": null,
+  "start_time": "11:00",
+  "end_time": "14:00"
+}
+```
 
 ### 4. Kubernetes Job 기반 DB 부트스트랩 파이프라인
 - `workloads/domains/location/base/`: Job 매니페스트
@@ -69,21 +99,25 @@ curl -i "http://127.0.0.1:8010/api/v1/locations/centers?lat=37.5665&lon=126.9780
 - 기존 DB 환경: Job 재실행 필요시 `kubectl delete job -n location <job-name>` 후 sync
 
 ## ⚠️ Breaking Changes
-- **API 응답 구조 변경**: `hours` 필드 제거 → `operating_hours` 객체 추가
+- **API 응답 구조 변경**: `hours`·`collection_items` 제거 → `operating_hours`, `store_category`, `pickup_categories` 필드로 통합
   ```json
   // Before
-  { "hours": "화 11:00 ~ 14:00; 임시휴무 전체휴무" }
-  
+  { 
+    "hours": "화 11:00 ~ 14:00; 임시휴무 전체휴무",
+    "collection_items": ["투명 PET", "플라스틱"]
+  }
+
   // After
   { 
-    "operating_hours": {
-      "status": "closed",
-      "start": "11:00",
-      "end": "14:00"
-    }
+    "store_category": "refill_zero",
+    "pickup_categories": ["clear_pet", "plastic"],
+    "is_holiday": false,
+    "is_open": null,
+    "start_time": "11:00",
+    "end_time": "14:00"
   }
   ```
-- **프론트엔드 업데이트 필요**: 운영시간 표시 로직 변경 필요
+- **프론트엔드 업데이트 필요**: 운영시간, 카테고리 표시 로직 변경 필요
 
 ## ✅ 체크리스트
 - [x] 코드 리뷰 완료 (self-review)
@@ -124,7 +158,7 @@ curl -i "http://127.0.0.1:8010/api/v1/locations/centers?lat=37.5665&lon=126.9780
 ## ✅ 체크리스트
 - [x] feature/location-service 브랜치 4개 커밋으로 논리적 단위 분리
 - [x] GitHub에 브랜치 push 완료
-- [ ] GitHub PR 생성 후 리뷰 요청
+- [x] GitHub PR 생성 후 리뷰 요청
 - [ ] ArgoCD dev 환경 sync 및 Job 성공 확인
 - [ ] API 엔드포인트 스모크 테스트 (health, centers)
 
