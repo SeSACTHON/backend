@@ -1,5 +1,8 @@
 ## ALB Controller 구성 흐름
 
+1. **ALB Controller → AWS 연동 설명**  
+   이 다이어그램은 쿠버네티스 Ingress가 서비스와 엔드포인트를 통해 노드·파드 정보를 노출하고, AWS Load Balancer Controller가 해당 정보를 이용해 Target Group과 ALB 리스너를 구성하는 전 과정을 단계별로 보여줍니다.
+
 ```mermaid
 graph TD
     subgraph "Kubernetes Cluster"
@@ -45,6 +48,9 @@ graph TD
 ```
 
 ## 실시간 트래픽 경로
+
+2. **요청·응답 데이터 경로 설명**  
+   아래 다이어그램은 사용자의 HTTPS 요청이 ALB와 Target Group을 거쳐 NodePort 31666으로 전달되고, 각 노드 내부의 파드가 응답을 반환하는 실제 런타임 플로우를 그대로 묘사합니다.
 
 ```mermaid
 graph TD
