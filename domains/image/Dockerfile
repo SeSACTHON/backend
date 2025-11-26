@@ -12,6 +12,7 @@ COPY domains/image/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 애플리케이션 코드 복사
+COPY domains/_shared /app/domains/_shared
 COPY domains/image /app/domains/image
 
 EXPOSE 8000
