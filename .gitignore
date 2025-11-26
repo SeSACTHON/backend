@@ -84,3 +84,6 @@ coverage.xml
 .flake8
 .pylintrc
 pyproject.toml
+
+# Large artifacts
+domains/location/data/location_common_dataset.csv
