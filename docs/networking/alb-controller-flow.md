@@ -3,6 +3,9 @@
 1. **ALB Controller → AWS 연동 설명**  
    Ingress는 `location-api` Service(NodePort 31666)를 통해 파드가 노출되고 있는 노드 IP와 포트 정보를 확인합니다. 이 Endpoints 정보를 AWS Load Balancer Controller가 감지해 Target Group에 노드 IP + NodePort를 등록하고, ALB 리스너/규칙을 생성·업데이트하는 과정을 이 다이어그램 하나로 보여줍니다.
 
+   > 왜 NodePort를 택했을까?  
+   > Ingress가 어떤 노드/파드로 라우팅할지 알아야 하는데, ClusterIP Service만 쓰면 외부에서 이 정보를 직접 얻기 어렵습니다. 그래서 파드를 NodePort로 노출해 노드 IP:포트 조합만 알면 ALB → Target Group → NodePort → Pod로 곧장 이어지도록 했습니다.
+
 ```mermaid
 graph TD
     subgraph "Kubernetes Cluster"
