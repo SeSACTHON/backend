@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import os
 import time
-from datetime import datetime
 from typing import List, Optional
 from uuid import uuid4
 
@@ -16,6 +15,7 @@ except Exception:  # pragma: no cover - optional dependency
 
 from domains._shared.schemas.waste import WasteClassificationResult
 from domains._shared.waste_pipeline import PipelineError, process_waste_classification
+from domains.chat.core.config import get_settings
 from domains.chat.schemas.chat import (
     ChatFeedback,
     ChatMessage,
@@ -23,20 +23,37 @@ from domains.chat.schemas.chat import (
     ChatMessageResponse,
     ChatSession,
 )
+from domains.chat.services.session_store import ChatSessionStore
 
 
 DEFAULT_MODEL = "gpt-4o-mini"
 
 
 class ChatService:
-    def __init__(self) -> None:
+    def __init__(self, session_store: ChatSessionStore | None = None) -> None:
+        settings = get_settings()
         self.model = os.getenv("OPENAI_CHAT_MODEL", DEFAULT_MODEL)
         api_key = os.getenv("OPENAI_API_KEY")
         self.client = AsyncOpenAI(api_key=api_key) if AsyncOpenAI and api_key else None
+        self.session_store = session_store or ChatSessionStore(
+            redis=None,
+            ttl_seconds=settings.session_ttl_seconds,
+            max_history=settings.session_history_limit,
+        )
 
-    async def send_message(self, payload: ChatMessageRequest) -> ChatMessageResponse:
+    async def send_message(
+        self,
+        payload: ChatMessageRequest,
+        *,
+        user_id: str,
+    ) -> ChatMessageResponse:
         session_id = payload.session_id or str(uuid4())
-        history = payload.history or []
+        stored_history = await self.session_store.fetch_messages(user_id, session_id)
+        history: List[ChatMessage] = list(stored_history)
+        if payload.history:
+            history.extend(payload.history)
+        if len(history) > self.session_store.max_history:
+            history = history[-self.session_store.max_history :]
         image_urls = [str(url) for url in (payload.image_urls or [])]
 
         if image_urls:
@@ -50,6 +67,17 @@ class ChatService:
                     or pipeline_result.final_answer.get("answer")
                     or self._fallback_answer(payload.message)
                 )
+                assistant_message = (
+                    pipeline_result.final_answer.get("assistant_summary") or message_text
+                )
+                await self.session_store.append_messages(
+                    user_id,
+                    session_id,
+                    [
+                        ChatMessage(role="user", content=payload.message),
+                        ChatMessage(role="assistant", content=assistant_message),
+                    ],
+                )
                 return ChatMessageResponse(
                     session_id=session_id,
                     message=message_text,
@@ -60,13 +88,23 @@ class ChatService:
                 )
 
         if not self.client:
-            return ChatMessageResponse(
+            fallback = self._fallback_answer(payload.message)
+            response = ChatMessageResponse(
                 session_id=session_id,
-                message=self._fallback_answer(payload.message),
+                message=fallback,
                 suggestions=self._default_suggestions(),
                 model=self.model,
                 latency_ms=None,
             )
+            await self.session_store.append_messages(
+                user_id,
+                session_id,
+                [
+                    ChatMessage(role="user", content=payload.message),
+                    ChatMessage(role="assistant", content=fallback),
+                ],
+            )
+            return response
 
         start = time.perf_counter()
         openai_messages = self._build_messages(history, payload.message)
@@ -82,33 +120,44 @@ class ChatService:
             content = self._fallback_answer(payload.message)
             latency_ms = None
 
-        return ChatMessageResponse(
+        response_payload = ChatMessageResponse(
             session_id=session_id,
             message=content,
             suggestions=self._default_suggestions(),
             model=self.model,
             latency_ms=latency_ms,
         )
+        await self.session_store.append_messages(
+            user_id,
+            session_id,
+            [
+                ChatMessage(role="user", content=payload.message),
+                ChatMessage(role="assistant", content=response_payload.message),
+            ],
+        )
+        return response_payload
 
-    async def get_session(self, session_id: str) -> Optional[ChatSession]:
-        now = datetime.utcnow()
+    async def get_session(
+        self,
+        session_id: str,
+        *,
+        user_id: str,
+    ) -> Optional[ChatSession]:
+        messages = await self.session_store.fetch_messages(user_id, session_id)
+        if not messages:
+            return None
+        created_at = messages[0].timestamp
+        updated_at = messages[-1].timestamp
         return ChatSession(
             session_id=session_id,
-            messages=[
-                ChatMessage(role="user", content="예시 세션입니다.", timestamp=now),
-                ChatMessage(
-                    role="assistant",
-                    content="실제 기록 저장소가 연결되면 이 내용이 교체됩니다.",
-                    timestamp=now,
-                ),
-            ],
-            created_at=now,
-            updated_at=now,
+            messages=messages,
+            created_at=created_at,
+            updated_at=updated_at,
             model=self.model,
         )
 
-    async def delete_session(self, session_id: str) -> None:
-        _ = session_id
+    async def delete_session(self, session_id: str, *, user_id: str) -> None:
+        await self.session_store.delete_session(user_id, session_id)
 
     async def suggestions(self) -> dict:
         return {"suggestions": self._default_suggestions()}
@@ -117,12 +166,16 @@ class ChatService:
         _ = payload
 
     async def metrics(self) -> dict:
-        return {
-            "active_sessions": 12,
-            "avg_response_ms": 320,
-            "feedback_positive_ratio": 0.92,
-            "model": self.model,
-        }
+        stats = self.session_store.info()
+        stats.update(
+            {
+                "active_sessions": 12,
+                "avg_response_ms": 320,
+                "feedback_positive_ratio": 0.92,
+                "model": self.model,
+            }
+        )
+        return stats
 
     def _build_messages(self, history: List[ChatMessage], current: str) -> list[dict]:
         system_prompt = {
@@ -132,7 +185,8 @@ class ChatService:
                 "questions in Korean. Provide concise, practical answers."
             ),
         }
-        converted_history = [{"role": msg.role, "content": msg.content} for msg in history[-6:]]
+        limit = getattr(self.session_store, "max_history", 6)
+        converted_history = [{"role": msg.role, "content": msg.content} for msg in history[-limit:]]
         converted_history.append({"role": "user", "content": current})
         return [system_prompt, *converted_history]
 
