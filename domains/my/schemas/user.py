@@ -22,7 +22,10 @@ class UserProfile(ORMModel):
 
 class UserUpdate(BaseModel):
     username: Optional[str] = None
-    name: Optional[str] = None
+    profile_image_url: Optional[str] = None
+
+
+class ProfileImageUpdateRequest(BaseModel):
     profile_image_url: Optional[str] = None
 
 
