@@ -24,8 +24,8 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_issuer: str = "sesacthon-auth"
     jwt_audience: str = "sesacthon-clients"
-    access_token_exp_minutes: int = 15
-    refresh_token_exp_minutes: int = 60 * 24 * 14
+    access_token_exp_minutes: int = 60 * 3
+    refresh_token_exp_minutes: int = 60 * 24 * 30
 
     # Frontend / Cookie domains
     frontend_url: str = "https://frontend.dev.growbin.app"
