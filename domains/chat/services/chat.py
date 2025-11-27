@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
-from typing import List, Optional
+from typing import List
 from uuid import uuid4
 
 try:
@@ -15,13 +15,7 @@ except Exception:  # pragma: no cover - optional dependency
 from domains._shared.schemas.waste import WasteClassificationResult
 from domains._shared.waste_pipeline import PipelineError, process_waste_classification
 from domains.chat.core.config import get_settings
-from domains.chat.schemas.chat import (
-    ChatFeedback,
-    ChatMessage,
-    ChatMessageRequest,
-    ChatMessageResponse,
-    ChatSession,
-)
+from domains.chat.schemas.chat import ChatMessage, ChatMessageRequest, ChatMessageResponse
 from domains.chat.services.session_store import ChatSessionStore
 
 
@@ -114,46 +108,6 @@ class ChatService:
         )
         return response_payload
 
-    async def get_session(
-        self,
-        session_id: str,
-        *,
-        user_id: str,
-    ) -> Optional[ChatSession]:
-        messages = await self.session_store.fetch_messages(user_id, session_id)
-        if not messages:
-            return None
-        created_at = messages[0].timestamp
-        updated_at = messages[-1].timestamp
-        return ChatSession(
-            session_id=session_id,
-            messages=messages,
-            created_at=created_at,
-            updated_at=updated_at,
-            model=self.model,
-        )
-
-    async def delete_session(self, session_id: str, *, user_id: str) -> None:
-        await self.session_store.delete_session(user_id, session_id)
-
-    async def suggestions(self) -> dict:
-        return {"suggestions": self._default_suggestions()}
-
-    async def submit_feedback(self, payload: ChatFeedback) -> None:
-        _ = payload
-
-    async def metrics(self) -> dict:
-        stats = self.session_store.info()
-        stats.update(
-            {
-                "active_sessions": 12,
-                "avg_response_ms": 320,
-                "feedback_positive_ratio": 0.92,
-                "model": self.model,
-            }
-        )
-        return stats
-
     def _build_messages(self, history: List[ChatMessage], current: str) -> list[dict]:
         system_prompt = {
             "role": "system",
@@ -172,13 +126,6 @@ class ChatService:
             "GPT-4o Mini 연결이 설정되지 않아 기본 답변을 제공합니다. "
             "질문: {question} → 페트병은 세척 후 라벨과 뚜껑을 분리하여 배출해주세요."
         ).format(question=message)
-
-    def _default_suggestions(self) -> list[str]:
-        return [
-            "투명 페트병은 어떻게 버리나요?",
-            "종이팩과 종이는 어떻게 구분하나요?",
-            "스티로폼 재활용 요령을 알려줘.",
-        ]
 
     async def _run_image_pipeline(
         self,

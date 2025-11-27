@@ -24,16 +24,17 @@ async def init_db() -> int:
 
     try:
         async with engine.begin() as conn:
-            # Check and create schema
+            # Drop and recreate schema to guarantee clean state
             exists = await conn.scalar(
                 text("SELECT 1 FROM information_schema.schemata WHERE schema_name = :schema_name"),
                 {"schema_name": "location"},
             )
             if exists:
-                print("ℹ️  Schema 'location' already exists; skipping creation.")
-            else:
-                print("📦 Creating 'location' schema...")
-                await conn.execute(text("CREATE SCHEMA IF NOT EXISTS location"))
+                print("♻️  Dropping existing 'location' schema...")
+                await conn.execute(text("DROP SCHEMA IF EXISTS location CASCADE"))
+
+            print("📦 Creating 'location' schema...")
+            await conn.execute(text("CREATE SCHEMA location"))
 
             # Verify required extensions (should be pre-installed by DB admin)
             print("🔍 Verifying required PostgreSQL extensions...")

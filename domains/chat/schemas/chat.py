@@ -20,17 +20,3 @@ class ChatMessageRequest(BaseModel):
 
 class ChatMessageResponse(BaseModel):
     user_answer: str
-
-
-class ChatSession(BaseModel):
-    session_id: str
-    messages: List[ChatMessage]
-    created_at: datetime
-    updated_at: datetime
-    model: str = "gpt-4o-mini"
-
-
-class ChatFeedback(BaseModel):
-    session_id: str
-    rating: int
-    comment: Optional[str] = None
