@@ -1,10 +1,9 @@
-## Image Chat Upload Flow (Frontend Guide)
+## Image Upload Flow (Frontend Guide)
 
-이 문서는 프론트엔드가 `/api/v1/images/chat` 업로드 파이프라인을 사용하는 방법을 정리합니다. presigned URL 발급 → S3 업로드 → 콜백 확정 → 챗 서버 전달 순서와 예시 코드를 포함합니다.
+이 문서는 프론트엔드가 `/api/v1/images/{scan | chat | my}` 업로드 파이프라인을 사용하는 방법을 정리합니다. presigned URL 발급 → S3 업로드 → 콜백 확정 → 챗 서버 전달 순서와 예시 코드를 포함합니다.
 
 > **필수 조건**
 > - 서비스 로그인 상태(쿠키 `s_access`)가 있어야 presigned 발급/콜백 모두 통과합니다.
-> - 요청 본문의 `uploader_id`를 전달하는 경우, 로그인한 사용자 ID와 반드시 일치해야 하며, 미입력 시 서버가 자동으로 쿠키 사용자 ID를 사용합니다.
 > - Swagger UI는 `https://api.dev.growbin.app/api/v1/images/docs` 에서 확인할 수 있습니다.
 
 ---
@@ -54,6 +53,12 @@ sequenceDiagram
 |  | `etag` | `"\"6d0c-...\""` | ⭕️ | 브라우저가 ETag를 못 읽으면 빈 문자열로 보내도 허용. |
 |  | `content_length` | `123456` | ⭕️ | 업로드한 파일 크기. 나중에 백엔드 검증에 사용. |
 |  | `checksum` | `"sha256:..."` | ⭕️ | 필요 시 제공. 현재는 선택사항. |
+
+#### 지원하는 Content-type
+- image/png
+- image/jpeg
+- image/webp
+**PUT Presigned 요청 전 반드시 헤더에 올바른 Content-type이 들어갔는지 확인**
 
 #### 채널별 업로드 파이프라인 요약
 
