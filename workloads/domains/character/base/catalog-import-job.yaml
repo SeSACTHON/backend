@@ -35,7 +35,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: character-secret
-              key: CHARACTER_DATABASE_URL
+              key: CHARACTER_DATABASE_SUPER_URL
         envFrom:
         - configMapRef:
             name: character-config
