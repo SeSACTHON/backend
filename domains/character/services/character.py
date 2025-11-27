@@ -3,14 +3,14 @@ from __future__ import annotations
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from domains.character.app.schemas.character import (
+from domains.character.database.session import get_db_session
+from domains.character.repositories import CharacterOwnershipRepository, CharacterRepository
+from domains.character.schemas.character import (
     CharacterAcquireRequest,
     CharacterAcquireResponse,
     CharacterProfile,
     CharacterSummary,
 )
-from domains.character.database.session import get_db_session
-from domains.character.repositories import CharacterOwnershipRepository, CharacterRepository
 
 
 class CharacterService:
@@ -41,7 +41,8 @@ class CharacterService:
         character_name = payload.character_name.strip()
         if not character_name:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Character name required"
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Character name required",
             )
 
         character = await self.character_repo.get_by_name(character_name)
@@ -49,7 +50,8 @@ class CharacterService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Character not found")
 
         existing = await self.ownership_repo.get_by_user_and_character(
-            user_id=payload.user_id, character_id=character.id
+            user_id=payload.user_id,
+            character_id=character.id,
         )
         if existing:
             return CharacterAcquireResponse(acquired=False, character=self._to_summary(character))

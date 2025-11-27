@@ -106,7 +106,7 @@
 ### 3.3 Character API
 - **책임**: 캐릭터 카탈로그 노출과 해금 처리. 현재 서버는 `CharacterProfile` 목록과 `/collect` 해금 API만 제공한다.
 - **데이터 소스**: Postgres `character.characters`, `character.character_ownerships` (참고: `domains/character/models/character.py`).
-- **Swagger/OpenAPI**: `/api/v1/character/docs`, `/api/v1/character/openapi.json` (`domains/character/app/main.py`에서 URL 지정).
+- **Swagger/OpenAPI**: `/api/v1/character/docs`, `/api/v1/character/openapi.json` (`domains/character/main.py`에서 URL 지정).
 
 | Method | Path | 설명 | 인증 | 비고 |
 | --- | --- | --- | --- | --- |
