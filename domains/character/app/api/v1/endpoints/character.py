@@ -3,30 +3,11 @@ from fastapi import APIRouter, Depends
 from domains.character.app.schemas.character import (
     CharacterAcquireRequest,
     CharacterAcquireResponse,
-    CharacterAnalysisRequest,
-    CharacterHistoryEntry,
     CharacterProfile,
 )
 from domains.character.app.services.character import CharacterService
 
 router = APIRouter(prefix="/character", tags=["character"])
-
-
-@router.post("/analyze", response_model=CharacterProfile, summary="Analyze user to character")
-async def analyze_user(
-    payload: CharacterAnalysisRequest,
-    service: CharacterService = Depends(),
-):
-    return await service.analyze(payload)
-
-
-@router.get(
-    "/history/{user_id}",
-    response_model=list[CharacterHistoryEntry],
-    summary="List character evolution history",
-)
-async def history(user_id: str, service: CharacterService = Depends()):
-    return await service.history(user_id)
 
 
 @router.get(

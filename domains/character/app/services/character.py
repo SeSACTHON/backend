@@ -1,16 +1,11 @@
 from __future__ import annotations
 
-from datetime import datetime
-from uuid import uuid4
-
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from domains.character.app.schemas.character import (
     CharacterAcquireRequest,
     CharacterAcquireResponse,
-    CharacterAnalysisRequest,
-    CharacterHistoryEntry,
     CharacterProfile,
     CharacterSummary,
 )
@@ -23,27 +18,6 @@ class CharacterService:
         self.session = session
         self.character_repo = CharacterRepository(session)
         self.ownership_repo = CharacterOwnershipRepository(session)
-
-    async def analyze(self, payload: CharacterAnalysisRequest) -> CharacterProfile:
-        score = 0.8 + (payload.mood_score or 0) * 0.1
-        return CharacterProfile(
-            id=str(uuid4()),
-            name="Eco Guardian",
-            description="Advocates for sustainable living and recycling awareness.",
-            compatibility_score=min(score, 1.0),
-            traits=payload.preferences or ["recycler", "educator"],
-        )
-
-    async def history(self, user_id: str) -> list[CharacterHistoryEntry]:
-        now = datetime.utcnow()
-        return [
-            CharacterHistoryEntry(
-                id=str(uuid4()),
-                character_id=str(uuid4()),
-                timestamp=now,
-                context={"user_id": user_id, "action": "completed-cleanup"},
-            )
-        ]
 
     async def catalog(self) -> list[CharacterProfile]:
         return [
