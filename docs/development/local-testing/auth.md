@@ -46,9 +46,9 @@
 
 ```bash
 cd /Users/mango/workspace/SeSACTHON/backend/domains/auth
-docker compose -f docker-compose.auth-local.yml up --build -d
+docker-compose -f docker-compose.auth-local.yml up --build -d
 # 컨테이너 목록
-docker compose -f docker-compose.auth-local.yml ps
+docker-compose -f docker-compose.auth-local.yml ps
 ```
 
 - `db` (Postgres 16), `redis`, `db-bootstrap`, `auth` 서비스가 순차적으로 뜹니다.
