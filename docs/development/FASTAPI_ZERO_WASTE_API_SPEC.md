@@ -104,20 +104,16 @@
 - **실패 대비**: Kakao API 429 시 fallback 데이터(사전 수집된 샵 300개)를 Postgres에서 노출.
 
 ### 3.3 Character API
-- **책임**: 캐릭터 메타데이터 관리(최대 15종), 획득 조건/진행률, 이미지 Asset 경로 관리.
-- **의존성**: Postgres `character.catalog`, `character.user_characters`; S3 `characters/{character_code}/sprite.png`.
-- **비즈니스 규칙**:
-  - 캐릭터 ID는 `CHR001` 형태, 고정 Seed 데이터.
-  - 획득 조건은 JSON Schema(`condition_type`, `threshold`, `metadata`)로 저장.
-  - 캐릭터 해금 시 `my` 서비스에 이벤트 발행 (`user.character.unlocked`).
-- **엔드포인트**:
+- **책임**: 캐릭터 카탈로그 노출과 해금 처리. 현재 서버는 `CharacterProfile` 목록과 `/collect` 해금 API만 제공한다.
+- **데이터 소스**: Postgres `character.characters`, `character.character_ownerships` (참고: `domains/character/models/character.py`).
+- **Swagger/OpenAPI**: `/api/v1/character/docs`, `/api/v1/character/openapi.json` (`domains/character/app/main.py`에서 URL 지정).
 
 | Method | Path | 설명 | 인증 | 비고 |
 | --- | --- | --- | --- | --- |
-| GET | `/api/v1/character/catalog` | 캐릭터 목록/조건 | Optional | CDN 이미지 URL 포함 |
-| GET | `/api/v1/character/me` | 내 캐릭터/진행률 | Access JWT | user join |
-| POST | `/api/v1/character/unlock` | 조건 충족 시 수동 해금 | Access JWT | idempotent |
-| POST | `/api/v1/character/webhook` | 외부 이벤트(예: 캠페인) | Internal token | Argo Workflows 연동 고려 |
+| GET | `/api/v1/character/catalog` | 정적 캐릭터 목록(`id/name/description/compatibility_score/traits`) 반환 | Public | `CharacterService.catalog()`가 하드코딩된 목록을 내려줌 |
+| POST | `/api/v1/character/collect` | `CharacterAcquireRequest`(`user_id`, `character_name`) 기반 해금 | Internal/Access JWT | 이미 보유 시 `acquired=false`, 미존재 캐릭터는 404 |
+| GET | `/api/v1/metrics/` | 캐릭터 서비스 메트릭 스냅샷 | Internal | `analyzed_users`, `catalog_size` 등 임시 카운터 |
+| GET | `/health`, `/ready` | 헬스/레디니스 체크 | Public | ALB/NLB 헬스체크용 |
 
 ### 3.4 My API
 - **책임**: 사용자 요약 페이지(캐릭터 수, 분리수거 횟수, 연속 참여일, 환경 영향 지표) 구성.
