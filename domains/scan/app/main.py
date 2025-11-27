@@ -12,6 +12,7 @@ def create_app() -> FastAPI:
         docs_url="/api/v1/scan/docs",
         openapi_url="/api/v1/scan/openapi.json",
         redoc_url=None,
+        root_path="/api/v1",
     )
 
     app.add_middleware(
@@ -23,7 +24,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(health_router)
-    app.include_router(api_router, prefix="/api/v1")
+    app.include_router(api_router)
     return app
 
 
