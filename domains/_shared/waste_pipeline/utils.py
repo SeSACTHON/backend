@@ -50,8 +50,9 @@ def load_prompt(path: Path) -> str:
         return file.read()
 
 
-def load_json_data(path: Path) -> Any:
-    with path.open("r", encoding="utf-8") as file:
+def load_json_data(path: Path | str) -> Any:
+    path_obj = Path(path)
+    with path_obj.open("r", encoding="utf-8") as file:
         return json.load(file)
 
 
