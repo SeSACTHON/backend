@@ -6,7 +6,7 @@ from uuid import uuid4
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.schemas.character import (
+from domains.character.app.schemas.character import (
     CharacterAcquireRequest,
     CharacterAcquireResponse,
     CharacterAnalysisRequest,
@@ -103,5 +103,5 @@ class CharacterService:
             name=character.name,
             rarity=character.rarity,
             description=character.description,
-            metadata=character.metadata,
+            metadata=character.metadata_json,
         )
