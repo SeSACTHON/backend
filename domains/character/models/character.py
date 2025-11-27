@@ -23,6 +23,7 @@ class Character(Base):
     """Static definition of a collectible character."""
 
     __tablename__ = "characters"
+    __table_args__ = {"schema": "character"}
 
     id: Mapped[UUID] = mapped_column(
         default=uuid4,
@@ -62,6 +63,7 @@ class CharacterOwnership(Base):
     __tablename__ = "character_ownerships"
     __table_args__ = (
         UniqueConstraint("user_id", "character_id", name="uq_character_ownership_user_character"),
+        {"schema": "character"},
     )
 
     id: Mapped[UUID] = mapped_column(default=uuid4, primary_key=True)

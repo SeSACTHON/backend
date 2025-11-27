@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: character-catalog-import
+  name: character-db-bootstrap
   namespace: character
   labels:
     app: character-api
@@ -9,7 +9,7 @@ metadata:
     domain: character
   annotations:
     argocd.argoproj.io/hook: PostSync
-    argocd.argoproj.io/hook-wave: '0'
+    argocd.argoproj.io/hook-wave: '-10'
     argocd.argoproj.io/hook-delete-policy: HookSucceeded
 spec:
   backoffLimit: 2
@@ -22,15 +22,13 @@ spec:
     spec:
       restartPolicy: Never
       containers:
-      - name: catalog-import
+      - name: db-bootstrap
         image: docker.io/mng990/eco2:character-api-latest
         imagePullPolicy: Always
         command:
         - python
         - -m
-        - domains.character.jobs.import_character_catalog
-        - --csv-path
-        - /app/domains/character/data/character_catalog.csv
+        - domains.character.jobs.init_db
         env:
         - name: CHARACTER_DATABASE_URL
           valueFrom:
