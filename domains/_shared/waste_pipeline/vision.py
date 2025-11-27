@@ -82,9 +82,7 @@ def analyze_images(user_input_text: str, image_urls: list[str]) -> str:
         content_items.append(
             {
                 "type": "input_image",
-                "image_url": {
-                    "url": url,
-                },
+                "image_url": url,
             }
         )
 
