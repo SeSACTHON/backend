@@ -20,12 +20,8 @@ class CharacterAcquireRequest(BaseModel):
 
 
 class CharacterSummary(BaseModel):
-    id: UUID
-    code: str
     name: str
-    rarity: str
     description: str | None = None
-    metadata: dict | None = None
 
 
 class CharacterAcquireResponse(BaseModel):

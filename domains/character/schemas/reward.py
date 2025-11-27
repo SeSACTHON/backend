@@ -21,7 +21,6 @@ class ClassificationSummary(BaseModel):
 
 class CharacterRewardCandidate(BaseModel):
     name: str
-    code: str
     match_reason: str
 
 

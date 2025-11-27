@@ -7,6 +7,8 @@ from domains.scan.app.schemas.scan import (
     ScanTask,
 )
 from domains.scan.app.services.scan import ScanService
+from domains.scan.api.dependencies import access_token_dependency
+from domains._shared.security import TokenPayload
 
 router = APIRouter(prefix="/scan", tags=["scan"])
 
@@ -18,9 +20,10 @@ router = APIRouter(prefix="/scan", tags=["scan"])
 )
 async def classify(
     payload: ClassificationRequest,
+    token: TokenPayload = Depends(access_token_dependency),
     service: ScanService = Depends(),
 ):
-    return await service.classify(payload)
+    return await service.classify(payload, token.user_id)
 
 
 @router.get(

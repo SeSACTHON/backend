@@ -116,7 +116,6 @@ class CharacterService:
             candidates = [
                 CharacterRewardCandidate(
                     name=match.name,
-                    code=match.code,
                     match_reason=self._build_match_reason(
                         classification.middle_category, classification.minor_category
                     ),
@@ -151,12 +150,8 @@ class CharacterService:
     @staticmethod
     def _to_summary(character) -> CharacterSummary:
         return CharacterSummary(
-            id=character.id,
-            code=character.code,
             name=character.name,
-            rarity=character.rarity,
             description=character.description,
-            metadata=character.metadata_json,
         )
 
     @staticmethod
@@ -176,7 +171,7 @@ class CharacterService:
         matches: Sequence[CharacterReward],
     ) -> tuple[CharacterSummary | None, bool, CharacterRewardFailureReason | None]:
         for match in matches:
-            character = await self.character_repo.get_by_code(match.code)
+            character = await self.character_repo.get_by_name(match.name)
             if character is None:
                 continue
 

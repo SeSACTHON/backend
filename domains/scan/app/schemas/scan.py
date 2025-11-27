@@ -4,6 +4,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field, HttpUrl
 
 from domains._shared.schemas.waste import WasteClassificationResult
+from domains.character.schemas.reward import CharacterRewardResponse
 
 
 class ClassificationRequest(BaseModel):
@@ -20,6 +21,7 @@ class ClassificationResponse(BaseModel):
     status: str
     message: str
     pipeline_result: Optional[WasteClassificationResult] = None
+    reward: Optional[CharacterRewardResponse] = None
     error: Optional[str] = None
 
 
@@ -30,6 +32,7 @@ class ScanTask(BaseModel):
     confidence: Optional[float] = None
     completed_at: Optional[datetime] = None
     pipeline_result: Optional[WasteClassificationResult] = None
+    reward: Optional[CharacterRewardResponse] = None
 
 
 class ScanCategory(BaseModel):

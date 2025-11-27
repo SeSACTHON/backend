@@ -3,26 +3,52 @@ from __future__ import annotations
 import asyncio
 from datetime import datetime, timezone
 from typing import Dict, List
-from uuid import uuid4
+from uuid import UUID, uuid4
 
+import httpx
+import logging
+from fastapi import Depends
+from pydantic import ValidationError
+
+from domains.character.schemas.reward import (
+    CharacterRewardRequest,
+    CharacterRewardResponse,
+    CharacterRewardSource,
+    ClassificationSummary,
+)
 from domains.scan.app.schemas.scan import (
     ClassificationRequest,
     ClassificationResponse,
     ScanCategory,
     ScanTask,
 )
+from domains.scan.core.config import Settings, get_settings
 from domains._shared.schemas.waste import WasteClassificationResult
 from domains._shared.waste_pipeline import PipelineError, process_waste_classification
 from domains._shared.waste_pipeline.utils import ITEM_CLASS_PATH, load_yaml
 
 DEFAULT_SCAN_PROMPT = "이 폐기물을 어떻게 분리배출해야 하나요?"
 _TASK_STORE: Dict[str, ScanTask] = {}
+DISQUALIFYING_TAGS = {
+    "내용물_있음",
+    "라벨_부착",
+    "뚜껑_있음",
+    "오염됨",
+    "미분류_소분류",
+}
+logger = logging.getLogger(__name__)
 
 
 class ScanService:
     _category_cache: List[ScanCategory] | None = None
 
-    async def classify(self, payload: ClassificationRequest) -> ClassificationResponse:
+    def __init__(self, settings: Settings = Depends(get_settings)):
+        self.settings = settings
+        self._reward_endpoint = self._build_reward_endpoint()
+
+    async def classify(
+        self, payload: ClassificationRequest, user_id: UUID
+    ) -> ClassificationResponse:
         image_urls = [str(url) for url in payload.image_urls or []]
         if payload.image_url:
             image_urls.append(str(payload.image_url))
@@ -57,6 +83,12 @@ class ScanService:
         category = classification.get("major_category")
         completed_at = datetime.now(timezone.utc)
 
+        reward = None
+        if self._should_attempt_reward(pipeline_result):
+            reward_request = self._build_reward_request(user_id, task_id, pipeline_result)
+            if reward_request:
+                reward = await self._call_character_reward_api(reward_request)
+
         task = ScanTask(
             task_id=task_id,
             status="completed",
@@ -64,6 +96,7 @@ class ScanService:
             confidence=None,
             completed_at=completed_at,
             pipeline_result=pipeline_result,
+            reward=reward,
         )
         _TASK_STORE[task_id] = task
 
@@ -72,6 +105,7 @@ class ScanService:
             status="completed",
             message="classification completed",
             pipeline_result=pipeline_result,
+            reward=reward,
         )
 
     async def task(self, task_id: str) -> ScanTask:
@@ -118,3 +152,83 @@ class ScanService:
             )
             counter += 1
         return categories
+
+    def _should_attempt_reward(self, result: WasteClassificationResult) -> bool:
+        if not self.settings.reward_feature_enabled:
+            return False
+        classification_payload = result.classification_result or {}
+        classification = classification_payload.get("classification", {})
+        major = (classification.get("major_category") or "").strip()
+        middle = (classification.get("middle_category") or "").strip()
+        if not major or not middle:
+            return False
+        if major != "재활용폐기물":
+            return False
+        if not result.disposal_rules:
+            return False
+        situation_tags = classification_payload.get("situation_tags", [])
+        if any(tag in DISQUALIFYING_TAGS for tag in situation_tags if isinstance(tag, str)):
+            return False
+        return True
+
+    def _build_reward_request(
+        self,
+        user_id: UUID,
+        task_id: str,
+        result: WasteClassificationResult,
+    ) -> CharacterRewardRequest | None:
+        classification_payload = result.classification_result or {}
+        classification = classification_payload.get("classification", {}) or {}
+        major = classification.get("major_category")
+        middle = classification.get("middle_category")
+        if not major or not middle:
+            return None
+        minor = classification.get("minor_category")
+        situation_tags = classification_payload.get("situation_tags", [])
+        normalized_tags = [str(tag).strip() for tag in situation_tags if isinstance(tag, str)]
+        return CharacterRewardRequest(
+            source=CharacterRewardSource.SCAN,
+            user_id=user_id,
+            task_id=task_id,
+            classification=ClassificationSummary(
+                major_category=str(major).strip(),
+                middle_category=str(middle).strip(),
+                minor_category=str(minor).strip() if minor else None,
+            ),
+            situation_tags=normalized_tags,
+            disposal_rules_present=bool(result.disposal_rules),
+        )
+
+    async def _call_character_reward_api(
+        self, reward_request: CharacterRewardRequest
+    ) -> CharacterRewardResponse | None:
+        headers = {}
+        if self.settings.character_api_token:
+            headers["Authorization"] = f"Bearer {self.settings.character_api_token}"
+        timeout = httpx.Timeout(self.settings.character_api_timeout_seconds)
+        payload = reward_request.model_dump(mode="json")
+        try:
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                response = await client.post(
+                    self._reward_endpoint,
+                    json=payload,
+                    headers=headers or None,
+                )
+                response.raise_for_status()
+        except httpx.HTTPError as exc:
+            logger.warning("Character reward API call failed: %s", exc)
+            return None
+
+        try:
+            data = response.json()
+            return CharacterRewardResponse(**data)
+        except (ValueError, ValidationError) as exc:
+            logger.warning("Invalid character reward payload: %s", exc)
+            return None
+
+    def _build_reward_endpoint(self) -> str:
+        base = self.settings.character_api_base_url.rstrip("/")
+        path = self.settings.character_reward_endpoint
+        if not path.startswith("/"):
+            path = f"/{path}"
+        return f"{base}{path}"

@@ -18,7 +18,6 @@ class CharacterCategory:
 @dataclass(frozen=True)
 class CharacterReward:
     name: str
-    code: str
     categories: tuple[CharacterCategory, ...]
     default_reward: bool = False
 
@@ -52,7 +51,6 @@ def load_reward_mappings() -> tuple[CharacterReward, ...]:
         characters.append(
             CharacterReward(
                 name=entry["name"],
-                code=entry["code"],
                 categories=tuple(categories),
                 default_reward=bool(entry.get("default_reward")),
             )
@@ -98,7 +96,6 @@ def summarize_mapping() -> list[dict[str, str]]:
             summary.append(
                 {
                     "character": character.name,
-                    "code": character.code,
                     "major": "*",
                     "middle": "*",
                     "minor": character.default_reward and "(default)" or "",
@@ -109,7 +106,6 @@ def summarize_mapping() -> list[dict[str, str]]:
             summary.append(
                 {
                     "character": character.name,
-                    "code": character.code,
                     "major": category.major,
                     "middle": category.middle,
                     "minor": category.minor or "*",
