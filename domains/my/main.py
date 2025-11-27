@@ -20,9 +20,9 @@ def create_app() -> FastAPI:
         title="My API",
         description="User profile and rewards service",
         version="0.7.3",
-        docs_url="/api/v1/my/docs",
-        redoc_url="/api/v1/my/redoc",
-        openapi_url="/api/v1/my/openapi.json",
+        docs_url="/api/v1/user/docs",
+        redoc_url="/api/v1/user/redoc",
+        openapi_url="/api/v1/user/openapi.json",
     )
 
     app.add_middleware(

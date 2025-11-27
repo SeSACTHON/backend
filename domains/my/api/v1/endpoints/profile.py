@@ -4,7 +4,7 @@ from domains.my.schemas import UserProfile, UserUpdate
 from domains.my.security import TokenPayload, access_token_dependency
 from domains.my.services.my import MyService
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(prefix="/user", tags=["user"])
 
 
 @router.get("/me", response_model=UserProfile, summary="Get current user profile")

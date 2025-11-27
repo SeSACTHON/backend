@@ -4,7 +4,7 @@ from domains.my.schemas import CharacterOwnershipStatus, UserCharacter
 from domains.my.security import TokenPayload, access_token_dependency
 from domains.my.services import UserCharacterService
 
-router = APIRouter(prefix="/users/me", tags=["user-characters"])
+router = APIRouter(prefix="/user/me", tags=["user-characters"])
 
 
 @router.get(

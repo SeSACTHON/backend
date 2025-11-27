@@ -5,7 +5,7 @@
 ## 주요 기능
 
 - `/health`, `/ready` 헬스 체크
-- `/api/v1/users/{user_id}` 프로필 조회/수정/삭제
+- `/api/v1/user/{user_id}` 프로필 조회/수정/삭제
 - `/api/v1/metrics` 서비스 메트릭 반환
 - (내부) `UserRepository`/`MyService` 레이어를 통한 Postgres 접근
 
@@ -56,9 +56,9 @@ docker compose -f docker-compose.my-local.yml up --build
 
 ## API 문서
 
-- Swagger UI: `http://localhost:8000/api/v1/my/docs`
-- ReDoc: `http://localhost:8000/api/v1/my/redoc`
-- OpenAPI JSON: `http://localhost:8000/api/v1/my/openapi.json`
+- Swagger UI: `http://localhost:8000/api/v1/user/docs`
+- ReDoc: `http://localhost:8000/api/v1/user/redoc`
+- OpenAPI JSON: `http://localhost:8000/api/v1/user/openapi.json`
 
 ## 테스트
 
