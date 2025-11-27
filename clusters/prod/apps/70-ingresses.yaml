@@ -16,6 +16,9 @@ spec:
       - name: character
         namespace: character
         path: workloads/ingress/character/prod
+      - name: my
+        namespace: my
+        path: workloads/ingress/my/prod
       - name: scan
         namespace: scan
         path: workloads/ingress/scan/prod
