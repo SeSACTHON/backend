@@ -30,6 +30,10 @@ class ProfileImageUpdateRequest(BaseModel):
     profile_image_url: Optional[str] = None
 
 
+class ProfileImageUpdateResponse(BaseModel):
+    success: bool = True
+
+
 class UserCharacter(BaseModel):
     id: UUID
     code: str

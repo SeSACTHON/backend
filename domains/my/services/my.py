@@ -55,13 +55,10 @@ class MyService:
         self,
         auth_user_id: UUID,
         profile_image_url: str | None,
-        provider: str | None = None,
-    ) -> UserProfile:
+    ) -> None:
         user = await self._get_user_by_auth_id(auth_user_id)
         payload = UserUpdate(profile_image_url=profile_image_url)
-        updated = await self._apply_update(user, payload)
-        accounts = await self.social_repo.list_by_user_id(auth_user_id)
-        return self._to_profile(updated, accounts, preferred_provider=provider)
+        await self._apply_update(user, payload)
 
     async def delete_user(self, user_id: int) -> None:
         await self._get_user_or_404(user_id)

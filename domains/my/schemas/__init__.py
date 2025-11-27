@@ -5,6 +5,7 @@ Pydantic schemas for the My domain.
 from .user import (
     CharacterOwnershipStatus,
     ProfileImageUpdateRequest,
+    ProfileImageUpdateResponse,
     UserCharacter,
     UserProfile,
     UserUpdate,
@@ -16,4 +17,5 @@ __all__ = [
     "UserCharacter",
     "CharacterOwnershipStatus",
     "ProfileImageUpdateRequest",
+    "ProfileImageUpdateResponse",
 ]
