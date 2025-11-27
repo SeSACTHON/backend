@@ -1,5 +1,6 @@
 from typing import Annotated, Optional
 import logging
+from urllib.parse import urlparse, urlunparse
 
 from fastapi import Cookie, Depends, Request, Response
 from fastapi.responses import RedirectResponse
@@ -26,6 +27,71 @@ from domains.auth.services.auth import ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME, 
 from domains._shared.security import TokenPayload
 
 logger = logging.getLogger(__name__)
+
+
+def _is_default_port(scheme: str, port: str) -> bool:
+    scheme = (scheme or "").lower()
+    return (scheme == "https" and port == "443") or (scheme == "http" and port == "80")
+
+
+def _get_request_origin(request: Request) -> Optional[str]:
+    headers = request.headers
+    forwarded_host = headers.get("x-forwarded-host")
+    forwarded_proto = headers.get("x-forwarded-proto")
+    forwarded_port = headers.get("x-forwarded-port")
+
+    host_header = forwarded_host or headers.get("host")
+    host = host_header.split(",")[0].strip() if host_header else request.url.hostname
+    if not host:
+        return None
+
+    scheme = (
+        forwarded_proto.split(",")[0].strip()
+        if forwarded_proto
+        else (request.url.scheme or "https")
+    )
+
+    if ":" not in host:
+        if forwarded_port:
+            port = forwarded_port.split(",")[0].strip()
+        else:
+            port = str(request.url.port) if request.url.port else None
+        if port and not _is_default_port(scheme, port):
+            host = f"{host}:{port}"
+
+    return f"{scheme}://{host}"
+
+
+def _build_frontend_redirect_url(request: Request, fallback_url: str) -> str:
+    origin = _get_request_origin(request)
+    if not origin:
+        return fallback_url
+
+    parsed_origin = urlparse(origin)
+    parsed_fallback = urlparse(fallback_url)
+
+    scheme = parsed_origin.scheme or parsed_fallback.scheme
+    netloc = parsed_origin.netloc or parsed_fallback.netloc
+    if not scheme or not netloc:
+        return fallback_url
+
+    path = parsed_fallback.path or "/"
+
+    return urlunparse(
+        (
+            scheme,
+            netloc,
+            path,
+            parsed_fallback.params,
+            parsed_fallback.query,
+            parsed_fallback.fragment,
+        )
+    )
+
+
+def _build_frontend_redirect_response(request: Request, fallback_url: str) -> RedirectResponse:
+    redirect_url = _build_frontend_redirect_url(request, fallback_url)
+    return RedirectResponse(url=redirect_url)
 
 
 @google_router.get(
@@ -80,7 +146,7 @@ async def google_callback(
 ):
     """Google OAuth 콜백을 처리하고 세션 쿠키를 설정합니다."""
     settings = get_settings()
-    success_response = RedirectResponse(url=settings.frontend_url)
+    success_response = _build_frontend_redirect_response(request, settings.frontend_url)
     try:
         payload = OAuthLoginRequest(code=code, state=state)
         await service.login_with_provider(
@@ -95,7 +161,7 @@ async def google_callback(
     except Exception as e:
         # OAuth 실패 시 프론트엔드 로그인 페이지로 리다이렉트
         logger.error(f"Google OAuth callback failed: {type(e).__name__}: {str(e)}", exc_info=True)
-        return RedirectResponse(url=settings.oauth_failure_redirect_url)
+        return _build_frontend_redirect_response(request, settings.oauth_failure_redirect_url)
 
 
 @kakao_router.get(
@@ -110,7 +176,7 @@ async def kakao_callback(
 ):
     """Kakao OAuth 콜백을 처리하고 세션 쿠키를 설정합니다."""
     settings = get_settings()
-    success_response = RedirectResponse(url=settings.frontend_url)
+    success_response = _build_frontend_redirect_response(request, settings.frontend_url)
     try:
         payload = OAuthLoginRequest(code=code, state=state)
         await service.login_with_provider(
@@ -125,7 +191,7 @@ async def kakao_callback(
     except Exception as e:
         # OAuth 실패 시 프론트엔드 로그인 페이지로 리다이렉트
         logger.error(f"Kakao OAuth callback failed: {type(e).__name__}: {str(e)}", exc_info=True)
-        return RedirectResponse(url=settings.oauth_failure_redirect_url)
+        return _build_frontend_redirect_response(request, settings.oauth_failure_redirect_url)
 
 
 @naver_router.get(
@@ -140,7 +206,7 @@ async def naver_callback(
 ):
     """Naver OAuth 콜백을 처리하고 세션 쿠키를 설정합니다."""
     settings = get_settings()
-    success_response = RedirectResponse(url=settings.frontend_url)
+    success_response = _build_frontend_redirect_response(request, settings.frontend_url)
     try:
         payload = OAuthLoginRequest(code=code, state=state)
         await service.login_with_provider(
@@ -155,7 +221,7 @@ async def naver_callback(
     except Exception as e:
         # OAuth 실패 시 프론트엔드 로그인 페이지로 리다이렉트
         logger.error(f"Naver OAuth callback failed: {type(e).__name__}: {str(e)}", exc_info=True)
-        return RedirectResponse(url=settings.oauth_failure_redirect_url)
+        return _build_frontend_redirect_response(request, settings.oauth_failure_redirect_url)
 
 
 @auth_router.post(
