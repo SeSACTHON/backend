@@ -27,13 +27,8 @@ async def init_db() -> int:
 
     try:
         async with engine.begin() as conn:
-            exists = await conn.scalar(
-                text("SELECT 1 FROM information_schema.schemata WHERE schema_name = :schema_name"),
-                {"schema_name": "auth"},
-            )
-            if exists:
-                print("♻️  Dropping existing 'auth' schema...")
-                await conn.execute(text("DROP SCHEMA IF EXISTS auth CASCADE"))
+            print("♻️  Dropping existing 'auth' schema (if present)...")
+            await conn.execute(text("DROP SCHEMA IF EXISTS auth CASCADE"))
 
             print("📦 Creating 'auth' schema...")
             await conn.execute(text("CREATE SCHEMA auth"))
