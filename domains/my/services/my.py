@@ -9,7 +9,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from domains.my.database.session import get_db_session
 from domains.my.models import AuthUserSocialAccount, User
 from domains.my.repositories import UserRepository, UserSocialAccountRepository
-from domains.my.schemas import SocialAccountProfile, UserProfile, UserUpdate
+from domains.my.schemas import UserProfile, UserUpdate
+
+DEFAULT_PROFILE_IMAGE_URL = (
+    "https://images.dev.growbin.app/scan/02cab060acea4504bdc8fa06c5b4e402.bin"
+)
 
 
 class MyService:
@@ -23,10 +27,12 @@ class MyService:
         accounts = await self.social_repo.list_by_user_id(user.auth_user_id)
         return self._to_profile(user, accounts)
 
-    async def get_current_user(self, auth_user_id: UUID) -> UserProfile:
+    async def get_current_user(
+        self, auth_user_id: UUID, provider: str | None = None
+    ) -> UserProfile:
         user = await self._get_user_by_auth_id(auth_user_id)
         accounts = await self.social_repo.list_by_user_id(auth_user_id)
-        return self._to_profile(user, accounts)
+        return self._to_profile(user, accounts, preferred_provider=provider)
 
     async def update_user(self, user_id: int, payload: UserUpdate) -> UserProfile:
         user = await self._get_user_or_404(user_id)
@@ -34,22 +40,28 @@ class MyService:
         accounts = await self.social_repo.list_by_user_id(user.auth_user_id)
         return self._to_profile(updated, accounts)
 
-    async def update_current_user(self, auth_user_id: UUID, payload: UserUpdate) -> UserProfile:
+    async def update_current_user(
+        self,
+        auth_user_id: UUID,
+        payload: UserUpdate,
+        provider: str | None = None,
+    ) -> UserProfile:
         user = await self._get_user_by_auth_id(auth_user_id)
         updated = await self._apply_update(user, payload)
         accounts = await self.social_repo.list_by_user_id(auth_user_id)
-        return self._to_profile(updated, accounts)
+        return self._to_profile(updated, accounts, preferred_provider=provider)
 
     async def update_profile_image(
         self,
         auth_user_id: UUID,
         profile_image_url: str | None,
+        provider: str | None = None,
     ) -> UserProfile:
         user = await self._get_user_by_auth_id(auth_user_id)
         payload = UserUpdate(profile_image_url=profile_image_url)
         updated = await self._apply_update(user, payload)
         accounts = await self.social_repo.list_by_user_id(auth_user_id)
-        return self._to_profile(updated, accounts)
+        return self._to_profile(updated, accounts, preferred_provider=provider)
 
     async def delete_user(self, user_id: int) -> None:
         await self._get_user_or_404(user_id)
@@ -96,29 +108,89 @@ class MyService:
         self,
         user: User,
         accounts: Sequence[AuthUserSocialAccount],
+        *,
+        preferred_provider: str | None = None,
     ) -> UserProfile:
-        social_accounts = [self._to_social_account_schema(account) for account in accounts]
-        primary = social_accounts[0] if social_accounts else None
+        account = self._select_social_account(accounts, preferred_provider)
+        username = self._resolve_username(user, account)
+        nickname = self._resolve_nickname(user, account, username)
+        profile_image_url = self._resolve_profile_image_url(user, account)
+        provider = account.provider if account else (preferred_provider or "unknown")
         return UserProfile(
-            id=int(user.id),
-            auth_user_id=user.auth_user_id,
-            username=user.username,
-            name=user.name,
-            profile_image_url=user.profile_image_url,
-            created_at=user.created_at,
-            primary_provider=primary.provider if primary else None,
-            primary_email=primary.email if primary else None,
-            social_accounts=social_accounts,
+            username=username,
+            nickname=nickname,
+            phone_number=None,
+            email=account.email if account else None,
+            profile_image_url=profile_image_url,
+            provider=provider,
+            last_login_at=account.last_login_at if account else None,
         )
 
     @staticmethod
-    def _to_social_account_schema(account: AuthUserSocialAccount) -> SocialAccountProfile:
-        return SocialAccountProfile(
-            provider=account.provider,
-            provider_user_id=account.provider_user_id,
-            email=account.email,
-            username=account.username,
-            nickname=account.nickname,
-            profile_image_url=account.profile_image_url,
-            last_login_at=account.last_login_at,
-        )
+    def _select_social_account(
+        accounts: Sequence[AuthUserSocialAccount],
+        preferred_provider: str | None,
+    ) -> AuthUserSocialAccount | None:
+        if not accounts:
+            return None
+        if preferred_provider:
+            for account in accounts:
+                if account.provider == preferred_provider:
+                    return account
+        return accounts[0]
+
+    @staticmethod
+    def _resolve_username(user: User, account: AuthUserSocialAccount | None) -> str:
+        candidates = [
+            getattr(user, "name", None),
+            user.username,
+            account.username if account else None,
+            account.nickname if account else None,
+        ]
+        for raw in candidates:
+            value = MyService._clean_text(raw)
+            if value:
+                return value
+        return "사용자"
+
+    @staticmethod
+    def _resolve_nickname(
+        user: User,
+        account: AuthUserSocialAccount | None,
+        fallback: str,
+    ) -> str:
+        candidates = [
+            account.nickname if account else None,
+            account.username if account else None,
+            user.username,
+            getattr(user, "name", None),
+            fallback,
+        ]
+        for raw in candidates:
+            value = MyService._clean_text(raw)
+            if value:
+                return value
+        return fallback
+
+    @staticmethod
+    def _resolve_profile_image_url(
+        user: User,
+        account: AuthUserSocialAccount | None,
+    ) -> str:
+        candidates = [
+            account.profile_image_url if account else None,
+            user.profile_image_url,
+            DEFAULT_PROFILE_IMAGE_URL,
+        ]
+        for raw in candidates:
+            value = MyService._clean_text(raw)
+            if value:
+                return value
+        return DEFAULT_PROFILE_IMAGE_URL
+
+    @staticmethod
+    def _clean_text(value: str | None) -> str | None:
+        if value is None:
+            return None
+        stripped = value.strip()
+        return stripped or None

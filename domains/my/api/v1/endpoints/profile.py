@@ -12,7 +12,7 @@ async def get_current_user(
     token: TokenPayload = Depends(access_token_dependency),
     service: MyService = Depends(MyService),
 ):
-    return await service.get_current_user(auth_user_id=token.user_id)
+    return await service.get_current_user(auth_user_id=token.user_id, provider=token.provider)
 
 
 @router.patch("/me", response_model=UserProfile, summary="Update current user profile")
@@ -21,7 +21,11 @@ async def update_current_user(
     token: TokenPayload = Depends(access_token_dependency),
     service: MyService = Depends(MyService),
 ):
-    return await service.update_current_user(auth_user_id=token.user_id, payload=payload)
+    return await service.update_current_user(
+        auth_user_id=token.user_id,
+        payload=payload,
+        provider=token.provider,
+    )
 
 
 @router.delete("/me", summary="Delete current user")

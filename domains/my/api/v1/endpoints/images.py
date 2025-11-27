@@ -21,4 +21,5 @@ async def save_profile_image(
     return await service.update_profile_image(
         auth_user_id=token.user_id,
         profile_image_url=profile_image_url,
+        provider=token.provider,
     )
