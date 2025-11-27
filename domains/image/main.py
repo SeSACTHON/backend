@@ -9,6 +9,9 @@ def create_app() -> FastAPI:
         title="Image API",
         description="Eco image ingestion and delivery service",
         version="0.7.3",
+        docs_url="/api/v1/images/docs",
+        openapi_url="/api/v1/images/openapi.json",
+        redoc_url=None,
     )
 
     app.add_middleware(

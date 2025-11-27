@@ -37,9 +37,33 @@ sequenceDiagram
 | 1 | `POST https://api.dev.growbin.app/api/v1/images/{channel}` | `Content-Type: application/json` | `filename`, `content_type`, `uploader_id`(optional), `metadata`(object). |
 | 2 | `PUT {upload_url}` | presigned에서 요구한 헤더(`Content-Type` 등) | 원본 이미지 바이너리. |
 | 3 | `POST https://api.dev.growbin.app/api/v1/images/{channel}/callback` | `Content-Type: application/json` | `key`, `etag`, `content_length`(선택), `checksum`(선택). |
-| 4 | `POST https://api.dev.growbin.app/api/v1/chat/...` | 프로젝트 규격 참고 | callback 응답에서 받은 `cdn_url`과 대화 텍스트를 전달. |
+| 4 | 최종 컨슈머 API (예: Chat, Scan) | 프로젝트 규격 참고 | callback 응답에서 받은 `cdn_url` 등 메타데이터를 전달. |
 
 `channel` 값은 `chat`, `scan`, `my` 중 하나이며 이번 플로우는 `chat` 기준입니다.
+
+#### 2-1. 요청 필드 상세
+
+| 구분 | 필드 | 타입 / 예시 | 필수? | 설명 |
+| --- | --- | --- | --- | --- |
+| Presigned 요청 (`POST /images/{channel}`) | `filename` | `"receipt.png"` | ✅ | S3 object key 결정에 사용. `"."` 포함 확장자 필수. |
+|  | `content_type` | `"image/png"` | ✅ | 허용 MIME: `image/png`, `image/jpeg`, `image/webp`. 기타는 `application/octet-stream`. |
+|  | `uploader_id` | `"0b6e...user-id"` | ⭕️ | 보내면 로그인 사용자와 동일해야 하며, 생략 시 서버가 쿠키 사용자 ID 사용. |
+|  | `metadata` | `{ "chat_session_id": "...", ... }` | ⭕️ | 채널 별 자유로운 JSON. 아래 표 참고. |
+|  | `metadata.channel` | 자동 | - | 서버가 내부적으로 저장. 입력하지 않아도 됨. |
+| Callback (`POST /images/{channel}/callback`) | `key` | `"chat/2025/11/27/...png"` | ✅ | presigned 응답에서 받은 `key` 그대로 전달. |
+|  | `etag` | `"\"6d0c-...\""` | ⭕️ | 브라우저가 ETag를 못 읽으면 빈 문자열로 보내도 허용. |
+|  | `content_length` | `123456` | ⭕️ | 업로드한 파일 크기. 나중에 백엔드 검증에 사용. |
+|  | `checksum` | `"sha256:..."` | ⭕️ | 필요 시 제공. 현재는 선택사항. |
+
+#### 채널별 업로드 파이프라인 요약
+
+| Channel | 주 소비자 | 주요 사용처 | 권장 메타데이터 | 비고 |
+| --- | --- | --- | --- | --- |
+| `chat` | Chat API (`POST /api/v1/chat/messages`) | 챗 UI에서 대화 중 첨부하는 이미지 | `chat_session_id`, `message_id`, `source`, `uploaded_at`, `camera_orientation` | 콜백 성공 시 `cdn_url`을 그대로 Chat API payload에 넣으면 됨. |
+| `scan` | Scan 도메인 (`POST /api/v1/scan/.../callback`) | OCR·분류용 촬영 이미지 (예: 영수증, 바코드) | `scan_session_id`, `label`, `captured_at`, `device_type`, `geo`(선택) | 키(prefix)는 `scan/{yyyy}/{mm}/{dd}/...` 형식. `metadata.label`을 활용하면 백엔드에서 분류 힌트를 받을 수 있음. |
+| `my` *(예비)* | My 도메인 (향후 `POST /api/v1/my/images`) | 마이페이지 개인 보관용 | `folder`, `note`, `uploaded_at`, `visibility` | 아직 BE 컨슈머가 활성화되지 않았으므로 테스트 용도로만 사용. 플로우 자체는 chat/scan과 동일. |
+
+모든 채널은 **로그인 쿠키(`s_access`)가 반드시 필요**하며, 요청 본문의 `uploader_id`가 쿠키 사용자 ID와 다르면 `Uploader mismatch` 오류가 발생합니다. metadata는 자유로운 JSON이지만, 위 표처럼 채널 별 최소 필드를 맞춰두면 이후 서비스 간 참조가 쉬워집니다.
 
 ---
 
