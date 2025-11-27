@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.endpoints import api_router, health_router
+from domains.scan.app.api.v1.endpoints import api_router, health_router
 
 
 def create_app() -> FastAPI:
@@ -11,8 +11,7 @@ def create_app() -> FastAPI:
         version="0.7.3",
         docs_url="/api/v1/scan/docs",
         openapi_url="/api/v1/scan/openapi.json",
-        redoc_url=None,
-        root_path="/api/v1",
+        redoc_url="/api/v1/scan/redoc",
     )
 
     app.add_middleware(

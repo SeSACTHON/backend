@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from typing import Dict, List
 from uuid import uuid4
 
-from app.schemas.scan import (
+from domains.scan.app.schemas.scan import (
     ClassificationRequest,
     ClassificationResponse,
     ScanCategory,

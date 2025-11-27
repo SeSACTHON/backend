@@ -1,12 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from app.schemas.scan import (
+from domains.scan.app.schemas.scan import (
     ClassificationRequest,
     ClassificationResponse,
     ScanCategory,
     ScanTask,
 )
-from app.services.scan import ScanService
+from domains.scan.app.services.scan import ScanService
 
 router = APIRouter(prefix="/scan", tags=["scan"])
 
