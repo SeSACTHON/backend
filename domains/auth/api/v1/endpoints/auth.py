@@ -166,9 +166,7 @@ async def google_callback(
     """Google OAuth 콜백을 처리하고 세션 쿠키를 설정합니다."""
     settings = get_settings()
     frontend_origin = request.headers.get(FRONTEND_ORIGIN_HEADER)
-    success_response = _build_frontend_redirect_response(
-        request, settings.frontend_url, frontend_origin
-    )
+    success_response = RedirectResponse(url=settings.frontend_url)
     try:
         payload = OAuthLoginRequest(code=code, state=state)
         await service.login_with_provider(
@@ -178,13 +176,18 @@ async def google_callback(
             user_agent=request.headers.get("user-agent"),
             ip_address=request.client.host if request.client else None,
         )
+        redirect_origin = frontend_origin or service.get_state_frontend_origin()
+        redirect_url = _build_frontend_redirect_url(request, settings.frontend_url, redirect_origin)
+        success_response.headers["location"] = redirect_url
         # 성공 시 프론트엔드 홈으로 리다이렉트
         return success_response
     except Exception as e:
         # OAuth 실패 시 프론트엔드 로그인 페이지로 리다이렉트
         logger.error(f"Google OAuth callback failed: {type(e).__name__}: {str(e)}", exc_info=True)
         return _build_frontend_redirect_response(
-            request, settings.oauth_failure_redirect_url, frontend_origin
+            request,
+            settings.oauth_failure_redirect_url,
+            frontend_origin or service.get_state_frontend_origin(),
         )
 
 
@@ -201,9 +204,7 @@ async def kakao_callback(
     """Kakao OAuth 콜백을 처리하고 세션 쿠키를 설정합니다."""
     settings = get_settings()
     frontend_origin = request.headers.get(FRONTEND_ORIGIN_HEADER)
-    success_response = _build_frontend_redirect_response(
-        request, settings.frontend_url, frontend_origin
-    )
+    success_response = RedirectResponse(url=settings.frontend_url)
     try:
         payload = OAuthLoginRequest(code=code, state=state)
         await service.login_with_provider(
@@ -213,13 +214,18 @@ async def kakao_callback(
             user_agent=request.headers.get("user-agent"),
             ip_address=request.client.host if request.client else None,
         )
+        redirect_origin = frontend_origin or service.get_state_frontend_origin()
+        redirect_url = _build_frontend_redirect_url(request, settings.frontend_url, redirect_origin)
+        success_response.headers["location"] = redirect_url
         # 성공 시 프론트엔드 홈으로 리다이렉트
         return success_response
     except Exception as e:
         # OAuth 실패 시 프론트엔드 로그인 페이지로 리다이렉트
         logger.error(f"Kakao OAuth callback failed: {type(e).__name__}: {str(e)}", exc_info=True)
         return _build_frontend_redirect_response(
-            request, settings.oauth_failure_redirect_url, frontend_origin
+            request,
+            settings.oauth_failure_redirect_url,
+            frontend_origin or service.get_state_frontend_origin(),
         )
 
 
@@ -236,9 +242,7 @@ async def naver_callback(
     """Naver OAuth 콜백을 처리하고 세션 쿠키를 설정합니다."""
     settings = get_settings()
     frontend_origin = request.headers.get(FRONTEND_ORIGIN_HEADER)
-    success_response = _build_frontend_redirect_response(
-        request, settings.frontend_url, frontend_origin
-    )
+    success_response = RedirectResponse(url=settings.frontend_url)
     try:
         payload = OAuthLoginRequest(code=code, state=state)
         await service.login_with_provider(
@@ -248,13 +252,18 @@ async def naver_callback(
             user_agent=request.headers.get("user-agent"),
             ip_address=request.client.host if request.client else None,
         )
+        redirect_origin = frontend_origin or service.get_state_frontend_origin()
+        redirect_url = _build_frontend_redirect_url(request, settings.frontend_url, redirect_origin)
+        success_response.headers["location"] = redirect_url
         # 성공 시 프론트엔드 홈으로 리다이렉트
         return success_response
     except Exception as e:
         # OAuth 실패 시 프론트엔드 로그인 페이지로 리다이렉트
         logger.error(f"Naver OAuth callback failed: {type(e).__name__}: {str(e)}", exc_info=True)
         return _build_frontend_redirect_response(
-            request, settings.oauth_failure_redirect_url, frontend_origin
+            request,
+            settings.oauth_failure_redirect_url,
+            frontend_origin or service.get_state_frontend_origin(),
         )
 
 

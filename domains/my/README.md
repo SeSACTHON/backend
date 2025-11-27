@@ -72,3 +72,15 @@ CI(GitHub Actions `ci-services.yml`)에서 `black`, `ruff`, `pytest`, Docker 이
 ```bash
 gh workflow run ci-services.yml -f target_services=my
 ```
+
+## Remote ArgoCD Sync
+
+My 서버 변경 사항이 머지되면 master, worker-1, worker-2, storage 노드에서 모두 `sync-argocd-all.sh`를 실행해 전체 Wave를 순차 동기화해야 합니다.
+
+```bash
+for node in master worker-1 worker-2 storage; do
+  SSH_NODE="$node" ./scripts/sync-argocd-all.sh dev
+done
+```
+
+`scripts/sync-argocd-all.sh`는 로컬에서 AWS CLI로 `k8s-$SSH_NODE` 인스턴스를 조회한 뒤 SSH로 접속해 `kubectl` 동기화 명령을 실행합니다. 따라서 실행 환경에는 해당 노드로 접속 가능한 SSH 키와 AWS 자격 증명이 필요합니다.

@@ -61,6 +61,7 @@ class AuthService:
             if self.settings.character_api_token
             else None
         )
+        self._state_frontend_origin: Optional[str] = None
 
     async def authorize(
         self, provider_name: str, params: OAuthAuthorizeParams
@@ -103,6 +104,7 @@ class AuthService:
         user_agent: Optional[str],
         ip_address: Optional[str],
     ) -> User:
+        self._state_frontend_origin = None
         provider = self._get_provider(provider_name)
         state_data = await self.state_store.consume_state(payload.state)
         if not state_data:
@@ -114,6 +116,7 @@ class AuthService:
                 status_code=status.HTTP_400_BAD_REQUEST, detail="State provider mismatch"
             )
 
+        self._state_frontend_origin = state_data.get("frontend_origin")
         redirect_uri = (
             payload.redirect_uri or state_data.get("redirect_uri") or provider.redirect_uri
         )
@@ -318,6 +321,9 @@ class AuthService:
             cookie_kwargs["domain"] = self.settings.cookie_domain
         response.delete_cookie(ACCESS_COOKIE_NAME, **cookie_kwargs)
         response.delete_cookie(REFRESH_COOKIE_NAME, **cookie_kwargs)
+
+    def get_state_frontend_origin(self) -> Optional[str]:
+        return self._state_frontend_origin
 
     def _set_cookie(self, response: Response, name: str, value: str, expires_at: int) -> None:
         max_age = max(expires_at - int(now_utc().timestamp()), 1)

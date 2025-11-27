@@ -23,3 +23,15 @@ poetry run uvicorn domains.character.main:app --reload --port 8001
 
 ## CI 메모
 2025-11-28: 캐릭터 도메인 README를 추가해 CI를 트리거했습니다.
+
+## Remote ArgoCD Sync
+
+Character 서버를 배포할 때는 master, worker-1, worker-2, storage 노드 각각에서 `sync-argocd-all.sh`를 실행해 전체 Wave를 순차 동기화해야 합니다.
+
+```bash
+for node in master worker-1 worker-2 storage; do
+  SSH_NODE="$node" ./scripts/sync-argocd-all.sh dev
+done
+```
+
+`sync-argocd-all.sh`는 로컬에서 AWS CLI로 대상 노드(`k8s-$SSH_NODE`)의 Public IP를 조회한 뒤 SSH 접속해 `kubectl` 동기화를 수행합니다. 실행 환경에는 해당 노드에 접근 가능한 SSH 키와 AWS 자격 증명이 필요합니다.

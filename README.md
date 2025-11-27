@@ -135,6 +135,26 @@ kubectl get applications -n argocd
 - `.github/workflows/ci-quality-gate.yml`가 서비스 코드 변경을 감지해 lint/test/build/push를 수행합니다.
 - Docker Hub 이미지 태그(`docker.io/mng990/eco2:*`)가 갱신되면 ArgoCD가 자동 배포합니다.
 
+### 5. Remote ArgoCD Sync (All Waves)
+- `./scripts/sync-argocd-all.sh <env>`는 **로컬에서 AWS CLI로 대상 노드 Public IP를 조회한 뒤**, SSH로 접속해 sync-wave 순서대로 `kubectl` 명령을 실행합니다.
+- 기본 대상은 `master` 노드지만 `SSH_NODE`(예: `worker-1`, `worker-2`, `storage`)를 지정하면 다른 서버에서도 동일하게 트리거할 수 있습니다.
+- 주요 환경 변수
+  - `SSH_NODE` (기본: `master`) → EC2 Name 태그는 `k8s-$SSH_NODE` 형식이어야 합니다.
+  - `SSH_KEY` (기본: `~/.ssh/sesacthon.pem`)
+  - `AWS_REGION` (기본: `ap-northeast-2`)
+  - `SSH_OPTS` (기본: `-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null`)
+- 예시
+```bash
+# dev Wave 전체 동기화 (master 노드)
+./scripts/sync-argocd-all.sh dev
+
+# 동일 작업을 다른 노드에서도 순차 실행
+for node in master worker-1 worker-2 storage; do
+  SSH_NODE="$node" ./scripts/sync-argocd-all.sh dev
+done
+```
+- 사전 조건: `aws ec2 describe-instances` 호출 권한과 해당 노드로 SSH 가능한 키가 로컬에 준비되어 있어야 합니다.
+
 ---
 
 ## Sync Wave Layout
