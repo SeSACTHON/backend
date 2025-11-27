@@ -217,6 +217,8 @@ backend/
 ## API Docs
 - [Auth](https://api.dev.growbin.app/api/v1/auth/docs)
 - [Locations](https://api.dev.growbin.app/api/v1/locations/docs)
+- [Chat](https://api.dev.growbin.app/api/v1/chat/docs#/)
+- [Images](https://api.dev.growbin.app/api/v1/images/docs)
 
 ---
 
