@@ -46,7 +46,7 @@ services:
     environment:
       LOCATION_DATABASE_URL: postgresql+asyncpg://location:location@db:5432/location
       LOCATION_REDIS_URL: redis://redis:6379/5
-      LOCATION_AUTH_DISABLED: ${LOCATION_AUTH_DISABLED:-false}
+      LOCATION_AUTH_DISABLED: ${LOCATION_AUTH_DISABLED:-true}
     ports:
     - 8010:8000
     depends_on:

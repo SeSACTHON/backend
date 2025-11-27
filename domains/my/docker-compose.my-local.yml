@@ -37,6 +37,7 @@ services:
     environment:
       MY_DATABASE_URL: postgresql+asyncpg://sesacthon:sesacthon@db:5432/ecoeco
       MY_JWT_SECRET_KEY: local-secret
+      MY_AUTH_DISABLED: ${MY_AUTH_DISABLED:-true}
       CHARACTER_DATABASE_URL: postgresql+asyncpg://sesacthon:sesacthon@db:5432/ecoeco
     ports:
     - 8002:8000
