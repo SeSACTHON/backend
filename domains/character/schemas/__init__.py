@@ -6,10 +6,26 @@ from .character import (
     CharacterProfile,
     CharacterSummary,
 )
+from .reward import (
+    CharacterRewardCandidate,
+    CharacterRewardFailureReason,
+    CharacterRewardRequest,
+    CharacterRewardResponse,
+    CharacterRewardResult,
+    CharacterRewardSource,
+    ClassificationSummary,
+)
 
 __all__ = [
     "CharacterAcquireRequest",
     "CharacterAcquireResponse",
     "CharacterProfile",
     "CharacterSummary",
+    "CharacterRewardSource",
+    "CharacterRewardRequest",
+    "CharacterRewardResponse",
+    "CharacterRewardResult",
+    "CharacterRewardFailureReason",
+    "CharacterRewardCandidate",
+    "ClassificationSummary",
 ]

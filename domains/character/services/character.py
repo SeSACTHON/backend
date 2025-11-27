@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from typing import Sequence
+from uuid import UUID
+
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from domains.character.core.reward_mapping import CharacterReward, find_matching_characters
 from domains.character.database.session import get_db_session
 from domains.character.repositories import CharacterOwnershipRepository, CharacterRepository
 from domains.character.schemas.character import (
@@ -11,6 +15,22 @@ from domains.character.schemas.character import (
     CharacterProfile,
     CharacterSummary,
 )
+from domains.character.schemas.reward import (
+    CharacterRewardCandidate,
+    CharacterRewardFailureReason,
+    CharacterRewardRequest,
+    CharacterRewardResponse,
+    CharacterRewardResult,
+    CharacterRewardSource,
+)
+
+DISQUALIFYING_TAGS = {
+    "내용물_있음",
+    "라벨_부착",
+    "뚜껑_있음",
+    "오염됨",
+    "미분류_소분류",
+}
 
 
 class CharacterService:
@@ -71,6 +91,63 @@ class CharacterService:
             "history_entries": 56,
         }
 
+    async def evaluate_reward(self, payload: CharacterRewardRequest) -> CharacterRewardResponse:
+        candidates: list[CharacterRewardCandidate] = []
+        failure_reason: CharacterRewardFailureReason | None = None
+        rewarded_summary: CharacterSummary | None = None
+        already_owned = False
+
+        classification = payload.classification
+
+        if payload.source != CharacterRewardSource.SCAN:
+            failure_reason = CharacterRewardFailureReason.UNSUPPORTED_SOURCE
+        elif classification.major_category.strip() != "재활용폐기물":
+            failure_reason = CharacterRewardFailureReason.UNSUPPORTED_CATEGORY
+        elif not payload.disposal_rules_present:
+            failure_reason = CharacterRewardFailureReason.MISSING_RULES
+        elif self._has_disqualifying_tags(payload.situation_tags):
+            failure_reason = CharacterRewardFailureReason.DISQUALIFYING_TAGS
+        else:
+            matches = find_matching_characters(
+                major=classification.major_category,
+                middle=classification.middle_category,
+                minor=classification.minor_category,
+            )
+            candidates = [
+                CharacterRewardCandidate(
+                    name=match.name,
+                    code=match.code,
+                    match_reason=self._build_match_reason(
+                        classification.middle_category, classification.minor_category
+                    ),
+                )
+                for match in matches
+            ]
+            if not matches:
+                failure_reason = CharacterRewardFailureReason.NO_MATCH
+            else:
+                (
+                    rewarded_summary,
+                    already_owned,
+                    failure_reason,
+                ) = await self._apply_reward(payload.user_id, matches)
+
+        if failure_reason:
+            result = CharacterRewardResult(
+                rewarded=False,
+                already_owned=already_owned,
+                character=rewarded_summary,
+                reason=failure_reason,
+            )
+        else:
+            result = CharacterRewardResult(
+                rewarded=not already_owned,
+                already_owned=already_owned,
+                character=rewarded_summary,
+            )
+
+        return CharacterRewardResponse(candidates=candidates, result=result)
+
     @staticmethod
     def _to_summary(character) -> CharacterSummary:
         return CharacterSummary(
@@ -81,3 +158,40 @@ class CharacterService:
             description=character.description,
             metadata=character.metadata_json,
         )
+
+    @staticmethod
+    def _has_disqualifying_tags(tags: Sequence[str]) -> bool:
+        normalized = {tag.strip() for tag in tags if isinstance(tag, str)}
+        return any(tag in DISQUALIFYING_TAGS for tag in normalized)
+
+    @staticmethod
+    def _build_match_reason(middle: str, minor: str | None) -> str:
+        if minor:
+            return f"{middle}>{minor}"
+        return middle
+
+    async def _apply_reward(
+        self,
+        user_id: UUID,
+        matches: Sequence[CharacterReward],
+    ) -> tuple[CharacterSummary | None, bool, CharacterRewardFailureReason | None]:
+        for match in matches:
+            character = await self.character_repo.get_by_code(match.code)
+            if character is None:
+                continue
+
+            existing = await self.ownership_repo.get_by_user_and_character(
+                user_id=user_id, character_id=character.id
+            )
+            if existing:
+                return self._to_summary(character), True, None
+
+            await self.ownership_repo.upsert_owned(
+                user_id=user_id,
+                character=character,
+                source="scan-reward",
+            )
+            await self.session.commit()
+            return self._to_summary(character), False, None
+
+        return None, False, CharacterRewardFailureReason.CHARACTER_NOT_FOUND
