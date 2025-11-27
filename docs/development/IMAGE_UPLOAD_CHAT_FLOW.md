@@ -66,7 +66,7 @@ sequenceDiagram
 | --- | --- | --- | --- | --- |
 | `chat` | Chat API (`POST /api/v1/chat/messages`) | 챗 UI에서 대화 중 첨부하는 이미지 | `chat_session_id`, `message_id`, `source`, `uploaded_at`, `camera_orientation` | 콜백 성공 시 `cdn_url`을 그대로 Chat API payload에 넣으면 됨. |
 | `scan` | Scan 도메인 (`POST /api/v1/scan/.../callback`) | OCR·분류용 촬영 이미지 (예: 영수증, 바코드) | `scan_session_id`, `label`, `captured_at`, `device_type`, `geo`(선택) | 키(prefix)는 `scan/{yyyy}/{mm}/{dd}/...` 형식. `metadata.label`을 활용하면 백엔드에서 분류 힌트를 받을 수 있음. |
-| `my` *(예비)* | My 도메인 (향후 `POST /api/v1/my/images`) | 마이페이지 개인 보관용 | `folder`, `note`, `uploaded_at`, `visibility` | 아직 BE 컨슈머가 활성화되지 않았으므로 테스트 용도로만 사용. 플로우 자체는 chat/scan과 동일. |
+| `my` *(예비)* | My 도메인 (향후 `POST /api/v1/user/images`) | 마이페이지 개인 보관용 | `folder`, `note`, `uploaded_at`, `visibility` | 아직 BE 컨슈머가 활성화되지 않았으므로 테스트 용도로만 사용. 플로우 자체는 chat/scan과 동일. |
 
 모든 채널은 **로그인 쿠키(`s_access`)가 반드시 필요**하며, 요청 본문의 `uploader_id`가 쿠키 사용자 ID와 다르면 `Uploader mismatch` 오류가 발생합니다. metadata는 자유로운 JSON이지만, 위 표처럼 채널 별 최소 필드를 맞춰두면 이후 서비스 간 참조가 쉬워집니다.
 

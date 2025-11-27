@@ -1,11 +1,11 @@
 ## Scan API Spec (MVP)
 
-- service: `domains/scan/app`
+- service: `domains/scan`
 - namespace: `scan`
 - ingress path: `/api/v1/scan/`
 - swagger: `https://api.dev.growbin.app/api/v1/scan/docs`
 - openapi json: `https://api.dev.growbin.app/api/v1/scan/openapi.json`
-- repo link: `domains/scan/app`
+- repo link: `domains/scan`
 
 ### 1. Responsibility
 - 이미지 URL 기반 폐기물 분류 (GPT Vision 호출)
@@ -48,7 +48,7 @@
 - 추후 Redis/DB로 교체 예정.
 
 #### 2.3 GET /scan/categories
-- `data/waste_pipeline/item_class_list.yaml` 기반.
+- `domains/_shared/waste_pipeline/data/item_class_list.yaml` 기반.
 - major category + instructions 배열 반환.
 - 캐시: `ScanService._category_cache`.
 

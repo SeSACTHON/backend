@@ -466,17 +466,17 @@ sequenceDiagram
 #### 핵심 엔드포인트
 
 ```python
-GET    /api/v1/users/me                # 내 프로필 조회
-PATCH  /api/v1/users/me                # 프로필 수정
-DELETE /api/v1/users/me                # 계정 삭제 (Soft Delete)
+GET    /api/v1/user/me                 # 내 프로필 조회
+PATCH  /api/v1/user/me                 # 프로필 수정
+DELETE /api/v1/user/me                 # 계정 삭제 (Soft Delete)
 
-GET    /api/v1/users/me/points         # 포인트 조회
-GET    /api/v1/users/me/level          # 레벨 정보
-GET    /api/v1/users/me/activities     # 활동 히스토리
-GET    /api/v1/users/me/settings       # 설정 조회
-PATCH  /api/v1/users/me/settings       # 설정 수정
+GET    /api/v1/user/me/points          # 포인트 조회
+GET    /api/v1/user/me/level           # 레벨 정보
+GET    /api/v1/user/me/activities      # 활동 히스토리
+GET    /api/v1/user/me/settings        # 설정 조회
+PATCH  /api/v1/user/me/settings        # 설정 수정
 
-POST   /api/v1/users/me/avatar         # 프로필 이미지 업로드 (동기)
+POST   /api/v1/user/me/avatar          # 프로필 이미지 업로드 (동기)
 ```
 
 #### 포인트 시스템
@@ -913,12 +913,12 @@ Tasks:
   1. 프로젝트 구조 설정
   2. DB 모델 및 마이그레이션
   3. 엔드포인트 구현
-     - GET /users/me (프로필 조회)
-     - PATCH /users/me (프로필 수정)
-     - GET /users/me/points (포인트 조회)
-     - GET /users/me/activities (활동 히스토리)
-     - GET /users/me/settings (설정)
-     - PATCH /users/me/settings (설정 수정)
+    - GET /user/me (프로필 조회)
+    - PATCH /user/me (프로필 수정)
+    - GET /user/me/points (포인트 조회)
+    - GET /user/me/activities (활동 히스토리)
+    - GET /user/me/settings (설정)
+    - PATCH /user/me/settings (설정 수정)
   
   4. Redis 캐싱
   5. Auth Service 연동 (JWT 검증)

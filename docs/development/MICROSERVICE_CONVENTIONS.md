@@ -655,7 +655,7 @@ from fastapi import status
 def test_create_user(client):
     """사용자 생성 테스트"""
     response = client.post(
-        "/api/v1/users",
+        "/api/v1/user",
         json={
             "email": "test@example.com",
             "password": "password123",
@@ -670,11 +670,11 @@ def test_create_user(client):
 def test_get_user(client):
     """사용자 조회 테스트"""
     # Given: 사용자 생성
-    create_response = client.post("/api/v1/users", json={...})
+    create_response = client.post("/api/v1/user", json={...})
     user_id = create_response.json()['data']['id']
     
     # When: 사용자 조회
-    response = client.get(f"/api/v1/users/{user_id}")
+    response = client.get(f"/api/v1/user/{user_id}")
     
     # Then: 성공
     assert response.status_code == status.HTTP_200_OK

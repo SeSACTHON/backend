@@ -44,7 +44,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from app.schemas.users import UserCreate, UserResponse
 from app.services.users import UserService
 
-router = APIRouter(prefix="/users", tags=["users"])
+router = APIRouter(prefix="/user", tags=["user"])
 
 
 @router.post("/", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
@@ -105,7 +105,7 @@ from . import health, users, metrics
 
 router = APIRouter()
 router.include_router(health.router)
-router.include_router(users.router, prefix="/users")
+router.include_router(users.router, prefix="/user")
 router.include_router(metrics.router, prefix="/metrics")
 ```
 

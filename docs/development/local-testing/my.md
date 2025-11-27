@@ -3,7 +3,7 @@
 ## 한눈에 보기
 
 - **기본 포트**: `8002` (docker compose 기준)
-- **Swagger**: `http://localhost:8002/api/v1/my/docs`
+- **Swagger**: `http://localhost:8002/api/v1/user/docs`
 - **Auth 우회**: `MY_AUTH_DISABLED=true` (기본값 true)
 - **필수 백엔드**: Postgres 16, (초기 캐릭터 데이터용) Character Bootstrap Job
 
@@ -48,7 +48,7 @@ MY_AUTH_DISABLED=true docker compose -f docker-compose.my-local.yml up --build
 
 ## 4. Auth 연동 토글
 
-- 기본적으로 `MY_AUTH_DISABLED=true` 로 실행되며, JWT 없이 `/api/v1/users/*` 엔드포인트를 호출할 수 있습니다.
+- 기본적으로 `MY_AUTH_DISABLED=true` 로 실행되며, JWT 없이 `/api/v1/user/*` 엔드포인트를 호출할 수 있습니다.
 - 실제 쿠키 검증을 하려면:
   1. `domains/auth/docker-compose.auth-local.yml` 로 Auth 스택을 띄우고
   2. `MY_AUTH_DISABLED=false` 로 재실행합니다.
@@ -66,5 +66,5 @@ curl -s http://localhost:8002/api/v1/metrics | jq
 | 증상 | 해결 방법 |
 | --- | --- |
 | `asyncpg.exceptions.InvalidCatalogNameError` | `MY_DATABASE_URL` 이 가리키는 DB가 없으므로 Postgres 내부에서 데이터베이스를 생성합니다. |
-| `/api/v1/users/...` 401 | `MY_AUTH_DISABLED` 가 `false` 인데 쿠키가 없는 상태입니다. Auth 스택에서 로그인 후 재시도하거나 우회 플래그를 `true` 로 설정하세요. |
+| `/api/v1/user/...` 401 | `MY_AUTH_DISABLED` 가 `false` 인데 쿠키가 없는 상태입니다. Auth 스택에서 로그인 후 재시도하거나 우회 플래그를 `true` 로 설정하세요. |
 

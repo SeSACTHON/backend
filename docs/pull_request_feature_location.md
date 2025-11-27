@@ -2,7 +2,7 @@
 
 ## 📋 변경 사항
 - Vision/RAG/Answer 파이프라인을 `domains/_shared/waste_pipeline` 모듈로 통합
-- 파이프라인 리소스(JSON/YAML/프롬프트)를 `data/waste_pipeline` 경로로 이동
+- 파이프라인 리소스(JSON/YAML/프롬프트)를 `domains/_shared/waste_pipeline/data` 경로로 이동
 - Chat/Scan Dockerfile에 `_shared` 모듈·데이터 복사를 추가해 컨테이너에서도 Vision 파이프라인 사용 가능
 - Image 도메인 Secret을 SSM→일반 Secret 방식으로 단순화하고, Ingress/Kustomize 구조를 Info → Image로 교체
 - 저장소 전체에 pre-commit 포맷(black/ruff/yaml formatter 등) 일괄 적용
@@ -20,9 +20,9 @@
 - Chat/Scan 서비스 로직은 동일하지만 의존 모듈 경로만 변경됨
 
 ### 2. 데이터 레이어 이관
-- `data/waste_pipeline` 디렉터리에 YAML/JSON/프롬프트/결과 디렉터리를 구성
-- `utils.py`는 프로젝트 루트를 기준으로 `data/waste_pipeline` 경로를 계산하여 로딩
-- Dockerfile에서 `domains/_shared` 와 `data/waste_pipeline`을 함께 복사하도록 변경 → 컨테이너에서도 즉시 사용 가능
+- `domains/_shared/waste_pipeline/data` 디렉터리에 YAML/JSON/프롬프트/결과 디렉터리를 구성
+- `utils.py`는 모듈 루트를 기준으로 `data` 경로를 계산하여 로딩
+- Dockerfile에서 `domains/_shared`만 복사하면 모듈·데이터가 함께 포함되어 컨테이너에서도 즉시 사용 가능
 
 ### 3. Image 도메인 구조 개편
 - `domains/image/` 에 API/Dockerfile/Config/Service를 정식 도메인 구조로 추가 (기존 info -> image 리네임 반영)
@@ -56,6 +56,6 @@
 
 ## 📌 참고
 - Shared 파이프라인 경로: `domains/_shared/waste_pipeline/`
-- 데이터 파일: `data/waste_pipeline/` (JSON/YAML/프롬프트)
+- 데이터 파일: `domains/_shared/waste_pipeline/data/` (JSON/YAML/프롬프트)
 - Image presign API: `POST /api/v1/images/{channel}` → `cdn_url` 값을 Chat/Scan 요청에 연결하면 Vision 파이프라인이 프리사인드 URL을 그대로 사용함
 

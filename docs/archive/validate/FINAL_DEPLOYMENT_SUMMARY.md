@@ -70,7 +70,7 @@ API Base: https://api.growbin.app
   /api/v1/chat
   /api/v1/info
   /api/v1/location
-  /api/v1/my
+  /api/v1/user
   /api/v1/scan
 ```
 

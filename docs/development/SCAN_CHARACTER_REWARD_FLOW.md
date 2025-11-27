@@ -10,7 +10,7 @@
    - `classification_result.classification.major_category == "재활용폐기물"`
    - `disposal_rules` 존재 (Lite RAG 매칭 성공)
    - `situation_tags`에 `내용물_있음`, `라벨_부착`, `미분류_소분류` 등 **DISQUALIFYING_TAGS** 미포함
-   - Vision middle/minor가 `character_reward_mapping.yaml`에서 캐릭터와 매핑됨
+   - Vision middle/minor가 Character DB (`characters.match_label`)의 매칭 기준과 일치
 3. Scan 서비스가 Character 내부 API `POST /api/v1/internal/characters/rewards`를 호출하여 user_id, Scan task_id, classification 요약, situation_tags, disposal_rules 존재 여부를 전달.
 4. Character 서비스는 매핑/중복 여부를 검증하고, `CharacterRewardResponse` (candidates + result/acquired 여부) 반환.
 5. Scan 응답 본문에 `reward` 필드(구현 예정)를 추가하여 Candidate 목록과 Result(획득 성공/이미 소유/조건 불충족 사유)를 포함한다.
@@ -81,13 +81,11 @@ sequenceDiagram
   ```
 
 ## 5. Reward 매핑 데이터 구조
-- 소스: `domains/character/data/character_reward_mapping.yaml`  
-  - `characters[].categories` 배열에 Vision `major/middle/minor` 조합을 명시한다.
-  - `default_reward: true` 항목은 매핑 실패 시 fallback 으로 사용할 캐릭터다.
-- 로더: `domains/character/core/reward_mapping.py`
-  - `lru_cache`로 파일을 단 1회만 읽고, `CharacterReward`/`CharacterCategory` dataclass로 구조화한다.
-  - `find_matching_characters()`는 중분류/소분류를 우선 매칭하며, 필요 시 소분류가 없는 경우도 처리한다.
-  - `summarize_mapping()`은 운영 중 맵 변경을 검증하기 위한 디버깅 출력에 사용 가능하다.
+- 소스: `domains/character/data/character_catalog.csv`
+  - `match` 컬럼에 Vision 분류 결과(재활용 2레벨, 기타 1레벨)를 명시한다.
+- 로더: `domains/character/jobs/import_character_catalog.py`
+  - CSV를 파싱해 Character DB(`characters` 테이블)의 `match_label` 컬럼과 `metadata.match` 필드에 저장한다.
+- Character 서비스는 `match_label` 기준으로 직접 DB를 조회해 후보 캐릭터를 결정한다.
 
 ## 6. Scan 서비스 구현 포인트
 | 단계 | 설명 |
@@ -102,7 +100,7 @@ sequenceDiagram
   1. **소스 검증**: 현재는 `scan`만 허용, 다른 값이면 `UNSUPPORTED_SOURCE`.
   2. **분류/규칙 검증**: major가 `재활용폐기물`인지, `disposal_rules_present`가 true인지 검사.
   3. **상황 태그 필터**: `DISQUALIFYING_TAGS` 집합(`내용물_있음`, `라벨_부착`, `미분류_소분류`, `오염됨`, `파손됨`)과 교집합이면 실패 처리.
-  4. **매핑 탐색**: `find_matching_characters()`로 후보 리스트를 만든 뒤 `CharacterRewardCandidate`에 사유를 기록.
+  4. **매핑 탐색**: Character DB의 `match_label` 값으로 후보 리스트를 만들고 `CharacterRewardCandidate`에 사유를 기록.
   5. **DB 반영**: 첫 유효 후보부터 캐릭터를 조회하고, `CharacterOwnershipRepository.upsert_owned()`로 저장. 이미 보유한 경우 `already_owned=true`.
   6. **결과 조립**: `CharacterRewardResult`에 지급 여부 또는 실패 사유(`CharacterRewardFailureReason`)를 명시한다.
 - 매핑 결과가 없거나 캐릭터 시드가 DB에 없다면 각각 `NO_MATCH`, `CHARACTER_NOT_FOUND`로 표기해 운영 모니터링이 가능하다.

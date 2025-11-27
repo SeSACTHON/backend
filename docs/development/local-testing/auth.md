@@ -110,7 +110,7 @@ cd /Users/mango/workspace/SeSACTHON/backend/domains/my
 MY_AUTH_DISABLED=false AUTH_JWT_SECRET_KEY=$AUTH_JWT_SECRET_KEY \
   docker compose -f docker-compose.my-local.yml up --build -d
 curl -s --cookie "s_access=${S_ACCESS_COOKIE}" \
-  http://localhost:8002/api/v1/users/<보호된-엔드포인트> | jq
+  http://localhost:8002/api/v1/user/<보호된-엔드포인트> | jq
 
 # 2) Scan API (uvicorn)
 cd /Users/mango/workspace/SeSACTHON/backend

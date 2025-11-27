@@ -75,7 +75,7 @@ spec:
     - host: api.growbin.app
       http:
         paths:
-          - path: /api/v1/my
+          - path: /api/v1/user
             backend:
               service:
                 name: my-api

@@ -141,10 +141,10 @@
 
 | Method | Path | 설명 | 인증 | 비고 |
 | --- | --- | --- | --- | --- |
-| GET | `/api/v1/my/summary` | 대시보드 데이터 일괄 반환 | Access JWT | 캐시 가능 |
-| GET | `/api/v1/my/timeline` | 활동 이력(최근 30일) | Access JWT | pagination |
-| PATCH | `/api/v1/my/profile` | 닉네임/이미지 수정 | Access JWT | 이미지 경로는 S3 URL |
-| GET | `/api/v1/my/badges` | 배지/업적 목록 | Access JWT | 캐릭터/환경 지표 연동 |
+| GET | `/api/v1/user/summary` | 대시보드 데이터 일괄 반환 | Access JWT | 캐시 가능 |
+| GET | `/api/v1/user/timeline` | 활동 이력(최근 30일) | Access JWT | pagination |
+| PATCH | `/api/v1/user/profile` | 닉네임/이미지 수정 | Access JWT | 이미지 경로는 S3 URL |
+| GET | `/api/v1/user/badges` | 배지/업적 목록 | Access JWT | 캐릭터/환경 지표 연동 |
 
 ### 3.5 Image / Scan API
 - **책임**: S3 업로드 Pre-signed URL 발급, 업로드 메타 저장, AI 추론 파이프라인 트리거.
