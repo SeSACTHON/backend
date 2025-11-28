@@ -22,7 +22,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: reset-user-data
-        image: docker.io/mng990/eco2:auth-api-latest
+        image: docker.io/mng990/eco2:auth-api-dev-latest
         imagePullPolicy: Always
         command:
         - python

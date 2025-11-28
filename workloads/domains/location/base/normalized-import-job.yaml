@@ -23,7 +23,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: normalized-import
-        image: docker.io/mng990/eco2:location-api-latest
+        image: docker.io/mng990/eco2:location-api-dev-latest
         imagePullPolicy: Always
         command:
         - python

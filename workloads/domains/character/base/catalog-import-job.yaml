@@ -23,7 +23,7 @@ spec:
       restartPolicy: Never
       containers:
       - name: catalog-import
-        image: docker.io/mng990/eco2:character-api-latest
+        image: docker.io/mng990/eco2:character-api-dev-latest
         imagePullPolicy: Always
         command:
         - python
