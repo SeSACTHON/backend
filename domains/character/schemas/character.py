@@ -14,11 +14,6 @@ class CharacterProfile(BaseModel):
     traits: List[str]
 
 
-class CharacterAcquireRequest(BaseModel):
-    user_id: UUID
-    character_name: str = Field(min_length=1, max_length=120)
-
-
 class DefaultCharacterGrantRequest(BaseModel):
     user_id: UUID
 

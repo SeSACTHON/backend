@@ -18,20 +18,27 @@ from domains.auth.models.user_social_account import UserSocialAccount  # noqa: F
 async def init_db() -> int:
     """Create all database tables."""
     settings = get_settings()
+    drop_schema = settings.schema_reset_enabled
     print(
         "🔗 Connecting to database: "
         f"{settings.database_url.split('@')[1] if '@' in settings.database_url else 'database'}"
     )
+    if drop_schema:
+        print("⚠️  AUTH_SCHEMA_RESET_ENABLED is true → full schema reset allowed.")
+    else:
+        print("🛡️  Schema reset guard is active → skipping DROP SCHEMA.")
 
     engine = create_async_engine(settings.database_url, echo=False)
 
     try:
         async with engine.begin() as conn:
-            print("♻️  Dropping existing 'auth' schema (if present)...")
-            await conn.execute(text("DROP SCHEMA IF EXISTS auth CASCADE"))
-
-            print("📦 Creating 'auth' schema...")
-            await conn.execute(text("CREATE SCHEMA auth"))
+            if drop_schema:
+                print("♻️  Dropping existing 'auth' schema (if present)...")
+                await conn.execute(text("DROP SCHEMA IF EXISTS auth CASCADE"))
+                print("📦 Creating 'auth' schema...")
+                await conn.execute(text("CREATE SCHEMA auth"))
+            else:
+                await conn.execute(text("CREATE SCHEMA IF NOT EXISTS auth"))
 
             print("📦 Creating database tables...")
             await conn.run_sync(Base.metadata.create_all)

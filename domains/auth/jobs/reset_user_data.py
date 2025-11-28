@@ -25,6 +25,13 @@ from domains.auth.models.user_social_account import UserSocialAccount  # noqa: F
 async def reset_user_data() -> int:
     """Drop and recreate the entire auth schema."""
     settings = get_settings()
+    if not settings.schema_reset_enabled:
+        print(
+            "🛡️  Schema reset guard is active. "
+            "Set AUTH_SCHEMA_RESET_ENABLED=true only when a destructive reset is required."
+        )
+        return 0
+
     engine = create_async_engine(settings.database_url, echo=False)
 
     print("⚠️  Resetting auth schema (development only)...")

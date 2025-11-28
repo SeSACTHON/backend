@@ -80,7 +80,6 @@
 | POST | `/api/v1/auth/logout` | 현재 토큰 무효화 | Access JWT | `blacklist:{jti}` 삽입 |
 | GET | `/api/v1/auth/tokens` | 내 활성 Refresh JTI 목록 조회 | Access JWT | Redis `user_tokens` 기반 |
 | DELETE | `/api/v1/auth/tokens/{jti}` | 특정 디바이스 Refresh 토큰 폐기 | Access JWT | Blacklist + Set 제거 |
-| GET | `/api/v1/auth/me` | 인증된 사용자 프로필 조회 | Access JWT | 캐릭터/마이 링크 제공 |
 
 #### 3.1.1 Stateless JWT 사례 참고
 - **Auth0 Access Token Revocation (2023)**: Authorization Server는 세션 테이블 없이 `jti` 기반 블록리스트와 Refresh Rotation을 사용한다. `logout` 시 Access/Refresh 모두 Blocklist에 넣어 리소스 서버가 Redis/DB에서 조회하도록 권장한다. → 본 서비스도 동일하게 Redis DB0에 `blacklist:{jti}` 패턴을 사용.
@@ -104,14 +103,13 @@
 - **실패 대비**: Kakao API 429 시 fallback 데이터(사전 수집된 샵 300개)를 Postgres에서 노출.
 
 ### 3.3 Character API
-- **책임**: 캐릭터 카탈로그 노출과 해금 처리. 현재 서버는 `CharacterProfile` 목록과 `/collect` 해금 API만 제공한다.
+- **책임**: 캐릭터 카탈로그 노출과 내부 해금 처리. 외부 노출은 카탈로그 조회만 제공한다.
 - **데이터 소스**: Postgres `character.characters`, `character.character_ownerships` (참고: `domains/character/models/character.py`).
 - **Swagger/OpenAPI**: `/api/v1/character/docs`, `/api/v1/character/openapi.json` (`domains/character/main.py`에서 URL 지정).
 
 | Method | Path | 설명 | 인증 | 비고 |
 | --- | --- | --- | --- | --- |
-| GET | `/api/v1/character/catalog` | 정적 캐릭터 목록(`id/name/description/compatibility_score/traits`) 반환 | Public | `CharacterService.catalog()`가 하드코딩된 목록을 내려줌 |
-| POST | `/api/v1/character/collect` | `CharacterAcquireRequest`(`user_id`, `character_name`) 기반 해금 | Internal/Access JWT | 이미 보유 시 `acquired=false`, 미존재 캐릭터는 404 |
+| GET | `/api/v1/character/catalog` | DB에 적재된 캐릭터 목록(`id/name/description/compatibility_score/traits`) 반환, 비어있으면 404 | Public | 카탈로그 CSV를 DB에 시딩해야 정상 동작 |
 | GET | `/api/v1/metrics/` | 캐릭터 서비스 메트릭 스냅샷 | Internal | `analyzed_users`, `catalog_size` 등 임시 카운터 |
 | GET | `/health`, `/ready` | 헬스/레디니스 체크 | Public | ALB/NLB 헬스체크용 |
 

@@ -10,7 +10,6 @@ from domains.character.database.session import get_db_session
 from domains.character.models import Character
 from domains.character.repositories import CharacterOwnershipRepository, CharacterRepository
 from domains.character.schemas.character import (
-    CharacterAcquireRequest,
     CharacterAcquireResponse,
     CharacterProfile,
     CharacterSummary,
@@ -34,30 +33,13 @@ class CharacterService:
         self.ownership_repo = CharacterOwnershipRepository(session)
 
     async def catalog(self) -> list[CharacterProfile]:
-        return [
-            CharacterProfile(
-                id="catalog-guardian",
-                name="Guardian",
-                description="Protects nature and educates neighbors.",
-                compatibility_score=0.93,
-                traits=["educator", "community-builder"],
-            ),
-            CharacterProfile(
-                id="catalog-strategist",
-                name="Strategist",
-                description="Optimizes recycling routes and logistics.",
-                compatibility_score=0.85,
-                traits=["analyst", "planner"],
-            ),
-        ]
-
-    async def acquire_character(self, payload: CharacterAcquireRequest) -> CharacterAcquireResponse:
-        return await self._grant_character_by_name(
-            user_id=payload.user_id,
-            character_name=payload.character_name,
-            source="api-acquire",
-            allow_empty=False,
-        )
+        characters = await self.character_repo.list_all()
+        if not characters:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="등록된 캐릭터가 없습니다.",
+            )
+        return [self._to_profile(character) for character in characters]
 
     async def grant_default_character(self, user_id: UUID) -> CharacterAcquireResponse:
         return await self._grant_character_by_name(
@@ -213,3 +195,47 @@ class CharacterService:
             return self._to_summary(match), False, None
 
         return None, False, CharacterRewardFailureReason.CHARACTER_NOT_FOUND
+
+    @staticmethod
+    def _to_profile(character: Character) -> CharacterProfile:
+        metadata = getattr(character, "metadata_json", None) or {}
+        description = CharacterService._extract_description(character, metadata)
+        traits = CharacterService._extract_traits(metadata, character.match_label)
+        compatibility_score = CharacterService._estimate_compatibility(traits)
+        identifier = character.code or str(character.id)
+        return CharacterProfile(
+            id=identifier,
+            name=character.name,
+            description=description,
+            compatibility_score=compatibility_score,
+            traits=traits,
+        )
+
+    @staticmethod
+    def _extract_description(character: Character, metadata: dict) -> str:
+        dialog = metadata.get("dialog") or metadata.get("dialogue")
+        description = (dialog or character.description or "").strip()
+        if description:
+            return description
+        return f"{character.name}와 함께 친환경 습관을 만들어보세요!"
+
+    @staticmethod
+    def _extract_traits(metadata: dict, match_label: str | None) -> list[str]:
+        type_field = metadata.get("type") or metadata.get("types") or ""
+        normalized = [
+            trait.strip()
+            for trait in type_field.replace("/", ",").split(",")
+            if trait and trait.strip()
+        ]
+        if normalized:
+            return normalized
+        label = (match_label or "").strip()
+        if label:
+            return [label]
+        return ["제로웨이스트"]
+
+    @staticmethod
+    def _estimate_compatibility(traits: list[str]) -> float:
+        base = 0.75
+        bonus = min(len(traits), 8) * 0.025
+        return round(min(base + bonus, 0.98), 2)

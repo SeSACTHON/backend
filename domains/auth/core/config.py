@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     app_name: str = "Auth API"
     environment: str = "local"
     api_v1_prefix: str = "/api/v1"
+    # Destructive schema reset guard. Keep False unless you need a full reset.
+    schema_reset_enabled: bool = False
 
     # Database connection (required in production, defaults for testing)
     database_url: str = "postgresql+asyncpg://test:test@localhost:5432/test"

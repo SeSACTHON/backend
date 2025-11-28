@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 from domains.location.core.config import get_settings
 from domains.location.database.base import Base
+from domains.location.models import NormalizedLocationSite  # noqa: F401
 
 
 async def init_db() -> int:

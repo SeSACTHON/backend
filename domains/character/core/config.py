@@ -10,6 +10,11 @@ class Settings(BaseSettings):
     app_name: str = "Character API"
     environment: str = "local"
 
+    schema_reset_enabled: bool = Field(
+        False,
+        validation_alias=AliasChoices("CHARACTER_SCHEMA_RESET_ENABLED"),
+        description="Allow destructive schema reset jobs (DROP/CREATE).",
+    )
     database_url: str = Field(
         "postgresql+asyncpg://postgres:postgres@localhost:5432/ecoeco",
         description="PostgreSQL connection string for the shared ecoeco database.",

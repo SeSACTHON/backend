@@ -20,6 +20,13 @@ from domains.my.models import User
 async def reset_user_data() -> int:
     """Drop and recreate the My service user table."""
     settings = get_settings()
+    if not settings.schema_reset_enabled:
+        print(
+            "🛡️  Schema reset guard is active. "
+            "Set MY_SCHEMA_RESET_ENABLED=true only when a destructive reset is required."
+        )
+        return 0
+
     engine = create_async_engine(settings.database_url, echo=False)
 
     print("⚠️  Resetting My service user table (development only)...")

@@ -6,7 +6,6 @@ from fastapi import Cookie, Depends, Request, Response
 from fastapi.responses import RedirectResponse
 
 from domains.auth.api.v1.routers import (
-    access_token_dependency,
     auth_router,
     google_router,
     kakao_router,
@@ -21,10 +20,8 @@ from domains.auth.schemas.auth import (
     LogoutSuccessResponse,
     OAuthAuthorizeParams,
     OAuthLoginRequest,
-    UserSuccessResponse,
 )
 from domains.auth.services.auth import ACCESS_COOKIE_NAME, REFRESH_COOKIE_NAME, AuthService
-from domains._shared.security import TokenPayload
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +60,11 @@ def _get_request_origin(request: Request) -> Optional[str]:
 
 
 FRONTEND_ORIGIN_HEADER = "x-frontend-origin"
+
+
+def _build_frontend_success_url(frontend_url: str) -> str:
+    sanitized = frontend_url.rstrip("/")
+    return f"{sanitized}/#/home"
 
 
 def _build_frontend_redirect_url(
@@ -166,7 +168,8 @@ async def google_callback(
     """Google OAuth 콜백을 처리하고 세션 쿠키를 설정합니다."""
     settings = get_settings()
     frontend_origin = request.headers.get(FRONTEND_ORIGIN_HEADER)
-    success_response = RedirectResponse(url=settings.frontend_url)
+    success_url = _build_frontend_success_url(settings.frontend_url)
+    success_response = RedirectResponse(url=success_url)
     try:
         payload = OAuthLoginRequest(code=code, state=state)
         await service.login_with_provider(
@@ -177,7 +180,7 @@ async def google_callback(
             ip_address=request.client.host if request.client else None,
         )
         redirect_origin = frontend_origin or service.get_state_frontend_origin()
-        redirect_url = _build_frontend_redirect_url(request, settings.frontend_url, redirect_origin)
+        redirect_url = _build_frontend_redirect_url(request, success_url, redirect_origin)
         success_response.headers["location"] = redirect_url
         # 성공 시 프론트엔드 홈으로 리다이렉트
         return success_response
@@ -204,7 +207,8 @@ async def kakao_callback(
     """Kakao OAuth 콜백을 처리하고 세션 쿠키를 설정합니다."""
     settings = get_settings()
     frontend_origin = request.headers.get(FRONTEND_ORIGIN_HEADER)
-    success_response = RedirectResponse(url=settings.frontend_url)
+    success_url = _build_frontend_success_url(settings.frontend_url)
+    success_response = RedirectResponse(url=success_url)
     try:
         payload = OAuthLoginRequest(code=code, state=state)
         await service.login_with_provider(
@@ -215,7 +219,7 @@ async def kakao_callback(
             ip_address=request.client.host if request.client else None,
         )
         redirect_origin = frontend_origin or service.get_state_frontend_origin()
-        redirect_url = _build_frontend_redirect_url(request, settings.frontend_url, redirect_origin)
+        redirect_url = _build_frontend_redirect_url(request, success_url, redirect_origin)
         success_response.headers["location"] = redirect_url
         # 성공 시 프론트엔드 홈으로 리다이렉트
         return success_response
@@ -242,7 +246,8 @@ async def naver_callback(
     """Naver OAuth 콜백을 처리하고 세션 쿠키를 설정합니다."""
     settings = get_settings()
     frontend_origin = request.headers.get(FRONTEND_ORIGIN_HEADER)
-    success_response = RedirectResponse(url=settings.frontend_url)
+    success_url = _build_frontend_success_url(settings.frontend_url)
+    success_response = RedirectResponse(url=success_url)
     try:
         payload = OAuthLoginRequest(code=code, state=state)
         await service.login_with_provider(
@@ -253,7 +258,7 @@ async def naver_callback(
             ip_address=request.client.host if request.client else None,
         )
         redirect_origin = frontend_origin or service.get_state_frontend_origin()
-        redirect_url = _build_frontend_redirect_url(request, settings.frontend_url, redirect_origin)
+        redirect_url = _build_frontend_redirect_url(request, success_url, redirect_origin)
         success_response.headers["location"] = redirect_url
         # 성공 시 프론트엔드 홈으로 리다이렉트
         return success_response
@@ -314,12 +319,3 @@ async def logout(
 ):
     await service.logout(access_token=access_token, refresh_token=refresh_token, response=response)
     return LogoutSuccessResponse(data=LogoutData())
-
-
-@auth_router.get("/me", response_model=UserSuccessResponse, summary="Fetch current user profile")
-async def get_current_user(
-    payload: Annotated[TokenPayload, Depends(access_token_dependency)],
-    service: Annotated[AuthService, Depends()],
-):
-    user = await service.get_current_user(payload)
-    return UserSuccessResponse(data=user)
