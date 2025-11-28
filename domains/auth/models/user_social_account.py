@@ -1,15 +1,13 @@
 import uuid
 from datetime import datetime
-from typing import TYPE_CHECKING, Optional
+from typing import Optional
 
 from sqlalchemy import DateTime, ForeignKey, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from domains.auth.database.base import Base
-
-if TYPE_CHECKING:  # pragma: no cover
-    from domains.auth.models.user import User
+from domains.auth.models.user import User
 
 
 class UserSocialAccount(Base):
@@ -30,7 +28,7 @@ class UserSocialAccount(Base):
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("auth.users.id", ondelete="CASCADE"),
+        ForeignKey(User.id, ondelete="CASCADE"),
         nullable=False,
         index=True,
     )

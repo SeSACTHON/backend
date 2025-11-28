@@ -25,7 +25,7 @@ class DefaultCharacterGrantRequest(BaseModel):
 
 class CharacterSummary(BaseModel):
     name: str
-    description: str | None = None
+    dialog: str | None = None
 
 
 class CharacterAcquireResponse(BaseModel):

@@ -8,11 +8,9 @@ from .character import (
     DefaultCharacterGrantRequest,
 )
 from .reward import (
-    CharacterRewardCandidate,
     CharacterRewardFailureReason,
     CharacterRewardRequest,
     CharacterRewardResponse,
-    CharacterRewardResult,
     CharacterRewardSource,
     ClassificationSummary,
 )
@@ -26,8 +24,6 @@ __all__ = [
     "CharacterRewardSource",
     "CharacterRewardRequest",
     "CharacterRewardResponse",
-    "CharacterRewardResult",
     "CharacterRewardFailureReason",
-    "CharacterRewardCandidate",
     "ClassificationSummary",
 ]

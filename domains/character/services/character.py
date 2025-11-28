@@ -16,11 +16,9 @@ from domains.character.schemas.character import (
     CharacterSummary,
 )
 from domains.character.schemas.reward import (
-    CharacterRewardCandidate,
     CharacterRewardFailureReason,
     CharacterRewardRequest,
     CharacterRewardResponse,
-    CharacterRewardResult,
     CharacterRewardSource,
     ClassificationSummary,
 )
@@ -77,60 +75,55 @@ class CharacterService:
         }
 
     async def evaluate_reward(self, payload: CharacterRewardRequest) -> CharacterRewardResponse:
-        candidates: list[CharacterRewardCandidate] = []
-        failure_reason: CharacterRewardFailureReason | None = None
-        rewarded_summary: CharacterSummary | None = None
-        already_owned = False
-
         classification = payload.classification
+        reward_summary: CharacterSummary | None = None
+        already_owned = False
+        received = False
+        match_reason: str | None = None
 
-        if payload.source != CharacterRewardSource.SCAN:
-            failure_reason = CharacterRewardFailureReason.UNSUPPORTED_SOURCE
-        elif classification.major_category.strip() != "재활용폐기물":
-            failure_reason = CharacterRewardFailureReason.UNSUPPORTED_CATEGORY
-        elif not payload.disposal_rules_present:
-            failure_reason = CharacterRewardFailureReason.MISSING_RULES
-        elif payload.insufficiencies_present:
-            failure_reason = CharacterRewardFailureReason.INSUFFICIENT_EVIDENCE
-        else:
+        should_evaluate = (
+            payload.source == CharacterRewardSource.SCAN
+            and classification.major_category.strip() == "재활용폐기물"
+            and payload.disposal_rules_present
+            and not payload.insufficiencies_present
+        )
+
+        if should_evaluate:
+            match_reason = self._build_match_reason(classification)
             matches = await self._match_characters(classification)
-            candidates = [
-                CharacterRewardCandidate(
-                    name=match.name,
-                    match_reason=self._build_match_reason(classification),
+            if matches:
+                reward_summary, already_owned, failure_reason = await self._apply_reward(
+                    payload.user_id, matches
                 )
-                for match in matches
-            ]
-            if not matches:
-                failure_reason = CharacterRewardFailureReason.NO_MATCH
-            else:
-                (
-                    rewarded_summary,
-                    already_owned,
-                    failure_reason,
-                ) = await self._apply_reward(payload.user_id, matches)
+                received = (
+                    failure_reason is None and reward_summary is not None and not already_owned
+                )
 
-        if failure_reason:
-            result = CharacterRewardResult(
-                rewarded=False,
-                already_owned=already_owned,
-                character=rewarded_summary,
-                reason=failure_reason,
-            )
-        else:
-            result = CharacterRewardResult(
-                rewarded=not already_owned,
-                already_owned=already_owned,
-                character=rewarded_summary,
-            )
-
-        return CharacterRewardResponse(candidates=candidates, result=result)
+        return self._to_reward_response(reward_summary, already_owned, received, match_reason)
 
     @staticmethod
     def _to_summary(character) -> CharacterSummary:
+        metadata = getattr(character, "metadata_json", None) or {}
+        dialog_value = metadata.get("dialog") or metadata.get("dialogue")
+        dialog = str(dialog_value).strip() if dialog_value else None
         return CharacterSummary(
             name=character.name,
-            description=character.description,
+            dialog=dialog,
+        )
+
+    @staticmethod
+    def _to_reward_response(
+        summary: CharacterSummary | None,
+        already_owned: bool,
+        received: bool,
+        match_reason: str | None,
+    ) -> CharacterRewardResponse:
+        return CharacterRewardResponse(
+            received=received,
+            already_owned=already_owned,
+            name=summary.name if summary else None,
+            dialog=summary.dialog if summary else None,
+            match_reason=match_reason,
         )
 
     async def _grant_character_by_name(

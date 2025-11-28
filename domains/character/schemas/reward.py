@@ -6,8 +6,6 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field
 
-from domains.character.schemas.character import CharacterSummary
-
 
 class CharacterRewardSource(str, Enum):
     SCAN = "scan"
@@ -17,11 +15,6 @@ class ClassificationSummary(BaseModel):
     major_category: str = Field(..., min_length=1)
     middle_category: str = Field(..., min_length=1)
     minor_category: str | None = None
-
-
-class CharacterRewardCandidate(BaseModel):
-    name: str
-    match_reason: str
 
 
 class CharacterRewardFailureReason(str, Enum):
@@ -43,13 +36,16 @@ class CharacterRewardRequest(BaseModel):
     insufficiencies_present: bool = True
 
 
-class CharacterRewardResult(BaseModel):
-    rewarded: bool
-    already_owned: bool = False
-    character: CharacterSummary | None = None
-    reason: CharacterRewardFailureReason | None = None
-
-
 class CharacterRewardResponse(BaseModel):
-    candidates: List[CharacterRewardCandidate] = Field(default_factory=list)
-    result: CharacterRewardResult
+    received: bool = Field(
+        default=False,
+        description="True when the character was newly granted as part of this reward evaluation",
+    )
+    already_owned: bool = Field(
+        default=False, description="True when the user already possessed the character"
+    )
+    name: str | None = Field(default=None, description="Character name when available")
+    dialog: str | None = Field(default=None, description="Character dialog to display")
+    match_reason: str | None = Field(
+        default=None, description="Why this character was selected for the reward"
+    )

@@ -12,8 +12,8 @@
    - `final_answer.insufficiencies`가 **존재**하며, 모든 항목이 비어 있음(실패 사유 없음)
    - Vision middle/minor가 Character DB (`characters.match_label`)의 매칭 기준과 일치
 3. Scan 서비스가 Character 내부 API `POST /api/v1/internal/characters/rewards`를 호출하여 user_id, Scan task_id, classification 요약, situation_tags, disposal_rules 존재 여부를 전달.
-4. Character 서비스는 매핑/중복 여부를 검증하고, `CharacterRewardResponse` (candidates + result/acquired 여부) 반환.
-5. Scan 응답 본문에 `reward` 필드(구현 예정)를 추가하여 Candidate 목록과 Result(획득 성공/이미 소유/조건 불충족 사유)를 포함한다.
+4. Character 서비스는 매핑/중복 여부를 검증하고, `CharacterRewardResponse` (received + already_owned + name/dialog/match_reason)만 반환한다.
+5. Scan 응답 본문에 `reward` 필드를 추가하여 최종 결과(신규 획득 여부, 캐릭터 이름/대사, 매칭 사유)만 포함한다.
 
 ## 3. 시퀀스 다이어그램
 
@@ -35,7 +35,7 @@ sequenceDiagram
         CharacterDB-->>CharacterAPI: 캐릭터/소유 정보
         CharacterAPI->>CharacterDB: upsert(character_ownerships) when newly rewarded
         CharacterDB-->>CharacterAPI: commit 완료
-        CharacterAPI-->>ScanAPI: CharacterRewardResponse (candidates + result)
+        CharacterAPI-->>ScanAPI: CharacterRewardResponse (received + already_owned + name/dialog/match_reason)
     else 조건 미충족 or API 실패
         ScanAPI-->>ScanAPI: reward 평가 스킵 or 실패 사유 기록
     end
@@ -63,21 +63,11 @@ sequenceDiagram
 - Response (`CharacterRewardResponse`):
   ```json
   {
-    "candidates": [
-      {
-        "name": "페이피",
-        "match_reason": "종이>골판지류"
-      }
-    ],
-    "result": {
-      "rewarded": true,
-      "already_owned": false,
-      "character": {
-        "name": "페이피",
-        "description": "테이프와 스테이플은 떼고 깨끗하게 접어요!"
-      },
-      "reason": null
-    }
+    "received": true,
+    "already_owned": false,
+    "name": "페이피",
+    "dialog": "테이프와 스테이플은 떼고 깨끗하게 접어요!",
+    "match_reason": "종이>골판지류"
   }
   ```
 
@@ -101,9 +91,9 @@ sequenceDiagram
   1. **소스 검증**: 현재는 `scan`만 허용, 다른 값이면 `UNSUPPORTED_SOURCE`.
   2. **분류/규칙 검증**: major가 `재활용폐기물`인지, `disposal_rules_present`가 true인지 검사.
   3. **insufficiencies 확인**: `insufficiencies_present`가 true이면 즉시 실패(사유: `INSUFFICIENT_EVIDENCE`).
-  4. **매핑 탐색**: Character DB의 `match_label` 값으로 후보 리스트를 만들고 `CharacterRewardCandidate`에 사유를 기록.
+  4. **매핑 탐색**: Character DB의 `match_label` 값으로 후보 리스트를 만들고, 최종 선택된 캐릭터에 대한 `match_reason` 문자열을 계산한다.
   5. **DB 반영**: 첫 유효 후보부터 캐릭터를 조회하고, `CharacterOwnershipRepository.upsert_owned()`로 저장. 이미 보유한 경우 `already_owned=true`.
-  6. **결과 조립**: `CharacterRewardResult`에 지급 여부 또는 실패 사유(`CharacterRewardFailureReason`)를 명시한다.
+  6. **결과 조립**: `received`, `already_owned`, `name`, `dialog`, `match_reason` 다섯 필드만 포함하는 `CharacterRewardResponse`를 반환한다.
 - 매핑 결과가 없거나 캐릭터 시드가 DB에 없다면 각각 `NO_MATCH`, `CHARACTER_NOT_FOUND`로 표기해 운영 모니터링이 가능하다.
 
 ## 8. Scan 응답 확장 예시
@@ -114,16 +104,11 @@ sequenceDiagram
   "message": "classification completed",
   "pipeline_result": { ... },
   "reward": {
-    "candidates": [...],
-    "result": {
-      "rewarded": true,
-      "already_owned": false,
-      "character": {
-        "name": "페이피",
-        "description": "테이프와 스테이플은 떼고 깨끗하게 접어요!"
-      },
-      "reason": null
-    }
+    "received": true,
+    "already_owned": false,
+    "name": "페이피",
+    "dialog": "테이프와 스테이플은 떼고 깨끗하게 접어요!",
+    "match_reason": "종이>골판지류"
   } // 실패 시 reward 필드는 null
 }
 ```
@@ -135,7 +120,7 @@ sequenceDiagram
 - 요청에는 user_id, task_id 등 최소한의 정보만 포함하고, Vision 결과 전문은 필요한 필드만 전송한다.
 
 ## 10. 장애 대응 및 테스트 전략
-- **API 호출 실패 처리**: `httpx.HTTPStatusError`/`RequestError`를 각각 로깅하고, reward 필드는 `null` 또는 명시적 실패 reason으로 응답하여 분류 결과 자체는 유지한다.
+- **API 호출 실패 처리**: `httpx.HTTPStatusError`/`RequestError`를 각각 로깅하고, reward 필드를 `null`로 두어도 분류 결과 자체는 유지한다.
 - **JWT 의존성 명시**:_scan 서비스 requirements에 `python-jose[cryptography]`를 추가해 테스트/배포 환경의 모듈 누락을 방지했다.
 - **App 탐색 테스트**: `domains/scan/tests/test_app.py`가 다양한 `sys.path` 후보를 시도해 FastAPI 인스턴스(`app`)를 발견함으로써 CI에서 조기 퇴행을 감지한다.
 - **수동 검증 포인트**: `reward_mapping.summarize_mapping()` 출력과 실제 Vision 분류 샘플을 대조해 매핑 누락을 확인한다.

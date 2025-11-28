@@ -22,7 +22,6 @@ class UserProfile(ORMModel):
 
 
 class UserUpdate(BaseModel):
-    username: Optional[str] = None
     nickname: Optional[str] = None
     phone_number: Optional[str] = None
     email: Optional[EmailStr] = None
