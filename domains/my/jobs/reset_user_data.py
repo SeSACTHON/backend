@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import sys
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from domains.my.core.config import get_settings
@@ -24,6 +25,7 @@ async def reset_user_data() -> int:
     print("⚠️  Resetting My service user table (development only)...")
     try:
         async with engine.begin() as conn:
+            await conn.execute(text("CREATE SCHEMA IF NOT EXISTS user_profile"))
             await conn.run_sync(User.__table__.drop, checkfirst=True)
             await conn.run_sync(User.__table__.create)
         print("✅ My service user table recreated successfully.")
