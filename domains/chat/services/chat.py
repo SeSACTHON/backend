@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 import os
 from typing import List
 from uuid import uuid4
@@ -18,6 +19,8 @@ from domains.chat.core.config import get_settings
 from domains.chat.schemas.chat import ChatMessage, ChatMessageRequest, ChatMessageResponse
 from domains.chat.services.session_store import ChatSessionStore
 
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "gpt-4o-mini"
 
@@ -53,6 +56,7 @@ class ChatService:
             try:
                 pipeline_result = await self._run_image_pipeline(payload.message, image_urls)
             except PipelineError:
+                logger.exception("Image pipeline failed; falling back to text response.")
                 pipeline_result = None
             else:
                 message_text = (
@@ -84,6 +88,7 @@ class ChatService:
                     ChatMessage(role="assistant", content=fallback),
                 ],
             )
+            logger.warning("ChatService fallback: OpenAI client missing.")
             return response
 
         openai_messages = self._build_messages(history, payload.message)
@@ -94,7 +99,9 @@ class ChatService:
                 temperature=payload.temperature,
             )
             content = response.output[0].content[0].text  # type: ignore[index]
+            logger.debug("OpenAI response success for session %s", session_id)
         except Exception:  # pragma: no cover - network errors
+            logger.exception("OpenAI responses.create failed; using fallback answer.")
             content = self._fallback_answer(payload.message)
 
         response_payload = ChatMessageResponse(user_answer=content)
