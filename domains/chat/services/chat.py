@@ -22,7 +22,7 @@ from domains.chat.services.session_store import ChatSessionStore
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "gpt-4o-mini"
+DEFAULT_MODEL = "gpt-5.1"
 
 
 class ChatService:
