@@ -15,10 +15,6 @@ class UserRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_user(self, user_id: int) -> User | None:
-        result = await self.session.execute(select(User).where(User.id == user_id))
-        return result.scalar_one_or_none()
-
     async def get_by_auth_user_id(self, auth_user_id: UUID) -> User | None:
         result = await self.session.execute(select(User).where(User.auth_user_id == auth_user_id))
         return result.scalar_one_or_none()

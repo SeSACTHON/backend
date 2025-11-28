@@ -22,22 +22,11 @@ class MyService:
         self.repo = UserRepository(session)
         self.social_repo = UserSocialAccountRepository(session)
 
-    async def get_user(self, user_id: int) -> UserProfile:
-        user = await self._get_user_or_404(user_id)
-        accounts = await self.social_repo.list_by_user_id(user.auth_user_id)
-        return self._to_profile(user, accounts)
-
     async def get_current_user(
         self, auth_user_id: UUID, provider: str | None = None
     ) -> UserProfile:
         user, accounts = await self._get_or_create_user_with_accounts(auth_user_id)
         return self._to_profile(user, accounts, preferred_provider=provider)
-
-    async def update_user(self, user_id: int, payload: UserUpdate) -> UserProfile:
-        user = await self._get_user_or_404(user_id)
-        updated = await self._apply_update(user, payload)
-        accounts = await self.social_repo.list_by_user_id(user.auth_user_id)
-        return self._to_profile(updated, accounts)
 
     async def update_current_user(
         self,
@@ -59,11 +48,6 @@ class MyService:
         payload = UserUpdate(profile_image_url=profile_image_url)
         await self._apply_update(user, payload)
 
-    async def delete_user(self, user_id: int) -> None:
-        await self._get_user_or_404(user_id)
-        await self.repo.delete_user(user_id)
-        await self.session.commit()
-
     async def delete_current_user(self, auth_user_id: UUID) -> None:
         user = await self._get_user_by_auth_id(auth_user_id)
         await self.repo.delete_user(user.id)
@@ -76,12 +60,6 @@ class MyService:
             **base_metrics,
             "by_provider": provider_counts,
         }
-
-    async def _get_user_or_404(self, user_id: int) -> User:
-        user = await self.repo.get_user(user_id)
-        if user is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-        return user
 
     async def _get_user_by_auth_id(self, auth_user_id: UUID) -> User:
         user = await self.repo.get_by_auth_user_id(auth_user_id)

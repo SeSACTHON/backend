@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Path
+from fastapi import APIRouter, Depends
 
 from domains.my.schemas import UserProfile, UserUpdate
 from domains.my.security import TokenPayload, access_token_dependency
@@ -35,8 +35,3 @@ async def delete_current_user(
 ):
     await service.delete_current_user(auth_user_id=token.user_id)
     return {"message": "user deleted"}
-
-
-@router.get("/{user_id}", response_model=UserProfile, summary="Get user profile")
-async def get_user(user_id: int = Path(..., gt=0), service: MyService = Depends(MyService)):
-    return await service.get_user(user_id)
