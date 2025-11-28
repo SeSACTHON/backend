@@ -11,8 +11,8 @@
 ---
 
 ## Service Architecture
+![A18323CF-A487-42F9-A7FE-2317E8B5104D_1_105_c](https://github.com/user-attachments/assets/9206be51-429f-486e-aa02-45530b702927)
 
-![E6A73249-BFDB-4CA9-A41B-4AF5A907C6D1](https://github.com/user-attachments/assets/fed94002-7bbd-49b0-bb2b-c2fc9ecd5b21)
 
 ```yaml
 Tier 1 Presentation : ALB, Route 53, CloudFront
