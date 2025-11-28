@@ -69,19 +69,8 @@ curl -s "http://localhost:8000/api/v1/auth/google?redirect_uri=http://localhost:
 ## 4. 쿠키 발급 / 로그인 플로우
 
 1. 위 authorization API 응답의 `authorization_url`을 브라우저에서 열고 실제 공급자(Google 등)에 로그인합니다.
-2. 설정한 `redirect_uri` 로 돌아오면 `code`, `state` 쿼리 파라미터가 붙어 있습니다.
-3. 프론트에서 다음 API 호출을 보내면 세션 쿠키(`s_access`, `s_refresh`)가 내려옵니다.
-
-```bash
-curl -i -X POST http://localhost:8000/api/v1/auth/login/google \
-  -H 'Content-Type: application/json' \
-  -d '{
-        "code": "<브라우저에서 받은 code>",
-        "state": "<브라우저에서 받은 state>",
-        "redirect_uri": "http://localhost:5173/auth/google/callback"
-      }'
-```
-
+2. Provider가 `http://localhost:8000/api/v1/auth/callback/{provider}` 로 리다이렉트하면서 `code`, `state`를 전달합니다.
+3. 백엔드가 콜백을 처리하면서 세션 쿠키(`s_access`, `s_refresh`)를 설정하고 `AUTH_FRONTEND_URL` 로 다시 리다이렉트하므로, 브라우저 개발자 도구에서 쿠키를 확인할 수 있습니다.
 4. 쿠키를 포함해 `/api/v1/auth/me`를 호출하면 로그인 정보 확인 가능:
 
 ```bash

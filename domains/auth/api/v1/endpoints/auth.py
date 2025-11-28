@@ -273,28 +273,6 @@ async def naver_callback(
 
 
 @auth_router.post(
-    "/login/{provider}",
-    response_model=LoginSuccessResponse,
-    summary="Exchange OAuth code for session cookies",
-)
-async def login_with_provider(
-    provider: str,
-    payload: OAuthLoginRequest,
-    request: Request,
-    response: Response,
-    service: Annotated[AuthService, Depends()],
-):
-    user = await service.login_with_provider(
-        provider,
-        payload,
-        response=response,
-        user_agent=request.headers.get("user-agent"),
-        ip_address=request.client.host if request.client else None,
-    )
-    return LoginSuccessResponse(data=LoginData(user=user))
-
-
-@auth_router.post(
     "/refresh",
     response_model=LoginSuccessResponse,
     summary="Rotate session cookies",

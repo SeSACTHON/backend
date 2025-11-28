@@ -333,7 +333,7 @@ kubectl set env daemonset/calico-node -n kube-system \
 ```
 ┌─────────────────────────────────────────────────────┐
 │  1. 사용자 요청                                      │
-│     https://api.growbin.app/auth/login              │
+│     https://api.growbin.app/api/v1/auth/google        │
 └─────────────────────────────────────────────────────┘
                     ↓
 ┌─────────────────────────────────────────────────────┐

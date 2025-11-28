@@ -328,7 +328,6 @@ RECYCLE_DB_URL: "postgresql://api_recycle_role:password@postgresql.data.svc.clus
 
 ```python
 POST   /api/v1/auth/register           # 회원가입
-POST   /api/v1/auth/login              # 로그인 (JWT 발급)
 POST   /api/v1/auth/logout             # 로그아웃 (토큰 블랙리스트)
 POST   /api/v1/auth/refresh            # Access Token 갱신
 GET    /api/v1/auth/me                 # 현재 사용자 정보
@@ -884,7 +883,7 @@ Tasks:
   
   3. 기본 인증 엔드포인트
      - POST /auth/register (회원가입)
-     - POST /auth/login (로그인)
+     - GET /auth/callback/{provider} (소셜 로그인 처리)
      - POST /auth/logout (로그아웃)
      - POST /auth/refresh (토큰 갱신)
      - GET /auth/me (현재 사용자)

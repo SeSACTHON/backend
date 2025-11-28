@@ -59,8 +59,8 @@
   - `users(id, provider, provider_user_id, email, nickname, profile_image_url, created_at, last_login_at)`
   - `login_audits(id, user_id, provider, jti, login_ip, user_agent, issued_at)` : 감사/보안용 Append-only
 - **OAuth 콜백 & PKCE 규칙**:
-  1. 클라이언트가 `GET /api/v1/auth/authorize/{provider}` 호출 → 서버는 `state`, `code_challenge`, 리다이렉트 URL을 돌려주고, `redis (DB3)`에 `oauth:state:{state}`로 `code_verifier`, redirect_uri, device 메타를 10분 TTL로 저장한다.
-  2. Provider 리다이렉트 이후 프런트 혹은 Provider가 직접 `POST /api/v1/auth/login/{provider}`(또는 `/callback/{provider}`) 를 호출할 때 `state`/`code_verifier`를 복구해 PKCE 검증을 완료한다.
+  1. 클라이언트가 `GET /api/v1/auth/{provider}` 호출 → 서버는 `state`, `code_challenge`, 리다이렉트 URL을 돌려주고, `redis (DB3)`에 `oauth:state:{state}`로 `code_verifier`, redirect_uri, device 메타를 10분 TTL로 저장한다.
+  2. Provider 리다이렉트 이후 백엔드의 `GET /api/v1/auth/callback/{provider}` 에서 `state`/`code_verifier`를 복구해 PKCE 검증을 완료한다.
   3. 교환이 끝나면 `oauth:state:{state}` 키는 즉시 삭제하며, 만료/재시도는 모니터링 지표(`oauth_state_expired_total`)로 집계한다.
 - **토큰 추적/로그아웃 전략**:
   - Refresh 토큰 JTI는 Redis `user_tokens:{user_id}` Set에 저장하고 TTL은 각 Refresh 만료 시점으로 맞춘다.
@@ -73,10 +73,9 @@
 
 | Method | Path | 설명 | 인증 | 비고 |
 | --- | --- | --- | --- | --- |
-| GET | `/api/v1/auth/authorize/{provider}` | PKCE용 state/code_challenge 생성 및 OAuth URL 반환 | Public | provider ∈ {naver, google, kakao} |
-| GET | `/api/v1/auth/callback/{provider}` | Provider가 백엔드로 직접 리다이렉트 시 Authorization Code 수신 | Public | state 검증 후 FE Deep Link 또는 One-time-code 발급 |
-| POST | `/api/v1/auth/login/{provider}` | Authorization Code 교환 후 JWT/리프레시 발급 | Public | state·PKCE 검증, Redis `user_tokens` 업데이트 |
-| POST | `/api/v1/auth/token/refresh` | Refresh 토큰으로 Access 재발급 & Rotation | Refresh JWT | Blacklist 확인 |
+| GET | `/api/v1/auth/{provider}` | PKCE용 state/code_challenge 생성 및 OAuth URL 반환 | Public | provider ∈ {naver, google, kakao} |
+| GET | `/api/v1/auth/callback/{provider}` | Provider가 백엔드로 직접 리다이렉트 시 Authorization Code 수신 및 세션 쿠키 발급 | Public | state 검증 후 FE Deep Link 또는 One-time-code 발급 |
+| POST | `/api/v1/auth/refresh` | Refresh 토큰으로 Access 재발급 & Rotation | Refresh JWT | Blacklist 확인 |
 | POST | `/api/v1/auth/logout` | 현재 토큰 무효화 | Access JWT | `blacklist:{jti}` 삽입 |
 | GET | `/api/v1/auth/tokens` | 내 활성 Refresh JTI 목록 조회 | Access JWT | Redis `user_tokens` 기반 |
 | DELETE | `/api/v1/auth/tokens/{jti}` | 특정 디바이스 Refresh 토큰 폐기 | Access JWT | Blacklist + Set 제거 |
@@ -187,12 +186,11 @@ sequenceDiagram
     participant REDIS as Redis (DB0)
 
     User->>FE: SNS 로그인 버튼 클릭
-    FE->>AUTH: GET /auth/authorize/{provider}
+    FE->>AUTH: GET /auth/{provider}
     AUTH->>REDIS: SET oauth:state:{state}
     AUTH-->>FE: auth_url + state + code_challenge
     FE->>SNS: Authorization Code 요청 (PKCE)
-    SNS-->>FE: code + state (redirect)
-    FE->>AUTH: POST /auth/login/{provider} (code, state)
+    SNS-->>AUTH: GET /auth/callback/{provider}?code&state
     AUTH->>REDIS: GET oauth:state:{state} (검증)
     AUTH->>SNS: Token 교환 (client_secret)
     SNS-->>AUTH: access_token + profile
