@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 from pydantic import BaseModel, Field, HttpUrl
 
@@ -14,7 +14,7 @@ class ChatMessageRequest(BaseModel):
     session_id: Optional[str] = None
     message: str
     temperature: float = 0.2
-    image_urls: Optional[List[HttpUrl]] = None
+    image_url: Optional[HttpUrl] = None
 
 
 class ChatMessageResponse(BaseModel):

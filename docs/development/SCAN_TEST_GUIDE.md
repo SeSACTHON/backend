@@ -15,14 +15,12 @@
 - Body 예시:
 ```json
 {
-  "image_urls": [
-    "https://images.dev.growbin.app/scan/2025/11/sample.png"
-  ],
+  "image_url": "https://images.dev.growbin.app/scan/2025/11/sample.png",
   "user_input": "이건 재활용이 가능한가요?"
 }
 ```
 - 기대 결과: HTTP 200, `status=completed`, `pipeline_result` 포함.
-- 에러 케이스: `image_urls` 미입력 시 `status=failed`, `error=IMAGE_URL_REQUIRED`.
+- 에러 케이스: `image_url` 미입력 시 `status=failed`, `error=IMAGE_URL_REQUIRED`.
 
 #### 2.2 분류 결과 조회
 - `POST /scan/classify` 응답의 `task_id` 활용.

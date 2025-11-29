@@ -19,7 +19,7 @@
 | --- | --- | --- | --- |
 | GET | `/health`, `/ready` | 헬스체크 | Public |
 | GET | `/metrics/` | 서비스 지표 | Public |
-| POST | `/scan/classify` | 이미지 URL 배열 + 유저 메시지 입력, 즉시 분류 | Public |
+| POST | `/scan/classify` | 단일 이미지 URL + 유저 메시지 입력, 즉시 분류 | Public |
 | GET | `/scan/task/{task_id}` | 분류 결과 조회 | Public |
 | GET | `/scan/categories` | 지원 카테고리 목록 | Public |
 
@@ -27,7 +27,7 @@
 - Body: `ClassificationRequest`
 ```json
 {
-  "image_urls": ["https://images.dev.growbin.app/scan/2025/11/...png"],
+  "image_url": "https://images.dev.growbin.app/scan/2025/11/...png",
   "user_input": "이게 종이컵인가요?"
 }
 ```
@@ -40,7 +40,7 @@
   "pipeline_result": { ...WasteClassificationResult... }
 }
 ```
-- image_urls 필수. 없는 경우 `IMAGE_URL_REQUIRED` 오류.
+- image_url 필수. 없는 경우 `IMAGE_URL_REQUIRED` 오류.
 
 #### 2.2 GET /scan/task/{task_id}
 - 메모리 저장소 `_TASK_STORE`에서 조회.

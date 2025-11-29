@@ -108,7 +108,7 @@ SCAN_AUTH_DISABLED=false AUTH_JWT_SECRET_KEY=$AUTH_JWT_SECRET_KEY \
 curl -s --cookie "s_access=${S_ACCESS_COOKIE}" \
   "http://localhost:8003/api/v1/scan/classify" \
   -H 'Content-Type: application/json' \
-  -d '{"image_urls":["https://..."],"user_input":"텍스트"}'
+  -d '{"image_url":"https://...","user_input":"텍스트"}'
 
 # 3) Character API (uvicorn)
 cd /Users/mango/workspace/SeSACTHON/backend

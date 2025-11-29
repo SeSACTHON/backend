@@ -47,7 +47,7 @@ curl -s http://localhost:8030/api/v1/chat/suggestions | jq
 
 ## 4. 이미지 + Scan 파이프라인 연동
 
-- `image_urls` 필드를 포함해 호출하면 Scan 파이프라인을 내부적으로 실행합니다.
+- `image_url` 필드를 포함해 호출하면 Scan 파이프라인을 내부적으로 실행합니다.
 - 이때 `OPENAI_API_KEY` 가 없어도 Scan 서비스에서 이미지를 처리할 수 있도록 별도로 띄워져 있어야 합니다.
 
 ## 5. Auth 토글

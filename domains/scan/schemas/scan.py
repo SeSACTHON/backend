@@ -8,8 +8,10 @@ from domains.character.schemas.reward import CharacterRewardResponse
 
 
 class ClassificationRequest(BaseModel):
-    image_url: Optional[HttpUrl] = Field(default=None, description="단일 이미지 URL (하위호환)")
-    image_urls: Optional[List[HttpUrl]] = Field(default=None, description="다중 이미지 URL 목록")
+    image_url: Optional[HttpUrl] = Field(
+        default=None,
+        description="분석할 단일 이미지 URL",
+    )
     user_input: Optional[str] = Field(
         default=None,
         description="사용자 질문/설명 (없으면 기본 안내 문구 사용)",

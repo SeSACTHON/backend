@@ -24,13 +24,13 @@ situation_tags_text = yaml.dump(situation_tags_yaml, allow_unicode=True)
 # ==========================================
 # GPT-5.1 Vision 호출 (responses API)
 # ==========================================
-def analyze_images(user_input_text: str, image_urls: list[str]) -> str:
+def analyze_images(user_input_text: str, image_url: str) -> str:
     """
     이미지와 텍스트를 분석하여 폐기물 분류 결과를 반환
 
     Args:
         user_input_text: 사용자 입력 텍스트
-        image_urls: 분석할 이미지 URL 리스트
+        image_url: 분석할 단일 이미지 URL
 
     Returns:
         분류 결과 JSON 문자열:
@@ -78,15 +78,12 @@ def analyze_images(user_input_text: str, image_urls: list[str]) -> str:
     content_items.append({"type": "input_text", "text": user_input_text})
 
     # 이미지 추가
-    for url in image_urls:
-        content_items.append(
-            {
-                "type": "input_image",
-                "image_url": {
-                    "url": url,
-                },
-            }
-        )
+    content_items.append(
+        {
+            "type": "input_image",
+            "image_url": image_url,
+        }
+    )
 
     # Vision API 호출
     response = client.responses.create(

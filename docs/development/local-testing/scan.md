@@ -43,7 +43,7 @@ curl -s http://localhost:8003/api/v1/scan/categories | jq '.[:2]'
 
 curl -X POST http://localhost:8003/api/v1/scan/classify \
   -H 'Content-Type: application/json' \
-  -d '{"image_urls":["https://images.dev.growbin.app/samples/pet.png"],"user_input":"이거 어떻게 버려?"}'
+  -d '{"image_url":"https://images.dev.growbin.app/samples/pet.png","user_input":"이거 어떻게 버려?"}'
 ```
 
 ## 4. Auth 토글 및 Character 연동

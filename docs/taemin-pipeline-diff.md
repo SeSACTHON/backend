@@ -51,7 +51,7 @@
 
 | 서비스 | 원본 구조 | 현재 구조 | Diff/비고 |
 | --- | --- | --- | --- |
-| Chat API | `services/chat/app/services/chat.py` – Vision 파이프라인 미포함 | `domains/chat/services/chat.py` – `image_urls` 존재 시 `process_waste_classification` 실행 | 이미지가 포함된 요청에서만 파이프라인을 타도록 로직 추가. 응답에 `pipeline_result`를 포함하도록 모델/스키마 확장. |
+| Chat API | `services/chat/app/services/chat.py` – Vision 파이프라인 미포함 | `domains/chat/services/chat.py` – `image_url` 존재 시 `process_waste_classification` 실행 | 이미지가 포함된 요청에서만 파이프라인을 타도록 로직 추가. 응답에 `pipeline_result`를 포함하도록 모델/스키마 확장. |
 | Scan API | 원본 Scan 서비스는 목업 응답 | `domains/scan/services/scan.py` – 동일 파이프라인 호출 | Scan 도메인에 파이프라인 전체를 연결하여 `ClassificationResponse.pipeline_result`에 Vision→RAG→Answer 결과를 담도록 변경. |
 
 ---

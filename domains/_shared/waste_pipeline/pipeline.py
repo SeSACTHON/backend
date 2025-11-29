@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Sequence
+from typing import Any
 
 from .answer import generate_answer
 from .rag import get_disposal_rules
@@ -14,20 +14,20 @@ class PipelineError(RuntimeError):
 
 def process_waste_classification(
     user_input_text: str,
-    image_urls: Sequence[str],
+    image_url: str,
     *,
     save_result: bool = False,
     verbose: bool = False,
 ) -> dict[str, Any]:
-    if not image_urls:
-        raise PipelineError("이미지 URL은 최소 한 개 이상이어야 합니다.")
+    if not image_url:
+        raise PipelineError("이미지 URL은 필수입니다.")
 
     if verbose:
         print("\n" + "=" * 50)
         print("STEP 1: 이미지 분석 및 분류")
         print("=" * 50)
 
-    result_text = analyze_images(user_input_text, list(image_urls))
+    result_text = analyze_images(user_input_text, image_url)
 
     if verbose:
         print(f"\n분석 결과:\n{result_text}")
@@ -73,19 +73,17 @@ def process_waste_classification(
 
 
 def _run_cli() -> None:
-    image_urls = [
-        "https://i.postimg.cc/NfjDJ3Cd/image.png",
-    ]
+    image_url = "https://i.postimg.cc/NfjDJ3Cd/image.png"
     user_input_text = "어떻게 분리수거해야하지?"
 
     print("\n🌱 Eco² 분리배출 AI 파이프라인 시작")
     print(f"📝 사용자 입력: {user_input_text}")
-    print(f"🖼️  이미지 개수: {len(image_urls)}개")
+    print("🖼️  이미지 개수: 1개")
 
     try:
         result = process_waste_classification(
             user_input_text,
-            image_urls,
+            image_url,
             save_result=True,
             verbose=True,
         )

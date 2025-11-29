@@ -46,11 +46,11 @@ class ChatService:
         history: List[ChatMessage] = list(stored_history)
         if len(history) > self.session_store.max_history:
             history = history[-self.session_store.max_history :]
-        image_urls = [str(url) for url in (payload.image_urls or [])]
+        image_url = str(payload.image_url) if payload.image_url else None
 
-        if image_urls:
+        if image_url:
             try:
-                pipeline_result = await self._run_image_pipeline(payload.message, image_urls)
+                pipeline_result = await self._run_image_pipeline(payload.message, image_url)
             except PipelineError:
                 logger.exception("Image pipeline failed; falling back to text response.")
                 pipeline_result = None
@@ -141,12 +141,12 @@ class ChatService:
     async def _run_image_pipeline(
         self,
         user_input: str,
-        image_urls: list[str],
+        image_url: str,
     ) -> WasteClassificationResult:
         result = await asyncio.to_thread(
             process_waste_classification,
             user_input,
-            image_urls,
+            image_url,
             save_result=False,
             verbose=False,
         )

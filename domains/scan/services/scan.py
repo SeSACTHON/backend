@@ -42,11 +42,9 @@ class ScanService:
     async def classify(
         self, payload: ClassificationRequest, user_id: UUID
     ) -> ClassificationResponse:
-        image_urls = [str(url) for url in payload.image_urls or []]
-        if payload.image_url:
-            image_urls.append(str(payload.image_url))
+        image_url = str(payload.image_url) if payload.image_url else None
 
-        if not image_urls:
+        if not image_url:
             return ClassificationResponse(
                 task_id=str(uuid4()),
                 status="failed",
@@ -59,7 +57,7 @@ class ScanService:
             pipeline_payload = await asyncio.to_thread(
                 process_waste_classification,
                 payload.user_input or DEFAULT_SCAN_PROMPT,
-                image_urls,
+                image_url,
                 save_result=False,
                 verbose=False,
             )
