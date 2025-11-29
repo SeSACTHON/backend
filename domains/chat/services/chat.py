@@ -114,21 +114,29 @@ class ChatService:
         return response_payload
 
     def _build_messages(self, history: List[ChatMessage], current: str) -> list[dict]:
-        system_prompt = {
-            "role": "system",
-            "content": (
-                "You are EcoMate, an assistant that answers recycling and sustainability "
-                "questions in Korean. Provide concise, practical answers."
-            ),
-        }
+        def _to_message(role: str, text: str) -> dict:
+            return {
+                "role": role,
+                "content": [
+                    {
+                        "type": "input_text",
+                        "text": text,
+                    }
+                ],
+            }
+
+        system_text = (
+            "You are EcoMate, an assistant that answers recycling and sustainability "
+            "questions in Korean. Provide concise, practical answers."
+        )
         limit = getattr(self.session_store, "max_history", 6)
-        converted_history = [{"role": msg.role, "content": msg.content} for msg in history[-limit:]]
-        converted_history.append({"role": "user", "content": current})
-        return [system_prompt, *converted_history]
+        converted_history = [_to_message(msg.role, msg.content) for msg in history[-limit:]]
+        converted_history.append(_to_message("user", current))
+        return [_to_message("system", system_text), *converted_history]
 
     def _fallback_answer(self, message: str) -> str:
         return (
-            "GPT-4o Mini 연결이 설정되지 않아 기본 답변을 제공합니다. "
+            "모델 연결이 설정되지 않아 기본 답변을 제공합니다. "
             "질문: {question} → 페트병은 세척 후 라벨과 뚜껑을 분리하여 배출해주세요."
         ).format(question=message)
 
