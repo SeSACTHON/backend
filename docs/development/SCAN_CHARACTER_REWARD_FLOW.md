@@ -12,8 +12,8 @@
    - `final_answer.insufficiencies`가 **존재**하며, 모든 항목이 비어 있음(실패 사유 없음)
    - Vision middle/minor가 Character DB (`characters.match_label`)의 매칭 기준과 일치
 3. Scan 서비스가 Character 내부 API `POST /api/v1/internal/characters/rewards`를 호출하여 user_id, Scan task_id, classification 요약, situation_tags, disposal_rules 존재 여부를 전달.
-4. Character 서비스는 매핑/중복 여부를 검증하고, `CharacterRewardResponse` (received + already_owned + name/dialog/match_reason)만 반환한다.
-5. Scan 응답 본문에 `reward` 필드를 추가하여 최종 결과(신규 획득 여부, 캐릭터 이름/대사, 매칭 사유)만 포함한다.
+4. Character 서비스는 매핑/중복 여부를 검증하고, `CharacterRewardResponse` (received + already_owned + name/dialog/match_reason/type)만 반환한다.
+5. Scan 응답 본문에 `reward` 필드를 추가하여 최종 결과(신규 획득 여부, 캐릭터 이름/대사/타입, 매칭 사유)만 포함한다.
 
 ## 3. 시퀀스 다이어그램
 
@@ -35,7 +35,7 @@ sequenceDiagram
         CharacterDB-->>CharacterAPI: 캐릭터/소유 정보
         CharacterAPI->>CharacterDB: upsert(character_ownerships) when newly rewarded
         CharacterDB-->>CharacterAPI: commit 완료
-        CharacterAPI-->>ScanAPI: CharacterRewardResponse (received + already_owned + name/dialog/match_reason)
+        CharacterAPI-->>ScanAPI: CharacterRewardResponse (received + already_owned + name/dialog/match_reason/type)
     else 조건 미충족 or API 실패
         ScanAPI-->>ScanAPI: reward 평가 스킵 or 실패 사유 기록
     end
@@ -67,7 +67,8 @@ sequenceDiagram
     "already_owned": false,
     "name": "페이피",
     "dialog": "테이프와 스테이플은 떼고 깨끗하게 접어요!",
-    "match_reason": "종이>골판지류"
+    "match_reason": "종이>골판지류",
+    "type": "골판지류"
   }
   ```
 
@@ -93,7 +94,7 @@ sequenceDiagram
   3. **insufficiencies 확인**: `insufficiencies_present`가 true이면 즉시 실패(사유: `INSUFFICIENT_EVIDENCE`).
   4. **매핑 탐색**: Character DB의 `match_label` 값으로 후보 리스트를 만들고, 최종 선택된 캐릭터에 대한 `match_reason` 문자열을 계산한다.
   5. **DB 반영**: 첫 유효 후보부터 캐릭터를 조회하고, `CharacterOwnershipRepository.upsert_owned()`로 저장. 이미 보유한 경우 `already_owned=true`.
-  6. **결과 조립**: `received`, `already_owned`, `name`, `dialog`, `match_reason` 다섯 필드만 포함하는 `CharacterRewardResponse`를 반환한다.
+  6. **결과 조립**: `received`, `already_owned`, `name`, `dialog`, `match_reason`, `type` 여섯 필드를 포함하는 `CharacterRewardResponse`를 반환한다.
 - 매핑 결과가 없거나 캐릭터 시드가 DB에 없다면 각각 `NO_MATCH`, `CHARACTER_NOT_FOUND`로 표기해 운영 모니터링이 가능하다.
 
 ## 8. Scan 응답 확장 예시
@@ -108,7 +109,8 @@ sequenceDiagram
     "already_owned": false,
     "name": "페이피",
     "dialog": "테이프와 스테이플은 떼고 깨끗하게 접어요!",
-    "match_reason": "종이>골판지류"
+    "match_reason": "종이>골판지류",
+    "type": "골판지류"
   } // 실패 시 reward 필드는 null
 }
 ```

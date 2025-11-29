@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import List
+from typing import Any, List
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -49,3 +49,16 @@ class CharacterRewardResponse(BaseModel):
     match_reason: str | None = Field(
         default=None, description="Why this character was selected for the reward"
     )
+    character_type: str | None = Field(
+        default=None, description="Primary type or trait of the rewarded character"
+    )
+    type: str | None = Field(
+        default=None,
+        description="Alias of character_type for clients expecting a 'type' field",
+    )
+
+    def model_post_init(self, __context: Any) -> None:
+        if self.type is None and self.character_type is not None:
+            self.type = self.character_type
+        if self.character_type is None and self.type is not None:
+            self.character_type = self.type

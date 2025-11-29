@@ -88,9 +88,11 @@ class CharacterService:
         metadata = getattr(character, "metadata_json", None) or {}
         dialog_value = metadata.get("dialog") or metadata.get("dialogue")
         dialog = str(dialog_value).strip() if dialog_value else None
+        character_type = CharacterService._extract_primary_type(metadata, character.match_label)
         return CharacterSummary(
             name=character.name,
             dialog=dialog,
+            character_type=character_type,
         )
 
     @staticmethod
@@ -100,12 +102,15 @@ class CharacterService:
         received: bool,
         match_reason: str | None,
     ) -> CharacterRewardResponse:
+        reward_type = summary.character_type if summary else None
         return CharacterRewardResponse(
             received=received,
             already_owned=already_owned,
             name=summary.name if summary else None,
             dialog=summary.dialog if summary else None,
             match_reason=match_reason,
+            character_type=reward_type,
+            type=reward_type,
         )
 
     async def _grant_character_by_name(
@@ -233,6 +238,11 @@ class CharacterService:
         if label:
             return [label]
         return ["제로웨이스트"]
+
+    @staticmethod
+    def _extract_primary_type(metadata: dict, match_label: str | None) -> str | None:
+        traits = CharacterService._extract_traits(metadata, match_label)
+        return traits[0] if traits else None
 
     @staticmethod
     def _estimate_compatibility(traits: list[str]) -> float:
