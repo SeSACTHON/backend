@@ -1,11 +1,6 @@
 """Pydantic schemas for the Character service."""
 
-from .character import (
-    CharacterAcquireResponse,
-    CharacterProfile,
-    CharacterSummary,
-    DefaultCharacterGrantRequest,
-)
+from .character import CharacterAcquireResponse, CharacterProfile, DefaultCharacterGrantRequest
 from .reward import (
     CharacterRewardFailureReason,
     CharacterRewardRequest,
@@ -17,7 +12,6 @@ from .reward import (
 __all__ = [
     "CharacterAcquireResponse",
     "CharacterProfile",
-    "CharacterSummary",
     "DefaultCharacterGrantRequest",
     "CharacterRewardSource",
     "CharacterRewardRequest",

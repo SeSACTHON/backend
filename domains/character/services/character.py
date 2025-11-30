@@ -9,11 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from domains.character.database.session import get_db_session
 from domains.character.models import Character
 from domains.character.repositories import CharacterOwnershipRepository, CharacterRepository
-from domains.character.schemas.character import (
-    CharacterAcquireResponse,
-    CharacterProfile,
-    CharacterSummary,
-)
+from domains.character.schemas.character import CharacterAcquireResponse, CharacterProfile
 from domains.character.schemas.reward import (
     CharacterRewardFailureReason,
     CharacterRewardRequest,
@@ -58,7 +54,7 @@ class CharacterService:
 
     async def evaluate_reward(self, payload: CharacterRewardRequest) -> CharacterRewardResponse:
         classification = payload.classification
-        reward_summary: CharacterSummary | None = None
+        reward_profile: CharacterProfile | None = None
         already_owned = False
         received = False
         match_reason: str | None = None
@@ -74,40 +70,28 @@ class CharacterService:
             match_reason = self._build_match_reason(classification)
             matches = await self._match_characters(classification)
             if matches:
-                reward_summary, already_owned, failure_reason = await self._apply_reward(
+                reward_profile, already_owned, failure_reason = await self._apply_reward(
                     payload.user_id, matches
                 )
                 received = (
-                    failure_reason is None and reward_summary is not None and not already_owned
+                    failure_reason is None and reward_profile is not None and not already_owned
                 )
 
-        return self._to_reward_response(reward_summary, already_owned, received, match_reason)
-
-    @staticmethod
-    def _to_summary(character) -> CharacterSummary:
-        metadata = getattr(character, "metadata_json", None) or {}
-        dialog_value = metadata.get("dialog") or metadata.get("dialogue")
-        dialog = str(dialog_value).strip() if dialog_value else None
-        character_type = CharacterService._extract_primary_type(metadata, character.match_label)
-        return CharacterSummary(
-            name=character.name,
-            dialog=dialog,
-            character_type=character_type,
-        )
+        return self._to_reward_response(reward_profile, already_owned, received, match_reason)
 
     @staticmethod
     def _to_reward_response(
-        summary: CharacterSummary | None,
+        profile: CharacterProfile | None,
         already_owned: bool,
         received: bool,
         match_reason: str | None,
     ) -> CharacterRewardResponse:
-        reward_type = summary.character_type if summary else None
+        reward_type = (profile.type or None) if profile else None
         return CharacterRewardResponse(
             received=received,
             already_owned=already_owned,
-            name=summary.name if summary else None,
-            dialog=summary.dialog if summary else None,
+            name=profile.name if profile else None,
+            dialog=profile.dialog if profile else None,
             match_reason=match_reason,
             character_type=reward_type,
             type=reward_type,
@@ -142,7 +126,7 @@ class CharacterService:
             character_id=character.id,
         )
         if existing:
-            return CharacterAcquireResponse(acquired=False, character=self._to_summary(character))
+            return CharacterAcquireResponse(acquired=False, character=self._to_profile(character))
 
         await self.ownership_repo.upsert_owned(
             user_id=user_id,
@@ -150,7 +134,7 @@ class CharacterService:
             source=source,
         )
         await self.session.commit()
-        return CharacterAcquireResponse(acquired=True, character=self._to_summary(character))
+        return CharacterAcquireResponse(acquired=True, character=self._to_profile(character))
 
     async def _match_characters(self, classification: ClassificationSummary) -> list[Character]:
         match_label = self._resolve_match_label(classification)
@@ -183,13 +167,13 @@ class CharacterService:
         self,
         user_id: UUID,
         matches: Sequence[Character],
-    ) -> tuple[CharacterSummary | None, bool, CharacterRewardFailureReason | None]:
+    ) -> tuple[CharacterProfile | None, bool, CharacterRewardFailureReason | None]:
         for match in matches:
             existing = await self.ownership_repo.get_by_user_and_character(
                 user_id=user_id, character_id=match.id
             )
             if existing:
-                return self._to_summary(match), True, None
+                return self._to_profile(match), True, None
 
             await self.ownership_repo.upsert_owned(
                 user_id=user_id,
@@ -197,55 +181,23 @@ class CharacterService:
                 source="scan-reward",
             )
             await self.session.commit()
-            return self._to_summary(match), False, None
+            return self._to_profile(match), False, None
 
         return None, False, CharacterRewardFailureReason.CHARACTER_NOT_FOUND
 
     @staticmethod
     def _to_profile(character: Character) -> CharacterProfile:
         metadata = getattr(character, "metadata_json", None) or {}
-        description = CharacterService._extract_description(character, metadata)
-        traits = CharacterService._extract_traits(metadata, character.match_label)
-        compatibility_score = CharacterService._estimate_compatibility(traits)
-        identifier = character.code or str(character.id)
-        return CharacterProfile(
-            id=identifier,
-            name=character.name,
-            description=description,
-            compatibility_score=compatibility_score,
-            traits=traits,
+        type_value = str(metadata.get("type") or "").strip()
+        dialog_value = str(metadata.get("dialog") or metadata.get("dialogue") or "").strip()
+        match_value = (
+            metadata.get("match") or metadata.get("match_label") or character.match_label or ""
         )
+        match_normalized = str(match_value).strip() or None
 
-    @staticmethod
-    def _extract_description(character: Character, metadata: dict) -> str:
-        dialog = metadata.get("dialog") or metadata.get("dialogue")
-        description = (dialog or character.description or "").strip()
-        if description:
-            return description
-        return f"{character.name}와 함께 친환경 습관을 만들어보세요!"
-
-    @staticmethod
-    def _extract_traits(metadata: dict, match_label: str | None) -> list[str]:
-        type_field = metadata.get("type") or metadata.get("types") or ""
-        normalized = [
-            trait.strip()
-            for trait in type_field.replace("/", ",").split(",")
-            if trait and trait.strip()
-        ]
-        if normalized:
-            return normalized
-        label = (match_label or "").strip()
-        if label:
-            return [label]
-        return ["제로웨이스트"]
-
-    @staticmethod
-    def _extract_primary_type(metadata: dict, match_label: str | None) -> str | None:
-        traits = CharacterService._extract_traits(metadata, match_label)
-        return traits[0] if traits else None
-
-    @staticmethod
-    def _estimate_compatibility(traits: list[str]) -> float:
-        base = 0.75
-        bonus = min(len(traits), 8) * 0.025
-        return round(min(base + bonus, 0.98), 2)
+        return CharacterProfile(
+            name=character.name,
+            type=type_value,
+            dialog=dialog_value or character.description or "",
+            match=match_normalized,
+        )
