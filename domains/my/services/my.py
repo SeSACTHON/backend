@@ -156,6 +156,9 @@ class MyService:
             return None
 
         digits = re.sub(r"\D+", "", value)
+        if digits.startswith("82") and len(digits) >= 11:
+            digits = "0" + digits[2:]
+
         if len(digits) == 11 and digits.startswith("010"):
             return f"{digits[:3]}-{digits[3:7]}-{digits[7:]}"
         if len(digits) == 10:
