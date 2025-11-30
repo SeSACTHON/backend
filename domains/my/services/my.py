@@ -111,8 +111,6 @@ class MyService:
         candidates = [
             getattr(user, "name", None),
             user.username,
-            account.username if account else None,
-            account.nickname if account else None,
         ]
         for raw in candidates:
             value = MyService._clean_text(raw)
@@ -128,8 +126,6 @@ class MyService:
     ) -> str:
         candidates = [
             getattr(user, "nickname", None),
-            account.nickname if account else None,
-            account.username if account else None,
             user.username,
             getattr(user, "name", None),
             fallback,

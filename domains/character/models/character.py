@@ -3,16 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import (
-    DateTime,
-    Enum as SqlEnum,
-    ForeignKey,
-    JSON,
-    String,
-    Text,
-    UniqueConstraint,
-    func,
-)
+from sqlalchemy import DateTime, Enum as SqlEnum, ForeignKey, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from domains.character.database.base import Base
@@ -32,13 +23,9 @@ class Character(Base):
     code: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
-    rarity: Mapped[str] = mapped_column(String(32), nullable=False, default="common")
-    element: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    thumbnail_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    type_label: Mapped[str] = mapped_column(String(120), nullable=False)
+    dialog: Mapped[str] = mapped_column(Text, nullable=False)
     match_label: Mapped[str | None] = mapped_column(String(120), nullable=True, index=True)
-    metadata_json: Mapped[dict | None] = mapped_column(
-        "metadata", JSON, nullable=True, default=dict
-    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

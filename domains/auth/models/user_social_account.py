@@ -35,9 +35,6 @@ class UserSocialAccount(Base):
     provider: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
     provider_user_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     email: Mapped[Optional[str]] = mapped_column(String(320))
-    username: Mapped[Optional[str]] = mapped_column(String(120))
-    nickname: Mapped[Optional[str]] = mapped_column(String(120))
-    profile_image_url: Mapped[Optional[str]] = mapped_column(String(512))
     last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
 
     created_at: Mapped[datetime] = mapped_column(

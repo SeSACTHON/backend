@@ -6,17 +6,17 @@ import csv
 import os
 import re
 import unicodedata
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 from uuid import NAMESPACE_URL, uuid5
 
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from domains.character.database.base import Base
 from domains.character.models.character import Character
+from domains.character.schemas.character import CharacterProfile
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 DEFAULT_CSV_PATH = DATA_DIR / "character_catalog.csv"
@@ -35,24 +35,6 @@ MANUAL_CODE_OVERRIDES = {
     "폼이": "char-foamy",
     "이코": "char-eco",
 }
-
-
-@dataclass(frozen=True)
-class CatalogEntry:
-    name: str
-    type_label: str
-    dialogue: str
-    match_label: str | None
-
-    @property
-    def metadata(self) -> dict:
-        payload = {
-            "type": self.type_label,
-            "dialog": self.dialogue,
-        }
-        if self.match_label:
-            payload["match"] = self.match_label
-        return payload
 
 
 def parse_args() -> argparse.Namespace:
@@ -88,11 +70,11 @@ def resolve_database_url(cli_value: str | None) -> str:
     return env_value
 
 
-def load_catalog(csv_path: Path) -> list[CatalogEntry]:
+def load_catalog(csv_path: Path) -> list[CharacterProfile]:
     if not csv_path.exists():
         raise SystemExit(f"CSV file not found: {csv_path}")
 
-    entries: list[CatalogEntry] = []
+    entries: list[CharacterProfile] = []
     with csv_path.open("r", encoding="utf-8-sig", newline="") as file_obj:
         reader = csv.DictReader(file_obj)
         required = {"name", "type", "dialog"}
@@ -108,11 +90,11 @@ def load_catalog(csv_path: Path) -> list[CatalogEntry]:
                 print(f"Skipping row {idx} due to empty fields")
                 continue
             entries.append(
-                CatalogEntry(
+                CharacterProfile(
                     name=name,
-                    type_label=type_label,
-                    dialogue=dialogue,
-                    match_label=match_label or None,
+                    type=type_label,
+                    dialog=dialogue,
+                    match=match_label or None,
                 )
             )
     return entries
@@ -135,12 +117,13 @@ def build_code(name: str) -> str:
     return f"char-{_slugify(name)}"
 
 
-def build_payload(entry: CatalogEntry) -> dict:
+def build_payload(entry: CharacterProfile) -> dict:
     return {
         "code": build_code(entry.name),
         "name": entry.name,
-        "match_label": entry.match_label,
-        "metadata": entry.metadata,
+        "type_label": entry.type,
+        "dialog": entry.dialog,
+        "match_label": entry.match,
     }
 
 
@@ -157,6 +140,7 @@ def batched(iterable: Iterable[dict], batch_size: int) -> Iterable[list[dict]]:
 
 async def ensure_tables(engine: AsyncEngine) -> None:
     async with engine.begin() as conn:
+        await conn.execute(text('CREATE SCHEMA IF NOT EXISTS "character"'))
         await conn.run_sync(Base.metadata.create_all)
 
 

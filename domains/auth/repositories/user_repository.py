@@ -74,19 +74,14 @@ class UserRepository:
                 provider=profile.provider,
                 provider_user_id=profile.provider_user_id,
                 email=profile.email,
-                username=profile.name,
-                nickname=profile.nickname,
-                profile_image_url=(
-                    str(profile.profile_image_url) if profile.profile_image_url else None
-                ),
                 last_login_at=now,
             )
             self.session.add(account)
 
         user.last_login_at = now
-        if profile.nickname and not user.nickname:
+        if profile.nickname:
             user.nickname = profile.nickname
-        if profile.name and not user.username:
+        if profile.name:
             user.username = profile.name
         if profile.profile_image_url:
             user.profile_image_url = str(profile.profile_image_url)
@@ -115,9 +110,5 @@ class UserRepository:
         last_login_at: Optional[datetime] = None,
     ) -> None:
         account.email = profile.email or account.email
-        account.username = profile.name or account.username
-        account.nickname = profile.nickname or account.nickname
-        if profile.profile_image_url:
-            account.profile_image_url = str(profile.profile_image_url)
         if last_login_at:
             account.last_login_at = last_login_at

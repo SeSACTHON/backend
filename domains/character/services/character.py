@@ -187,17 +187,9 @@ class CharacterService:
 
     @staticmethod
     def _to_profile(character: Character) -> CharacterProfile:
-        metadata = getattr(character, "metadata_json", None) or {}
-        type_value = str(metadata.get("type") or "").strip()
-        dialog_value = str(metadata.get("dialog") or metadata.get("dialogue") or "").strip()
-        match_value = (
-            metadata.get("match") or metadata.get("match_label") or character.match_label or ""
-        )
-        match_normalized = str(match_value).strip() or None
-
         return CharacterProfile(
             name=character.name,
-            type=type_value,
-            dialog=dialog_value or character.description or "",
-            match=match_normalized,
+            type=str(character.type_label or "").strip(),
+            dialog=str(character.dialog or character.description or "").strip(),
+            match=str(character.match_label or "").strip() or None,
         )

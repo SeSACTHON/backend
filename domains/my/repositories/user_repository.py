@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from domains.my.models import AuthUserSocialAccount, User
+from domains.my.models import AuthUser, AuthUserSocialAccount, User
 from domains.my.utils.nickname import generate_default_nickname
 
 
@@ -33,14 +33,19 @@ class UserRepository:
         accounts: Sequence[AuthUserSocialAccount],
     ) -> User:
         account = accounts[0] if accounts else None
-        nickname = account.nickname if account and account.nickname else generate_default_nickname()
+        auth_user = await self.session.get(AuthUser, auth_user_id)
+        username = getattr(auth_user, "username", None) if auth_user else None
+        name = getattr(auth_user, "nickname", None) if auth_user else None
+        nickname_source = getattr(auth_user, "nickname", None) if auth_user else None
+        nickname = nickname_source or generate_default_nickname()
+        profile_image_url = getattr(auth_user, "profile_image_url", None) if auth_user else None
         user = User(
             auth_user_id=auth_user_id,
-            username=self._select_username(account),
-            name=self._select_name(account),
+            username=username,
+            name=name or username,
             nickname=nickname,
             email=account.email if account else None,
-            profile_image_url=account.profile_image_url if account else None,
+            profile_image_url=profile_image_url,
         )
         self.session.add(user)
         await self.session.flush()
@@ -55,15 +60,3 @@ class UserRepository:
         return {
             "total_users": int(total or 0),
         }
-
-    @staticmethod
-    def _select_username(account: AuthUserSocialAccount | None) -> str | None:
-        if account is None:
-            return None
-        return account.username or account.nickname
-
-    @staticmethod
-    def _select_name(account: AuthUserSocialAccount | None) -> str | None:
-        if account is None:
-            return None
-        return account.nickname or account.username
