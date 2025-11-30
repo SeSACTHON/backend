@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from domains.character.schemas.character import CharacterProfile
+from domains.character.schemas.catalog import CharacterProfile
 from domains.character.services.character import CharacterService
 
 router = APIRouter(prefix="/character", tags=["character"])

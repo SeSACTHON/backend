@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
 from domains.character.database.base import Base
 from domains.character.models.character import Character
-from domains.character.schemas.character import CharacterProfile
+from domains.character.schemas.catalog import CharacterProfile
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 DEFAULT_CSV_PATH = DATA_DIR / "character_catalog.csv"

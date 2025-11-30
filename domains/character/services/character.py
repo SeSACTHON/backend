@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from domains.character.database.session import get_db_session
 from domains.character.models import Character
 from domains.character.repositories import CharacterOwnershipRepository, CharacterRepository
-from domains.character.schemas.character import CharacterAcquireResponse, CharacterProfile
+from domains.character.schemas.catalog import CharacterAcquireResponse, CharacterProfile
 from domains.character.schemas.reward import (
     CharacterRewardFailureReason,
     CharacterRewardRequest,

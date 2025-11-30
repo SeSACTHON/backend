@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends
 
-from domains.character.schemas.character import (
+from domains.character.schemas.catalog import (
     CharacterAcquireResponse,
     DefaultCharacterGrantRequest,
 )

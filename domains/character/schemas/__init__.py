@@ -1,6 +1,6 @@
 """Pydantic schemas for the Character service."""
 
-from .character import CharacterAcquireResponse, CharacterProfile, DefaultCharacterGrantRequest
+from .catalog import CharacterAcquireResponse, CharacterProfile, DefaultCharacterGrantRequest
 from .reward import (
     CharacterRewardFailureReason,
     CharacterRewardRequest,
