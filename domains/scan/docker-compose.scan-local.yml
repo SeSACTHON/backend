@@ -1,21 +1,34 @@
+x-shared:
+  postgres_url: &postgres_url postgresql+asyncpg://sesacthon:sesacthon@local-db:5432/ecoeco
+  redis_blacklist_url: &redis_blacklist_url redis://local-redis:6379/0
+  redis_oauth_url: &redis_oauth_url redis://local-redis:6379/3
+  shared_jwt_secret: &shared_jwt_secret ${SHARED_JWT_SECRET:-local-shared-secret}
+
 services:
-  character-db:
+  local-db:
     image: postgres:16
-    container_name: character-local-postgres
+    container_name: scan-local-postgres
     restart: unless-stopped
     environment:
-      POSTGRES_USER: character
-      POSTGRES_PASSWORD: character
-      POSTGRES_DB: character
+      POSTGRES_USER: sesacthon
+      POSTGRES_PASSWORD: sesacthon
+      POSTGRES_DB: ecoeco
     ports:
     - 5436:5432
     volumes:
-    - character-db-data:/var/lib/postgresql/data
+    - local-db-data:/var/lib/postgresql/data
     healthcheck:
-      test: [CMD-SHELL, pg_isready -U character -d character]
+      test: [CMD-SHELL, pg_isready -U sesacthon -d ecoeco]
       interval: 5s
       timeout: 5s
       retries: 10
+
+  local-redis:
+    image: redis:7
+    container_name: scan-local-redis
+    command: [redis-server, --appendonly, no]
+    ports:
+    - 6380:6379
 
   character-seed:
     build:
@@ -25,11 +38,91 @@ services:
     restart: no
     command: [python, -m, domains.character.jobs.import_character_catalog]
     environment:
-      CHARACTER_DATABASE_URL: postgresql+asyncpg://character:character@character-db:5432/character
+      CHARACTER_DATABASE_URL: *postgres_url
       CHARACTER_SCHEMA_RESET_ENABLED: 'true'
     depends_on:
-      character-db:
+      local-db:
         condition: service_healthy
+
+  auth-db-bootstrap:
+    build:
+      context: ../..
+      dockerfile: domains/auth/Dockerfile
+    container_name: scan-local-auth-bootstrap
+    restart: no
+    command: [python, -m, domains.auth.jobs.init_db]
+    environment:
+      AUTH_DATABASE_URL: *postgres_url
+    depends_on:
+      local-db:
+        condition: service_healthy
+
+  auth-api:
+    build:
+      context: ../..
+      dockerfile: domains/auth/Dockerfile
+    container_name: scan-local-auth-api
+    restart: unless-stopped
+    ports:
+    - 8000:8000
+    environment:
+      AUTH_DATABASE_URL: *postgres_url
+      AUTH_REDIS_BLACKLIST_URL: *redis_blacklist_url
+      AUTH_REDIS_OAUTH_STATE_URL: *redis_oauth_url
+      AUTH_COOKIE_DOMAIN: localhost
+      AUTH_FRONTEND_URL: http://localhost:3000
+      AUTH_JWT_SECRET_KEY: *shared_jwt_secret
+      AUTH_CHARACTER_API_BASE_URL: http://character-api:8000
+      AUTH_CHARACTER_API_TOKEN: ${AUTH_CHARACTER_API_TOKEN:-}
+      AUTH_ACCESS_COOKIE_NAME: ${AUTH_ACCESS_COOKIE_NAME:-s_access}
+      AUTH_KAKAO_CLIENT_ID: ${AUTH_KAKAO_CLIENT_ID:?AUTH_KAKAO_CLIENT_ID is required}
+      AUTH_GOOGLE_CLIENT_ID: ${AUTH_GOOGLE_CLIENT_ID:?AUTH_GOOGLE_CLIENT_ID is required}
+      AUTH_GOOGLE_CLIENT_SECRET: ${AUTH_GOOGLE_CLIENT_SECRET:?AUTH_GOOGLE_CLIENT_SECRET is required}
+      AUTH_NAVER_CLIENT_ID: ${AUTH_NAVER_CLIENT_ID:?AUTH_NAVER_CLIENT_ID is required}
+      AUTH_NAVER_CLIENT_SECRET: ${AUTH_NAVER_CLIENT_SECRET:?AUTH_NAVER_CLIENT_SECRET is required}
+    depends_on:
+      local-redis:
+        condition: service_started
+      auth-db-bootstrap:
+        condition: service_completed_successfully
+      character-api:
+        condition: service_started
+
+  my-schema-reset:
+    build:
+      context: ../..
+      dockerfile: domains/my/Dockerfile
+    container_name: scan-local-my-schema
+    restart: no
+    command:
+    - python
+    - -m
+    - domains.my.jobs.reset_user_data
+    environment:
+      MY_DATABASE_URL: *postgres_url
+      MY_SCHEMA_RESET_ENABLED: 'true'
+    depends_on:
+      local-db:
+        condition: service_healthy
+
+  my-api:
+    build:
+      context: ../..
+      dockerfile: domains/my/Dockerfile
+    container_name: scan-local-my-api
+    restart: unless-stopped
+    ports:
+    - 8002:8000
+    environment:
+      MY_DATABASE_URL: *postgres_url
+      MY_AUTH_DISABLED: ${MY_AUTH_DISABLED:-true}
+      MY_JWT_SECRET_KEY: *shared_jwt_secret
+      CHARACTER_DATABASE_URL: *postgres_url
+    depends_on:
+      my-schema-reset:
+        condition: service_completed_successfully
+      character-seed:
+        condition: service_completed_successfully
 
   character-api:
     build:
@@ -42,12 +135,43 @@ services:
     env_file:
     - .env.character.local
     environment:
-      CHARACTER_DATABASE_URL: postgresql+asyncpg://character:character@character-db:5432/character
+      CHARACTER_DATABASE_URL: *postgres_url
       CHARACTER_AUTH_DISABLED: ${CHARACTER_AUTH_DISABLED:-true}
       CHARACTER_SCHEMA_RESET_ENABLED: 'false'
+      CHARACTER_JWT_SECRET_KEY: *shared_jwt_secret
     depends_on:
       character-seed:
         condition: service_completed_successfully
+
+  image-api:
+    build:
+      context: ../..
+      dockerfile: domains/image/Dockerfile
+    container_name: scan-local-image-api
+    restart: unless-stopped
+    ports:
+    - 8005:8000
+    environment:
+      IMAGE_AWS_REGION: ${IMAGE_AWS_REGION:-ap-northeast-2}
+      IMAGE_S3_BUCKET: ${IMAGE_S3_BUCKET:-dev-sesacthon-dev-images}
+      IMAGE_CDN_DOMAIN: ${IMAGE_CDN_DOMAIN:-https://images.dev.growbin.app}
+      IMAGE_PRESIGN_EXPIRES: ${IMAGE_PRESIGN_EXPIRES:-900}
+      IMAGE_UPLOAD_STATE_TTL: ${IMAGE_UPLOAD_STATE_TTL:-900}
+      IMAGE_REDIS_URL: ${IMAGE_REDIS_URL:-redis://local-redis:6379/6}
+      IMAGE_AUTH_DISABLED: ${IMAGE_AUTH_DISABLED:-true}
+      IMAGE_JWT_SECRET_KEY: *shared_jwt_secret
+      IMAGE_JWT_ALGORITHM: ${IMAGE_JWT_ALGORITHM:-HS256}
+      IMAGE_JWT_ISSUER: ${IMAGE_JWT_ISSUER:-sesacthon-auth}
+      IMAGE_JWT_AUDIENCE: ${IMAGE_JWT_AUDIENCE:-sesacthon-clients}
+      IMAGE_ACCESS_COOKIE_NAME: ${IMAGE_ACCESS_COOKIE_NAME:-s_access}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      AWS_SESSION_TOKEN: ${AWS_SESSION_TOKEN:-}
+    depends_on:
+      local-redis:
+        condition: service_started
+      auth-api:
+        condition: service_started
 
   scan-api:
     build:
@@ -74,13 +198,15 @@ services:
       SCAN_CHARACTER_API_TOKEN: ${SCAN_CHARACTER_API_TOKEN:-}
 
       # JWT 설정은 Auth와 동일 값 사용. 기본값은 develop 브랜치 디폴트.
-      SCAN_JWT_SECRET_KEY: ${SCAN_JWT_SECRET_KEY:-local-scan-secret}
+      SCAN_JWT_SECRET_KEY: *shared_jwt_secret
       SCAN_JWT_ALGORITHM: ${SCAN_JWT_ALGORITHM:-HS256}
       SCAN_JWT_ISSUER: ${SCAN_JWT_ISSUER:-sesacthon-auth}
       SCAN_JWT_AUDIENCE: ${SCAN_JWT_AUDIENCE:-sesacthon-clients}
 
     depends_on:
       character-api:
+        condition: service_started
+      auth-api:
         condition: service_started
     command:
     - uvicorn
@@ -91,5 +217,5 @@ services:
     - '8000'
 
 volumes:
-  character-db-data:
+  local-db-data:
     driver: local

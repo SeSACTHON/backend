@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import datetime, timezone
 from typing import Dict, List
+from urllib.parse import parse_qs, urlparse
 from uuid import UUID, uuid4
 
 import httpx
-import logging
 from fastapi import Depends
 from pydantic import ValidationError
 
@@ -51,6 +52,11 @@ class ScanService:
                 message="이미지 URL이 필요합니다.",
                 error="IMAGE_URL_REQUIRED",
             )
+
+        normalized_image_url = self._normalize_image_url(image_url)
+        if normalized_image_url != image_url:
+            logger.debug("이미지 URL 정규화: %s -> %s", image_url, normalized_image_url)
+        image_url = normalized_image_url
 
         task_id = str(uuid4())
         try:
@@ -164,6 +170,39 @@ class ScanService:
         if not result.disposal_rules:
             return False
         return True
+
+    def _normalize_image_url(self, raw_url: str) -> str:
+        """OpenAI Vision은 사설/서명 URL을 직접 다운로드하지 못하므로 CDN URL로 치환한다."""
+        try:
+            parsed = urlparse(raw_url)
+        except ValueError:
+            return raw_url
+
+        if not parsed.scheme.startswith("http"):
+            return raw_url
+
+        query = parse_qs(parsed.query)
+        has_presign_markers = any(key.lower().startswith("x-amz-") for key in query)
+        is_s3_domain = "amazonaws.com" in parsed.netloc.lower()
+
+        if not (is_s3_domain and has_presign_markers):
+            return raw_url
+
+        object_key = parsed.path.lstrip("/")
+        if not object_key:
+            return raw_url
+
+        cdn_domain = self.settings.image_cdn_domain
+        if cdn_domain:
+            cdn_base = str(cdn_domain).rstrip("/")
+            return f"{cdn_base}/{object_key}"
+
+        sanitized = f"{parsed.scheme}://{parsed.netloc}{parsed.path}"
+        logger.warning(
+            "프리사인 S3 URL을 받았지만 IMAGE_CDN_DOMAIN 이 설정되지 않았습니다. "
+            "쿼리스트링을 제거한 URL을 그대로 사용합니다."
+        )
+        return sanitized
 
     def _build_reward_request(
         self,

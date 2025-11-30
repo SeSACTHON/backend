@@ -6,3 +6,4 @@ metadata:
 data:
   ENVIRONMENT: prod
   DEBUG: 'false'
+  IMAGE_CDN_DOMAIN: https://images.growbin.app
