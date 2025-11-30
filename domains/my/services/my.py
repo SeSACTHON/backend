@@ -72,6 +72,10 @@ class MyService:
                 detail="No changes provided",
             )
         updated = await self.repo.update_user(user, update_data)
+        if "phone_number" in update_data:
+            await self.repo.update_auth_user_phone(
+                user.auth_user_id, update_data.get("phone_number")
+            )
         await self.session.commit()
         return updated
 
@@ -89,6 +93,7 @@ class MyService:
         return UserProfile(
             username=username,
             nickname=nickname,
+            phone_number=user.phone_number,
             provider=provider,
             last_login_at=account.last_login_at if account else None,
         )

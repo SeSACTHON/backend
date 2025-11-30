@@ -25,6 +25,7 @@ class User(Base):
     nickname: Mapped[str | None] = mapped_column(String(120), nullable=True)
     name: Mapped[str | None] = mapped_column(String(120), nullable=True)
     email: Mapped[str | None] = mapped_column(String(320), nullable=True)
+    phone_number: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     profile_image_url: Mapped[str | None] = mapped_column(String(500), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         nullable=False,

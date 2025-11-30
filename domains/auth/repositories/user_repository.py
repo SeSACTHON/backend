@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -51,11 +51,14 @@ class UserRepository:
         account = await self.get_account_by_provider(profile.provider, profile.provider_user_id)
         now = now_utc()
         created_user = False
+        normalized_phone = self._normalize_phone(profile.phone_number)
         if account:
             self._apply_profile(account, profile, last_login_at=now)
             user = account.user
         else:
             user = await self._resolve_user_from_profile(profile)
+            if user is None and normalized_phone:
+                user = await self._resolve_user_by_name_phone(profile, normalized_phone)
             if user is None:
                 user = User(
                     username=profile.name or profile.nickname,
@@ -63,6 +66,7 @@ class UserRepository:
                     profile_image_url=(
                         str(profile.profile_image_url) if profile.profile_image_url else None
                     ),
+                    phone_number=normalized_phone,
                     last_login_at=now,
                 )
                 self.session.add(user)
@@ -85,6 +89,8 @@ class UserRepository:
             user.username = profile.name
         if profile.profile_image_url:
             user.profile_image_url = str(profile.profile_image_url)
+        if normalized_phone and not user.phone_number:
+            user.phone_number = normalized_phone
 
         await self.session.flush()
         await self.session.refresh(user)
@@ -101,6 +107,30 @@ class UserRepository:
             if account:
                 return account.user
         return None
+
+    async def _resolve_user_by_name_phone(
+        self, profile: OAuthProfile, normalized_phone: str
+    ) -> Optional[User]:
+        normalized_name = (profile.name or profile.nickname or "").strip()
+        if not normalized_name or not normalized_phone:
+            return None
+        stmt = (
+            select(User)
+            .where(
+                func.lower(User.username) == normalized_name.lower(),
+                User.phone_number == normalized_phone,
+            )
+            .options(selectinload(User.social_accounts))
+        )
+        result = await self.session.execute(stmt)
+        return result.scalar_one_or_none()
+
+    @staticmethod
+    def _normalize_phone(phone: Optional[str]) -> Optional[str]:
+        if not phone:
+            return None
+        digits = "".join(ch for ch in phone if ch.isdigit())
+        return digits or None
 
     @staticmethod
     def _apply_profile(

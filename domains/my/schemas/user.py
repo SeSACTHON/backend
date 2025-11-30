@@ -14,12 +14,14 @@ class ORMModel(BaseModel):
 class UserProfile(ORMModel):
     username: str
     nickname: str
+    phone_number: Optional[str] = None
     provider: str
     last_login_at: Optional[datetime] = None
 
 
 class UserUpdate(BaseModel):
     nickname: Optional[str] = None
+    phone_number: Optional[str] = None
 
 
 class ProfileImageUpdateRequest(BaseModel):

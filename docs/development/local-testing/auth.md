@@ -44,11 +44,29 @@
 
 ## 2. docker compose로 전체 스택 실행
 
+### 2-1. Auth + My 통합 스택 (추천)
+
+로컬에서 Auth + My API 를 동시에 확인하려면 `domains/my/docker-compose.my-local.yml` 을 사용하세요.  
+`domains/my/.env.my-local` 을 작성한 뒤 아래 명령으로 전체 스택을 기동합니다.
+
+```bash
+cd /Users/mango/workspace/SeSACTHON/backend/domains/my
+docker compose --env-file .env.my-local -f docker-compose.my-local.yml up --build
+```
+
+- 서비스 구성: `db`, `redis`, `auth-bootstrap`, `my-bootstrap`, `character-bootstrap`, `auth`, `my-api`
+- Auth 포트 `8000`, My 포트 `8002`
+- 종료: `docker compose --env-file .env.my-local -f docker-compose.my-local.yml down -v`
+
+> 이 방식은 My API 문서에서도 동일하게 안내됩니다. Auth 단독 테스트가 필요할 때만 아래 2-2를 참고하세요.
+
+### 2-2. Auth 단독 스택
+
 ```bash
 cd /Users/mango/workspace/SeSACTHON/backend/domains/auth
-docker-compose -f docker-compose.auth-local.yml up --build -d
+docker compose -f docker-compose.auth-local.yml up --build -d
 # 컨테이너 목록
-docker-compose -f docker-compose.auth-local.yml ps
+docker compose -f docker-compose.auth-local.yml ps
 ```
 
 - `db` (Postgres 16), `redis`, `db-bootstrap`, `auth` 서비스가 순차적으로 뜹니다.

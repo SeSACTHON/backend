@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any, Sequence
 from uuid import UUID
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from domains.my.models import AuthUser, AuthUserSocialAccount, User
@@ -39,18 +39,25 @@ class UserRepository:
         nickname_source = getattr(auth_user, "nickname", None) if auth_user else None
         nickname = nickname_source or generate_default_nickname()
         profile_image_url = getattr(auth_user, "profile_image_url", None) if auth_user else None
+        phone_number = getattr(auth_user, "phone_number", None) if auth_user else None
         user = User(
             auth_user_id=auth_user_id,
             username=username,
             name=name or username,
             nickname=nickname,
             email=account.email if account else None,
+            phone_number=phone_number,
             profile_image_url=profile_image_url,
         )
         self.session.add(user)
         await self.session.flush()
         await self.session.refresh(user)
         return user
+
+    async def update_auth_user_phone(self, auth_user_id: UUID, phone_number: str | None) -> None:
+        await self.session.execute(
+            update(AuthUser).where(AuthUser.id == auth_user_id).values(phone_number=phone_number)
+        )
 
     async def delete_user(self, user_id: int) -> None:
         await self.session.execute(delete(User).where(User.id == user_id))

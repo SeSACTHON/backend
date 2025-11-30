@@ -10,3 +10,4 @@ class OAuthProfile(BaseModel):
     name: Optional[str] = None
     nickname: Optional[str] = None
     profile_image_url: Optional[HttpUrl] = None
+    phone_number: Optional[str] = None

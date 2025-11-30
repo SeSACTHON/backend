@@ -20,3 +20,4 @@ class AuthUser(Base):
     username: Mapped[Optional[str]] = mapped_column(String(120))
     nickname: Mapped[Optional[str]] = mapped_column(String(120))
     profile_image_url: Mapped[Optional[str]] = mapped_column(String(512))
+    phone_number: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)

@@ -67,6 +67,7 @@ class User(BaseModel):
     username: Optional[str] = None
     nickname: Optional[str] = None
     profile_image_url: Optional[HttpUrl] = None
+    phone_number: Optional[str] = None
     created_at: datetime
     last_login_at: Optional[datetime] = None
     social_accounts: list[SocialAccount] = Field(default_factory=list)

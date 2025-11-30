@@ -32,8 +32,7 @@ _rng = secrets.SystemRandom()
 
 
 def generate_default_nickname() -> str:
-    """Build a friendly eco-themed nickname such as '초록이코42'."""
+    """Build a friendly eco-themed nickname such as '초록이코'."""
     prefix = _rng.choice(_ADJECTIVES)
     suffix = _rng.choice(_NOUNS)
-    number = _rng.randrange(10, 100)
-    return f"{prefix}{suffix}{number}"
+    return f"{prefix}{suffix}"

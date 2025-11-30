@@ -149,7 +149,9 @@ async def upsert_batch(engine: AsyncEngine, batch: list[dict]) -> None:
     stmt = insert(table).values(batch)
     update_columns = {
         "name": stmt.excluded.name,
-        "metadata": stmt.excluded.metadata,
+        "type_label": stmt.excluded.type_label,
+        "dialog": stmt.excluded.dialog,
+        "match_label": stmt.excluded.match_label,
         "updated_at": func.now(),
     }
     async with engine.begin() as conn:

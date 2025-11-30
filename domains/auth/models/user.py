@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, List, Optional
 
-from sqlalchemy import DateTime, String, func
+from sqlalchemy import DateTime, String, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -16,7 +16,10 @@ if TYPE_CHECKING:  # pragma: no cover
 
 class User(Base):
     __tablename__ = "users"
-    __table_args__ = ({"schema": "auth"},)
+    __table_args__ = (
+        UniqueConstraint("username", "phone_number", name="uq_auth_users_name_phone"),
+        {"schema": "auth"},
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -26,6 +29,7 @@ class User(Base):
     username: Mapped[Optional[str]] = mapped_column(String(120))
     nickname: Mapped[Optional[str]] = mapped_column(String(120))
     profile_image_url: Mapped[Optional[str]] = mapped_column(String(512))
+    phone_number: Mapped[Optional[str]] = mapped_column(String(32), nullable=True, index=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
