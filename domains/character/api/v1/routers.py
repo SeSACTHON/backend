@@ -2,7 +2,7 @@ from fastapi import APIRouter
 
 from domains.character.api.v1.endpoints import character, health, metrics, onboarding, rewards
 
-api_router = APIRouter(prefix="/api/v1")
+api_router = APIRouter()
 api_router.include_router(character.router)
 api_router.include_router(metrics.router)
 api_router.include_router(rewards.router)
