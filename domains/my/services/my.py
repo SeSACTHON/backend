@@ -3,6 +3,8 @@ from __future__ import annotations
 from typing import Sequence
 from uuid import UUID
 
+import re
+
 from fastapi import Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -93,7 +95,7 @@ class MyService:
         return UserProfile(
             username=username,
             nickname=nickname,
-            phone_number=user.phone_number,
+            phone_number=self._format_phone_number(user.phone_number),
             provider=provider,
             last_login_at=account.last_login_at if account else None,
         )
@@ -147,3 +149,16 @@ class MyService:
             return None
         stripped = value.strip()
         return stripped or None
+
+    @staticmethod
+    def _format_phone_number(value: str | None) -> str | None:
+        if not value:
+            return None
+
+        digits = re.sub(r"\D+", "", value)
+        if len(digits) == 11 and digits.startswith("010"):
+            return f"{digits[:3]}-{digits[3:7]}-{digits[7:]}"
+        if len(digits) == 10:
+            return f"{digits[:3]}-{digits[3:6]}-{digits[6:]}"
+
+        return value
