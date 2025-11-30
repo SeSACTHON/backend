@@ -11,10 +11,6 @@ from domains.my.models import AuthUserSocialAccount, User
 from domains.my.repositories import UserRepository, UserSocialAccountRepository
 from domains.my.schemas import UserProfile, UserUpdate
 
-DEFAULT_PROFILE_IMAGE_URL = (
-    "https://images.dev.growbin.app/scan/02cab060acea4504bdc8fa06c5b4e402.bin"
-)
-
 
 class MyService:
     def __init__(self, session: AsyncSession = Depends(get_db_session)):
@@ -98,16 +94,12 @@ class MyService:
         account = self._select_social_account(accounts, preferred_provider)
         username = self._resolve_username(user, account)
         nickname = self._resolve_nickname(user, account, username)
-        profile_image_url = self._resolve_profile_image_url(user, account)
         provider = account.provider if account else (preferred_provider or "unknown")
         phone_number = getattr(user, "phone_number", None)
-        email = self._resolve_email(user, account)
         return UserProfile(
             username=username,
             nickname=nickname,
             phone_number=phone_number,
-            email=email,
-            profile_image_url=profile_image_url,
             provider=provider,
             last_login_at=account.last_login_at if account else None,
         )
@@ -158,37 +150,6 @@ class MyService:
             if value:
                 return value
         return fallback
-
-    @staticmethod
-    def _resolve_profile_image_url(
-        user: User,
-        account: AuthUserSocialAccount | None,
-    ) -> str:
-        candidates = [
-            account.profile_image_url if account else None,
-            user.profile_image_url,
-            DEFAULT_PROFILE_IMAGE_URL,
-        ]
-        for raw in candidates:
-            value = MyService._clean_text(raw)
-            if value:
-                return value
-        return DEFAULT_PROFILE_IMAGE_URL
-
-    @staticmethod
-    def _resolve_email(
-        user: User,
-        account: AuthUserSocialAccount | None,
-    ) -> str | None:
-        candidates = [
-            getattr(user, "email", None),
-            account.email if account else None,
-        ]
-        for raw in candidates:
-            value = MyService._clean_text(raw)
-            if value:
-                return value
-        return None
 
     @staticmethod
     def _clean_text(value: str | None) -> str | None:

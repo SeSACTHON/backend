@@ -15,8 +15,6 @@ class UserProfile(ORMModel):
     username: str
     nickname: str
     phone_number: Optional[str] = None
-    email: Optional[EmailStr] = None
-    profile_image_url: str
     provider: str
     last_login_at: Optional[datetime] = None
 

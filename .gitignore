@@ -61,6 +61,8 @@ tfplan
 .env
 .env.local
 domain/auth/.env.local
+domains/scan/.env.scan.local
+domains/scan/.env.character.local
 
 # Kubernetes
 kubeconfig.tmp

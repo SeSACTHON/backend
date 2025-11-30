@@ -2,8 +2,7 @@
 
 > **Version**: v0.7.4 | [Changelog](CHANGELOG.md)
 
-Self-managed Kubernetes 기반으로 Terraform · Ansible · ArgoCD · Atlantis를 결합해 운영하는 14-Node 마이크로서비스 플랫폼입니다.
-AI 폐기물 분류·지도·챗봇 등 도메인 API와 데이터 계층, GitOps 파이프라인을 하나의 리포지토리에서 관리합니다.
+Self-managed Kubernetes 기반으로 Terraform · Ansible · ArgoCD를 결합해 운영하는 14-Node 마이크로서비스 플랫폼입니다. AI 폐기물 분류·지도·챗봇 등 모든 도메인 API와 데이터 계층, GitOps 파이프라인을 하나의 레포지토리(`develop` 기준)에서 관리합니다.[^tory15]
 
 ---
 
@@ -12,7 +11,7 @@ AI 폐기물 분류·지도·챗봇 등 도메인 API와 데이터 계층, GitOp
 ```yaml
 Cluster  : kubeadm Self-Managed (14 Nodes)
 GitOps   :
-  Layer0 - Atlantis + Terraform (AWS 인프라)
+  Layer0 - Terraform CLI (AWS 인프라)
   Layer1 - Ansible (kubeadm, CNI, Add-ons)
   Layer2 - ArgoCD App-of-Apps + Kustomize/Helm
   Layer3 - GitHub Actions + Docker Hub
@@ -23,9 +22,8 @@ Ingress  : Route53 + CloudFront + ALB → Calico NetworkPolicy
 
 ## SeSACTHON 2025 Participation
 
-서울시 주최 · 데이콘 운영 **SeSACTHON 2025** 본선에 이 플랫폼으로 참가했습니다.
-Rakuten Symphony Cloud BU(Storage Dev Team)에서 익힌 GitOps/스토리지 역량을 그대로 가져와,
-AWS 인프라 경계와 Kubernetes 네트워크 경계를 명확히 유지한 채 개발을 진행하고 있습니다.
+서울시 주최 · 데이콘 운영 **SeSACTHON 2025** 본선에 이 플랫폼으로 참가했습니다. 181팀 중 6위로 본선 티켓을 확보했고, 14노드 K8s 클러스터·GitOps 파이프라인·7개 도메인 API를 32일 만에 구현한 여정을 정리했습니다.[^tory15]
+Rakuten Symphony Cloud BU에서 축적한 GitOps/스토리지 역량을 기반으로, AWS 인프라 경계와 Kubernetes 네트워크 경계를 분리한 채 개발을 진행했습니다.[^tory14]
 
 ### 개인 기여
 
@@ -72,6 +70,12 @@ graph TD
 
 ---
 
+## Field Notes & External References
+
+- **GitOps Wave & Namespace/RBAC 일원화** – Sync Wave 설계 배경과 Namespaces/RBAC/NetworkPolicy를 한 뿌리에서 관리한 과정은 개인 블로그 연재 #06, #05에서 확인할 수 있습니다.[^tory14][^tory13]
+- **Operator · Helm 전환 시행착오** – External Secrets, Postgres/Redis Operator를 Helm ↔ CRD로 나누며 겪은 문제/해결책은 #04, #03 포스팅에 정리돼 있습니다.[^tory12][^tory8]
+- **AWS + GitOps 전환기** – Ansible 의존성을 줄이고 Kustomize Overlays 패턴을 정비한 초기 기록은 #02, #01 포스팅을 참고하세요.[^tory7][^tory6]
+
 ## Quick Links
 
 | 카테고리 | 문서 |
@@ -85,15 +89,15 @@ graph TD
 
 ---
 
-## GitOps Flow
+## GitOps Flow (develop 기준)
 
 ```mermaid
 graph TD
-    TF["Atlantis + Terraform<br/>AWS Infra"] --> ANS["Ansible<br/>Cluster Bootstrap"]
-    ANS --> ACD["ArgoCD Root App<br/>Kustomize + Helm"]
-    ACD --> SVC["서비스 오버레이<br/>k8s/base + overlays/*"]
-    SVC --> OBS["Observability<br/>Prometheus · Grafana"]
-    SVC --> DB["Data Layer<br/>PostgreSQL · Redis · RabbitMQ"]
+    TF["Terraform CLI<br/>(terraform/)"] --> ANS["Ansible<br/>Cluster Bootstrap (ansible/)"]
+    ANS --> ACD["ArgoCD Root App<br/>(clusters/)"]
+    ACD --> SVC["서비스 오버레이<br/>workloads/domains/*"]
+    SVC --> OBS["Observability<br/>kube-prometheus-stack · grafana"]
+    SVC --> DB["Data Layer<br/>platform/cr + CRDs"]
     style TF fill:#5b21b6,color:#fff
     style ANS fill:#b91c1c,color:#fff
     style ACD fill:#c2410c,color:#fff
@@ -102,7 +106,7 @@ graph TD
     style DB fill:#92400e,color:#fff
 ```
 
-Atlantis는 PR 기반으로 Terraform plan/apply를 실행하고, Ansible이 kubeadm + CNI + ArgoCD를 구성합니다. 이후 ArgoCD App-of-Apps가 Wave 순서대로 upstream Helm/Kustomize 소스를 동기화하며, GitHub Actions는 단일 Docker Hub 이미지(`docker.io/mng990/eco2`)를 태깅해 Kustomize 오버레이에 반영합니다.
+Terraform은 로컬 CLI에서 plan/apply하며, Ansible이 kubeadm + Calico + Core Add-ons를 구성합니다. `clusters/{env}/root-app.yaml`을 ArgoCD에 등록하면 Wave 00~70 순서로 Helm/Kustomize 리소스(`clusters/`, `workloads/`, `platform/cr*`)가 동기화되고, GitHub Actions는 단일 Docker Hub 이미지(`docker.io/mng990/eco2`)를 태깅해 Overlay에 반영합니다.[^tory13][^tory14]
 
 ---
 
@@ -167,14 +171,14 @@ done
 | 02 | Namespaces | `workloads/namespaces/{env}` · 13개 도메인/데이터/플랫폼 Namespace |
 | 03 | RBAC & Storage | `workloads/rbac-storage/{env}` · ServiceAccount, ClusterRole, `gp3` StorageClass, dockerhub-secret |
 | 06 | NetworkPolicy | `workloads/network-policies/{env}` · Tier 기반 기본 차단 + 허용 규칙 |
-| 10 | External Secrets Operator | `clusters/{env}/apps/10-secrets-operator.yaml` · `charts.external-secrets.io` Helm (skip CRD) |
+| 10 | External Secrets Operator | `clusters/{env}/apps/10-secrets-operator.yaml` · `charts.external-secrets.io` Helm |
 | 11 | ExternalSecret CR | `workloads/secrets/external-secrets/{env}` · SSM Parameter / Secrets Manager ←→ K8s Secret |
 | 15 | AWS Load Balancer Controller | `clusters/{env}/apps/15-alb-controller.yaml` · `aws/eks-charts` Helm |
 | 16 | ExternalDNS | `clusters/{env}/apps/16-external-dns.yaml` · `kubernetes-sigs/external-dns` Helm |
 | 20 | kube-prometheus-stack | `clusters/{env}/apps/20-monitoring-operator.yaml` · `prometheus-community` Helm (skip CRD) |
 | 21 | Grafana | `clusters/{env}/apps/21-grafana.yaml` · `grafana/grafana` Helm (NodePort + Secret) |
 | 24 | Postgres Operator | `clusters/{env}/apps/24-postgres-operator.yaml` · `zalando/postgres-operator` Helm |
-| 28 | Redis Operator | `clusters/{env}/apps/28-redis-operator.yaml` · OT-Container-Kit Helm (`skipCrds`) |
+| 28 | Redis Operator | `clusters/{env}/apps/28-redis-operator.yaml` · Bitnami Redis Replication + Sentinel Helm |
 | 35 | Data Custom Resources | `platform/cr/{env}` · PostgresCluster / RedisReplication / RedisSentinel (RabbitMQ 일시 중단) |
 | 60 | Domain APIs | `clusters/{env}/apps/60-apis-appset.yaml` → `workloads/domains/<domain>/{env}` |
 | 70 | Ingress | `workloads/ingress/{env}` · API / Grafana / ArgoCD Ingress + ExternalDNS annotation |
@@ -218,7 +222,7 @@ troubleshooting/TROUBLESHOOTING.md#8-argocd-리디렉션-루프-문제` |
 
 ```text
 backend/
-├── terraform/           # Terraform (Atlantis) IaC
+├── terraform/           # Terraform IaC
 ├── ansible/             # kubeadm, Calico, bootstrap playbooks
 ├── scripts/deployment/  # bootstrap_cluster.sh / destroy_cluster.sh
 ├── clusters/            # Argo CD Root Apps + Wave별 Application 목록
@@ -234,10 +238,20 @@ backend/
 
 ## Status
 
-- ✅ Terraform · Atlantis · Ansible bootstrap · ArgoCD App-of-Apps
+- ✅ Terraform · Ansible bootstrap · ArgoCD App-of-Apps
 - ✅ GitOps Sync Wave 재정렬 (00~70) + upstream Helm/CRD 분리
 - ✅ Docker Hub 단일 이미지 파이프라인 + External Secrets 운영 안정화
 - ⚠️ RabbitMQ Operator/CR은 장애 원인 분석 완료 후 재도입 예정
 - 🚧 서비스 비즈니스 로직/성능 테스트 고도화 진행 예정
 
 최종 업데이트: 2025-11-19 (GitOps Sync Wave & 문서 보강)
+
+---
+
+[^tory15]: “이코에코(Eco²) 2025 새싹톤 본선 진출 후일담”, rooftopsnow.tistory.com/15
+[^tory14]: “이코에코(Eco²) 인프라 구축 #06 - GitOps: Namespace · RBAC · NetworkPolicy를 한 뿌리에서”, rooftopsnow.tistory.com/14
+[^tory13]: “이코에코(Eco²) 인프라 구축 #05 - GitOps: Sync Wave”, rooftopsnow.tistory.com/13
+[^tory12]: “이코에코(Eco²) 인프라 구축 #04 - GitOps: Operator와 Helm-charts를 오가며 겪은 시행착오들”, rooftopsnow.tistory.com/12
+[^tory8]: “이코에코(Eco²) 인프라 구축 #03 - GitOps 안정화: SG는 줄이고 Typha는 올리고”, rooftopsnow.tistory.com/8
+[^tory7]: “이코에코(Eco²) 인프라 구축 #02 - GitOps 전환: Ansible 의존성 감소, Kustomize Overlays 패턴 적용”, rooftopsnow.tistory.com/7
+[^tory6]: “이코에코(Eco²) 인프라 구축 #01 - AWS + GitOps 여정”, rooftopsnow.tistory.com/6

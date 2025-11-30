@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from domains.location.api.v1.routers import api_router, health_router
+from domains.location.app.api.v1.routers import api_router, health_router
 
 
 def create_app() -> FastAPI:
@@ -19,6 +19,8 @@ def create_app() -> FastAPI:
         allow_origins=[
             "https://frontend1.dev.growbin.app",
             "https://frontend.dev.growbin.app",
+            "http://localhost:5173",
+            "https://localhost:5173",
         ],
         allow_credentials=True,
         allow_methods=["*"],

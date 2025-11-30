@@ -1,0 +1,95 @@
+services:
+  character-db:
+    image: postgres:16
+    container_name: character-local-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: character
+      POSTGRES_PASSWORD: character
+      POSTGRES_DB: character
+    ports:
+    - 5436:5432
+    volumes:
+    - character-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U character -d character]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  character-seed:
+    build:
+      context: ../..
+      dockerfile: domains/character/Dockerfile
+    container_name: character-local-seed
+    restart: no
+    command: [python, -m, domains.character.jobs.import_character_catalog]
+    environment:
+      CHARACTER_DATABASE_URL: postgresql+asyncpg://character:character@character-db:5432/character
+      CHARACTER_SCHEMA_RESET_ENABLED: 'true'
+    depends_on:
+      character-db:
+        condition: service_healthy
+
+  character-api:
+    build:
+      context: ../..
+      dockerfile: domains/character/Dockerfile
+    container_name: scan-local-character-api
+    restart: unless-stopped
+    ports:
+    - 8004:8000
+    env_file:
+    - .env.character.local
+    environment:
+      CHARACTER_DATABASE_URL: postgresql+asyncpg://character:character@character-db:5432/character
+      CHARACTER_AUTH_DISABLED: ${CHARACTER_AUTH_DISABLED:-true}
+      CHARACTER_SCHEMA_RESET_ENABLED: 'false'
+    depends_on:
+      character-seed:
+        condition: service_completed_successfully
+
+  scan-api:
+    build:
+      context: ../..
+      dockerfile: domains/scan/Dockerfile
+    container_name: scan-local-api
+    restart: unless-stopped
+    ports:
+    - 8003:8000
+    # 선택: 환경변수를 .env.scan-local 파일로 관리하고 싶다면 현재 디렉터리에 생성하세요.
+    env_file:
+    - .env.scan.local
+    environment:
+      # Vision 파이프라인이 실행되려면 필수입니다.
+      OPENAI_API_KEY: ${OPENAI_API_KEY:?OPENAI_API_KEY is required}
+
+      # 로컬 개발 편의용. 필요 시 false 로 바꾼 뒤 Auth 스택을 함께 띄우세요.
+      SCAN_AUTH_DISABLED: ${SCAN_AUTH_DISABLED:-true}
+
+      # Character API가 없으면 false 로 두고, 로컬 Character 서비스를 사용할 경우 true + BASE_URL 수정
+      SCAN_REWARD_FEATURE_ENABLED: ${SCAN_REWARD_FEATURE_ENABLED:-true}
+      SCAN_CHARACTER_API_BASE_URL: ${SCAN_CHARACTER_API_BASE_URL:-http://character-api:8000}
+      SCAN_CHARACTER_API_TIMEOUT_SECONDS: ${SCAN_CHARACTER_API_TIMEOUT_SECONDS:-5.0}
+      SCAN_CHARACTER_API_TOKEN: ${SCAN_CHARACTER_API_TOKEN:-}
+
+      # JWT 설정은 Auth와 동일 값 사용. 기본값은 develop 브랜치 디폴트.
+      SCAN_JWT_SECRET_KEY: ${SCAN_JWT_SECRET_KEY:-local-scan-secret}
+      SCAN_JWT_ALGORITHM: ${SCAN_JWT_ALGORITHM:-HS256}
+      SCAN_JWT_ISSUER: ${SCAN_JWT_ISSUER:-sesacthon-auth}
+      SCAN_JWT_AUDIENCE: ${SCAN_JWT_AUDIENCE:-sesacthon-clients}
+
+    depends_on:
+      character-api:
+        condition: service_started
+    command:
+    - uvicorn
+    - domains.scan.main:app
+    - --host
+    - 0.0.0.0
+    - --port
+    - '8000'
+
+volumes:
+  character-db-data:
+    driver: local
