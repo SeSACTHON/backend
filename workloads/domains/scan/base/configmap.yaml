@@ -6,4 +6,3 @@ metadata:
 data:
   LOG_LEVEL: INFO
   ENVIRONMENT: base
-  IMAGE_CDN_DOMAIN: https://images.dev.growbin.app

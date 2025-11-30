@@ -1,17 +1,11 @@
 from functools import lru_cache
 
-from pydantic import AliasChoices, AnyHttpUrl, Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
     app_name: str = "Scan API"
-    image_cdn_domain: AnyHttpUrl | None = Field(
-        default=None,
-        validation_alias=AliasChoices("IMAGE_CDN_DOMAIN"),
-        description="Base CDN domain for image downloads (e.g. https://images.dev.growbin.app).",
-    )
-
     character_api_base_url: str = Field(
         "http://character-api.character.svc.cluster.local:8000",
         description="Base URL for the Character service (no trailing slash).",
