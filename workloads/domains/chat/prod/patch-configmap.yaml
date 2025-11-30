@@ -4,6 +4,6 @@ metadata:
   name: chat-config
   namespace: chat
 data:
-  ENVIRONMENT: "prod"
-  DEBUG: "false"
-
+  ENVIRONMENT: prod
+  DEBUG: 'false'
+  CHAT_REDIS_URL: redis://redis.redis.svc.cluster.local:6379/7

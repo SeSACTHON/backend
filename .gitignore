@@ -61,6 +61,9 @@ tfplan
 .env
 .env.local
 domain/auth/.env.local
+domains/scan/.env.scan.local
+domains/scan/.env.character.local
+domains/my/.env.my-local
 
 # Kubernetes
 kubeconfig.tmp
@@ -84,3 +87,6 @@ coverage.xml
 .flake8
 .pylintrc
 pyproject.toml
+
+# Large artifacts
+domains/location/data/location_common_dataset.csv

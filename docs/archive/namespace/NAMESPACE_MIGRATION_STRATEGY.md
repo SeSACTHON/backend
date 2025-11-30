@@ -659,9 +659,9 @@ aws elbv2 describe-target-health \
 
 # ✅ 4. End-to-End 테스트 (실제 API 호출)
 AUTH_URL=$(kubectl get ingress -n auth -o jsonpath='{.items[0].status.loadBalancer.ingress[0].hostname}')
-curl -X POST https://$AUTH_URL/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"username":"test","password":"test"}'
+curl -G "https://$AUTH_URL/api/v1/auth/google" \
+  --data-urlencode "redirect_uri=https://app.example.com/auth/google/callback" \
+  --data-urlencode "device_id=smoke-test-device"
 
 # ✅ 5. Grafana 메트릭 확인
 # - CPU, Memory 사용량

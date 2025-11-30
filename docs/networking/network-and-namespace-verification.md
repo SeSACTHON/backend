@@ -389,7 +389,7 @@ atlantis:
 │                                                             │
 │  1. api.growbin.app                                         │
 │     ├── /api/v1/auth → auth-api:8000 (domain=auth)         │
-│     ├── /api/v1/my → my-api:8000 (domain=my)               │
+│     ├── /api/v1/user → my-api:8000 (domain=my)             │
 │     ├── /api/v1/scan → scan-api:8000 (domain=scan)         │
 │     ├── /api/v1/character → character-api:8000             │
 │     ├── /api/v1/location → location-api:8000               │

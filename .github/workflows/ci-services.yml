@@ -32,7 +32,7 @@ on:
         required: false
 
 permissions:
-  contents: read
+  contents: write
   packages: write
 
 concurrency:
@@ -52,6 +52,12 @@ jobs:
         id: detect
         run: |
           set -euo pipefail
+          if [ "${GITHUB_ACTOR}" = "github-actions[bot]" ]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "reason=Triggered by github-actions bot (manifest bump)" >> "$GITHUB_OUTPUT"
+            echo "commit_type=bot" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           EVENT_NAME="${{ github.event_name }}"
           if [ "$EVENT_NAME" = "pull_request" ]; then
             REF_TEXT="${{ github.event.pull_request.title }}"
@@ -115,25 +121,36 @@ jobs:
           import json
           import os
           import sys
+          from collections import OrderedDict
 
           files = os.environ.get("CHANGED_FILES", "").split()
           any_changed = os.environ.get("ANY_CHANGED", "false").lower() == "true"
           event_name = os.environ.get("EVENT_NAME", "")
           force_all = os.environ.get("FORCE_ALL", "false").lower() == "true"
-          target_services = [
-              s.strip() for s in os.environ.get("TARGET_SERVICES", "").split(",") if s.strip()
+          alias_map = {
+              "info": "image",
+          }
+
+          def normalize(service: str) -> str:
+              return alias_map.get(service, service)
+
+          raw_targets = [
+              s.strip()
+              for s in os.environ.get("TARGET_SERVICES", "").split(",")
+              if s.strip()
           ]
+          target_services = [normalize(s) for s in raw_targets]
 
           services = []
           service_root = "domains"
-          all_services = sorted(
-              [
-                  entry
-                  for entry in os.listdir(service_root)
-                  if os.path.isdir(os.path.join(service_root, entry))
-                  and not entry.startswith("_")
-              ]
-          )
+          discovered = []
+          for entry in os.listdir(service_root):
+              if entry.startswith("_"):
+                  continue
+              if not os.path.isdir(os.path.join(service_root, entry)):
+                  continue
+              discovered.append(normalize(entry))
+          all_services = sorted(set(discovered))
 
           if event_name == "workflow_dispatch":
               if force_all:
@@ -143,19 +160,20 @@ jobs:
                   if invalid:
                       sys.stderr.write(f"Unknown services: {', '.join(invalid)}\n")
                       sys.exit(1)
-                  services = target_services
+                  # preserve order
+                  services = list(OrderedDict.fromkeys(target_services))
 
           if not services and any_changed:
               for path in files:
                   parts = path.split("/")
                   # domains/<service>/ 경로 감지
                   if len(parts) >= 2 and parts[0] == "domains":
-                      svc = parts[1]
+                      svc = normalize(parts[1])
                       if svc and svc in all_services and svc not in services:
                           services.append(svc)
                   # workloads/domains/<service>/ 경로 감지
                   elif len(parts) >= 3 and parts[0] == "workloads" and parts[1] == "domains":
-                      svc = parts[2]
+                      svc = normalize(parts[2])
                       if svc and svc in all_services and svc not in services:
                           services.append(svc)
 
@@ -228,6 +246,7 @@ jobs:
       needs.detect-api-changes.outputs.has_changes == 'true'
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         service: ${{ fromJson(needs.detect-api-changes.outputs.services) }}
     steps:
@@ -271,13 +290,19 @@ jobs:
               echo "${IMAGE_REPO}:${SERVICE_SLUG}-latest"
               echo "TAGS"
             } >> "$GITHUB_OUTPUT"
+            echo "tag_name=${UNIQUE_TAG}" >> "$GITHUB_OUTPUT"
+            echo "manifest_tag=${UNIQUE_TAG}" >> "$GITHUB_OUTPUT"
           else
+            DEV_TAG="${SERVICE_SLUG}-dev-${SHORT_SHA}"
+            DEV_LATEST_TAG="${SERVICE_SLUG}-dev-latest"
             {
               echo "tags<<TAGS"
-              echo "${IMAGE_REPO}:${SERVICE_SLUG}-dev-${SHORT_SHA}"
-              echo "${IMAGE_REPO}:${SERVICE_SLUG}-dev-latest"
+              echo "${IMAGE_REPO}:${DEV_TAG}"
+              echo "${IMAGE_REPO}:${DEV_LATEST_TAG}"
               echo "TAGS"
             } >> "$GITHUB_OUTPUT"
+            echo "tag_name=${DEV_TAG}" >> "$GITHUB_OUTPUT"
+            echo "manifest_tag=${DEV_LATEST_TAG}" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build and push
@@ -287,5 +312,76 @@ jobs:
           file: domains/${{ matrix.service }}/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
+
+      - name: Sync manifest branch
+        if: >
+          (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main') &&
+          (matrix.service == 'auth' || matrix.service == 'location')
+        env:
+          BRANCH_NAME: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          git fetch origin "${BRANCH_NAME}"
+          git checkout -B "${BRANCH_NAME}"
+          git pull --rebase origin "${BRANCH_NAME}"
+
+      - name: Update dev manifest tag
+        if: >
+          github.ref == 'refs/heads/develop' &&
+          (matrix.service == 'auth' || matrix.service == 'location')
+        id: update_dev
+        env:
+          KUSTOMIZE_FILE: workloads/domains/${{ matrix.service }}/dev/kustomization.yaml
+          TAG_NAME: ${{ steps.meta.outputs.manifest_tag }}
+        run: |
+          python -m pip install --upgrade pip pyyaml
+          python scripts/ci/update_kustomize_image.py \
+            --file "$KUSTOMIZE_FILE" \
+            --image docker.io/mng990/eco2 \
+            --tag "$TAG_NAME"
+          if git diff --quiet -- "$KUSTOMIZE_FILE"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "file=$KUSTOMIZE_FILE" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Update prod manifest tag
+        if: >
+          github.ref == 'refs/heads/main' &&
+          (matrix.service == 'auth' || matrix.service == 'location')
+        id: update_prod
+        env:
+          KUSTOMIZE_FILE: workloads/domains/${{ matrix.service }}/prod/kustomization.yaml
+          TAG_NAME: ${{ steps.meta.outputs.tag_name }}
+        run: |
+          python -m pip install --upgrade pip pyyaml
+          python scripts/ci/update_kustomize_image.py \
+            --file "$KUSTOMIZE_FILE" \
+            --image docker.io/mng990/eco2 \
+            --tag "$TAG_NAME"
+          if git diff --quiet -- "$KUSTOMIZE_FILE"; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "file=$KUSTOMIZE_FILE" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Commit manifest updates
+        if: >
+          (steps.update_dev.outputs.changed == 'true') ||
+          (steps.update_prod.outputs.changed == 'true')
+        env:
+          DEV_FILE: ${{ steps.update_dev.outputs.file }}
+          PROD_FILE: ${{ steps.update_prod.outputs.file }}
+          TAG_NAME: ${{ steps.meta.outputs.manifest_tag }}
+          SERVICE: ${{ matrix.service }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if [ -n "${DEV_FILE}" ]; then git add "${DEV_FILE}"; fi
+          if [ -n "${PROD_FILE}" ]; then git add "${PROD_FILE}"; fi
+          git commit -m "chore(${SERVICE}): bump image tag to ${TAG_NAME} [skip ci]"
+          git push origin HEAD:${GITHUB_REF_NAME}
 
 

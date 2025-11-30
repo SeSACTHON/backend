@@ -235,7 +235,7 @@ graph TB
 - **Replicas**: 2
 - **Node**: k8s-api-userinfo (t3a.medium)
 - **기술**: FastAPI
-- **Path**: `/api/v1/users`
+- **Path**: `/api/v1/user`
 
 #### 3. location-api
 - **Namespace**: `api-location`

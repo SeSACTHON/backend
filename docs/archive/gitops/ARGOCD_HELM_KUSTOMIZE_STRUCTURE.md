@@ -205,7 +205,7 @@ workloads/ingress/
 ```
 
 - Base manifest는 `api.example.com`, `argocd.example.com` 등 placeholder를 사용하고, Overlay에서 실제 도메인/ACM ARN을 덮어쓴다.  
-- ALB Path 기반 라우팅( `/api/v1/auth`, `/api/v1/my`, … )과 `alb.ingress.kubernetes.io/group.*` 어노테이션은 ansible `07-ingress-resources.yml`과 동일하게 유지된다.  
+- ALB Path 기반 라우팅( `/api/v1/auth`, `/api/v1/user`, … )과 `alb.ingress.kubernetes.io/group.*` 어노테이션은 ansible `07-ingress-resources.yml`과 동일하게 유지된다.  
 - `argocd/apps/70-applications-ingress.yaml`은 환경별 Overlay를 참조한다. (예: `path: workloads/ingress/overlays/dev`)
 
 ## 6. 운영 체크리스트

@@ -111,7 +111,7 @@ graph TB
     end
     
     Gateway -->|/api/v1/auth| Auth
-    Gateway -->|/api/v1/users| Users
+    Gateway -->|/api/v1/user| Users
     Gateway -->|/api/v1/waste| Waste
     Gateway -->|/api/v1/recycling| Recycling
     Gateway -->|/api/v1/locations| Locations
@@ -276,7 +276,7 @@ graph TB
     end
     
     LB -->|/api/v1/auth| Task1
-    LB -->|/api/v1/users| Task2
+    LB -->|/api/v1/user| Task2
     LB -->|/api/v1/waste| Task3
     LB -->|/api/v1/recycling| Task4
     LB -->|/api/v1/locations| Task5
@@ -417,7 +417,7 @@ graph TB
     CDN --> Gateway
     
     Gateway -->|/api/v1/auth/*| Auth
-    Gateway -->|/api/v1/users/*| Users
+    Gateway -->|/api/v1/user/*| Users
     Gateway -->|/api/v1/waste/*| Waste
     Gateway -->|/api/v1/recycling/*| Recycling
     Gateway -->|/api/v1/locations/*| Locations
@@ -583,7 +583,7 @@ services:
       replicas: 1
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.users.rule=PathPrefix(`/api/v1/users`)"
+      - "traefik.http.routers.users.rule=PathPrefix(`/api/v1/user`)"
   
   # Locations Service
   locations-service:
@@ -749,7 +749,7 @@ graph TB
     Users --> Traefik
     
     Traefik -->|/api/v1/auth/*| A1
-    Traefik -->|/api/v1/users/*| U1
+    Traefik -->|/api/v1/user/*| U1
     Traefik -->|/api/v1/waste/*| W1
     Traefik -->|/api/v1/waste/*| W2
     Traefik -->|/api/v1/waste/*| W3

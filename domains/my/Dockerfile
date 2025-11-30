@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -12,6 +12,8 @@ COPY domains/my/requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
 # 애플리케이션 코드 복사
+COPY domains/_shared /app/domains/_shared
+COPY domains/character /app/domains/character
 COPY domains/my /app/domains/my
 
 EXPOSE 8000
@@ -20,4 +22,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import httpx; httpx.get('http://localhost:8000/health')"
 
-CMD ["uvicorn", "domains.my.app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "domains.my.main:app", "--host", "0.0.0.0", "--port", "8000"]

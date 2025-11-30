@@ -7,33 +7,6 @@ Eco² Backend 프로젝트의 모든 주목할 만한 변경사항을 기록합�
 
 ---
 
-## [0.8.0] - 2025-11-23
-
-### Added
-- **OAuth 안정화 구성 요소**
-  - Google/Kakao/Naver 콜백에 상세 로깅 추가 (`domains/auth/api/v1/endpoints/auth.py`)
-  - RedirectResponse 재사용으로 리다이렉트 후에도 `Set-Cookie` 유지 (`domains/auth/services/auth.py`)
-  - `cookie_domain=.growbin.app` 기본값 도입으로 dev/prod 서브도메인 간 세션 공유
-- **네트워크/보안**
-  - Auth 파드가 OAuth Provider와 통신할 수 있도록 `workloads/network-policies/base/allow-external-https.yaml` 추가
-  - ArgoCD GitHub webhook secret을 ExternalSecret + SSM 구조로 재작성 (`workloads/secrets/external-secrets/*/argocd-webhook-secret.yaml`)
-- **DNS**
-  - Route53에 `frontend.growbin.app`, `frontend.dev.growbin.app` CNAME(Vercel) 레코드 추가 → 프런트 커스텀 도메인 growbin 계층 편입
-- **AI 도메인 고도화**
-  - Vision 파이프라인(`ImageRecognition.py`, `vision.py`), Text/Intent 분류(`text_classifier.py`) 리팩토링
-  - `app/core/source/*.json` 기반 RAG 지식 베이스 확장 및 멀티 프롬프트(`answer_generation_prompt.txt`, `vision_classification_prompt.txt`, `text_classification_prompt.txt`) 정비
-
-### Changed
-- Pre-commit(Black, Ruff, 기본 hooks) 도입으로 lint/format 파이프라인 자동화
-- README v0.8.0 업데이트: OAuth/쿠키 정책, DNS 구조, AI 진행 상황 반영
-- Release/PR 문서(`.github/PULL_REQUESTS/PR_2025-11-22_AUTH_OAUTH_STABILIZATION.md`) 신규 작성
-
-### Fixed
-- Kakao OAuth `Invalid or expired state` / 쿠키 미전달 이슈 → state TTL 조정 + RedirectResponse cookie fix
-- ArgoCD webhook HMAC 검증 실패 원인: template 구문 오류 수정 및 `/api/webhook` endpoint로 통일
-
----
-
 ## [0.7.5] - 2025-11-19
 
 ### Fixed

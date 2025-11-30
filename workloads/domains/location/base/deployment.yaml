@@ -20,41 +20,51 @@ spec:
         domain: location
     spec:
       containers:
-        - name: location-api
-          image: docker.io/mng990/eco2:location-api-latest
-          imagePullPolicy: Always
-          ports:
-            - containerPort: 8000
-              name: http
-          env:
-            - name: POSTGRES_HOST
-              value: postgresql.postgres.svc.cluster.local
-            - name: REDIS_HOST
-              value: redis.redis.svc.cluster.local
-          envFrom:
-            - configMapRef:
-                name: location-config
-            - secretRef:
-                name: location-secret
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 8000
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 8000
-            initialDelaySeconds: 10
-            periodSeconds: 5
+      - name: location-api
+        image: docker.io/mng990/eco2:location-api-dev-latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: POSTGRES_HOST
+          value: postgresql.postgres.svc.cluster.local
+        - name: REDIS_HOST
+          value: redis.redis.svc.cluster.local
+        - name: AUTH_JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: location-secret
+              key: AUTH_JWT_SECRET_KEY
+        - name: AUTH_JWT_ISSUER
+          value: sesacthon-auth
+        - name: AUTH_JWT_AUDIENCE
+          value: sesacthon-clients
+        - name: AUTH_ACCESS_COOKIE_NAME
+          value: s_access
+        envFrom:
+        - configMapRef:
+            name: location-config
+        - secretRef:
+            name: location-secret
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
       imagePullSecrets:
-        - name: dockerhub-secret
+      - name: dockerhub-secret
       nodeSelector:
         domain: location
       tolerations:
-        - key: domain
-          operator: Equal
-          value: location
-          effect: NoSchedule
-
+      - key: domain
+        operator: Equal
+        value: location
+        effect: NoSchedule

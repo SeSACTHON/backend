@@ -52,12 +52,22 @@ metadata:
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: info
+  name: image
   labels:
     app.kubernetes.io/part-of: ecoeco-backend
     tier: business-logic
     role: api
-    domain: info
+    domain: image
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rabbitmq
+  labels:
+    app.kubernetes.io/part-of: ecoeco-backend
+    tier: integration
+    role: messaging
+    domain: rabbitmq
 ---
 apiVersion: v1
 kind: Namespace
@@ -88,15 +98,6 @@ metadata:
     tier: data
     role: cache
     data-type: redis
----
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: rabbitmq
-  labels:
-    app.kubernetes.io/part-of: ecoeco-backend
-    tier: integration
-    role: messaging
 ---
 apiVersion: v1
 kind: Namespace
@@ -142,4 +143,3 @@ metadata:
     app.kubernetes.io/part-of: ecoeco-platform
     tier: infrastructure
     role: operators
-

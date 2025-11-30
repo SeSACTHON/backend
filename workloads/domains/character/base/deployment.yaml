@@ -20,41 +20,51 @@ spec:
         domain: character
     spec:
       containers:
-        - name: character-api
-          image: docker.io/mng990/eco2:character-api-latest
-          imagePullPolicy: Always
-          ports:
-            - containerPort: 8000
-              name: http
-          env:
-            - name: POSTGRES_HOST
-              value: postgresql.postgres.svc.cluster.local
-            - name: REDIS_HOST
-              value: redis.redis.svc.cluster.local
-          envFrom:
-            - configMapRef:
-                name: character-config
-            - secretRef:
-                name: character-secret
-          livenessProbe:
-            httpGet:
-              path: /health
-              port: 8000
-            initialDelaySeconds: 30
-            periodSeconds: 10
-          readinessProbe:
-            httpGet:
-              path: /health
-              port: 8000
-            initialDelaySeconds: 10
-            periodSeconds: 5
+      - name: character-api
+        image: docker.io/mng990/eco2:character-api-dev-latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: POSTGRES_HOST
+          value: postgresql.postgres.svc.cluster.local
+        - name: REDIS_HOST
+          value: redis.redis.svc.cluster.local
+        - name: AUTH_JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: character-secret
+              key: CHARACTER_JWT_SECRET_KEY
+        - name: AUTH_JWT_ISSUER
+          value: sesacthon-auth
+        - name: AUTH_JWT_AUDIENCE
+          value: sesacthon-clients
+        - name: AUTH_ACCESS_COOKIE_NAME
+          value: s_access
+        envFrom:
+        - configMapRef:
+            name: character-config
+        - secretRef:
+            name: character-secret
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
       imagePullSecrets:
-        - name: dockerhub-secret
+      - name: dockerhub-secret
       nodeSelector:
         domain: character
       tolerations:
-        - key: domain
-          operator: Equal
-          value: character
-          effect: NoSchedule
-
+      - key: domain
+        operator: Equal
+        value: character
+        effect: NoSchedule

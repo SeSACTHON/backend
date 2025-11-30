@@ -7,9 +7,9 @@ metadata:
     env: prod
     tier: data
   annotations:
-    argocd.argoproj.io/sync-wave: "27"
+    argocd.argoproj.io/sync-wave: '27'
   finalizers:
-    - resources-finalizer.argocd.argoproj.io
+  - resources-finalizer.argocd.argoproj.io
 spec:
   project: prod
   source:
@@ -65,17 +65,6 @@ spec:
 
           volumePermissions:
             enabled: true
-
-          initdb:
-            scripts:
-              00-init-schemas.sql: |
-                -- auth 서비스용 스키마 생성
-                CREATE SCHEMA IF NOT EXISTS auth;
-                
-                -- sesacthon 사용자에게 auth 스키마 권한 부여
-                GRANT ALL PRIVILEGES ON SCHEMA auth TO sesacthon;
-                GRANT ALL PRIVILEGES ON DATABASE sesacthon TO sesacthon;
-                GRANT ALL PRIVILEGES ON SCHEMA public TO sesacthon;
 
           nodeSelector:
             domain: data
@@ -157,5 +146,4 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-      - CreateNamespace=true
-
+    - CreateNamespace=true

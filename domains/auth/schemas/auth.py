@@ -26,6 +26,7 @@ class OAuthAuthorizeParams(BaseModel):
     redirect_uri: Optional[HttpUrl] = None
     scope: Optional[str] = None
     device_id: Optional[str] = Field(default=None, max_length=120)
+    frontend_origin: Optional[HttpUrl] = Field(default=None, description="Frontend origin URL")
 
 
 class OAuthLoginRequest(BaseModel):
@@ -46,15 +47,30 @@ class LogoutSuccessResponse(SuccessResponse[LogoutData]):
     pass
 
 
-class User(BaseModel):
-    id: UUID
+class SocialAccount(BaseModel):
     provider: str
+    provider_user_id: str
     email: Optional[EmailStr] = None
     username: Optional[str] = None
     nickname: Optional[str] = None
     profile_image_url: Optional[HttpUrl] = None
+    last_login_at: Optional[datetime] = None
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class User(BaseModel):
+    id: UUID
+    provider: Optional[str] = None
+    provider_user_id: Optional[str] = None
+    email: Optional[EmailStr] = None
+    username: Optional[str] = None
+    nickname: Optional[str] = None
+    profile_image_url: Optional[HttpUrl] = None
+    phone_number: Optional[str] = None
     created_at: datetime
     last_login_at: Optional[datetime] = None
+    social_accounts: list[SocialAccount] = Field(default_factory=list)
 
     model_config = ConfigDict(from_attributes=True)
 

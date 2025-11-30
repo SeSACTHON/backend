@@ -83,6 +83,7 @@ class KakaoOAuthProvider(OAuthProvider):
 
         kakao_account = payload.get("kakao_account") or {}
         profile = kakao_account.get("profile") or {}
+        phone_number = kakao_account.get("phone_number")
 
         return OAuthProfile(
             provider=self.name,
@@ -91,4 +92,5 @@ class KakaoOAuthProvider(OAuthProvider):
             nickname=profile.get("nickname"),
             name=profile.get("nickname"),
             profile_image_url=profile.get("profile_image_url"),
+            phone_number=phone_number,
         )

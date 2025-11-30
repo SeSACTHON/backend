@@ -9,6 +9,8 @@ class Settings(BaseSettings):
     app_name: str = "Auth API"
     environment: str = "local"
     api_v1_prefix: str = "/api/v1"
+    # Destructive schema reset guard. Keep False unless you need a full reset.
+    schema_reset_enabled: bool = False
 
     # Database connection (required in production, defaults for testing)
     database_url: str = "postgresql+asyncpg://test:test@localhost:5432/test"
@@ -24,11 +26,21 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_issuer: str = "sesacthon-auth"
     jwt_audience: str = "sesacthon-clients"
-    access_token_exp_minutes: int = 15
-    refresh_token_exp_minutes: int = 60 * 24 * 14
+    access_token_exp_minutes: int = 60 * 3
+    refresh_token_exp_minutes: int = 60 * 24 * 30
 
-    # Frontend URL
-    frontend_url: str = "https://frontend-beta-gray-c44lrfj3n1.vercel.app"
+    # Frontend / Cookie domains
+    frontend_url: str = "https://frontend1.dev.growbin.app"
+    cookie_domain: Optional[str] = ".dev.growbin.app"
+
+    # Character service integration
+    character_api_base_url: str = "http://character-api.character.svc.cluster.local:8000"
+    character_default_grant_endpoint: str = "/api/v1/internal/characters/default"
+    character_api_timeout_seconds: float = 5.0
+    character_api_token: Optional[str] = None
+    character_onboarding_enabled: bool = True
+    character_onboarding_retry_attempts: int = 3
+    character_onboarding_retry_backoff_seconds: float = 0.5
 
     # OAuth failure redirect
     @property

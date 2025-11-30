@@ -12,7 +12,7 @@
 ## 🔧 배포 전 필수 작업
 
 ### A. 코드 정리
-- [ ] 불필요한 엔드포인트 제거 (POST /login/{provider})
+- [x] 불필요한 엔드포인트 제거 (POST /login/{provider})
 - [ ] 불필요한 import 제거 (RedirectResponse)
 - [ ] OAuthAuthorizeParams 단순화
 

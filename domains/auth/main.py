@@ -3,7 +3,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
-from domains.auth.api.v1.router import api_router, health_probe_router
+from domains.auth.api.v1.routers import api_router, health_probe_router
 from domains.auth.core.exceptions import (
     general_exception_handler,
     http_exception_handler,
@@ -29,7 +29,13 @@ def create_app() -> FastAPI:
 
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=[
+            "https://frontend1.dev.growbin.app",
+            "https://frontend2.dev.growbin.app",
+            "https://frontend.dev.growbin.app",
+            "http://localhost:5173",
+            "https://localhost:5173",
+        ],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

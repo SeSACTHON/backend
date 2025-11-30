@@ -18,7 +18,7 @@
 ## 선행 조건
 
 - Wave 35: PostgreSQL/Redis Cluster (데이터 계층)
-- Wave 58: `dockerhub-secret` (GHCR pull secret, GitHub Actions에서 생성)
+- Wave 58: `dockerhub-secret` (Docker Hub pull secret, GitHub Actions에서 생성)
 - NetworkPolicy: tier=business-logic → tier=data 허용
 
 ## 배포
@@ -27,4 +27,3 @@
 kubectl apply -k workloads/domains/auth/overlays/dev
 kubectl get pods -n auth
 ```
-

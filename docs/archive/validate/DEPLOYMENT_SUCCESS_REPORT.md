@@ -171,7 +171,7 @@ Total Applications: 17
 - **Chat API:** https://api.growbin.app/api/v1/chat
 - **Info API:** https://api.growbin.app/api/v1/info
 - **Location API:** https://api.growbin.app/api/v1/location
-- **My API:** https://api.growbin.app/api/v1/my
+- **My API:** https://api.growbin.app/api/v1/user
 - **Scan API:** https://api.growbin.app/api/v1/scan
 
 ---

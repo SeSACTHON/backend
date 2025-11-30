@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import httpx
+import logging
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -24,11 +25,12 @@ from domains.auth.services.token_service import TokenService, TokenType
 from domains.auth.services.user_token_store import UserTokenStore
 from domains._shared.security import TokenPayload
 
+logger = logging.getLogger(__name__)
+
 ACCESS_COOKIE_NAME = "s_access"
 REFRESH_COOKIE_NAME = "s_refresh"
 COOKIE_PATH = "/"
 COOKIE_SAMESITE = "lax"
-COOKIE_DOMAIN = ".growbin.app"  # None: 현재 도메인만, ".dev.growbin.app": 서브도메인 공유
 
 
 class AuthService:
@@ -51,6 +53,7 @@ class AuthService:
         self.user_repo = UserRepository(session)
         self.login_audit_repo = LoginAuditRepository(session)
         self.http_timeout = 10.0
+        self._state_frontend_origin: Optional[str] = None
 
     async def authorize(
         self, provider_name: str, params: OAuthAuthorizeParams
@@ -67,6 +70,7 @@ class AuthService:
             redirect_uri=str(redirect_uri),
             scope=params.scope,
             device_id=params.device_id,
+            frontend_origin=params.frontend_origin,
         )
 
         authorization_url = provider.build_authorization_url(
@@ -92,6 +96,7 @@ class AuthService:
         user_agent: Optional[str],
         ip_address: Optional[str],
     ) -> User:
+        self._state_frontend_origin = None
         provider = self._get_provider(provider_name)
         state_data = await self.state_store.consume_state(payload.state)
         if not state_data:
@@ -103,6 +108,7 @@ class AuthService:
                 status_code=status.HTTP_400_BAD_REQUEST, detail="State provider mismatch"
             )
 
+        self._state_frontend_origin = state_data.get("frontend_origin")
         redirect_uri = (
             payload.redirect_uri or state_data.get("redirect_uri") or provider.redirect_uri
         )
@@ -128,7 +134,7 @@ class AuthService:
         except (httpx.HTTPError, OAuthProviderError) as exc:
             raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=str(exc)) from exc
 
-        user = await self.user_repo.upsert_from_profile(profile)
+        user, _ = await self.user_repo.upsert_from_profile(profile)
 
         token_pair = self.token_service.issue_pair(user_id=user.id, provider=provider.name)
         access_payload = self.token_service.decode(token_pair.access_token)
@@ -263,10 +269,13 @@ class AuthService:
 
     def _clear_session_cookies(self, response: Response) -> None:
         cookie_kwargs = {"path": COOKIE_PATH}
-        if COOKIE_DOMAIN:
-            cookie_kwargs["domain"] = COOKIE_DOMAIN
+        if self.settings.cookie_domain:
+            cookie_kwargs["domain"] = self.settings.cookie_domain
         response.delete_cookie(ACCESS_COOKIE_NAME, **cookie_kwargs)
         response.delete_cookie(REFRESH_COOKIE_NAME, **cookie_kwargs)
+
+    def get_state_frontend_origin(self) -> Optional[str]:
+        return self._state_frontend_origin
 
     def _set_cookie(self, response: Response, name: str, value: str, expires_at: int) -> None:
         max_age = max(expires_at - int(now_utc().timestamp()), 1)
@@ -280,6 +289,6 @@ class AuthService:
             "path": COOKIE_PATH,
         }
         # domain이 설정된 경우에만 추가 (None이면 현재 도메인에만 바인딩)
-        if COOKIE_DOMAIN:
-            cookie_kwargs["domain"] = COOKIE_DOMAIN
+        if self.settings.cookie_domain:
+            cookie_kwargs["domain"] = self.settings.cookie_domain
         response.set_cookie(**cookie_kwargs)

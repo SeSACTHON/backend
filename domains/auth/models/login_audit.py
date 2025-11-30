@@ -7,6 +7,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from domains.auth.database.base import Base
+from domains.auth.models.user import User
 
 
 class LoginAudit(Base):
@@ -20,7 +21,7 @@ class LoginAudit(Base):
     )
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("auth.users.id", ondelete="CASCADE"),
+        ForeignKey(User.id, ondelete="CASCADE"),
         index=True,
         nullable=False,
     )

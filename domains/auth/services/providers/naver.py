@@ -76,6 +76,7 @@ class NaverOAuthProvider(OAuthProvider):
         response.raise_for_status()
         body = response.json()
         response_data = body.get("response") or {}
+        phone_number = response_data.get("mobile_e164") or response_data.get("mobile")
         return OAuthProfile(
             provider=self.name,
             provider_user_id=response_data.get("id"),
@@ -83,4 +84,5 @@ class NaverOAuthProvider(OAuthProvider):
             nickname=response_data.get("nickname"),
             name=response_data.get("name"),
             profile_image_url=response_data.get("profile_image"),
+            phone_number=phone_number,
         )
