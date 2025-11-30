@@ -2,8 +2,13 @@ from fastapi import APIRouter, Depends
 
 from domains.character.schemas.catalog import CharacterProfile
 from domains.character.services.character import CharacterService
+from domains.character.api.dependencies import access_token_dependency
 
-router = APIRouter(prefix="/character", tags=["character"])
+router = APIRouter(
+    prefix="/character",
+    tags=["character"],
+    dependencies=[Depends(access_token_dependency)],
+)
 
 
 @router.get(

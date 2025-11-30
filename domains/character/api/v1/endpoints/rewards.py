@@ -2,8 +2,13 @@ from fastapi import APIRouter, Depends
 
 from domains.character.schemas import CharacterRewardRequest, CharacterRewardResponse
 from domains.character.services.character import CharacterService
+from domains.character.api.dependencies import service_token_dependency
 
-router = APIRouter(prefix="/internal/characters", tags=["character-rewards"])
+router = APIRouter(
+    prefix="/internal/characters",
+    tags=["character-rewards"],
+    dependencies=[Depends(service_token_dependency)],
+)
 
 
 @router.post(

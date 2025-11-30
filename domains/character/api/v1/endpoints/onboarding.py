@@ -5,8 +5,13 @@ from domains.character.schemas.catalog import (
     DefaultCharacterGrantRequest,
 )
 from domains.character.services.character import CharacterService
+from domains.character.api.dependencies import service_token_dependency
 
-router = APIRouter(prefix="/internal/characters", tags=["character-onboarding"])
+router = APIRouter(
+    prefix="/internal/characters",
+    tags=["character-onboarding"],
+    dependencies=[Depends(service_token_dependency)],
+)
 
 
 @router.post(
