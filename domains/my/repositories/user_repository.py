@@ -7,6 +7,7 @@ from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from domains.my.models import AuthUserSocialAccount, User
+from domains.my.utils.nickname import generate_default_nickname
 
 
 class UserRepository:
@@ -32,11 +33,12 @@ class UserRepository:
         accounts: Sequence[AuthUserSocialAccount],
     ) -> User:
         account = accounts[0] if accounts else None
+        nickname = account.nickname if account and account.nickname else generate_default_nickname()
         user = User(
             auth_user_id=auth_user_id,
             username=self._select_username(account),
             name=self._select_name(account),
-            nickname=account.nickname if account else None,
+            nickname=nickname,
             email=account.email if account else None,
             profile_image_url=account.profile_image_url if account else None,
         )
