@@ -1,15 +1,16 @@
 import yaml
-from utils import (
-    load_yaml,
-    load_prompt,
-    get_openai_client,
-    save_json_result,
+from typing import List, Optional
+from pydantic import BaseModel
+
+from .utils import (
     ITEM_CLASS_PATH,
     SITUATION_TAG_PATH,
     VISION_PROMPT_PATH,
+    get_openai_client,
+    load_prompt,
+    load_yaml,
+    save_json_result,
 )
-from pydantic import BaseModel
-from typing import List, Optional
 
 # ==========================================
 # YAML 데이터 로드 및 변환
@@ -40,13 +41,13 @@ class VisionResult(BaseModel):
 # ==========================================
 # GPT-5.1 Vision 호출 (responses API)
 # ==========================================
-def analyze_images(user_input_text: str, image_urls: list[str], save_result: bool = False) -> dict:
+def analyze_images(user_input_text: str, image_url: str, save_result: bool = False) -> dict:
     """
     이미지와 텍스트를 분석하여 폐기물 분류 결과를 반환
 
     Args:
         user_input_text: 사용자 입력 텍스트
-        image_urls: 분석할 이미지 URL 리스트
+        image_url: 분석할 이미지 URL(단일)
         save_result: 결과를 JSON 파일로 저장할지 여부 (기본값: False)
 
     Returns:
@@ -79,9 +80,8 @@ def analyze_images(user_input_text: str, image_urls: list[str], save_result: boo
     # 사용자 메시지 구성
     content_items.append({"type": "input_text", "text": user_input_text})
 
-    # 이미지 추가
-    for url in image_urls:
-        content_items.append({"type": "input_image", "image_url": url})
+    # 이미지 추가 (단일 URL)
+    content_items.append({"type": "input_image", "image_url": image_url})
 
     # Vision API 호출
     response = client.responses.parse(

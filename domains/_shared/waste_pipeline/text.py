@@ -1,14 +1,15 @@
 import yaml
-from utils import (
-    load_yaml,
-    load_prompt,
-    get_openai_client,
-    save_json_result,
+from typing import Optional
+from pydantic import BaseModel
+
+from .utils import (
     ITEM_CLASS_PATH,
     TEXT_CLASSIFICATION_PROMPT_PATH,
+    get_openai_client,
+    load_prompt,
+    load_yaml,
+    save_json_result,
 )
-from pydantic import BaseModel
-from typing import Optional
 
 # ==========================================
 # YAML 데이터 로드 및 변환
@@ -88,3 +89,10 @@ def classify_text(user_input_text: str, save_result: bool = False) -> dict:
         print(f"✅ 텍스트 분류 결과가 저장되었습니다: {saved_path}")
 
     return parsed.model_dump()
+
+
+def process_text_classification(user_input_text: str, save_result: bool = False) -> dict:
+    """
+    Legacy wrapper for backwards compatibility.
+    """
+    return classify_text(user_input_text, save_result=save_result)
