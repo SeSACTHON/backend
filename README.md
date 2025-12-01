@@ -1,13 +1,13 @@
 # Eco² Backend
 
-> **Version**: v0.9.0 | [Changelog](CHANGELOG.md)
+> **Version**: v1.0.0 | [Changelog](CHANGELOG.md)
 
 <img width="3840" height="2160" alt="515829337-6a4f523a-fa37-49de-b8e1-0a5befe26605" src="https://github.com/user-attachments/assets/e6c7d948-aa06-4bbb-b2fc-237aa7f01223" />
 
 
 - Self-managed Kubernetes, ArgoCD/Helm-charts/Kustomize 기반 GitOps Sync-wave로 운영하는 14-Nodes 마이크로서비스 플랫폼입니다.
 - AI 폐기물 분류·근처 제로웨이스트샵 안내·챗봇 등 도메인 API와 데이터 계층, GitOps 파이프라인을 모노레포로 관리합니다.
-
+- [🌱🌏 정상 배포 중]
 ---
 
 ## Service Architecture
@@ -269,4 +269,4 @@ backend/
 - ✅ GitOps Sync-Wave 재정렬 (00~70) + upstream Helm/CRD 분리
 - ✅ Docker Hub 단일 이미지 파이프라인 + External Secrets 운영 안정화
 - ⚠️ RabbitMQ Operator/CR 장애로 Pending, MVP API 개발 이후 재도입 예정
-- ✅ API 개발 완료, 연동 테스트 진행중
+- ✅ API 개발 완료, 프론트-백-AI 연동 완료
