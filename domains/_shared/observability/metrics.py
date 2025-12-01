@@ -13,7 +13,7 @@ from prometheus_client import (
     generate_latest,
 )
 
-PROMETHEUS_METRICS_PATH = "/metrics/prometheus"
+PROMETHEUS_METRICS_PATH = "/metrics/status"
 
 _FLAG_ATTR = "_observability_metrics_registered"
 _DEFAULT_BUCKETS = (

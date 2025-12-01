@@ -105,7 +105,7 @@ spec:
                   app: auth-api
               endpoints:
               - port: http
-                path: /metrics/prometheus
+                path: /metrics/status
                 interval: 30s
                 scrapeTimeout: 5s
             - name: chat-api
@@ -120,7 +120,7 @@ spec:
                   app: chat-api
               endpoints:
               - port: http
-                path: /metrics/prometheus
+                path: /metrics/status
                 interval: 30s
                 scrapeTimeout: 5s
             - name: character-api
@@ -135,7 +135,7 @@ spec:
                   app: character-api
               endpoints:
               - port: http
-                path: /metrics/prometheus
+                path: /metrics/status
                 interval: 30s
                 scrapeTimeout: 5s
             - name: image-api
@@ -150,7 +150,7 @@ spec:
                   app: image-api
               endpoints:
               - port: http
-                path: /metrics/prometheus
+                path: /metrics/status
                 interval: 30s
                 scrapeTimeout: 5s
             - name: location-api
@@ -165,7 +165,7 @@ spec:
                   app: location-api
               endpoints:
               - port: http
-                path: /metrics/prometheus
+                path: /metrics/status
                 interval: 30s
                 scrapeTimeout: 5s
             - name: my-api
@@ -180,7 +180,7 @@ spec:
                   app: my-api
               endpoints:
               - port: http
-                path: /metrics/prometheus
+                path: /metrics/status
                 interval: 30s
                 scrapeTimeout: 5s
             - name: scan-api
@@ -195,7 +195,7 @@ spec:
                   app: scan-api
               endpoints:
               - port: http
-                path: /metrics/prometheus
+                path: /metrics/status
                 interval: 30s
                 scrapeTimeout: 5s
   destination:
