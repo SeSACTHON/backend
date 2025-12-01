@@ -24,5 +24,4 @@ def test_render_answer_falls_back_when_missing():
     )
 
     text = service._render_answer(result, "원문 질문")
-
-    assert "원문 질문" in text
+    assert text == service._fallback_answer("원문 질문")
