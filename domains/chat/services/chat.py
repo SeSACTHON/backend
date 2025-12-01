@@ -91,7 +91,7 @@ class ChatService:
         try:
             response = await self.client.responses.create(
                 model=self.model,
-                input=openai_messages,
+                messages=openai_messages,
                 temperature=payload.temperature,
             )
             content = response.output[0].content[0].text  # type: ignore[index]
@@ -113,13 +113,11 @@ class ChatService:
 
     def _build_messages(self, history: List[ChatMessage], current: str) -> list[dict]:
         def _to_message(role: str, text: str) -> dict:
-            # Responses API는 assistant 기록에 output_text 타입을 요구한다.
-            content_type = "output_text" if role == "assistant" else "input_text"
             return {
                 "role": role,
                 "content": [
                     {
-                        "type": content_type,
+                        "type": "text",
                         "text": text,
                     }
                 ],
