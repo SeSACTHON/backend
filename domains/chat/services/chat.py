@@ -87,11 +87,11 @@ class ChatService:
             logger.warning("ChatService fallback: OpenAI client missing.")
             return response
 
-        openai_messages = self._build_messages(history, payload.message)
+        openai_input = self._build_messages(history, payload.message)
         try:
             response = await self.client.responses.create(
                 model=self.model,
-                messages=openai_messages,
+                input=openai_input,
                 temperature=payload.temperature,
             )
             content = response.output[0].content[0].text  # type: ignore[index]
