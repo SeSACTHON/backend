@@ -88,3 +88,14 @@ def classify_text(user_input_text: str, save_result: bool = False) -> dict:
         print(f"✅ 텍스트 분류 결과가 저장되었습니다: {saved_path}")
 
     return parsed.model_dump()
+
+
+def process_text_classification(user_input_text: str, save_result: bool = False) -> dict:
+    """
+    Legacy wrapper to keep compatibility with existing imports.
+
+    Historically the text 분류 파이프라인은 `process_*` 네이밍을 사용했습니다.
+    현재 구현에서는 `classify_text`가 동일한 역할을 수행하므로,
+    이전 코드가 기대하는 함수 시그니처를 그대로 위임합니다.
+    """
+    return classify_text(user_input_text, save_result=save_result)
