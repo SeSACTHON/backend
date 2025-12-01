@@ -17,3 +17,4 @@ done
 ## Observability
 
 - Prometheus 스크레이프 엔드포인트: `/metrics/status` (HTTP 상태/지연 지표)
+- Grafana 패널: *Domain API Error Overview* (4xx/5xx 오류율)
