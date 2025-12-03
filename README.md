@@ -59,8 +59,6 @@ Tier 0 Monitoring  : Prometheus, Grafana, Alerter Manager, ArgoCD
 | API 구조 | `domains/chat/app` → FastAPI + `chat/app/core/*` 서비스 계층으로 분리. `/api/v1/chat` 엔드포인트는 text/vision 요청을 자동 판별하고 OpenAI 호출을 추상화. |
 | 테스트/운영 | `tests/test_app.py`로 API 레벨 smoke test, `requirements.txt`에 OpenAI/Azure SDK 고정.|
 
-다음 단계: 멀티모달 입력(텍스트+이미지) 동시 처리, 사용자별 히스토리 저장, ELK 기반 대화 로그 분석.
-
 ---
 
 ## Bootstrap Overview
