@@ -220,25 +220,23 @@ backend/
 
 ---
 
-## Release Highlights (v0.8.0)
+## Release Summary (v1.0.0)
 
-- **OAuth 플로우 안정화 (2025-11-20 ~ 2025-11-23)**
-  Google/Kakao/Naver 콜백에 상세 로깅을 추가하고 RedirectResponse를 재사용해 리다이렉트 이후에도 `Set-Cookie`가 유지되도록 수정했습니다.
-  쿠키 `domain`을 `.growbin.app`으로 확장해 `api.dev.growbin.app`, `frontend.dev.growbin.app` 등 growbin 서브도메인 간 세션을 공유할 수 있습니다.
+- **Unified Scan·Chat AI Pipeline**
+  - Chat 메시지가 이미지/텍스트 모두 `_shared/waste_pipeline`의 Vision → Lite RAG → Answer 플로우를 그대로 사용하도록 리팩터링했습니다.
+  - 공통 프롬프트·상황 태그를 재정비하고, fallback 문구를 “이미지가 인식되지 않았어요! 다시 시도해주세요.”로 다듬어 사용자 경험을 개선했습니다.
 
-- **네트워크 & 보안 보강**
-  `allow-external-https` NetworkPolicy를 추가해 Auth 파드가 OAuth Provider(HTTPS)와 안정적으로 통신하도록 했으며, ArgoCD GitHub webhook secret을 ExternalSecret + SSM 구조로 재작성했습니다.
-  Pre-commit(Black, Ruff, 기본 hooks)을 도입해 lint/format 파이프라인을 커밋 단계에서 자동화했습니다.
+- **Waste Pipeline 운영성 강화**
+  - `domains/_shared/waste_pipeline/README.md`를 추가해 구조·데이터 자산·CI 트리거 절차를 문서화했습니다.
+  - Prompt/Tag 수정 시 README/Troubleshooting에 변경 내역을 기록하고, Scan·Chat CI가 반드시 재실행되도록 릴리스 정책을 명시했습니다.
 
-- **DNS & 쿠키 도메인 전략 정비**
-  Route53에 `frontend.growbin.app`, `frontend.dev.growbin.app` CNAME(Vercel) 레코드를 추가해 프런트 커스텀 도메인을 growbin 계층으로 편입했습니다.
+- **Troubleshooting 패턴 축적**
+  - `docs/troubleshooting/2025-12-02-v1.0.0.md`에서 Chat 이미지 fallback, pytest 기대치 불일치, waste pipeline 롤백, CI 트리거 누락 등 v1.0.0 과정의 장애 사례를 정리했습니다.
+  - README의 “Troubleshooting” 섹션이 이 문서를 참조하도록 갱신됐습니다.
 
-- **AI 도메인 기능 고도화**
-  Vision 인식(`ImageRecognition.py`, `vision.py`)과 Text/Intent 분류(`text_classifier.py`) 파이프라인을 정리하고, RAG 지식 베이스(`app/core/source/*.json`)를 확장했습니다.
-  프롬프트(`answer_generation_prompt.txt`, `vision_classification_prompt.txt`, `text_classification_prompt.txt`)를 분리해 멀티모달 응답 품질을 높였고, FastAPI 챗봇 엔드포인트 `/api/v1/chat`이 이 흐름을 통합 처리합니다.
-
-- **플랫폼 토대 (v0.7.4) 유지**
-  GitOps Sync-wave(00~70) 재정렬, `platform/crds`/`platform/cr` 단일화, Docker Hub 단일 이미지 파이프라인, RBAC/Storage 안정화 등 v0.7.4 기반 구성은 그대로 유지되며 이번 버전에서 Auth/OAuth 영역만 추가됐습니다.
+- **릴리스 정책 개선**
+  - develop → main 머지 시 README만 main 버전을 유지하고 나머지 파일은 develop 내용을 덮어쓰는 절차를 명문화했습니다.
+  - `release/v1.0.0` 브랜치 + `gh release create v1.0.0`으로 태그와 GitHub Release를 동시에 관리합니다.
 
 ---
 
