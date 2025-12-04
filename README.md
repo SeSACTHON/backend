@@ -176,10 +176,9 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 - Ingress는 `location-api` Service(NodePort 31666)를 통해 파드가 노출되고 있는 노드 IP와 포트 정보를 확인합니다.
 - Endpoints 정보를 AWS Load Balancer Controller가 감지해 Target Group에 노드 IP + NodePort를 등록하고, ALB 리스너/규칙을 생성·업데이트합니다.
 
-#### Cluster IP가 아닌 NodePort를 선택한 이유
-- 이코에코의 클러스터는 Calico VXLAN으로 터널링된 **L2 오버레이 네트워크**를 사용합니다.
-- Ingress가 어떤 노드/파드로 라우팅할지 알아야 하는데, ClusterIP Service를 사용하면 클러스터 외부에서 이를 인지할 수 없어 별도 프록시가 요구됩니다.
-- NodePort로 파드를 노출하면 노드 IP:포트 조합만으로 ALB → Target Group → Ingress → Pod 통신이 가능해지며, 중간 레이어 및 hop을 최소화합니다.
+#### ClusterIP가 아닌 NodePort를 선택한 이유
+- **북-남(North-South) 경로**: ALB/Target Group은 노드 IP만 볼 수 있으므로 NodePort(Service type)로 파드를 노출하고, AWS Load Balancer Controller가 Endpoints → NodePort 정보를 읽어 Target Group을 구성합니다. 덕분에 외부 요청은 ALB → NodePort → Ingress → Pod 순으로 단순하게 흐르고, 중간에 별도 프록시 계층이 필요하지 않습니다.
+- **동-서(East-West) 경로**: 서비스 간 통신은 Calico VXLAN 오버레이(L2) 위에서 ClusterIP를 이용합니다. Pod IP는 Calico가 VXLAN 터널(UDP 4789)로 캡슐화해 전달하므로, 내부 마이크로서비스나 DB 부트스트랩 Job은 L2 오버레이 위에서만 움직이고 외부 노출 경로와 분리됩니다.
 
 #### Client <-> Pod 트래픽 경로
 
@@ -194,7 +193,7 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 
 | 이슈 | 증상 & 해결 | 문서 |
 |------|------------|------|
-| **Auth OAuth 콜백 리다이렉트 실패** | `fix(auth): Redirect to frontend after successful OAuth login`(5846944) 이전에는 OAuth 성공 후에도 API JSON 응답에서 멈추고 `.growbin.app` 외 서브도메인으로 쿠키가 전달되지 않음 → `X-Frontend-Origin`·`x-forwarded-*` 헤더와 state에 저장된 origin을 기반으로 Location/쿠키 도메인을 재계산해 각 프런트 배포 환경으로 정확히 리다이렉트 | `docs/troubleshooting/2025-12-02-v1.0.0.md#6-auth-oauth-콜백이-프런트로-리다이렉트되지-않음` |
+| **Auth OAuth 콜백 리다이렉트 실패** | `fix(auth): Redirect to frontend after successful OAuth login`(5846944) 이전에는 OAuth 성공 후에도 API JSON 응답에서 멈추고 `.growbin.app` 외 서브도메인으로 쿠키가 전달되지 않음 → `X-Frontend-Origin`·`x-forwarded-*` 헤더와 state에 저장된 origin을 기반으로 쿠키 도메인을 재구성해 각 프런트 배포 환경에 맞춰 리다이렉트하도록 분기 로직 작성| `docs/troubleshooting/2025-12-02-v1.0.0.md#6-auth-oauth-콜백이-프런트로-리다이렉트되지-않음` |
 | **OAuth Provider HTTPS egress 차단** | NetworkPolicy로 인해 Auth/Scan/Chat/Image 파드가 Google·Kakao 등 외부 OAuth 엔드포인트에 연결하지 못함 → `allow-external-https` 정책으로 TCP 443 egress 허용 | `docs/troubleshooting/2025-12-02-v1.0.0.md#7-oauth-provider-https-egress-차단` |
 | **Chat 세션 저장소로 인해 Classification 오염/지연** | Redis + Postgres history 때문에 Vision/Text 파이프라인이 지연되고, 과거 답변이 prompt에 재삽입돼 AI 출력이 오염됨 → 세션 로직/DB 제거, stateless API로 전환하며 응답 시간도 단축 | `docs/troubleshooting/2025-12-02-v1.0.0.md#5-chat-세션-저장소-제거로-classification-파이프라인-복구` |
 | **ALB HTTPS→HTTP NAT** | `backend-protocol: HTTP` + HTTPS-only listener + HTTP NodePort | `docs/troubleshooting/TROUBLESHOOTING.md#8-argocd-리디렉션-루프-문제` |
