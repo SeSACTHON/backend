@@ -194,11 +194,10 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 
 | 이슈 | 증상 & 해결 | 문서 |
 |------|------------|------|
-| **Auth OAuth 콜백 리다이렉트 실패** | 프런트 배포 환경이 분리돼 쿠키가 동일 도메인에서만 발급되고, OAuth 성공 시에도 JSON 응답에 머물러 세션이 확정되지 않음 → `X-Frontend-Origin` 헤더로 실제 프런트 오리진을 받아 Location·쿠키 도메인을 재계산 | `docs/troubleshooting/2025-12-02-v1.0.0.md#6-auth-oauth-콜백이-프런트로-리다이렉트되지-않음` |
+| **Auth OAuth 콜백 리다이렉트 실패** | `fix(auth): Redirect to frontend after successful OAuth login`(5846944) 이전에는 OAuth 성공 후에도 API JSON 응답에서 멈추고 `.growbin.app` 외 서브도메인으로 쿠키가 전달되지 않음 → `X-Frontend-Origin`·`x-forwarded-*` 헤더와 state에 저장된 origin을 기반으로 Location/쿠키 도메인을 재계산해 각 프런트 배포 환경으로 정확히 리다이렉트 | `docs/troubleshooting/2025-12-02-v1.0.0.md#6-auth-oauth-콜백이-프런트로-리다이렉트되지-않음` |
 | **OAuth Provider HTTPS egress 차단** | NetworkPolicy로 인해 Auth/Scan/Chat/Image 파드가 Google·Kakao 등 외부 OAuth 엔드포인트에 연결하지 못함 → `allow-external-https` 정책으로 TCP 443 egress 허용 | `docs/troubleshooting/2025-12-02-v1.0.0.md#7-oauth-provider-https-egress-차단` |
-| **pytest: Chat fallback 기대치 불일치** | `test_render_answer_falls_back_when_missing` 실패 → `_fallback_answer()` 문구와 테스트를 동기화 | `docs/troubleshooting/2025-12-02-v1.0.0.md#2-chat-pytest-실패-test_render_answer_falls_back_when_missing` |
 | **Chat 세션 저장소로 인해 Classification 오염/지연** | Redis + Postgres history 때문에 Vision/Text 파이프라인이 지연되고, 과거 답변이 prompt에 재삽입돼 AI 출력이 오염됨 → 세션 로직/DB 제거, stateless API로 전환하며 응답 시간도 단축 | `docs/troubleshooting/2025-12-02-v1.0.0.md#5-chat-세션-저장소-제거로-classification-파이프라인-복구` |
-| ALB HTTPS→HTTP NAT | `backend-protocol: HTTP` + HTTPS-only listener + HTTP NodePort | `docs/troubleshooting/TROUBLESHOOTING.md#8-argocd-리디렉션-루프-문제` |
+| **ALB HTTPS→HTTP NAT** | `backend-protocol: HTTP` + HTTPS-only listener + HTTP NodePort | `docs/troubleshooting/TROUBLESHOOTING.md#8-argocd-리디렉션-루프-문제` |
 | **Calico Typha 포트 차단** | Master ↔ Worker 노드 간 5473/TCP 연결 실패 → Security Group에 Calico Typha 포트 규칙 추가 | `docs/troubleshooting/CALICO_TYPHA_PORT_5473_ISSUE.md` |
 | **Redis PVC Pending** | EBS CSI Driver 미설치로 PVC 생성 실패 → `ebs.csi.aws.com` Provisioner + `gp3` StorageClass 설정 | `docs/troubleshooting/2025-11-19-rabbitmq-redis.md#2` |
 | **CRD 이중 적용** | Helm Chart 내장 CRD와 충돌 → `skipCrds: true` + `platform/crds/{env}` 단일 관리 | `docs/troubleshooting/2025-11-19-rabbitmq-redis.md#4` |
@@ -234,11 +233,6 @@ backend/
 
 - **Troubleshooting 패턴 축적**
   - `docs/troubleshooting/2025-12-02-v1.0.0.md`에서 Chat 이미지 fallback, pytest 기대치 불일치, waste pipeline 롤백, CI 트리거 누락 등 v1.0.0 과정의 장애 사례를 정리했습니다.
-  - README의 “Troubleshooting” 섹션이 이 문서를 참조하도록 갱신됐습니다.
-
-- **릴리스 정책 개선**
-  - develop → main 머지 시 README만 main 버전을 유지하고 나머지 파일은 develop 내용을 덮어쓰는 절차를 명문화했습니다.
-  - `release/v1.0.0` 브랜치 + `gh release create v1.0.0`으로 태그와 GitHub Release를 동시에 관리합니다.
 
 ---
 
