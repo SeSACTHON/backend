@@ -172,7 +172,7 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 ### Network Topology
 
 #### ALB가 Pod를 인지하는 경로
-![CC86B4CB-7C2C-4602-BC10-B42B481948FD_4_5005_c](https://github.com/user-attachments/assets/ecbb091a-7310-4116-8d7a-f04d05e84aa4)
+![ALB-Pod](https://github.com/user-attachments/assets/b5f0331d-6206-4025-8c94-96aee2b13ba4)
 
 - Ingress는 `location-api` Service(NodePort 31666)를 통해 파드가 노출되고 있는 노드 IP와 포트 정보를 확인합니다.
 - Endpoints 정보를 AWS Load Balancer Controller가 감지해 Target Group에 노드 IP + NodePort를 등록하고, ALB 리스너/규칙을 생성·업데이트합니다.
