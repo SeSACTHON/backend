@@ -24,7 +24,11 @@ _DEFAULT_BUCKETS = (
     1.0,
     2.5,
     5.0,
+    7.5,
     10.0,
+    12.5,
+    15.0,
+    20.0,
 )
 
 REGISTRY = CollectorRegistry(auto_describe=True)
