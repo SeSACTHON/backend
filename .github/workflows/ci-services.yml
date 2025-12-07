@@ -175,6 +175,12 @@ jobs:
                               svc = normalize(svc)
                               if svc in all_services and svc not in services:
                                   services.append(svc)
+                  
+                  # Observability 변경 시 모든 서비스 재배포
+                  if path.startswith("domains/_shared/observability"):
+                      services = list(all_services)
+                      break
+
                   parts = path.split("/")
                   # domains/<service>/ 경로 감지
                   if len(parts) >= 2 and parts[0] == "domains":
