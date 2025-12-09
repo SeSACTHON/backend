@@ -44,46 +44,57 @@
 
 ## 3. Migration Roadmap
 
-### Phase 1: Istio Installation (Base & Control Plane)
+### Phase 1: Istio Installation (Base & Control Plane) - ✅ Completed
 가장 먼저 Istio의 기반이 되는 CRD와 Control Plane(`istiod`)을 설치합니다. 기존 애플리케이션에 영향을 주지 않습니다.
 
 *   **Sync Wave 4:** `istio-base`, `istiod`
 *   **Target Node:** `k8s-master` (Resource 여유분 활용)
 *   **Profile:** `default` (프로덕션 권장)
 
-### Phase 2: Ingress Gateway & Routing Setup
+### Phase 2: Ingress Gateway & Routing Setup - ✅ Completed
 Traffic의 입구가 될 Ingress Gateway와 라우팅 규칙(`VirtualService`)을 설정합니다. `workloads/ingress` 폴더를 `workloads/routing`으로 리팩토링하여 관리합니다.
 
 *   **Sync Wave 5:** `istio-ingressgateway` (NodePort Type for ALB Controller)
 *   **Sync Wave 50:** `VirtualService`, `Gateway` (Application 배포 전 라우팅 준비)
 *   **Service Type Migration:** 기존 도메인(`auth`, `scan` 등)의 Service 타입을 `NodePort`에서 **`ClusterIP`**로 변경하여 클러스터 내부 보안을 강화합니다.
 
-### Phase 3: Cookie to Header Strategy (Bridge)
+### Phase 3: Cookie to Header Strategy (Bridge) - ✅ Completed
 프론트엔드 수정 없이 백엔드 인증 구조를 개선하기 위해, Istio Ingress Gateway에서 **`EnvoyFilter`**를 사용하여 `Cookie`를 `Authorization Header`로 변환합니다.
 
 1.  **EnvoyFilter:** `s_access` 쿠키 추출 → `Authorization: Bearer <token>` 헤더 주입.
 2.  **Backend:** `Cookie` 의존성 제거, `Authorization` 헤더 기반 검증 로직으로 단일화.
 
-### Phase 4: Sidecar Injection (Full Mesh)
+### Phase 4: Sidecar Injection (Full Mesh) - ✅ Completed
 모든 서비스에 Sidecar를 주입하여 mTLS 및 Observability를 확보합니다.
 
 1.  `istio-injection=enabled` 라벨 적용 (Namespace 단위)
 2.  `Deployment` 재시작 → `istio-proxy` 컨테이너 주입
 3.  **Health Check:** `Readiness Probe`가 정상 동작하는지 확인 (mTLS 이슈 주의)
 
-### Phase 5: Auth Offloading (Final Goal)
+### Phase 5: Auth Offloading (Final Goal) - ✅ Completed
 트래픽이 안정화되면, 애플리케이션의 인증 로직을 제거하고 Istio 정책으로 대체합니다.
 
-1.  `RequestAuthentication` 적용 (JWT 검증)
-2.  `AuthorizationPolicy` 적용 (경로별 접근 제어)
-3.  애플리케이션 코드 리팩토링 (인증 미들웨어 제거)
+1.  **RSA Key Migration:** JWT 서명 알고리즘을 `HS256`에서 `RS256`으로 전환하고 JWKS 엔드포인트 구현.
+2.  **RequestAuthentication:** Istio Gateway에서 JWT 서명 검증 수행.
+3.  **Code Refactoring:** 애플리케이션(`dependencies.py`)에서 검증 로직 제거, 헤더 파싱만 수행하도록 경량화.
+
+### Phase 6: Advanced AuthZ & Observability (Next Step)
+보안 및 관측성을 더욱 강화하기 위해 다음 단계를 진행합니다.
+
+1.  **External Authorization (gRPC):**
+    *   `auth-api`에 gRPC 서버를 내장하여 Istio의 `CUSTOM` Authorization 요청을 처리.
+    *   Redis Blacklist 체크 로직을 인프라 레벨(Istio -> Auth gRPC)로 이관하여 애플리케이션 로직 완전 분리.
+2.  **Observability Offloading:**
+    *   `metrics.py` 미들웨어 제거. (`http_requests_total` 등 표준 메트릭은 Envoy가 자동 수집)
+    *   Access Log 포맷을 JSON으로 변경하여 ELK Stack 등으로의 수집 효율화.
+    *   비즈니스 로직에 특화된 커스텀 메트릭(예: AI Pipeline Step Latency)만 코드에 남김.
 
 ---
 
 ## 4. Implementation Details (Hands-on Guide)
 
 ### 4.1 Helm Chart Configuration (ArgoCD)
-우리는 ArgoCD App-of-Apps 패턴을 사용하므로, `clusters/dev/apps/04-istio.yaml`에 다음과 같이 정의합니다.
+우리는 ArgoCD App-of-Apps 패턴을 사용하므로, `clusters/dev/apps/05-istio.yaml`에 다음과 같이 정의합니다.
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -95,16 +106,17 @@ metadata:
 spec:
   source:
     chart: istiod
-    repoURL: https://istio-release.storage.googleapis.com/charts
+    repoURL: https://istio-release.storage.googleapis.com/charts/
     targetRevision: 1.24.1
     helm:
-      values:
+      valuesObject:
         pilot:
           nodeSelector:
-            kubernetes.io/hostname: k8s-master
+            role: control-plane
           tolerations:
-          - key: node-role.kubernetes.io/control-plane
-            operator: Exists
+          - key: role
+            operator: Equal
+            value: control-plane
             effect: NoSchedule
 ```
 
@@ -132,12 +144,39 @@ spec:
           "@type": "type.googleapis.com/envoy.extensions.filters.http.lua.v3.Lua"
           inlineCode: |
             function envoy_on_request(request_handle)
-              local cookie = request_handle:headers():get("cookie")
-              if cookie then
-                -- Parse s_access cookie and set Authorization header
-                -- (Lua script implementation needed)
+              local cookie_header = request_handle:headers():get("cookie")
+              if cookie_header then
+                local token = string.match(cookie_header, "s_access=([^;]+)")
+                if token then
+                  request_handle:headers():add("Authorization", "Bearer " .. token)
+                end
               end
             end
+```
+
+### 4.3 Gateway Node Provisioning (Terraform & Ansible)
+기존 클러스터 영향 없이 **Istio Ingress Gateway 전용 노드**를 추가하고 클러스터에 조인시키는 절차입니다.
+
+**1. Terraform Apply (Node Creation)**
+```bash
+cd terraform
+# 변경 사항 확인 (ingress_gateway 모듈 추가 확인)
+terraform plan -var-file=env/dev.tfvars
+# 적용
+terraform apply -var-file=env/dev.tfvars
+```
+
+**2. Ansible Provisioning (Node Join)**
+```bash
+cd ansible
+# 새로 생성된 ingress_gateway 그룹만 타겟팅하여 K8s Join 실행
+ansible-playbook -i inventory/hosts.ini playbooks/03-worker-join.yml --limit ingress_gateway
+```
+
+**3. Verification**
+```bash
+kubectl get nodes -l role=ingress-gateway
+# STATUS: Ready 확인
 ```
 
 ---
@@ -157,4 +196,3 @@ spec:
 *   [Istio Security: Authentication Policies](https://istio.io/latest/docs/tasks/security/authentication/authn-policy/)
 *   [EnvoyFilter Examples](https://istio.io/latest/docs/reference/config/networking/envoy-filter/)
 *   [Cookie Based Routing in Istio](https://istio.io/latest/docs/tasks/traffic-management/request-routing/#route-based-on-user-identity)
-

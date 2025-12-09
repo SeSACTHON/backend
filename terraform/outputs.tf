@@ -240,6 +240,21 @@ output "monitoring_public_ip" {
   value       = module.monitoring.public_ip
 }
 
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Phase 5: Network Nodes Outputs
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Ingress Gateway (Phase 5)
+output "ingress_gateway_instance_id" {
+  description = "Ingress Gateway Instance ID"
+  value       = module.ingress_gateway.instance_id
+}
+
+output "ingress_gateway_public_ip" {
+  description = "Ingress Gateway Public IP"
+  value       = module.ingress_gateway.public_ip
+}
+
 # output "rabbitmq_private_ip" {
 #   description = "RabbitMQ 노드 Private IP"
 #   value       = module.rabbitmq.private_ip
@@ -280,6 +295,8 @@ output "ansible_inventory" {
     rabbitmq_private_ip       = module.rabbitmq.private_ip
     monitoring_public_ip      = module.monitoring.public_ip
     monitoring_private_ip     = module.monitoring.private_ip
+    ingress_gateway_public_ip  = module.ingress_gateway.public_ip
+    ingress_gateway_private_ip = module.ingress_gateway.private_ip
   })
 }
 

@@ -99,6 +99,13 @@ spec:
             port: 443
             protocol: TCP
             targetPort: 443
+        nodeSelector:
+          role: ingress-gateway
+        tolerations:
+        - key: role
+          operator: Equal
+          value: ingress-gateway
+          effect: NoSchedule
   destination:
     server: https://kubernetes.default.svc
     namespace: istio-system
