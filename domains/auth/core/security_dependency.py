@@ -1,31 +1,27 @@
 from typing import Optional
-from fastapi import Cookie, Depends, HTTPException, status, Header
+from fastapi import Depends, HTTPException, status, Header
 from domains.auth.core.config import get_settings
 from domains._shared.security.jwt import TokenPayload, TokenType
 from domains.auth.core.jwt import decode_jwt
 from domains.auth.services.key_manager import KeyManager
 from domains.auth.services.token_blacklist import TokenBlacklist
 
-ACCESS_COOKIE_NAME = "s_access"
-
 
 async def access_token_dependency(
-    token: Optional[str] = Cookie(default=None, alias=ACCESS_COOKIE_NAME),
     authorization: Optional[str] = Header(default=None),
     blacklist: TokenBlacklist = Depends(TokenBlacklist),
 ) -> TokenPayload:
-    jwt_token = token
-
-    if not jwt_token and authorization:
-        scheme, _, value = authorization.partition(" ")
-        if scheme.lower() == "bearer":
-            jwt_token = value
-
-    if not jwt_token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing access token")
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing authorization header"
+        )
+    scheme, _, jwt_token = authorization.partition(" ")
+    if scheme.lower() != "bearer" or not jwt_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authorization format"
+        )
 
     settings = get_settings()
-    # Verify signature using Public Key
     payload = decode_jwt(
         jwt_token,
         secret=KeyManager.get_public_key_pem(),

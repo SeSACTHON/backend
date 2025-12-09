@@ -293,10 +293,8 @@ def _parse_bearer(header_value: Optional[str]) -> Optional[str]:
 async def refresh_session(
     response: Response,
     service: Annotated[AuthService, Depends()],
-    authorization: Annotated[Optional[str], Header(alias="Authorization", default=None)] = None,
-    refresh_authorization: Annotated[
-        Optional[str], Header(alias="X-Refresh-Token", default=None)
-    ] = None,
+    authorization: Annotated[Optional[str], Header(alias="Authorization")] = None,
+    refresh_authorization: Annotated[Optional[str], Header(alias="X-Refresh-Token")] = None,
 ):
     # EnvoyFilter가 refresh 쿠키를 헤더로 변환했다는 가정 하에 Authorization 또는 X-Refresh-Token에서 추출
     refresh_token = _parse_bearer(refresh_authorization) or _parse_bearer(authorization)
@@ -311,10 +309,8 @@ async def refresh_session(
 async def logout(
     response: Response,
     service: Annotated[AuthService, Depends()],
-    authorization: Annotated[Optional[str], Header(alias="Authorization", default=None)] = None,
-    refresh_authorization: Annotated[
-        Optional[str], Header(alias="X-Refresh-Token", default=None)
-    ] = None,
+    authorization: Annotated[Optional[str], Header(alias="Authorization")] = None,
+    refresh_authorization: Annotated[Optional[str], Header(alias="X-Refresh-Token")] = None,
 ):
     access_token = _parse_bearer(authorization)
     refresh_token = _parse_bearer(refresh_authorization)
