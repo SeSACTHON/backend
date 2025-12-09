@@ -191,6 +191,16 @@ kubectl get nodes -l role=ingress-gateway
 
 ---
 
+## 6. Ext AuthZ 운영 체크리스트 (추가)
+
+- **타임아웃/CB**: ext_authz gRPC timeout 250ms, fail-open=false, 헤더 최소 전달(Authorization, X-Refresh-Token, trace headers), 바디/불필요 쿠키 전달 금지.
+- **Fail-open/closed 구분**: 민감 리소스만 CUSTOM 정책 적용(fail-closed), 비민감 경로는 정책 적용 제외로 사실상 fail-open. (현재 `/api/v1/*`만 검사, login/health/metrics 제외)
+- **캐싱**: 권한/블랙리스트는 Redis 캐시 TTL 짧게, 롤/블랙리스트 버전 키로 무효화, 캐시 미스율·latency 모니터링.
+- **모니터링**: ext_authz 호출률/성공률/타임아웃, auth-api p95/p99, Redis 적중률/latency 대시보드화. 에러 증가는 fail-open/closed 정책 점검.
+- **테스트/롤아웃**: JWKS 헬스, ext_authz 장애 시 동작(fail-open/closed) 스테이징 테스트, 점진적 배포 및 롤백 스크립트 유지.
+
+---
+
 ## 6. References
 *   [Istio Official Docs: Installation with Helm](https://istio.io/latest/docs/setup/install/helm/)
 *   [Istio Security: Authentication Policies](https://istio.io/latest/docs/tasks/security/authentication/authn-policy/)
