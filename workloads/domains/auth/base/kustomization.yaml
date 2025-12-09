@@ -6,6 +6,7 @@ resources:
 - service.yaml
 - configmap.yaml
 - db-bootstrap-job.yaml
+- hpa.yaml
 labels:
 - includeSelectors: true
   pairs:
