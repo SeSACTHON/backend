@@ -265,8 +265,9 @@ class ScanService:
         self, reward_request: CharacterRewardRequest
     ) -> CharacterRewardResponse | None:
         headers = {}
-        if self.settings.character_api_token:
-            headers["Authorization"] = f"Bearer {self.settings.character_api_token}"
+        # Istio sidecar handles mTLS authentication; no application-level token needed.
+        # if self.settings.character_api_token:
+        #     headers["Authorization"] = f"Bearer {self.settings.character_api_token}"
         timeout = httpx.Timeout(self.settings.character_api_timeout_seconds)
         payload = reward_request.model_dump(mode="json")
         try:
