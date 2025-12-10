@@ -21,4 +21,4 @@ EXPOSE 8000
 EXPOSE 9001
 
 # 애플리케이션 서버 시작
-CMD ["uvicorn", "domains.auth.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["opentelemetry-instrument", "uvicorn", "domains.auth.main:app", "--host", "0.0.0.0", "--port", "8000"]
