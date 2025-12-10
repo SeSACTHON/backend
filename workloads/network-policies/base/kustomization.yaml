@@ -5,3 +5,5 @@ resources:
 - allow-database-access.yaml
 - allow-external-https.yaml
 - allow-istiod.yaml
+- allow-observability.yaml
+# - default-deny-all.yaml
