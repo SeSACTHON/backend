@@ -152,6 +152,104 @@ Tier 0 Monitoring & Control : Prometheus, Grafana, ArgoCD, Istiod, Controllers
 
 ---
 
+### Network Topology
+```mermaid
+graph TD
+    User["User/Client"]
+    R53["Route53 DNS Zones (Global)"]
+
+    subgraph AWS_VPC ["AWS VPC"]
+        ALB["AWS ALB (HTTPS 443)"]
+        TG["AWS Target Group (Instance Mode)"]
+
+        subgraph K8s ["Self-managed K8s Cluster"]
+            IngressRes["Bridge Ingress (K8s Ingress Resource)"]
+            IstioRes["Istio VirtualService (Routing Rules)"]
+
+            subgraph Master ["Master Node"]
+                ALB_Controller["AWS LB Controller Pod"]
+                EDNS["ExternalDNS Controller Pod"]
+                Istiod["Istiod Control Plane"]
+            end
+
+            subgraph IngressNode ["Ingress Gateway Node"]
+                subgraph ServicePortMapping ["Istio-ingressgateway"]
+                    NP["NodePort (30xxx) - Receives Traffic from TG"]
+                    TP["TargetPort: 80 (Protocol: HTTP)"]
+                end
+                IGW["Istio Ingress Gateway Pod (Listening on Port 80)"]
+            end
+
+            subgraph Worker ["Worker Node"]
+                Sidecar["Envoy Sidecar"]
+                App["Scan API Pod (Backend Service)"]
+            end
+        end
+    end
+
+    %% DNS & User Flow
+    R53 -.->|CNAME / A Record| ALB
+    User -->|HTTPS Request| ALB
+
+    %% Controllers Watching
+    IngressRes -.->|Watched by| ALB_Controller
+    IngressRes -.->|Watched by| EDNS
+    EDNS -->|Updates via AWS API| R53
+    IstioRes -.->|Watched by| Istiod
+
+    %% Control Plane Logic
+    ALB_Controller -.->|"AWS API Calls (Create/Update)"| ALB
+    ALB_Controller -.->|"AWS API Calls (Register Targets)"| TG
+    Istiod -.->|"xDS Config (Gateway/Routes)"| IGW
+    Istiod -.->|xDS Config| Sidecar
+
+    %% Data Plane Traffic
+    ALB -->|Forward| TG
+    TG -->|"Health Check / Traffic (HTTP)"| NP
+    NP -->|Forward| TP
+    TP -->|Traffic| IGW
+    IGW -->|VirtualService Routing| Sidecar
+    Sidecar -->|Localhost| App
+
+    %% Styling
+    style User fill:#f9f,stroke:#333,stroke-width:2px
+    style R53 fill:#f4a460,stroke:#333,stroke-width:2px
+    style ALB fill:#ff9900,stroke:#333,stroke-width:2px
+    style TG fill:#ffcc00,stroke:#333,stroke-width:2px
+    
+    style IngressRes fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    style IstioRes fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
+    
+    style ALB_Controller fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style EDNS fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
+    style Istiod fill:#326ce5,stroke:#fff,stroke-width:2px,color:#fff
+    
+    style IGW fill:#4682b4,stroke:#fff,stroke-width:2px,color:#fff
+    style Sidecar fill:#4682b4,stroke:#fff,stroke-width:2px,color:#fff
+    
+    style App fill:#b3e5fc,stroke:#0277bd,stroke-width:2px
+    style Master fill:#eceff1,stroke:#cfd8dc
+    style IngressNode fill:#fff9c4,stroke:#fbc02d
+    style Worker fill:#f1f8e9,stroke:#aed581
+    style ServicePortMapping fill:#fff,stroke:#ccc,stroke-dasharray: 5 5
+```
+**1. AWS Ingress Flow (North-South)**
+- Route53 DNS → AWS ALB (HTTPS 종료) → AWS Target Group (Instance Mode) → NodePort (3xxxx) → **Istio Ingress Gateway Pod**
+- ALB는 SSL Offloading을 담당하고, 클러스터 내부로는 HTTP 트래픽을 전달합니다.
+- Istio Gateway는 `VirtualService` 규칙에 따라 각 서비스(my, chat, scan 등)로 라우팅을 분배합니다.
+
+**2. Service Mesh (East-West)**
+- 모든 마이크로서비스 파드에는 **Envoy Sidecar**가 주입되어 있습니다.
+- 서비스 간 통신(예: Scan → Character)은 Sidecar Proxy를 통해 mTLS로 암호화되어 전달됩니다.
+- **Auth Offloading**: 외부 요청은 Ingress Gateway 단계에서 JWT 검증(`RequestAuthentication`)과 인가(`AuthorizationPolicy`)를 거친 후 애플리케이션에 도달합니다.
+
+**3. Infrastructure Components**
+- **Istiod**: 서비스 메시 컨트롤 플레인으로, Envoy 프록시들에게 설정(xDS)을 배포합니다.
+- **ExternalDNS**: Route53 레코드를 K8s 리소스와 동기화합니다.
+- **AWS LB Controller**: Ingress 리소스를 감지하여 ALB 및 Target Group을 프로비저닝합니다.
+
+---
+
 ## Bootstrap Overview
 
 ```yaml
@@ -257,26 +355,6 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 4. **domain / data-type**
    - `domain` 라벨로 실제 서비스(예: `auth`, `location`)를 식별.
    - 데이터 계층은 `data-type`으로 DB 종류까지 표기(`postgres`, `redis`).
-
----
-
-### Network Topology
-![D45C3C09-B6A7-4058-973B-43EA365F353D_1_105_c](https://github.com/user-attachments/assets/ffbb8592-7a8a-4f0e-be97-79a8f2f348b1)
-
-**1. AWS Ingress Flow (North-South)**
-- Route53 DNS → AWS ALB (HTTPS 종료) → AWS Target Group (Instance Mode) → NodePort (3xxxx) → **Istio Ingress Gateway Pod**
-- ALB는 SSL Offloading을 담당하고, 클러스터 내부로는 HTTP 트래픽을 전달합니다.
-- Istio Gateway는 `VirtualService` 규칙에 따라 각 서비스(my, chat, scan 등)로 라우팅을 분배합니다.
-
-**2. Service Mesh (East-West)**
-- 모든 마이크로서비스 파드에는 **Envoy Sidecar**가 주입되어 있습니다.
-- 서비스 간 통신(예: Scan → Character)은 Sidecar Proxy를 통해 mTLS로 암호화되어 전달됩니다.
-- **Auth Offloading**: 외부 요청은 Ingress Gateway 단계에서 JWT 검증(`RequestAuthentication`)과 인가(`AuthorizationPolicy`)를 거친 후 애플리케이션에 도달합니다.
-
-**3. Infrastructure Components**
-- **Istiod**: 서비스 메시 컨트롤 플레인으로, Envoy 프록시들에게 설정(xDS)을 배포합니다.
-- **ExternalDNS**: Route53 레코드를 K8s 리소스와 동기화합니다.
-- **AWS LB Controller**: Ingress 리소스를 감지하여 ALB 및 Target Group을 프로비저닝합니다.
 
 ---
 
