@@ -171,8 +171,7 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 ---
 
 ### Network Topology
-
-![Istio Topology](https://github.com/user-attachments/assets/fc762fc9-be27-4467-b737-2fb0c902272e)
+![D45C3C09-B6A7-4058-973B-43EA365F353D_1_105_c](https://github.com/user-attachments/assets/ffbb8592-7a8a-4f0e-be97-79a8f2f348b1)
 
 **1. AWS Ingress Flow (North-South)**
 - Route53 DNS → AWS ALB (HTTPS 종료) → AWS Target Group (Instance Mode) → NodePort (3xxxx) → **Istio Ingress Gateway Pod**
