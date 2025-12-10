@@ -10,7 +10,7 @@ pattern = re.compile(r'"{{[^"]+}}"')
 errors = []
 
 for path in pathlib.Path(".").rglob("*.yaml"):
-    if any(part.startswith(".git") for part in path.parts):
+    if any(part.startswith(".git") or part == "worktrees" for part in path.parts):
         continue
     try:
         data = path.read_text()
