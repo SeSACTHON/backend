@@ -268,3 +268,4 @@ backend/
 - ✅ Docker Hub 단일 이미지 파이프라인 + External Secrets 운영 안정화
 - ⚠️ RabbitMQ Operator/CR 장애로 Pending, MVP API 개발 이후 재도입 예정
 - ✅ API 개발 완료, 프론트-백-AI 연동 완료
+- 🚧 Istio Migration 중
