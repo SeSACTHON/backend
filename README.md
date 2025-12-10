@@ -228,7 +228,8 @@ graph TD
     class App app;
     class User user;
     class IngressRes,IstioRes res;
-    class NP,TP res;```
+    class NP,TP res;
+```
 **1. AWS Ingress Flow (North-South)**
 - Route53 DNS → AWS ALB (HTTPS 종료) → AWS Target Group (Instance Mode) → NodePort (3xxxx) → **Istio Ingress Gateway Pod**
 - ALB는 SSL Offloading을 담당하고, 클러스터 내부로는 HTTP 트래픽을 전달합니다.
