@@ -5,6 +5,7 @@ metadata:
   namespace: character
   labels:
     app: character-api
+    version: v1
     tier: business-logic
     domain: character
 spec:
@@ -12,10 +13,12 @@ spec:
   selector:
     matchLabels:
       app: character-api
+      version: v1
   template:
     metadata:
       labels:
         app: character-api
+        version: v1
         tier: business-logic
         domain: character
     spec:

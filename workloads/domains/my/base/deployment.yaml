@@ -5,6 +5,7 @@ metadata:
   namespace: my
   labels:
     app: my-api
+    version: v1
     tier: business-logic
     domain: my
 spec:
@@ -12,10 +13,12 @@ spec:
   selector:
     matchLabels:
       app: my-api
+      version: v1
   template:
     metadata:
       labels:
         app: my-api
+        version: v1
         tier: business-logic
         domain: my
     spec:

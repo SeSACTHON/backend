@@ -5,6 +5,7 @@ metadata:
   namespace: scan
   labels:
     app: scan-api
+    version: v1
     tier: business-logic
     domain: scan
 spec:
@@ -12,10 +13,12 @@ spec:
   selector:
     matchLabels:
       app: scan-api
+      version: v1
   template:
     metadata:
       labels:
         app: scan-api
+        version: v1
         tier: business-logic
         domain: scan
     spec:

@@ -5,6 +5,7 @@ metadata:
   namespace: chat
   labels:
     app: chat-api
+    version: v1
     tier: business-logic
     domain: chat
 spec:
@@ -12,10 +13,12 @@ spec:
   selector:
     matchLabels:
       app: chat-api
+      version: v1
   template:
     metadata:
       labels:
         app: chat-api
+        version: v1
         tier: business-logic
         domain: chat
     spec:

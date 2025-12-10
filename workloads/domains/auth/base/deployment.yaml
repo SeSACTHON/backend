@@ -5,6 +5,7 @@ metadata:
   namespace: auth
   labels:
     app: auth-api
+    version: v1
     tier: business-logic
     domain: auth
 spec:
@@ -12,10 +13,12 @@ spec:
   selector:
     matchLabels:
       app: auth-api
+      version: v1
   template:
     metadata:
       labels:
         app: auth-api
+        version: v1
         tier: business-logic
         domain: auth
     spec:
