@@ -44,6 +44,20 @@ spec:
     targetRevision: 1.24.1
     helm:
       valuesObject:
+        meshConfig:
+          extensionProviders:
+          - name: eco2-ext-authz
+            envoyExtAuthzGrpc:
+              service: auth-api.auth.svc.cluster.local
+              port: '9001'
+              timeout: 0.25s
+              failOpen: false
+              includeHeadersInCheck:
+              - authorization
+              - x-refresh-token
+              - x-request-id
+              - x-b3-traceid
+              - x-b3-spanid
         pilot:
           autoscaleEnabled: false
           replicaCount: 1
