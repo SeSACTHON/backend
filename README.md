@@ -214,27 +214,21 @@ graph TD
     Sidecar -->|Localhost| App
 
     %% Styling
-    style User fill:#f9f,stroke:#333,stroke-width:2px
-    style R53 fill:#f4a460,stroke:#333,stroke-width:2px
-    style ALB fill:#ff9900,stroke:#333,stroke-width:2px
-    style TG fill:#ffcc00,stroke:#333,stroke-width:2px
-    
-    style IngressRes fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
-    style IstioRes fill:#e1f5fe,stroke:#0277bd,stroke-width:2px
-    
-    style ALB_Controller fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style EDNS fill:#c8e6c9,stroke:#2e7d32,stroke-width:2px
-    style Istiod fill:#326ce5,stroke:#fff,stroke-width:2px,color:#fff
-    
-    style IGW fill:#4682b4,stroke:#fff,stroke-width:2px,color:#fff
-    style Sidecar fill:#4682b4,stroke:#fff,stroke-width:2px,color:#fff
-    
-    style App fill:#b3e5fc,stroke:#0277bd,stroke-width:2px
-    style Master fill:#eceff1,stroke:#cfd8dc
-    style IngressNode fill:#fff9c4,stroke:#fbc02d
-    style Worker fill:#f1f8e9,stroke:#aed581
-    style ServicePortMapping fill:#fff,stroke:#ccc,stroke-dasharray: 5 5
-```
+    classDef aws fill:#FF9900,stroke:#232F3E,stroke-width:2px,color:white;
+    classDef k8s fill:#326CE5,stroke:#fff,stroke-width:2px,color:white;
+    classDef control fill:#0073BB,stroke:#fff,stroke-width:2px,color:white;
+    classDef ingress fill:#466BB0,stroke:#fff,stroke-width:2px,color:white;
+    classDef app fill:#009688,stroke:#fff,stroke-width:2px,color:white;
+    classDef user fill:#24292e,stroke:#fff,stroke-width:2px,color:white;
+    classDef res fill:#666,stroke:#fff,stroke-width:1px,color:white,stroke-dasharray: 5 5;
+
+    class ALB,TG,R53 aws;
+    class ALB_Controller,EDNS,Istiod control;
+    class IGW,Sidecar ingress;
+    class App app;
+    class User user;
+    class IngressRes,IstioRes res;
+    class NP,TP res;```
 **1. AWS Ingress Flow (North-South)**
 - Route53 DNS → AWS ALB (HTTPS 종료) → AWS Target Group (Instance Mode) → NodePort (3xxxx) → **Istio Ingress Gateway Pod**
 - ALB는 SSL Offloading을 담당하고, 클러스터 내부로는 HTTP 트래픽을 전달합니다.
