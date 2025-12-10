@@ -49,7 +49,7 @@ graph TD
                 end
 
                 subgraph "Service Mesh"
-                    Apps["Microservices (Domain APIs) Auth, My, Scan, Chat, Char, Locations (All with Envoy Sidecars)"]
+                    Apps["Microservices All with Envoy Sidecars"]
                 end
 
                 subgraph "Data Infrastructure"
