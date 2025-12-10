@@ -1,6 +1,6 @@
 # Eco² Backend
 
-> **Version**: v1.0.0 | [Changelog](CHANGELOG.md)
+> **Version**: v1.0.5 | [Changelog](CHANGELOG.md)
 
 <img width="3840" height="2160" alt="515829337-6a4f523a-fa37-49de-b8e1-0a5befe26605" src="https://github.com/user-attachments/assets/e6c7d948-aa06-4bbb-b2fc-237aa7f01223" />
 
@@ -19,15 +19,15 @@
 Tier 1 Presentation : ALB, Route 53, CloudFront
 Tier 2 Business Logic : auth, my, scan, character, location, info, chat
 Tier 3 Data : PostgreSQL, Redis, RabbitMQ(Pending), Celery(Pending)
-Tier 0 Monitoring  : Prometheus, Grafana, Alerter Manager, ArgoCD
+Tier 0 Monitoring  : Prometheus, Grafana, Alerter Manager, ArgoCD, Istio(Kiali/Jaeger)
 ```
 
 본 서비스는 4-Tier Layered Architecture로 구성되었습니다.
 
 각 계층은 서로 독립적으로 기능하도록 설계되었으며, 모니터링 스택을 제외한 상위 계층의 의존성은 단일 하위 계층으로 제한됩니다.
 프로덕션 환경을 전제로 한 Self-manged Kubernetes 기반 클러스터로 컨테이너화된 어플리케이션의 오케스트레이션을 지원합니다.
+**Istio Service Mesh**를 도입하여 mTLS 보안 통신, 트래픽 제어(VirtualService), 인증 위임(Auth Offloading)을 구현했습니다.
 클러스터의 안정성과 성능을 보장하기 위해 모니터링 시스템을 도입, IaC(Infrastructure as Code) 및 GitOps 파이프라인을 구축해 모노레포 기반 코드베이스가 SSOT(Single Source Of Truth)로 기능하도록 제작되었습니다.
-이에 따라 리소스 증설, 고가용성(HA) 도입 등 다양한 요구사항에 따라 클러스터가 유연하게 변경 및 확장이 가능합니다.
 
 ---
 
@@ -36,7 +36,7 @@ Tier 0 Monitoring  : Prometheus, Grafana, Alerter Manager, ArgoCD
 
 | 서비스 | 설명 | 이미지/태그 |
 |--------|------|-------------|
-| auth | JWT 인증/인가 | `docker.io/mng990/eco2:auth-{env}-latest` |
+| auth | JWT 인증/인가 (RS256) | `docker.io/mng990/eco2:auth-{env}-latest` |
 | my | 사용자 정보 | `docker.io/mng990/eco2:my-{env}-latest` |
 | scan | Lite RAG + GPT 5.1 Vision 폐기물 분류 | `docker.io/mng990/eco2:scan-{env}-latest` |
 | chat | Lite RAG + GPT 5.1 챗봇 | `docker.io/mng990/eco2:chat-{env}-latest` |
@@ -73,7 +73,8 @@ GitOps   :
   Layer3 - GitHub Actions + Docker Hub
 Domains  : auth, my, scan, character, location, info, chat
 Data     : PostgreSQL, Redis, RabbitMQ (paused), Monitoring stack
-Ingress  : Route53 + CloudFront + ALB → SG (AWS Nodes) -> Calico NetworkPolicy
+Ingress  : Istio Ingress Gateway + VirtualService -> Envoy Sidecar
+Network  : Calico CNI + Istio Service Mesh (mTLS)
 ```
 1. Terraform으로 AWS 인프라를 구축합니다.
 2. Ansible로 구축된 AWS 인프라를 엮어 K8s 클러스터를 구성하고, ArgoCD root-app을 설치합니다.
@@ -101,7 +102,7 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 ### Wave 설계 원칙
 - 인프라 레이어: CNI, NetworkPolicy, ALB Controller, ExternalDNS, Observability 등 공통 컴포넌트는 낮은 Wave에 배치합니다.
 - 데이터/시크릿 레이어: ExternalSecret → Secret → 데이터베이스/스토리지 → Operator/Instance 순으로 Wave를 띄워 “컨트롤러 → 인스턴스” 의존성을 명확히 했습니다.
-- 애플리케이션 레이어: 60-apis-appset.yaml에서 도메인 API 전체를 Healthy 상태로 올린 뒤, 마지막 Wave 70에서 Ingress를 열어 외부 라우팅을 붙입니다. (Wave 설계 배경, 추가 사례)
+- 애플리케이션 레이어: 40-apis-appset.yaml에서 도메인 API 전체를 Healthy 상태로 올린 뒤, 마지막 Wave 50에서 VirtualService를 열어 외부 라우팅을 붙입니다. (v1.0.5 변경 사항)
 
 ### CI 파이프라인 연동
 - 코드 변경 → GitHub Actions CI → Docker Image 빌드 & 푸시 → Helm/Kustomize 오버레이 업데이트 → ArgoCD Auto-Sync 순으로 이어집니다.
@@ -119,7 +120,10 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 | 0 | `00-crds.yaml` | ALB / External Secrets / Postgres / Redis / Prometheus 등 플랫폼 CRD 번들 | `platform/crds/{env}` |
 | 2 | `02-namespaces.yaml` | 비즈니스·데이터·플랫폼 Namespace 정의 | `workloads/namespaces/{env}` |
 | 3 | `03-rbac-storage.yaml` | ServiceAccount, RBAC, StorageClass, GHCR Pull Secret | `workloads/rbac-storage/{env}` |
-| 6 | `06-network-policies.yaml` | Tier 기반 NetworkPolicy (default deny + DNS 허용) | `workloads/network-policies/{env}` |
+| 4 | `05-istio.yaml` (Base) | Istio CRD, Base Helm Chart | `charts.istio.io` |
+| 5 | `05-istio.yaml` (Istiod) | Istiod Control Plane | `charts.istio.io` |
+| 6 | `05-istio.yaml` (Gateway) | Istio Ingress Gateway | `charts.istio.io` |
+| 7 | `07-network-policies.yaml` | Tier 기반 NetworkPolicy (Egress Whitelist) | `workloads/network-policies/{env}` |
 | 10 | `10-secrets-operator.yaml` | External Secrets Operator Helm | Helm repo `charts.external-secrets.io` |
 | 11 | `11-secrets-cr.yaml` | SSM Parameter → Kubernetes Secret ExternalSecret | `workloads/secrets/external-secrets/{env}` |
 | 15 | `15-alb-controller.yaml` | AWS Load Balancer Controller Helm | Helm repo `aws/eks-charts` |
@@ -128,13 +132,10 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 | 21 | `21-grafana.yaml` | Grafana Helm (독립 UI) | Helm repo `grafana/grafana` |
 | 27 | `27-postgresql.yaml` | Bitnami PostgreSQL (standalone) | Helm repo `bitnami/postgresql` |
 | 28 | `28-redis-operator.yaml` | Bitnami Redis Replication + Sentinel | Helm repo `bitnami/redis` |
-| 60 | `60-apis-appset.yaml` | 도메인 API ApplicationSet (auth, my, scan, character, location, info, chat) | `workloads/domains/<service>/{env}` |
-| 70 | `70-ingresses.yaml` | API·Argocd·Grafana Ingress ApplicationSet | `workloads/ingress/{service}/{env}` |
+| 40 | `40-apis-appset.yaml` | 도메인 API ApplicationSet (auth, my, scan, character, location, info, chat) | `workloads/domains/<service>/{env}` |
+| 50 | `50-istio-routes.yaml` | Istio VirtualService 라우팅 규칙 | `workloads/routing/<service>/{env}` |
 
-- Calico CNI는 Ansible(kubeadm bootstrap)에서 1회 설치하며, RabbitMQ Operator/CR은 안정화 완료 후 재도입합니다.
-- ArgoCD Sync-wave로 의존성 순서를 보장하며, 패키지 의존성이 높은 플랫폼은 Helm-charts로 관리·배포합니다.
-- AWS Load Balancer Controller·External Secrets·Postgres/Redis Operator는 upstream Helm chart를 `skipCrds: true`로 설치합니다.
-- Operator에 의존하는 CRD와 CR은 `platform/{crds | cr}/{env}`에서 Kustomzie Overlay 방식으로 관리합니다.
+- Istio Migration으로 인해 `Ingress` 대신 `Gateway/VirtualService`를 사용하며, Sync Wave가 60/70에서 40/50으로 조정되었습니다.
 - 모든 API는 공통 base(kustomize) 템플릿을 상속하고, 환경별 patch에서 이미지 태그·환경 변수·노드 셀렉터만 조정합니다.
 
 ---
@@ -171,22 +172,22 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 
 ### Network Topology
 
-#### ALB가 Pod를 인지하는 경로
-![ALB-Pod](https://github.com/user-attachments/assets/b5f0331d-6206-4025-8c94-96aee2b13ba4)
+![Istio Topology](https://github.com/user-attachments/assets/fc762fc9-be27-4467-b737-2fb0c902272e)
 
-- Ingress는 `location-api` Service(NodePort 31666)를 통해 파드가 노출되고 있는 노드 IP와 포트 정보를 확인합니다.
-- Endpoints 정보를 AWS Load Balancer Controller가 감지해 Target Group에 노드 IP + NodePort를 등록하고, ALB 리스너/규칙을 생성·업데이트합니다.
+**1. AWS Ingress Flow (North-South)**
+- Route53 DNS → AWS ALB (HTTPS 종료) → AWS Target Group (Instance Mode) → NodePort (3xxxx) → **Istio Ingress Gateway Pod**
+- ALB는 SSL Offloading을 담당하고, 클러스터 내부로는 HTTP 트래픽을 전달합니다.
+- Istio Gateway는 `VirtualService` 규칙에 따라 각 서비스(my, chat, scan 등)로 라우팅을 분배합니다.
 
-#### ClusterIP가 아닌 NodePort를 선택한 이유
-- **North-South**: ALB/Target Group은 노드 IP만 볼 수 있으므로 NodePort(Service type)로 파드를 노출하고, AWS Load Balancer Controller가 Endpoints → NodePort 정보를 읽어 Target Group을 구성합니다. 외부 요청은 ALB → NodePort → Ingress → Pod 순으로 흐르고, 중간에 별도 프록시 계층이 필요하지 않습니다.
-- **East-West**: 서비스 간 통신은 Calico VXLAN 오버레이(L2) 위에서 ClusterIP를 이용합니다. 예를 들어 Character `/internal/characters/rewards` 같은 API는 `character-api.character.svc.cluster.local` ClusterIP를 통해 호출되고, Calico가 Pod IP를 VXLAN 터널(UDP 4789)로 캡슐화해 전달하므로 외부 노출 경로와 완전히 분리됩니다. DB 부트스트랩 Job, CronJob 등 백그라운드 작업도 동일한 L2 오버레이 위에서 동작합니다.
+**2. Service Mesh (East-West)**
+- 모든 마이크로서비스 파드에는 **Envoy Sidecar**가 주입되어 있습니다.
+- 서비스 간 통신(예: Scan → Character)은 Sidecar Proxy를 통해 mTLS로 암호화되어 전달됩니다.
+- **Auth Offloading**: 외부 요청은 Ingress Gateway 단계에서 JWT 검증(`RequestAuthentication`)과 인가(`AuthorizationPolicy`)를 거친 후 애플리케이션에 도달합니다.
 
-#### Client <-> Pod 트래픽 경로
-
-![17DBA027-2EDF-459E-9B4D-4A3A0AB10F0C](https://github.com/user-attachments/assets/26e8128b-8b7f-4b46-93d1-c85553f4c853)
-
-- 얖서 구축한 TG와 Ingress를 바탕으로 Client → ALB → Target Group → Ingress → 각 노드 내부 파드 순서로 전달됩니다.
-- Path by Route를 수행하며, RestFul한 트래픽 토폴로지를 제공합니다.
+**3. Infrastructure Components**
+- **Istiod**: 서비스 메시 컨트롤 플레인으로, Envoy 프록시들에게 설정(xDS)을 배포합니다.
+- **ExternalDNS**: Route53 레코드를 K8s 리소스와 동기화합니다.
+- **AWS LB Controller**: Ingress 리소스를 감지하여 ALB 및 Target Group을 프로비저닝합니다.
 
 ---
 
@@ -194,14 +195,12 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 
 | 이슈 | 증상 & 해결 | 문서 |
 |------|------------|------|
-| **Auth OAuth 콜백 리다이렉트 실패** | `fix(auth): Redirect to frontend after successful OAuth login`(5846944) 이전에는 OAuth 성공 후에도 API JSON 응답에서 멈추고 `.growbin.app` 외 서브도메인으로 쿠키가 전달되지 않음 → `X-Frontend-Origin`·`x-forwarded-*` 헤더와 state에 저장된 origin을 기반으로 쿠키 도메인을 재구성해 각 프런트 배포 환경에 맞춰 리다이렉트하도록 분기 로직 작성| `docs/troubleshooting/2025-12-02-v1.0.0.md#6-auth-oauth-콜백이-프런트로-리다이렉트되지-않음` |
-| **OAuth Provider HTTPS egress 차단** | NetworkPolicy로 인해 Auth/Scan/Chat/Image 파드가 Google·Kakao 등 외부 OAuth 엔드포인트에 연결하지 못함 → `allow-external-https` 정책으로 TCP 443 egress 허용 | `docs/troubleshooting/2025-12-02-v1.0.0.md#7-oauth-provider-https-egress-차단` |
-| **Chat 세션 저장소로 인해 Classification 오염/지연** | Redis + Postgres history 때문에 Vision/Text 파이프라인이 지연되고, 과거 답변이 prompt에 재삽입돼 AI 출력이 오염됨 → 세션 로직/DB 제거, stateless API로 전환하며 응답 시간도 단축 | `docs/troubleshooting/2025-12-02-v1.0.0.md#5-chat-세션-저장소-제거로-classification-파이프라인-복구` |
-| **ALB HTTPS→HTTP NAT** | `backend-protocol: HTTP` + HTTPS-only listener + HTTP NodePort | `docs/troubleshooting/TROUBLESHOOTING.md#8-argocd-리디렉션-루프-문제` |
-| **Calico Typha 포트 차단** | Master ↔ Worker 노드 간 5473/TCP 연결 실패 → Security Group에 Calico Typha 포트 규칙 추가 | `docs/troubleshooting/CALICO_TYPHA_PORT_5473_ISSUE.md` |
-| **Redis PVC Pending** | EBS CSI Driver 미설치로 PVC 생성 실패 → `ebs.csi.aws.com` Provisioner + `gp3` StorageClass 설정 | `docs/troubleshooting/2025-11-19-rabbitmq-redis.md#2` |
-| **CRD 이중 적용** | Helm Chart 내장 CRD와 충돌 → `skipCrds: true` + `platform/crds/{env}` 단일 관리 | `docs/troubleshooting/2025-11-19-rabbitmq-redis.md#4` |
-| **Taint/Toleration 이슈** | 노드 라벨/taint 불일치로 Pod Pending → `fix-node-labels.yml` 실행 + kubeadm 재설정 | `docs/troubleshooting/ansible-label-sync.md` |
+| **Istio Webhook Sync Error** | ArgoCD Sync 시 `istiod-default-validator`가 `OutOfSync` 및 `Deleting` 상태 반복 → `ignoreDifferences`에 `failurePolicy` 추가하여 Istio의 런타임 패치 무시 설정 | `docs/troubleshooting/istio-webhook-sync-error.md` |
+| **NetworkPolicy Egress 차단** | `allow-istiod` 정책 적용 후 `my`, `chat` 등 서비스가 DB/DNS 접속 실패 (`ConnectionRefused`, `i/o timeout`) → `allow-dns`, `allow-database-access` 정책을 모든 애플리케이션 네임스페이스로 확장 | `workloads/network-policies` |
+| **My 서비스 404 에러** | `/api/v1/user/me` 호출 시 404 발생 → VirtualService 경로가 `/api/v1/my`로 잘못 설정됨 → `/api/v1/user`로 수정하여 해결 | - |
+| **Auth OAuth 콜백 리다이렉트 실패** | OAuth 성공 후에도 API JSON 응답에서 멈추고 `.growbin.app` 외 서브도메인으로 쿠키가 전달되지 않음 → `X-Frontend-Origin` 헤더 기반 리다이렉트 분기 | `docs/troubleshooting/2025-12-02-v1.0.0.md` |
+| **OAuth Provider HTTPS egress 차단** | Auth/Scan/Chat 파드가 외부 OAuth 엔드포인트 연결 실패 → `allow-external-https` 정책으로 TCP 443 egress 허용 | `docs/troubleshooting/2025-12-02-v1.0.0.md` |
+| **ArgoCD Deployment CrashLoopBackOff** | Ansible의 Deployment 직접 패치 방식 충돌 → ConfigMap 기반 `server.insecure` 설정으로 전환 | `docs/troubleshooting/ARGOCD_DEPLOYMENT_ISSUES.md` |
 
 ---
 
@@ -213,26 +212,28 @@ backend/
 ├── ansible/             # kubeadm, Calico, bootstrap playbooks
 ├── scripts/deployment/  # bootstrap_cluster.sh / destroy_cluster.sh
 ├── clusters/            # Argo CD Root Apps + Wave별 Application 목록
-├── workloads/           # Kustomize (namespaces, rbac, network, apis, ingress 등 K8s 리소스)
-├── platform/            # Upstream CRD & CR bundles (AWS LB, External Secrets, Redis, Postgres, Prometheus)
+├── workloads/           # Kustomize (namespaces, rbac, network, apis, routing 등 K8s 리소스)
+├── platform/            # Upstream CRD & CR bundles (Istio, AWS LB, External Secrets 등)
 ├── services/            # FastAPI 도메인 코드
 └── docs/                # Architecture / Deployment / Troubleshooting
 ```
 
 ---
 
-## Release Summary (v1.0.0)
+## Release Summary (v1.0.5)
 
-- **Unified Scan·Chat AI Pipeline**
-  - Chat 메시지가 이미지/텍스트 모두 `_shared/waste_pipeline`의 Vision → Lite RAG → Answer 플로우를 그대로 사용하도록 리팩터링했습니다.
-  - 공통 프롬프트·상황 태그를 재정비하고, fallback 문구를 “이미지가 인식되지 않았어요! 다시 시도해주세요.”로 다듬어 사용자 경험을 개선했습니다.
+- **Istio Service Mesh Migration**
+  - 기존 ALB Ingress Controller 기반 라우팅을 **Istio Ingress Gateway** + **VirtualService** 구조로 전면 전환했습니다.
+  - 이를 통해 L7 트래픽 제어(Canary 배포, Fault Injection 등) 기반을 마련하고, **Auth Offloading**을 통해 애플리케이션의 인증 부하를 게이트웨이로 위임했습니다.
 
-- **Waste Pipeline 운영성 강화**
-  - `domains/_shared/waste_pipeline/README.md`를 추가해 구조·데이터 자산·CI 트리거 절차를 문서화했습니다.
-  - Prompt/Tag 수정 시 README/Troubleshooting에 변경 내역을 기록하고, Scan·Chat CI가 반드시 재실행되도록 릴리스 정책을 명시했습니다.
+- **Security & Observability 강화**
+  - **mTLS**: 서비스 간 통신 암호화를 기본 적용하여 내부 보안을 강화했습니다.
+  - **Metrics Offloading**: 애플리케이션 레벨의 메트릭 수집을 Envoy Sidecar로 이관하여 비즈니스 로직 성능을 최적화했습니다.
+  - **RS256 JWT**: 인증 서명 알고리즘을 비대칭키(RS256)로 고도화하고 JWKS 엔드포인트를 제공합니다.
 
-- **Troubleshooting 패턴 축적**
-  - `docs/troubleshooting/2025-12-02-v1.0.0.md`에서 Chat 이미지 fallback, pytest 기대치 불일치, waste pipeline 롤백, CI 트리거 누락 등 v1.0.0 과정의 장애 사례를 정리했습니다.
+- **Infrastructure Stabilization**
+  - NetworkPolicy를 정교화하여 네임스페이스 간 격리를 유지하면서도 필수적인 DNS, DB, 외부 통신을 허용하도록 `Egress Whitelist` 정책을 완성했습니다.
+  - ArgoCD Sync Wave를 재설계하여 Istio 컴포넌트(Wave 4~6)와 애플리케이션(Wave 40), 라우팅(Wave 50) 간의 배포 순서를 보장했습니다.
 
 ---
 
