@@ -13,7 +13,7 @@ Eco² Backend 프로젝트의 모든 주목할 만한 변경사항을 기록합�
 - **Observability Stack 전면 강화**
   - **Kiali & Jaeger 도입:** Service Mesh 토폴로지 시각화(Kiali) 및 분산 트레이싱(Jaeger) 구축 (`istio-system` 네임스페이스)
   - **OpenTelemetry Auto-Instrumentation:** 모든 백엔드 서비스(FastAPI)에 OpenTelemetry 적용하여 DB, Redis, 외부 API 호출까지 자동 추적
-  - **Service Topology Visualization:** 외부 의존성(Google/Kakao OAuth, OpenAI, AWS S3)을 Istio `ServiceEntry`로 정의하여 Kiali 그래프에 명확히 시각화
+  - **Service Topology Visualization:** 외부 의존성(Google/Kakao OAuth, OpenAI, AWS S3/CloudFront)을 Istio `ServiceEntry`로 정의하여 Kiali 그래프에 명확히 시각화
   - **Trace Sampling 전략:** 개발 환경(`dev`)의 모든 트레이스를 수집하도록 Global Sampling 100% 설정
 
 ### Changed
