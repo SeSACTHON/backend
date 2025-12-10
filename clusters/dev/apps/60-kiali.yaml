@@ -20,7 +20,7 @@ spec:
           - '**'
         external_services:
           prometheus:
-            url: http://prometheus-operated.monitoring.svc.cluster.local:9090 # Prometheus 주소 확인 필요 (보통 monitoring 네임스페이스)
+            url: http://prometheus-operated.prometheus.svc.cluster.local:9090 # Prometheus 주소 수정 (monitoring -> prometheus)
           tracing:
             enabled: true
             in_cluster_url: http://jaeger-query.istio-system.svc.cluster.local:16686 # Jaeger 주소 확인 필요
