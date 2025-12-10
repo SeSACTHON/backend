@@ -37,6 +37,9 @@ spec:
       - name: grafana
         namespace: grafana
         path: workloads/routing/grafana/dev
+      - name: kiali
+        namespace: istio-system
+        path: workloads/routing/kiali/dev
   template:
     metadata:
       name: dev-route-{{name}}
