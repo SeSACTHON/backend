@@ -15,7 +15,7 @@ class Settings(BaseSettings):
         description="Path for the character reward evaluation endpoint.",
     )
     character_api_timeout_seconds: float = Field(
-        5.0,
+        30.0,
         ge=0.1,
         description="Timeout in seconds for Character service HTTP calls.",
     )
