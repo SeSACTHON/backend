@@ -7,3 +7,5 @@ resources:
 - allow-istiod.yaml
 - allow-scan-to-character.yaml
 - allow-scan-egress-to-character.yaml
+- allow-ingress-to-character-from-gateway.yaml
+- default-deny-all.yaml
