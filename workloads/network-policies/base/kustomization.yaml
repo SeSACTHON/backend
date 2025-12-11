@@ -9,4 +9,3 @@ resources:
 - allow-scan-to-character-grpc.yaml
 - allow-scan-egress-to-character.yaml
 - allow-ingress-to-character-from-gateway.yaml
-- default-deny-all.yaml
