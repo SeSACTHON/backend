@@ -10,6 +10,9 @@ RUN go mod download
 # Copy source
 COPY . .
 
+# Run tests
+RUN go test ./...
+
 # Build
 # CGO_ENABLED=0 for static binary
 RUN CGO_ENABLED=0 GOOS=linux go build -o ext-authz main.go

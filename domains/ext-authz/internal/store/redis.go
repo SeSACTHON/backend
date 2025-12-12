@@ -9,8 +9,17 @@ import (
 
 const blacklistKeyPrefix = "blacklist:"
 
+// RedisClient는 Store가 의존하는 최소 인터페이스다.
+type RedisClient interface {
+	Exists(ctx context.Context, keys ...string) *redis.IntCmd
+	Ping(ctx context.Context) *redis.StatusCmd
+	Close() error
+}
+
+var _ RedisClient = (*redis.Client)(nil)
+
 type Store struct {
-	client *redis.Client
+	client RedisClient
 }
 
 func New(ctx context.Context, redisURL string) (*Store, error) {
@@ -25,6 +34,13 @@ func New(ctx context.Context, redisURL string) (*Store, error) {
 		return nil, fmt.Errorf("failed to connect to redis: %w", err)
 	}
 
+	return &Store{client: client}, nil
+}
+
+func NewWithClient(client RedisClient) (*Store, error) {
+	if client == nil {
+		return nil, fmt.Errorf("redis client is nil")
+	}
 	return &Store{client: client}, nil
 }
 
