@@ -9,4 +9,4 @@ labels:
   pairs:
     app.kubernetes.io/part-of: ecoeco-backend
     domain: ext-authz
-    tier: infrastructure
+    tier: business-logic
