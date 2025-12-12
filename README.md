@@ -413,16 +413,17 @@ backend/
 
 ## Article
 
-- [이코에코 인프라 구축기 #1 클러스터 부트스트랩](https://rooftopsnow.tistory.com/8)
-- [이코에코 인프라 구축기 #2 GitOps: Ansible 의존성 줄이기](https://rooftopsnow.tistory.com/10)
-- [이코에코 인프라 구축기 #3 GitOps: 네트워크 트러블슈팅](https://rooftopsnow.tistory.com/11)
-- [이코에코 인프라 구축기 #4 GitOps: Operator vs Helm-charts](https://rooftopsnow.tistory.com/12)
-- [이코에코 인프라 구축기 #5 GitOps: Sync-wave](https://rooftopsnow.tistory.com/13)
-- [이코에코 인프라 구축기 #6 Namespace/RBAC/NeworkPolicy](https://rooftopsnow.tistory.com/14)
+- [이코에코 GitOps 구축기 #1 클러스터 부트스트랩](https://rooftopsnow.tistory.com/8)
+- [이코에코 GitOps 구축기 #2 Ansible 의존성 줄이기](https://rooftopsnow.tistory.com/10)
+- [이코에코 GitOps 구축기 #3 네트워크 트러블슈팅](https://rooftopsnow.tistory.com/11)
+- [이코에코 GitOps 구축기 #4 Operator vs Helm-charts](https://rooftopsnow.tistory.com/12)
+- [이코에코 GitOps 구축기 #5 Sync-wave](https://rooftopsnow.tistory.com/13)
+- [이코에코 GitOps 구축기 #6 Namespace/RBAC/NeworkPolicy](https://rooftopsnow.tistory.com/14)
 - [이코에코(Eco²) 2025 새싹톤 본선 진출 후일담](https://rooftopsnow.tistory.com/15)
 - [이코에코(Eco²) 2025 새싹톤 우수상 후기](https://rooftopsnow.tistory.com/16)
 - [이코에코(Eco²) Scan API 성능 측정](https://rooftopsnow.tistory.com/17)
-- [이코에코(Eco²) Istio Service Mesh (Sidecar) 도입 및 Ingress Gateway Migration](https://rooftopsnow.tistory.com/19)
+- [이코에코(Eco²) Service Mesh #1 Istio Sidecar 도입 및 마이그레이션](https://rooftopsnow.tistory.com/19)
+- [이코에코(Eco²) Service Mesh #2 내부 통신을 위한 gRPC 마이그레이션](https://rooftopsnow.tistory.com/20)
 
 ---
 
@@ -434,3 +435,4 @@ backend/
 - ⚠️ RabbitMQ Operator/CR 장애로 Pending, MVP API 개발 이후 재도입 예정
 - ✅ API 개발 완료, 프론트-백-AI 연동 완료
 - ✅ Istio Migration 완료
+- ✅ gRPC Migration 완료
