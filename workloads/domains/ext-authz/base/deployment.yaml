@@ -5,7 +5,7 @@ metadata:
   namespace: auth
   labels:
     app: ext-authz
-    tier: infrastructure
+    tier: business-logic
     domain: ext-authz
 spec:
   replicas: 1
@@ -16,7 +16,7 @@ spec:
     metadata:
       labels:
         app: ext-authz
-        tier: infrastructure
+        tier: business-logic
         domain: ext-authz
     spec:
       containers:
@@ -27,34 +27,47 @@ spec:
         ports:
         - containerPort: 50051
           name: grpc
+        - containerPort: 9090
+          name: metrics
         env:
         - name: AUTH_REDIS_URL
           valueFrom:
             secretKeyRef:
               name: auth-secret
-              key: AUTH_REDIS_URL
+              key: AUTH_REDIS_BLACKLIST_URL
         - name: AUTH_SECRET_KEY
           valueFrom:
             secretKeyRef:
               name: auth-secret
-              key: AUTH_SECRET_KEY
+              key: AUTH_JWT_SECRET_KEY
         - name: AUTH_ALGORITHM
           valueFrom:
             configMapKeyRef:
               name: auth-config
-              key: AUTH_ALGORITHM
+              key: AUTH_JWT_ALGORITHM
         - name: AUTH_GRPC_PORT
           value: '50051'
+        - name: AUTH_METRICS_PORT
+          value: '9090'
         livenessProbe:
-          tcpSocket:
-            port: 50051
-          initialDelaySeconds: 10
+          httpGet:
+            path: /health
+            port: 9090
+          initialDelaySeconds: 5
           periodSeconds: 10
         readinessProbe:
-          tcpSocket:
-            port: 50051
-          initialDelaySeconds: 5
+          httpGet:
+            path: /ready
+            port: 9090
+          initialDelaySeconds: 3
           periodSeconds: 5
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
       imagePullSecrets:
       - name: dockerhub-secret
       nodeSelector:
