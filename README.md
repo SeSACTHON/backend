@@ -408,6 +408,8 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 - [이코에코(Eco²) Scan API 성능 측정](https://rooftopsnow.tistory.com/17)
 - [이코에코(Eco²) Service Mesh #1 Istio Sidecar 도입 및 마이그레이션](https://rooftopsnow.tistory.com/19)
 - [이코에코(Eco²) Service Mesh #2 내부 통신을 위한 gRPC 마이그레이션](https://rooftopsnow.tistory.com/20)
+- [이코에코(Eco²) Auth Offloading: ext-authz 서버 개발기 (Go, gRPC)](https://rooftopsnow.tistory.com/21)
+- [이코에코(Eco²) Auth Offloading: 도메인 공통 모듈 제거](https://rooftopsnow.tistory.com/22)
 
 ---
 
