@@ -306,7 +306,9 @@ jobs:
       - commit-filter
       - detect-api-changes
       - api-quality
+    # PR에서는 테스트만, 머지(push) 시에만 빌드/푸시
     if: >
+      github.event_name == 'push' &&
       needs.commit-filter.outputs.skip != 'true' &&
       needs.detect-api-changes.outputs.has_changes == 'true'
     strategy:
