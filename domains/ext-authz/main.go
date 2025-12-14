@@ -21,12 +21,16 @@ import (
 	"github.com/eco2-team/backend/domains/ext-authz/internal/store"
 )
 
+const (
+	PathMetrics = "/metrics"
+	PathHealth  = "/health"
+	PathReady   = "/ready"
+	HealthOK    = "ok"
+)
+
 func main() {
-	// 1. Load Config
 	cfg := config.Load()
 
-	// 2. Initialize Components
-	// Use a context with timeout for initialization to avoid hanging
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -36,7 +40,7 @@ func main() {
 	}
 	defer redisStore.Close()
 
-	verifier := jwt.NewVerifier(
+	verifier, err := jwt.NewVerifier(
 		cfg.JWTSecretKey,
 		cfg.JWTAlgorithm,
 		cfg.JWTIssuer,
@@ -44,19 +48,25 @@ func main() {
 		time.Duration(cfg.JWTClockSkewSec)*time.Second,
 		cfg.JWTRequiredScope,
 	)
-	authServer := server.New(verifier, redisStore)
+	if err != nil {
+		log.Fatalf("Failed to create JWT verifier: %v", err)
+	}
 
-	// 3. Start Prometheus metrics server
+	authServer, err := server.New(verifier, redisStore)
+	if err != nil {
+		log.Fatalf("Failed to create auth server: %v", err)
+	}
+
 	go func() {
 		mux := http.NewServeMux()
-		mux.Handle("/metrics", promhttp.Handler())
-		mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		mux.Handle(PathMetrics, promhttp.Handler())
+		mux.HandleFunc(PathHealth, func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("ok"))
+			w.Write([]byte(HealthOK))
 		})
-		mux.HandleFunc("/ready", func(w http.ResponseWriter, r *http.Request) {
+		mux.HandleFunc(PathReady, func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("ok"))
+			w.Write([]byte(HealthOK))
 		})
 		metricsAddr := fmt.Sprintf(":%d", cfg.MetricsPort)
 		log.Printf("📊 Starting metrics server on %s", metricsAddr)
@@ -65,7 +75,6 @@ func main() {
 		}
 	}()
 
-	// 4. Start gRPC Server
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPCPort))
 	if err != nil {
 		log.Fatalf("Failed to listen: %v", err)
@@ -74,7 +83,6 @@ func main() {
 	grpcServer := grpc.NewServer()
 	authv3.RegisterAuthorizationServer(grpcServer, authServer)
 
-	// Graceful Shutdown
 	go func() {
 		log.Printf("🚀 Starting ext-authz gRPC server on :%d", cfg.GRPCPort)
 		if err := grpcServer.Serve(lis); err != nil {

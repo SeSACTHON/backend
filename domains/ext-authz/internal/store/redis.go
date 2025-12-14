@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/redis/go-redis/v9"
@@ -45,8 +46,11 @@ func NewWithClient(client RedisClient) (*Store, error) {
 }
 
 func (s *Store) Close() error {
-	if s == nil || s.client == nil {
-		return nil
+	if s == nil {
+		return errors.New("store is nil")
+	}
+	if s.client == nil {
+		return errors.New("redis client is nil")
 	}
 	return s.client.Close()
 }

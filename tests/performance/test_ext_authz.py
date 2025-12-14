@@ -1,10 +1,10 @@
 """
-ext-authz + auth/ping 부하 테스트
+ext-authz + character/ping 부하 테스트
 
 테스트 대상:
-    - Endpoint: GET /api/v1/auth/ping
+    - Endpoint: GET /api/v1/character/ping
     - ext-authz (Go): Envoy sidecar에서 JWT 검증 수행
-    - auth API (FastAPI): 검증 통과 후 간단한 응답 반환
+    - character API (FastAPI): 검증 통과 후 간단한 응답 반환
 
 테스트 목적:
     - ext-authz gRPC 서버의 동시 처리 성능 측정
@@ -37,12 +37,12 @@ from locust import HttpUser, between, task
 
 class ExtAuthzPingUser(HttpUser):
     """
-    ext-authz 검증을 거치는 /api/v1/auth/ping 부하 테스트.
+    ext-authz 검증을 거치는 /api/v1/character/ping 부하 테스트.
 
     Flow:
         Client → Istio Ingress → EnvoyFilter (cookie→header 변환)
               → ext-authz (JWT verify + Redis blacklist)
-              → auth-api /ping → Response
+              → character-api /ping → Response
     """
 
     wait_time = between(1, 3)
@@ -73,16 +73,16 @@ class ExtAuthzPingUser(HttpUser):
     @task
     def ping_via_ext_authz(self):
         """
-        GET /api/v1/auth/ping
+        GET /api/v1/character/ping
 
         ext-authz가 검증하는 protected endpoint.
         DB I/O 없이 순수 인증 성능만 측정.
         """
         with self.client.get(
-            "/api/v1/auth/ping",
+            "/api/v1/character/ping",
             headers=self.headers,
             cookies=self.cookies,
-            name="[ext-authz] /api/v1/auth/ping",
+            name="[ext-authz] /api/v1/character/ping",
             catch_response=True,
         ) as resp:
             if resp.status_code == 200:
@@ -113,9 +113,9 @@ class ExtAuthzCookieUser(HttpUser):
     def ping_cookie(self):
         """쿠키로 인증."""
         with self.client.get(
-            "/api/v1/auth/ping",
+            "/api/v1/character/ping",
             cookies=self.cookies,
-            name="[cookie] /api/v1/auth/ping",
+            name="[cookie] /api/v1/character/ping",
             catch_response=True,
         ) as resp:
             if resp.status_code == 200:
@@ -142,9 +142,9 @@ class ExtAuthzHeaderUser(HttpUser):
     def ping_header(self):
         """헤더로 인증."""
         with self.client.get(
-            "/api/v1/auth/ping",
+            "/api/v1/character/ping",
             headers=self.headers,
-            name="[header] /api/v1/auth/ping",
+            name="[header] /api/v1/character/ping",
             catch_response=True,
         ) as resp:
             if resp.status_code == 200:
@@ -177,8 +177,8 @@ class ExtAuthzStressUser(HttpUser):
     def ping_stress(self):
         """최소 대기 연속 요청."""
         self.client.get(
-            "/api/v1/auth/ping",
+            "/api/v1/character/ping",
             headers=self.headers,
             cookies=self.cookies,
-            name="[stress] /api/v1/auth/ping",
+            name="[stress] /api/v1/character/ping",
         )

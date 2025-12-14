@@ -7,12 +7,58 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+func TestNewVerifier_Validation(t *testing.T) {
+	tests := []struct {
+		name      string
+		secretKey string
+		algorithm string
+		wantErr   bool
+	}{
+		{
+			name:      "Valid params",
+			secretKey: "secret",
+			algorithm: "HS256",
+			wantErr:   false,
+		},
+		{
+			name:      "Empty secretKey",
+			secretKey: "",
+			algorithm: "HS256",
+			wantErr:   true,
+		},
+		{
+			name:      "Whitespace secretKey",
+			secretKey: "   ",
+			algorithm: "HS256",
+			wantErr:   true,
+		},
+		{
+			name:      "Empty algorithm",
+			secretKey: "secret",
+			algorithm: "",
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewVerifier(tt.secretKey, tt.algorithm, "", "", time.Minute, "")
+			if (err != nil) != tt.wantErr {
+				t.Errorf("NewVerifier() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestVerifier_Verify(t *testing.T) {
 	secret := "secret"
 	issuer := "eco2"
 	audience := "eco2-api"
 	scope := "read"
-	verifier := NewVerifier(secret, "HS256", issuer, audience, time.Minute, scope)
+	verifier, err := NewVerifier(secret, "HS256", issuer, audience, time.Minute, scope)
+	if err != nil {
+		t.Fatalf("NewVerifier error: %v", err)
+	}
 
 	tests := []struct {
 		name    string

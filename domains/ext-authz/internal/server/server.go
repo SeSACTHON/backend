@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"log"
 	"time"
 
@@ -16,16 +17,42 @@ import (
 	"github.com/eco2-team/backend/domains/ext-authz/internal/store"
 )
 
+// HTTP Header keys
+const (
+	HeaderAuthorization = "authorization"
+	HeaderUserID        = "x-user-id"
+	HeaderAuthProvider  = "x-auth-provider"
+)
+
+// JWT claim keys
+const (
+	ClaimSub      = "sub"
+	ClaimJTI      = "jti"
+	ClaimProvider = "provider"
+)
+
+// Error labels for metrics
+const (
+	ErrorLabelJWTVerify = "jwt_verify"
+	ErrorLabelRedis     = "redis"
+)
+
 type AuthorizationServer struct {
 	verifier *jwt.Verifier
 	store    *store.Store
 }
 
-func New(verifier *jwt.Verifier, store *store.Store) *AuthorizationServer {
+func New(verifier *jwt.Verifier, store *store.Store) (*AuthorizationServer, error) {
+	if verifier == nil {
+		return nil, errors.New("verifier is required")
+	}
+	if store == nil {
+		return nil, errors.New("store is required")
+	}
 	return &AuthorizationServer{
 		verifier: verifier,
 		store:    store,
-	}
+	}, nil
 }
 
 // extractRequestInfo extracts method, path, and host from the request
@@ -55,7 +82,14 @@ func (s *AuthorizationServer) Check(ctx context.Context, req *authv3.CheckReques
 	}
 
 	// 1. Extract Token
-	authHeader, ok := req.Attributes.Request.Http.Headers["authorization"]
+	if req.Attributes == nil || req.Attributes.Request == nil || req.Attributes.Request.Http == nil {
+		log.Printf("[DENY] method=%s path=%s host=%s reason=\"malformed_request\" duration=%s",
+			method, path, host, time.Since(start))
+		recordMetrics(metrics.ResultDeny, metrics.ReasonMissingHeader)
+		return denyResponse(typev3.StatusCode_BadRequest, "Malformed request"), nil
+	}
+
+	authHeader, ok := req.Attributes.Request.Http.Headers[HeaderAuthorization]
 	if !ok || authHeader == "" {
 		log.Printf("[DENY] method=%s path=%s host=%s reason=\"missing_auth_header\" duration=%s",
 			method, path, host, time.Since(start))
@@ -72,13 +106,13 @@ func (s *AuthorizationServer) Check(ctx context.Context, req *authv3.CheckReques
 		log.Printf("[DENY] method=%s path=%s host=%s reason=\"invalid_token\" error=\"%v\" duration=%s",
 			method, path, host, err, time.Since(start))
 		recordMetrics(metrics.ResultDeny, metrics.ReasonInvalidToken)
-		metrics.ErrorsTotal.WithLabelValues("jwt_verify").Inc()
+		metrics.ErrorsTotal.WithLabelValues(ErrorLabelJWTVerify).Inc()
 		return denyResponse(typev3.StatusCode_Unauthorized, "Invalid token"), nil
 	}
 
 	// Extract user info for logging
-	userID, _ := claims["sub"].(string)
-	jti, _ := claims["jti"].(string)
+	userID, _ := claims[ClaimSub].(string)
+	jti, _ := claims[ClaimJTI].(string)
 
 	// 3. Check Blacklist
 	if jti != "" {
@@ -90,7 +124,7 @@ func (s *AuthorizationServer) Check(ctx context.Context, req *authv3.CheckReques
 			log.Printf("[DENY] method=%s path=%s host=%s user_id=%s jti=%s reason=\"redis_error\" error=\"%v\" duration=%s",
 				method, path, host, userID, jti, err, time.Since(start))
 			recordMetrics(metrics.ResultDeny, metrics.ReasonRedisError)
-			metrics.ErrorsTotal.WithLabelValues("redis").Inc()
+			metrics.ErrorsTotal.WithLabelValues(ErrorLabelRedis).Inc()
 			// Fail-closed: Deny on internal error
 			return denyResponse(typev3.StatusCode_InternalServerError, "Internal Authorization Error"), nil
 		}
@@ -104,7 +138,7 @@ func (s *AuthorizationServer) Check(ctx context.Context, req *authv3.CheckReques
 	}
 
 	// 4. Allow Request (Inject Headers)
-	provider, _ := claims["provider"].(string)
+	provider, _ := claims[ClaimProvider].(string)
 	log.Printf("[ALLOW] method=%s path=%s host=%s user_id=%s provider=%s jti=%s duration=%s",
 		method, path, host, userID, provider, jti, time.Since(start))
 	recordMetrics(metrics.ResultAllow, metrics.ReasonSuccess)
@@ -121,13 +155,13 @@ func allowResponse(userID, provider string) *authv3.CheckResponse {
 				Headers: []*corev3.HeaderValueOption{
 					{
 						Header: &corev3.HeaderValue{
-							Key:   "x-user-id",
+							Key:   HeaderUserID,
 							Value: userID,
 						},
 					},
 					{
 						Header: &corev3.HeaderValue{
-							Key:   "x-auth-provider",
+							Key:   HeaderAuthProvider,
 							Value: provider,
 						},
 					},
