@@ -13,8 +13,8 @@ const (
 
 	// Redis (local dev defaults; override via env in k8s)
 	DefaultRedisURL            = "redis://localhost:6379/0"
-	DefaultRedisPoolSize       = 200 // go-redis default: 20 (tuned for 2500+ users)
-	DefaultRedisMinIdleConns   = 50  // warm connections to prevent cold start
+	DefaultRedisPoolSize       = 500 // max connections per pod (tuned for high concurrency)
+	DefaultRedisMinIdleConns   = 200 // warm connections to prevent cold start
 	DefaultRedisPoolTimeoutMs  = 2000 // 2s - fast fail for backpressure
 	DefaultRedisReadTimeoutMs  = 1000 // 1s
 	DefaultRedisWriteTimeoutMs = 1000 // 1s
