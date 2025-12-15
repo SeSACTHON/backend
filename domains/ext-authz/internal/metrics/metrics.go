@@ -8,6 +8,31 @@ import (
 const namespace = "ext_authz"
 
 // ============================================================================
+// Histogram bucket configurations
+// ============================================================================
+//
+// Using ExponentialBucketsRange for fine-grained latency measurement:
+// - Denser buckets at lower latencies (where most requests fall)
+// - Sparser buckets at higher latencies (tail detection)
+
+const (
+	// Request duration: 0.5ms ~ 2s (full auth check including JWT + Redis)
+	requestDurationMin    = 0.0005 // 0.5ms
+	requestDurationMax    = 2.0    // 2s
+	requestDurationCount  = 14     // ~2x factor between buckets
+
+	// JWT verification: 0.1ms ~ 100ms (CPU-bound crypto operation)
+	jwtVerifyMin   = 0.0001 // 0.1ms
+	jwtVerifyMax   = 0.1    // 100ms
+	jwtVerifyCount = 10     // ~2x factor
+
+	// Redis lookup: 1ms ~ 5s (network + pool wait)
+	redisLookupMin   = 0.001 // 1ms
+	redisLookupMax   = 5.0   // 5s (covers timeout scenarios)
+	redisLookupCount = 12    // ~2x factor
+)
+
+// ============================================================================
 // Histograms - Latency measurements
 // ============================================================================
 
@@ -19,7 +44,7 @@ var (
 			Namespace: namespace,
 			Name:      "request_duration_seconds",
 			Help:      "Time spent processing authorization requests",
-			Buckets:   []float64{.0005, .001, .0025, .005, .01, .025, .05, .1, .25, .5, 1},
+			Buckets:   prometheus.ExponentialBucketsRange(requestDurationMin, requestDurationMax, requestDurationCount),
 		},
 		[]string{"result", "reason"},
 	)
@@ -30,7 +55,7 @@ var (
 			Namespace: namespace,
 			Name:      "jwt_verify_duration_seconds",
 			Help:      "Time spent verifying JWT tokens",
-			Buckets:   []float64{.0001, .00025, .0005, .001, .0025, .005, .01, .025, .05},
+			Buckets:   prometheus.ExponentialBucketsRange(jwtVerifyMin, jwtVerifyMax, jwtVerifyCount),
 		},
 	)
 
@@ -40,7 +65,7 @@ var (
 			Namespace: namespace,
 			Name:      "redis_lookup_duration_seconds",
 			Help:      "Time spent checking Redis blacklist",
-			Buckets:   []float64{.001, .0025, .005, .01, .025, .05, .1, .25, .5, 1, 2},
+			Buckets:   prometheus.ExponentialBucketsRange(redisLookupMin, redisLookupMax, redisLookupCount),
 		},
 	)
 )
