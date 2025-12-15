@@ -5,6 +5,7 @@ resources:
 - deployment.yaml
 - service.yaml
 - servicemonitor.yaml
+# - hpa.yaml  # TODO: 10K+ users 대응 시 활성화
 labels:
 - includeSelectors: true
   pairs:

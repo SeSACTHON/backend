@@ -33,6 +33,13 @@ spec:
           enabled: false
           sentinel: false
 
+        # Redis 서버 설정 (maxclients 확장)
+        commonConfiguration: |-
+          maxclients 50000
+          tcp-keepalive 300
+          timeout 0
+          maxmemory-clients 500mb
+
         master:
           count: 1
           resources:

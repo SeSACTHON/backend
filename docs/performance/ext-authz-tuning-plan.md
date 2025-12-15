@@ -108,15 +108,16 @@ poolOpts := &store.PoolOptions{
 **적용된 값** (스트레스 테스트 결과 기반):
 | 항목 | 기본값 | 튜닝값 | 근거 |
 |------|--------|--------|------|
-| PoolSize | 20 | 100 | 동시 처리 230개 대응 |
-| MinIdleConns | 0 | 20 | Cold start 방지 |
+| PoolSize | 20 | 200 | HPA 수평 확장 + 2500+ users 대응 |
+| MinIdleConns | 0 | 50 | Cold start 방지 (PoolSize의 25%) |
 | PoolTimeout | 4s | 2s | 빠른 실패 (backpressure) |
 | ReadTimeout | 3s | 1s | 빠른 타임아웃 |
 
 **예상 효과**:
-- 동시 Redis 연결 수 5배 증가 (20 → 100)
+- 동시 Redis 연결 수 10배 증가 (20 → 200)
+- HPA 10 pods 시 총 2,000 연결 (maxclients 50,000 내 충분)
 - Redis 풀 대기 시간 대폭 감소
-- Cold start 지연 방지 (MinIdleConns=20)
+- Cold start 지연 방지 (MinIdleConns=50)
 - 빠른 실패로 cascading failure 방지
 
 ---
