@@ -40,7 +40,7 @@ var (
 			Namespace: namespace,
 			Name:      "redis_lookup_duration_seconds",
 			Help:      "Time spent checking Redis blacklist",
-			Buckets:   []float64{.0001, .00025, .0005, .001, .0025, .005, .01, .025, .05, .1},
+			Buckets:   []float64{.001, .0025, .005, .01, .025, .05, .1, .25, .5, 1, 2},
 		},
 	)
 )
