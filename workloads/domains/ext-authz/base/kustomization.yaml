@@ -6,6 +6,7 @@ resources:
 - service.yaml
 - servicemonitor.yaml
 - hpa.yaml
+- destination-rule.yaml
 labels:
 - includeSelectors: true
   pairs:
