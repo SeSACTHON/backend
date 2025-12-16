@@ -18,7 +18,7 @@ data:
       },
       "title": "🖥️ Master Node - Resources",
       "uid": "master-node-resources",
-      "version": 1,
+      "version": 2,
       "timezone": "browser",
       "schemaVersion": 38,
       "refresh": "30s",
@@ -27,7 +27,15 @@ data:
         "to": "now"
       },
       "templating": {
-        "list": []
+        "list": [
+          {
+            "name": "datasource",
+            "type": "datasource",
+            "query": "prometheus",
+            "current": { "text": "Prometheus", "value": "prometheus" },
+            "hide": 2
+          }
+        ]
       },
       "panels": [
         {
@@ -40,9 +48,10 @@ data:
           "title": "CPU 사용률",
           "type": "gauge",
           "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\", instance=~\".*k8s-master.*\"}[5m])) * 100)",
+              "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\", job=\"node-exporter\"}[5m]) * on(instance) group_left(nodename) node_uname_info{nodename=~\".*master.*\"}) * 100)",
               "legendFormat": "CPU %"
             }
           ],
@@ -66,9 +75,10 @@ data:
           "title": "메모리 사용률",
           "type": "gauge",
           "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "(1 - (node_memory_MemAvailable_bytes{instance=~\".*k8s-master.*\"} / node_memory_MemTotal_bytes{instance=~\".*k8s-master.*\"})) * 100",
+              "expr": "(1 - avg(node_memory_MemAvailable_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*master.*\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*master.*\"})) * 100",
               "legendFormat": "Memory %"
             }
           ],
@@ -92,9 +102,10 @@ data:
           "title": "디스크 사용률",
           "type": "gauge",
           "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "(1 - (node_filesystem_avail_bytes{instance=~\".*k8s-master.*\", mountpoint=\"/\"} / node_filesystem_size_bytes{instance=~\".*k8s-master.*\", mountpoint=\"/\"})) * 100",
+              "expr": "(1 - avg(node_filesystem_avail_bytes{job=\"node-exporter\", mountpoint=\"/\", fstype!=\"rootfs\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*master.*\"} / node_filesystem_size_bytes{job=\"node-exporter\", mountpoint=\"/\", fstype!=\"rootfs\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*master.*\"})) * 100",
               "legendFormat": "Disk %"
             }
           ],
@@ -118,17 +129,18 @@ data:
           "title": "메모리 상세 (GB)",
           "type": "stat",
           "gridPos": { "h": 6, "w": 6, "x": 18, "y": 1 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "node_memory_MemTotal_bytes{instance=~\".*k8s-master.*\"} / 1024 / 1024 / 1024",
+              "expr": "avg(node_memory_MemTotal_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*master.*\"}) / 1024 / 1024 / 1024",
               "legendFormat": "Total"
             },
             {
-              "expr": "(node_memory_MemTotal_bytes{instance=~\".*k8s-master.*\"} - node_memory_MemAvailable_bytes{instance=~\".*k8s-master.*\"}) / 1024 / 1024 / 1024",
+              "expr": "avg((node_memory_MemTotal_bytes{job=\"node-exporter\"} - node_memory_MemAvailable_bytes{job=\"node-exporter\"}) * on(instance) group_left(nodename) node_uname_info{nodename=~\".*master.*\"}) / 1024 / 1024 / 1024",
               "legendFormat": "Used"
             },
             {
-              "expr": "node_memory_MemAvailable_bytes{instance=~\".*k8s-master.*\"} / 1024 / 1024 / 1024",
+              "expr": "avg(node_memory_MemAvailable_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*master.*\"}) / 1024 / 1024 / 1024",
               "legendFormat": "Available"
             }
           ],
@@ -149,9 +161,10 @@ data:
           "title": "CPU 사용률 (시계열)",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\", instance=~\".*k8s-master.*\"}[5m])) * 100)",
+              "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\", job=\"node-exporter\"}[5m]) * on(instance) group_left(nodename) node_uname_info{nodename=~\".*master.*\"}) * 100)",
               "legendFormat": "CPU Usage %"
             }
           ],
@@ -171,9 +184,10 @@ data:
           "title": "메모리 사용률 (시계열)",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "(1 - (node_memory_MemAvailable_bytes{instance=~\".*k8s-master.*\"} / node_memory_MemTotal_bytes{instance=~\".*k8s-master.*\"})) * 100",
+              "expr": "(1 - avg(node_memory_MemAvailable_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*master.*\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*master.*\"})) * 100",
               "legendFormat": "Memory Usage %"
             },
             {
@@ -197,9 +211,10 @@ data:
           "title": "메모리 사용량 (GB)",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "(node_memory_MemTotal_bytes{instance=~\".*k8s-master.*\"} - node_memory_MemAvailable_bytes{instance=~\".*k8s-master.*\"}) / 1024 / 1024 / 1024",
+              "expr": "avg((node_memory_MemTotal_bytes{job=\"node-exporter\"} - node_memory_MemAvailable_bytes{job=\"node-exporter\"}) * on(instance) group_left(nodename) node_uname_info{nodename=~\".*master.*\"}) / 1024 / 1024 / 1024",
               "legendFormat": "Used (GB)"
             },
             {
@@ -225,13 +240,14 @@ data:
           "title": "네트워크 I/O (MB/s)",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "rate(node_network_receive_bytes_total{instance=~\".*k8s-master.*\", device!~\"lo|veth.*|cali.*|tunl.*\"}[5m]) / 1024 / 1024",
+              "expr": "sum(rate(node_network_receive_bytes_total{job=\"node-exporter\", device!~\"lo|veth.*|cali.*|tunl.*|docker.*\"}[5m]) * on(instance) group_left(nodename) node_uname_info{nodename=~\".*master.*\"}) / 1024 / 1024",
               "legendFormat": "Receive (MB/s)"
             },
             {
-              "expr": "rate(node_network_transmit_bytes_total{instance=~\".*k8s-master.*\", device!~\"lo|veth.*|cali.*|tunl.*\"}[5m]) / 1024 / 1024",
+              "expr": "sum(rate(node_network_transmit_bytes_total{job=\"node-exporter\", device!~\"lo|veth.*|cali.*|tunl.*|docker.*\"}[5m]) * on(instance) group_left(nodename) node_uname_info{nodename=~\".*master.*\"}) / 1024 / 1024",
               "legendFormat": "Transmit (MB/s)"
             }
           ],
