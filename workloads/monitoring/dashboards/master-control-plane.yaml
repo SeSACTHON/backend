@@ -1,0 +1,376 @@
+# Control Plane 컴포넌트 모니터링 대시보드
+# 목적: kube-apiserver, etcd, scheduler, controller-manager 상태 추적
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-master-control-plane
+  namespace: prometheus
+  labels:
+    grafana_dashboard: '1'
+    app: grafana
+  annotations:
+    grafana_folder: Master Node
+data:
+  master-control-plane.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "title": "⚙️ Master Node - Control Plane",
+      "uid": "master-control-plane",
+      "version": 1,
+      "timezone": "browser",
+      "schemaVersion": 38,
+      "refresh": "30s",
+      "time": {
+        "from": "now-6h",
+        "to": "now"
+      },
+      "templating": {
+        "list": []
+      },
+      "panels": [
+        {
+          "title": "🔧 kube-apiserver",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "collapsed": false
+        },
+        {
+          "title": "API Server 메모리 (MB)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 1 },
+          "targets": [
+            {
+              "expr": "container_memory_working_set_bytes{pod=~\"kube-apiserver.*\", container!=\"POD\"} / 1024 / 1024",
+              "legendFormat": "Memory"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decmBytes",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1500 },
+                  { "color": "red", "value": 2000 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "API Server CPU (millicores)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 1 },
+          "targets": [
+            {
+              "expr": "sum(rate(container_cpu_usage_seconds_total{pod=~\"kube-apiserver.*\", container!=\"POD\"}[5m])) * 1000",
+              "legendFormat": "CPU"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 200 },
+                  { "color": "red", "value": 500 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "API 요청률 (/sec)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 1 },
+          "targets": [
+            {
+              "expr": "sum(rate(apiserver_request_total[5m]))",
+              "legendFormat": "Requests/sec"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "decimals": 1
+            }
+          }
+        },
+        {
+          "title": "API 에러율 (%)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 1 },
+          "targets": [
+            {
+              "expr": "sum(rate(apiserver_request_total{code=~\"5..\"}[5m])) / sum(rate(apiserver_request_total[5m])) * 100",
+              "legendFormat": "Error Rate"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.5 },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "API 요청 by Verb",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 5 },
+          "targets": [
+            {
+              "expr": "sum(rate(apiserver_request_total[5m])) by (verb)",
+              "legendFormat": "{{verb}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": {
+                "lineWidth": 1,
+                "fillOpacity": 20
+              }
+            }
+          }
+        },
+        {
+          "title": "API 응답 지연시간 (P99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 5 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(apiserver_request_duration_seconds_bucket{verb!=\"WATCH\"}[5m])) by (le, verb))",
+              "legendFormat": "{{verb}} P99"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": {
+                "lineWidth": 1,
+                "fillOpacity": 10
+              }
+            }
+          }
+        },
+        {
+          "title": "💾 etcd",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 13 },
+          "collapsed": false
+        },
+        {
+          "title": "etcd 메모리 (MB)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 14 },
+          "targets": [
+            {
+              "expr": "container_memory_working_set_bytes{pod=~\"etcd.*\", container!=\"POD\"} / 1024 / 1024",
+              "legendFormat": "Memory"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decmBytes",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 200 },
+                  { "color": "red", "value": 500 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "etcd DB 크기 (MB)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 14 },
+          "targets": [
+            {
+              "expr": "etcd_mvcc_db_total_size_in_bytes / 1024 / 1024",
+              "legendFormat": "DB Size"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decmBytes",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 500 },
+                  { "color": "red", "value": 1000 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "etcd 리더 상태",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 12, "y": 14 },
+          "targets": [
+            {
+              "expr": "etcd_server_is_leader",
+              "legendFormat": "Is Leader"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                { "type": "value", "options": { "1": { "text": "✅ Leader", "color": "green" } } },
+                { "type": "value", "options": { "0": { "text": "❌ Follower", "color": "yellow" } } }
+              ]
+            }
+          }
+        },
+        {
+          "title": "etcd 요청 지연 (P99)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 18, "y": 14 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(etcd_request_duration_seconds_bucket[5m])) by (le))",
+              "legendFormat": "P99 Latency"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "decimals": 3,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.1 },
+                  { "color": "red", "value": 0.5 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "🎛️ Scheduler & Controller Manager",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+          "collapsed": false
+        },
+        {
+          "title": "Controller Manager 메모리 (MB)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 0, "y": 19 },
+          "targets": [
+            {
+              "expr": "container_memory_working_set_bytes{pod=~\"kube-controller-manager.*\", container!=\"POD\"} / 1024 / 1024",
+              "legendFormat": "Memory"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decmBytes"
+            }
+          }
+        },
+        {
+          "title": "Scheduler 메모리 (MB)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 6, "x": 6, "y": 19 },
+          "targets": [
+            {
+              "expr": "container_memory_working_set_bytes{pod=~\"kube-scheduler.*\", container!=\"POD\"} / 1024 / 1024",
+              "legendFormat": "Memory"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decmBytes"
+            }
+          }
+        },
+        {
+          "title": "스케줄링 시도 (/sec)",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 19 },
+          "targets": [
+            {
+              "expr": "sum(rate(scheduler_schedule_attempts_total[5m])) by (result)",
+              "legendFormat": "{{result}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": {
+                "lineWidth": 1,
+                "fillOpacity": 20
+              }
+            }
+          }
+        },
+        {
+          "title": "🚀 ArgoCD",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 25 },
+          "collapsed": false
+        },
+        {
+          "title": "ArgoCD 전체 메모리 (MB)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 8, "x": 0, "y": 26 },
+          "targets": [
+            {
+              "expr": "sum(container_memory_working_set_bytes{namespace=\"argocd\", container!=\"POD\"}) / 1024 / 1024",
+              "legendFormat": "Total Memory"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decmBytes",
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 800 },
+                  { "color": "red", "value": 1200 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "ArgoCD 컴포넌트별 메모리",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 16, "x": 8, "y": 26 },
+          "targets": [
+            {
+              "expr": "sum(container_memory_working_set_bytes{namespace=\"argocd\", container!=\"POD\"}) by (pod) / 1024 / 1024",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decmBytes",
+              "custom": {
+                "lineWidth": 1,
+                "fillOpacity": 20
+              }
+            }
+          }
+        }
+      ]
+    }

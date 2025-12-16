@@ -1,0 +1,249 @@
+# 마스터 노드 리소스 모니터링 대시보드
+# 목적: CPU, Memory, Disk, Network 사용량 추적
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-master-resources
+  namespace: prometheus
+  labels:
+    grafana_dashboard: '1'
+    app: grafana
+  annotations:
+    grafana_folder: Master Node
+data:
+  master-node-resources.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "title": "🖥️ Master Node - Resources",
+      "uid": "master-node-resources",
+      "version": 1,
+      "timezone": "browser",
+      "schemaVersion": 38,
+      "refresh": "30s",
+      "time": {
+        "from": "now-6h",
+        "to": "now"
+      },
+      "templating": {
+        "list": []
+      },
+      "panels": [
+        {
+          "title": "📊 리소스 요약",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "collapsed": false
+        },
+        {
+          "title": "CPU 사용률",
+          "type": "gauge",
+          "gridPos": { "h": 6, "w": 6, "x": 0, "y": 1 },
+          "targets": [
+            {
+              "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\", instance=~\".*k8s-master.*\"}[5m])) * 100)",
+              "legendFormat": "CPU %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 50 },
+                  { "color": "red", "value": 80 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "메모리 사용률",
+          "type": "gauge",
+          "gridPos": { "h": 6, "w": 6, "x": 6, "y": 1 },
+          "targets": [
+            {
+              "expr": "(1 - (node_memory_MemAvailable_bytes{instance=~\".*k8s-master.*\"} / node_memory_MemTotal_bytes{instance=~\".*k8s-master.*\"})) * 100",
+              "legendFormat": "Memory %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 60 },
+                  { "color": "red", "value": 80 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "디스크 사용률",
+          "type": "gauge",
+          "gridPos": { "h": 6, "w": 6, "x": 12, "y": 1 },
+          "targets": [
+            {
+              "expr": "(1 - (node_filesystem_avail_bytes{instance=~\".*k8s-master.*\", mountpoint=\"/\"} / node_filesystem_size_bytes{instance=~\".*k8s-master.*\", mountpoint=\"/\"})) * 100",
+              "legendFormat": "Disk %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 85 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "메모리 상세 (GB)",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 6, "x": 18, "y": 1 },
+          "targets": [
+            {
+              "expr": "node_memory_MemTotal_bytes{instance=~\".*k8s-master.*\"} / 1024 / 1024 / 1024",
+              "legendFormat": "Total"
+            },
+            {
+              "expr": "(node_memory_MemTotal_bytes{instance=~\".*k8s-master.*\"} - node_memory_MemAvailable_bytes{instance=~\".*k8s-master.*\"}) / 1024 / 1024 / 1024",
+              "legendFormat": "Used"
+            },
+            {
+              "expr": "node_memory_MemAvailable_bytes{instance=~\".*k8s-master.*\"} / 1024 / 1024 / 1024",
+              "legendFormat": "Available"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decgbytes",
+              "decimals": 1
+            }
+          }
+        },
+        {
+          "title": "📈 시계열 그래프",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+          "collapsed": false
+        },
+        {
+          "title": "CPU 사용률 (시계열)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "targets": [
+            {
+              "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\", instance=~\".*k8s-master.*\"}[5m])) * 100)",
+              "legendFormat": "CPU Usage %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 20
+              }
+            }
+          }
+        },
+        {
+          "title": "메모리 사용률 (시계열)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "targets": [
+            {
+              "expr": "(1 - (node_memory_MemAvailable_bytes{instance=~\".*k8s-master.*\"} / node_memory_MemTotal_bytes{instance=~\".*k8s-master.*\"})) * 100",
+              "legendFormat": "Memory Usage %"
+            },
+            {
+              "expr": "50",
+              "legendFormat": "t3.large 기준 (8GB 중 4GB)"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 20
+              }
+            }
+          }
+        },
+        {
+          "title": "메모리 사용량 (GB)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+          "targets": [
+            {
+              "expr": "(node_memory_MemTotal_bytes{instance=~\".*k8s-master.*\"} - node_memory_MemAvailable_bytes{instance=~\".*k8s-master.*\"}) / 1024 / 1024 / 1024",
+              "legendFormat": "Used (GB)"
+            },
+            {
+              "expr": "8",
+              "legendFormat": "t3.large 제한 (8GB)"
+            },
+            {
+              "expr": "6",
+              "legendFormat": "안전 기준 (6GB)"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decgbytes",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10
+              }
+            }
+          }
+        },
+        {
+          "title": "네트워크 I/O (MB/s)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+          "targets": [
+            {
+              "expr": "rate(node_network_receive_bytes_total{instance=~\".*k8s-master.*\", device!~\"lo|veth.*|cali.*|tunl.*\"}[5m]) / 1024 / 1024",
+              "legendFormat": "Receive (MB/s)"
+            },
+            {
+              "expr": "rate(node_network_transmit_bytes_total{instance=~\".*k8s-master.*\", device!~\"lo|veth.*|cali.*|tunl.*\"}[5m]) / 1024 / 1024",
+              "legendFormat": "Transmit (MB/s)"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "MBs",
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 20
+              }
+            }
+          }
+        }
+      ]
+    }
