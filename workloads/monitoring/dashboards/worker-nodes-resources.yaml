@@ -1,0 +1,219 @@
+# Worker 노드별 리소스 모니터링 대시보드
+# 목적: 각 도메인 노드의 CPU, Memory, Disk, Network 사용량 추적
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-worker-nodes
+  namespace: prometheus
+  labels:
+    grafana_dashboard: '1'
+    app: grafana
+  annotations:
+    grafana_folder: Cluster Nodes
+data:
+  worker-nodes-resources.json: |
+    {
+      "title": "🖥️ Worker Nodes - Resources",
+      "uid": "worker-nodes-resources",
+      "version": 1,
+      "timezone": "browser",
+      "schemaVersion": 38,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "node",
+            "type": "query",
+            "datasource": "prometheus",
+            "query": "label_values(node_uname_info, nodename)",
+            "refresh": 1,
+            "multi": true,
+            "includeAll": true,
+            "current": { "text": "All", "value": "$__all" }
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "📊 노드별 CPU 사용률",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "targets": [
+            {
+              "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\", instance=~\".*($node).*\"}[5m])) * 100)",
+              "legendFormat": "{{instance}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "custom": { "lineWidth": 2, "fillOpacity": 20 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 60 },
+                  { "color": "red", "value": 80 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "📊 노드별 Memory 사용률",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "targets": [
+            {
+              "expr": "(1 - (node_memory_MemAvailable_bytes{instance=~\".*($node).*\"} / node_memory_MemTotal_bytes{instance=~\".*($node).*\"})) * 100",
+              "legendFormat": "{{instance}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "custom": { "lineWidth": 2, "fillOpacity": 20 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 85 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "📊 노드별 Disk 사용률",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "targets": [
+            {
+              "expr": "(1 - (node_filesystem_avail_bytes{instance=~\".*($node).*\", mountpoint=\"/\"} / node_filesystem_size_bytes{instance=~\".*($node).*\", mountpoint=\"/\"})) * 100",
+              "legendFormat": "{{instance}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "custom": { "lineWidth": 2, "fillOpacity": 20 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 85 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "📊 노드별 Network I/O (MB/s)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "targets": [
+            {
+              "expr": "sum by (instance) (rate(node_network_receive_bytes_total{instance=~\".*($node).*\", device!~\"lo|veth.*|cali.*|tunl.*\"}[5m])) / 1024 / 1024",
+              "legendFormat": "{{instance}} - RX"
+            },
+            {
+              "expr": "sum by (instance) (rate(node_network_transmit_bytes_total{instance=~\".*($node).*\", device!~\"lo|veth.*|cali.*|tunl.*\"}[5m])) / 1024 / 1024",
+              "legendFormat": "{{instance}} - TX"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "MBs",
+              "custom": { "lineWidth": 2, "fillOpacity": 10 }
+            }
+          }
+        },
+        {
+          "title": "🏷️ 도메인 노드별 요약",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+          "collapsed": false
+        },
+        {
+          "title": "k8s-api-auth (ext-authz)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 17 },
+          "targets": [
+            {
+              "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\", instance=~\".*k8s-api-auth.*\"}[5m])) * 100)",
+              "legendFormat": "CPU %"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "percent", "decimals": 1 } }
+        },
+        {
+          "title": "k8s-api-scan",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 17 },
+          "targets": [
+            {
+              "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\", instance=~\".*k8s-api-scan.*\"}[5m])) * 100)",
+              "legendFormat": "CPU %"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "percent", "decimals": 1 } }
+        },
+        {
+          "title": "k8s-api-character",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 17 },
+          "targets": [
+            {
+              "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\", instance=~\".*k8s-api-character.*\"}[5m])) * 100)",
+              "legendFormat": "CPU %"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "percent", "decimals": 1 } }
+        },
+        {
+          "title": "k8s-api-my",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 17 },
+          "targets": [
+            {
+              "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\", instance=~\".*k8s-api-my.*\"}[5m])) * 100)",
+              "legendFormat": "CPU %"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "percent", "decimals": 1 } }
+        },
+        {
+          "title": "k8s-redis",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 17 },
+          "targets": [
+            {
+              "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\", instance=~\".*k8s-redis.*\"}[5m])) * 100)",
+              "legendFormat": "CPU %"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "percent", "decimals": 1 } }
+        },
+        {
+          "title": "k8s-ingress-gateway",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 17 },
+          "targets": [
+            {
+              "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\", instance=~\".*k8s-ingress.*\"}[5m])) * 100)",
+              "legendFormat": "CPU %"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "percent", "decimals": 1 } }
+        }
+      ]
+    }

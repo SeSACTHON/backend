@@ -1,0 +1,235 @@
+# Character 도메인 대시보드 (REST + gRPC)
+# 목적: 캐릭터 카탈로그, 리워드 지급, gRPC 서비스 성능 추적
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-character
+  namespace: prometheus
+  labels:
+    grafana_dashboard: '1'
+    app: grafana
+  annotations:
+    grafana_folder: Domain APIs
+data:
+  domain-character.json: |
+    {
+      "title": "🎭 Character - Catalog & Rewards (REST + gRPC)",
+      "uid": "domain-character",
+      "version": 1,
+      "timezone": "browser",
+      "schemaVersion": 38,
+      "refresh": "10s",
+      "time": { "from": "now-30m", "to": "now" },
+      "panels": [
+        {
+          "title": "📈 REST API 핵심 지표",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "collapsed": false
+        },
+        {
+          "title": "REST RPS",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+          "targets": [
+            {
+              "expr": "sum(rate(http_request_duration_seconds_count{service=\"character-api\"}[5m]))",
+              "legendFormat": "RPS"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 1 } }
+        },
+        {
+          "title": "REST p99 Latency",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{service=\"character-api\"}[5m])) by (le)) * 1000",
+              "legendFormat": "p99"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "ms", "decimals": 1 } }
+        },
+        {
+          "title": "REST Avg Latency",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+          "targets": [
+            {
+              "expr": "(sum(rate(http_request_duration_seconds_sum{service=\"character-api\"}[5m])) / sum(rate(http_request_duration_seconds_count{service=\"character-api\"}[5m]))) * 1000",
+              "legendFormat": "Avg"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "ms", "decimals": 1 } }
+        },
+        {
+          "title": "Reward Evaluations",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+          "targets": [
+            {
+              "expr": "sum(rate(character_reward_evaluation_total[5m]))",
+              "legendFormat": "Total"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 2 } }
+        },
+        {
+          "title": "Rewards Granted",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+          "targets": [
+            {
+              "expr": "sum(rate(character_reward_granted_total[5m]))",
+              "legendFormat": "Granted"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 2 } }
+        },
+        {
+          "title": "Pod Count (HPA)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+          "targets": [
+            {
+              "expr": "count(up{job=~\"character-api|character-grpc\"})",
+              "legendFormat": "Pods"
+            }
+          ],
+          "fieldConfig": { "defaults": { "unit": "short", "decimals": 0 } }
+        },
+        {
+          "title": "🎯 gRPC 서비스 지표",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+          "collapsed": false
+        },
+        {
+          "title": "gRPC Reward Processing Time",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum by (source, le) (rate(character_reward_processing_seconds_bucket[5m])))",
+              "legendFormat": "{{source}} p99"
+            },
+            {
+              "expr": "sum by (source) (rate(character_reward_processing_seconds_sum[5m])) / sum by (source) (rate(character_reward_processing_seconds_count[5m]))",
+              "legendFormat": "{{source}} avg"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": { "lineWidth": 2, "fillOpacity": 10 }
+            }
+          }
+        },
+        {
+          "title": "Reward Evaluation by Status",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "targets": [
+            {
+              "expr": "sum by (status) (rate(character_reward_evaluation_total[5m]))",
+              "legendFormat": "{{status}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": { "lineWidth": 2, "fillOpacity": 20, "stacking": { "mode": "normal" } }
+            }
+          }
+        },
+        {
+          "title": "📊 REST API Latency 시계열",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+          "collapsed": false
+        },
+        {
+          "title": "REST Latency (p50, p95, p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(http_request_duration_seconds_bucket{service=\"character-api\"}[5m])) by (le)) * 1000",
+              "legendFormat": "p99"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(http_request_duration_seconds_bucket{service=\"character-api\"}[5m])) by (le)) * 1000",
+              "legendFormat": "p95"
+            },
+            {
+              "expr": "histogram_quantile(0.50, sum(rate(http_request_duration_seconds_bucket{service=\"character-api\"}[5m])) by (le)) * 1000",
+              "legendFormat": "p50"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "custom": { "lineWidth": 2, "fillOpacity": 10 }
+            }
+          }
+        },
+        {
+          "title": "Rewards Granted by Character",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+          "targets": [
+            {
+              "expr": "sum by (character_name) (rate(character_reward_granted_total[5m]))",
+              "legendFormat": "{{character_name}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": { "lineWidth": 2, "fillOpacity": 20, "stacking": { "mode": "normal" } }
+            }
+          }
+        },
+        {
+          "title": "💻 리소스 사용량",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+          "collapsed": false
+        },
+        {
+          "title": "CPU 사용량 (cores)",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 12, "x": 0, "y": 24 },
+          "targets": [
+            {
+              "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"character\", container!=\"\"}[5m]))",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "lineWidth": 2, "fillOpacity": 20 }
+            }
+          }
+        },
+        {
+          "title": "Memory 사용량 (MB)",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 24 },
+          "targets": [
+            {
+              "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"character\", container!=\"\"}) / 1024 / 1024",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decmbytes",
+              "custom": { "lineWidth": 2, "fillOpacity": 20 }
+            }
+          }
+        }
+      ]
+    }

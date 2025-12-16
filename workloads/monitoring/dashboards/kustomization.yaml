@@ -4,10 +4,18 @@ kind: Kustomization
 namespace: prometheus
 
 resources:
+# Master Node Dashboards
 - master-node-resources.yaml
 - master-control-plane.yaml
 - master-downgrade-decision.yaml
+# Worker Nodes Dashboard
+- worker-nodes-resources.yaml
+# Domain API Dashboards
+- domain-ext-authz.yaml
+- domain-scan-api.yaml
+- domain-character.yaml
+- domain-my.yaml
 
 commonLabels:
-  monitoring: master-node
+  monitoring: ecoeco-cluster
   managed-by: kustomize
