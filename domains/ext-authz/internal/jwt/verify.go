@@ -9,6 +9,21 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
+// Token prefix
+const (
+	BearerPrefix = "Bearer "
+)
+
+// JWT claim keys (exported for use by other packages)
+const (
+	ClaimSub      = "sub"
+	ClaimJTI      = "jti"
+	ClaimIss      = "iss"
+	ClaimAud      = "aud"
+	ClaimScope    = "scope"
+	ClaimProvider = "provider"
+)
+
 type Verifier struct {
 	secretKey []byte
 	algorithm string
@@ -18,7 +33,13 @@ type Verifier struct {
 	reqScope  string
 }
 
-func NewVerifier(secretKey, algorithm, issuer, audience string, clockSkew time.Duration, requiredScope string) *Verifier {
+func NewVerifier(secretKey, algorithm, issuer, audience string, clockSkew time.Duration, requiredScope string) (*Verifier, error) {
+	if strings.TrimSpace(secretKey) == "" {
+		return nil, errors.New("secretKey is required")
+	}
+	if strings.TrimSpace(algorithm) == "" {
+		return nil, errors.New("algorithm is required")
+	}
 	return &Verifier{
 		secretKey: []byte(secretKey),
 		algorithm: algorithm,
@@ -26,13 +47,16 @@ func NewVerifier(secretKey, algorithm, issuer, audience string, clockSkew time.D
 		audience:  audience,
 		clockSkew: clockSkew,
 		reqScope:  strings.TrimSpace(requiredScope),
-	}
+	}, nil
 }
 
+// Claims is the return type for Verify, compatible with server.TokenVerifier interface.
+type Claims = map[string]any
+
 // Verify parses and validates the token. Returns claims if valid.
-func (v *Verifier) Verify(tokenString string) (jwt.MapClaims, error) {
+func (v *Verifier) Verify(tokenString string) (Claims, error) {
 	// Remove "Bearer " prefix if present
-	tokenString = strings.TrimPrefix(tokenString, "Bearer ")
+	tokenString = strings.TrimPrefix(tokenString, BearerPrefix)
 
 	parser := jwt.NewParser(
 		jwt.WithValidMethods([]string{v.algorithm}),
@@ -53,32 +77,32 @@ func (v *Verifier) Verify(tokenString string) (jwt.MapClaims, error) {
 	}
 
 	// Required claims
-	sub, ok := claims["sub"].(string)
+	sub, ok := claims[ClaimSub].(string)
 	if !ok || strings.TrimSpace(sub) == "" {
 		return nil, errors.New("missing required claim: sub")
 	}
 
-	jti, ok := claims["jti"].(string)
+	jti, ok := claims[ClaimJTI].(string)
 	if !ok || strings.TrimSpace(jti) == "" {
 		return nil, errors.New("missing required claim: jti")
 	}
 
 	// exp/nbf/iat checked by parser; issuer/audience optional
 	if v.issuer != "" && !matchesIssuer(claims, v.issuer) {
-		return nil, fmt.Errorf("invalid issuer: %v", claims["iss"])
+		return nil, fmt.Errorf("invalid issuer: %v", claims[ClaimIss])
 	}
 	if v.audience != "" && !matchesAudience(claims, v.audience) {
-		return nil, fmt.Errorf("invalid audience: %v", claims["aud"])
+		return nil, fmt.Errorf("invalid audience: %v", claims[ClaimAud])
 	}
 
 	if v.reqScope != "" {
-		scope, _ := claims["scope"].(string)
+		scope, _ := claims[ClaimScope].(string)
 		if !scopeContains(scope, v.reqScope) {
 			return nil, fmt.Errorf("required scope missing: %s", v.reqScope)
 		}
 	}
 
-	return claims, nil
+	return Claims(claims), nil
 }
 
 func scopeContains(scope string, required string) bool {
@@ -95,7 +119,7 @@ func scopeContains(scope string, required string) bool {
 }
 
 func matchesIssuer(claims jwt.MapClaims, issuer string) bool {
-	iss, ok := claims["iss"].(string)
+	iss, ok := claims[ClaimIss].(string)
 	if !ok {
 		return false
 	}
@@ -106,7 +130,7 @@ func matchesAudience(claims jwt.MapClaims, audience string) bool {
 	if audience == "" {
 		return true
 	}
-	switch aud := claims["aud"].(type) {
+	switch aud := claims[ClaimAud].(type) {
 	case string:
 		return aud == audience
 	case []any:

@@ -2,7 +2,9 @@ package store
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -18,15 +20,36 @@ type RedisClient interface {
 
 var _ RedisClient = (*redis.Client)(nil)
 
+// PoolOptions contains Redis connection pool settings.
+type PoolOptions struct {
+	PoolSize     int           // Maximum number of connections
+	MinIdleConns int           // Minimum idle connections to maintain
+	PoolTimeout  time.Duration // Time to wait for a connection from the pool
+	ReadTimeout  time.Duration // Timeout for read operations
+	WriteTimeout time.Duration // Timeout for write operations
+}
+
 type Store struct {
 	client RedisClient
 }
 
-func New(ctx context.Context, redisURL string) (*Store, error) {
+// New creates a new Store with the given Redis URL and pool options.
+func New(ctx context.Context, redisURL string, poolOpts *PoolOptions) (*Store, error) {
+	if poolOpts == nil {
+		return nil, fmt.Errorf("pool options is required")
+	}
+
 	opts, err := redis.ParseURL(redisURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse redis url: %w", err)
 	}
+
+	// Apply pool options
+	opts.PoolSize = poolOpts.PoolSize
+	opts.MinIdleConns = poolOpts.MinIdleConns
+	opts.PoolTimeout = poolOpts.PoolTimeout
+	opts.ReadTimeout = poolOpts.ReadTimeout
+	opts.WriteTimeout = poolOpts.WriteTimeout
 
 	client := redis.NewClient(opts)
 
@@ -45,14 +68,15 @@ func NewWithClient(client RedisClient) (*Store, error) {
 }
 
 func (s *Store) Close() error {
-	if s == nil || s.client == nil {
-		return nil
+	if s == nil {
+		return errors.New("store is nil")
+	}
+	if s.client == nil {
+		return errors.New("redis client is nil")
 	}
 	return s.client.Close()
 }
 
-// IsBlacklisted checks if the given JTI (JWT ID) exists in the blacklist.
-// Key format matches Python backend: "blacklist:{jti}"
 func (s *Store) IsBlacklisted(ctx context.Context, jti string) (bool, error) {
 	key := blacklistKey(jti)
 	exists, err := s.client.Exists(ctx, key).Result()
