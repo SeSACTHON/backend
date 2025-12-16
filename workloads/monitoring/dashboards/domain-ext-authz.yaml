@@ -1,0 +1,272 @@
+# ext-authz 도메인 대시보드 (gRPC AuthN/AuthZ 서버)
+# 목적: JWT 검증, Redis 블랙리스트 조회, 요청 처리 성능 추적
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-ext-authz
+  namespace: prometheus
+  labels:
+    grafana_dashboard: '1'
+    app: grafana
+  annotations:
+    grafana_folder: Domain APIs
+data:
+  domain-ext-authz.json: |
+    {
+      "title": "🔐 ext-authz - AuthN/AuthZ (gRPC)",
+      "uid": "domain-ext-authz",
+      "version": 1,
+      "timezone": "browser",
+      "schemaVersion": 38,
+      "refresh": "10s",
+      "time": { "from": "now-30m", "to": "now" },
+      "panels": [
+        {
+          "title": "📈 핵심 지표",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "collapsed": false
+        },
+        {
+          "title": "RPS",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 1 },
+          "targets": [
+            {
+              "expr": "sum(rate(ext_authz_requests_total[5m]))",
+              "legendFormat": "RPS"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "reqps", "decimals": 0 }
+          }
+        },
+        {
+          "title": "p99 Latency",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(ext_authz_request_duration_seconds_bucket[5m])) by (le)) * 1000",
+              "legendFormat": "p99"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "ms", "decimals": 1 },
+            "overrides": []
+          }
+        },
+        {
+          "title": "Avg Latency",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 1 },
+          "targets": [
+            {
+              "expr": "(sum(rate(ext_authz_request_duration_seconds_sum[5m])) / sum(rate(ext_authz_request_duration_seconds_count[5m]))) * 1000",
+              "legendFormat": "Avg"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "ms", "decimals": 1 }
+          }
+        },
+        {
+          "title": "Success Rate",
+          "type": "gauge",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
+          "targets": [
+            {
+              "expr": "sum(rate(ext_authz_requests_total{result=\"allow\"}[5m])) / sum(rate(ext_authz_requests_total[5m])) * 100",
+              "legendFormat": "Success %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "red", "value": null },
+                  { "color": "yellow", "value": 95 },
+                  { "color": "green", "value": 99 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "In-Flight Requests",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
+          "targets": [
+            {
+              "expr": "ext_authz_requests_in_flight",
+              "legendFormat": "Current"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "decimals": 0 }
+          }
+        },
+        {
+          "title": "Pod Count (HPA)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
+          "targets": [
+            {
+              "expr": "count(up{job=\"ext-authz\"})",
+              "legendFormat": "Pods"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "decimals": 0 }
+          }
+        },
+        {
+          "title": "⏱️ Latency 분석",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+          "collapsed": false
+        },
+        {
+          "title": "p99 Latency (시계열)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 6 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(ext_authz_request_duration_seconds_bucket[5m])) by (le)) * 1000",
+              "legendFormat": "Total p99"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(ext_authz_jwt_verify_duration_seconds_bucket[5m])) by (le)) * 1000",
+              "legendFormat": "JWT Verify p99"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(ext_authz_redis_lookup_duration_seconds_bucket[5m])) by (le)) * 1000",
+              "legendFormat": "Redis Lookup p99"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "custom": { "lineWidth": 2, "fillOpacity": 10 }
+            }
+          }
+        },
+        {
+          "title": "Avg Latency (시계열)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
+          "targets": [
+            {
+              "expr": "(sum(rate(ext_authz_request_duration_seconds_sum[5m])) / sum(rate(ext_authz_request_duration_seconds_count[5m]))) * 1000",
+              "legendFormat": "Total Avg"
+            },
+            {
+              "expr": "(sum(rate(ext_authz_jwt_verify_duration_seconds_sum[5m])) / sum(rate(ext_authz_jwt_verify_duration_seconds_count[5m]))) * 1000",
+              "legendFormat": "JWT Verify Avg"
+            },
+            {
+              "expr": "(sum(rate(ext_authz_redis_lookup_duration_seconds_sum[5m])) / sum(rate(ext_authz_redis_lookup_duration_seconds_count[5m]))) * 1000",
+              "legendFormat": "Redis Lookup Avg"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "ms",
+              "custom": { "lineWidth": 2, "fillOpacity": 10 }
+            }
+          }
+        },
+        {
+          "title": "📊 요청 분석",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 },
+          "collapsed": false
+        },
+        {
+          "title": "RPS (시계열)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 15 },
+          "targets": [
+            {
+              "expr": "sum(rate(ext_authz_requests_total[5m]))",
+              "legendFormat": "Total RPS"
+            },
+            {
+              "expr": "sum(rate(ext_authz_requests_total{result=\"allow\"}[5m]))",
+              "legendFormat": "Allow"
+            },
+            {
+              "expr": "sum(rate(ext_authz_requests_total{result=\"deny\"}[5m]))",
+              "legendFormat": "Deny"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": { "lineWidth": 2, "fillOpacity": 20 }
+            }
+          }
+        },
+        {
+          "title": "Deny 원인별 분석",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 15 },
+          "targets": [
+            {
+              "expr": "sum by (reason) (rate(ext_authz_requests_total{result=\"deny\"}[5m]))",
+              "legendFormat": "{{reason}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "reqps",
+              "custom": { "lineWidth": 2, "fillOpacity": 20, "stacking": { "mode": "normal" } }
+            }
+          }
+        },
+        {
+          "title": "💻 리소스 사용량",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+          "collapsed": false
+        },
+        {
+          "title": "CPU 사용량 (cores)",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 12, "x": 0, "y": 24 },
+          "targets": [
+            {
+              "expr": "sum(rate(container_cpu_usage_seconds_total{namespace=\"auth\", pod=~\"ext-authz.*\", container!=\"\"}[5m]))",
+              "legendFormat": "ext-authz CPU"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "lineWidth": 2, "fillOpacity": 20 }
+            }
+          }
+        },
+        {
+          "title": "Memory 사용량 (MB)",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 12, "x": 12, "y": 24 },
+          "targets": [
+            {
+              "expr": "sum(container_memory_working_set_bytes{namespace=\"auth\", pod=~\"ext-authz.*\", container!=\"\"}) / 1024 / 1024",
+              "legendFormat": "ext-authz Memory"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decmbytes",
+              "custom": { "lineWidth": 2, "fillOpacity": 20 }
+            }
+          }
+        }
+      ]
+    }
