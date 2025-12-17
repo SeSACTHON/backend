@@ -54,7 +54,8 @@ data:
         Name              tail
         Tag               kube.*
         Path              /var/log/containers/*.log
-        Parser            docker
+        # containerd 런타임용 CRI parser
+        Parser            cri
         DB                /fluent-bit/db/flb_kube.db
         Mem_Buf_Limit     50MB
         Skip_Long_Lines   On
@@ -67,6 +68,7 @@ data:
         Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
         Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
         Kube_Tag_Prefix     kube.var.log.containers.
+        # JSON 로그 파싱 및 병합
         Merge_Log           On
         Merge_Log_Key       log_processed
         K8S-Logging.Parser  On
@@ -78,7 +80,7 @@ data:
     [FILTER]
         Name          grep
         Match         kube.*
-        Exclude       log /health|ready/
+        Exclude       log /health|ready|healthz|readyz|livez/
 
     [FILTER]
         Name          modify
@@ -93,48 +95,17 @@ data:
         Nested_under  kubernetes
         Add_prefix    k8s_
 
-    # 앱/인프라 태그 분리 (네임스페이스 기반)
-    # App: auth, character, chat, scan, my, location, image
-    [FILTER]
-        Name          rewrite_tag
-        Match         kube.*
-        Rule          $k8s_namespace_name ^(auth|character|chat|scan|my|location|image)$ app.$k8s_namespace_name false
-        Emitter_Name  re_emitted_app
-
-    # Infra: 나머지 (kube-system, istio-system, logging, monitoring 등)
-    [FILTER]
-        Name          rewrite_tag
-        Match         kube.*
-        Rule          $k8s_namespace_name .+ infra.$k8s_namespace_name false
-        Emitter_Name  re_emitted_infra
-
-    # App 로그 → logs-app-dev-*
+    # 모든 로그를 단일 인덱스로 전송 (간소화)
+    # 인덱스: logs-YYYY.MM.DD
     [OUTPUT]
         Name            es
-        Match           app.*
+        Match           kube.*
         Host            eco2-logs-es-http.logging.svc.cluster.local
         Port            9200
         HTTP_User       ${ES_USER}
         HTTP_Passwd     ${ES_PASSWORD}
         Logstash_Format On
-        Logstash_Prefix logs-app-dev
-        Logstash_DateFormat %Y.%m.%d
-        Retry_Limit     False
-        Replace_Dots    On
-        Suppress_Type_Name On
-        Buffer_Size     5MB
-        Generate_ID     On
-
-    # Infra 로그 → logs-infra-dev-*
-    [OUTPUT]
-        Name            es
-        Match           infra.*
-        Host            eco2-logs-es-http.logging.svc.cluster.local
-        Port            9200
-        HTTP_User       ${ES_USER}
-        HTTP_Passwd     ${ES_PASSWORD}
-        Logstash_Format On
-        Logstash_Prefix logs-infra-dev
+        Logstash_Prefix logs
         Logstash_DateFormat %Y.%m.%d
         Retry_Limit     False
         Replace_Dots    On
@@ -143,6 +114,15 @@ data:
         Generate_ID     On
 
   parsers.conf: |
+    # CRI Parser for containerd runtime
+    [PARSER]
+        Name        cri
+        Format      regex
+        Regex       ^(?<time>[^ ]+) (?<stream>stdout|stderr) (?<logtag>[^ ]*) (?<log>.*)$
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L%z
+        Time_Keep   On
+
     [PARSER]
         Name        docker
         Format      json
@@ -155,6 +135,14 @@ data:
         Format      json
         Time_Key    timestamp
         Time_Format %Y-%m-%dT%H:%M:%S.%LZ
+
+    # ECS JSON 로그 파서 (앱 서비스용)
+    [PARSER]
+        Name        ecs_json
+        Format      json
+        Time_Key    @timestamp
+        Time_Format %Y-%m-%dT%H:%M:%S.%LZ
+        Time_Keep   On
 
     [PARSER]
         Name        syslog
