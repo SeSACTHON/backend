@@ -4,13 +4,14 @@ apiVersion: kibana.eck.github.com/v1alpha1
 kind: Dashboard
 metadata:
   name: logs-eco2-debug
-  namespace: logging
+  namespace: kibana
   labels:
     app.kubernetes.io/part-of: ecoeco-observability
     dashboard-type: developer
 spec:
   targetInstance:
     name: eco2-kibana
+    namespace: logging
   body: |
     {
       "attributes": {
