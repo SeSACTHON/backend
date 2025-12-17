@@ -12,12 +12,13 @@ redis==5.0.1
 httpx==0.26.0
 email-validator==2.1.0
 prometheus-client==0.20.0
-grpcio==1.76.0
-protobuf==6.33.2
-opentelemetry-distro
-opentelemetry-exporter-otlp
-opentelemetry-instrumentation-fastapi
-opentelemetry-instrumentation-sqlalchemy
-opentelemetry-instrumentation-requests
-opentelemetry-instrumentation-redis
-opentelemetry-instrumentation-asyncpg
+grpcio==1.68.1
+protobuf==5.29.2
+# OpenTelemetry - 2025.12 stable versions
+opentelemetry-distro==0.50b0
+opentelemetry-exporter-otlp==1.29.0
+opentelemetry-instrumentation-fastapi==0.50b0
+opentelemetry-instrumentation-sqlalchemy==0.50b0
+opentelemetry-instrumentation-httpx==0.50b0
+opentelemetry-instrumentation-redis==0.50b0
+opentelemetry-instrumentation-asyncpg==0.50b0
