@@ -25,6 +25,11 @@ from domains.auth.core.constants import (
     ENV_KEY_LOG_FORMAT,
     ENV_KEY_LOG_LEVEL,
     EXCLUDED_LOG_RECORD_ATTRS,
+    MASK_MIN_LENGTH,
+    MASK_PLACEHOLDER,
+    MASK_PRESERVE_PREFIX,
+    MASK_PRESERVE_SUFFIX,
+    SENSITIVE_FIELD_PATTERNS,
     SERVICE_NAME,
     SERVICE_VERSION,
 )
@@ -35,6 +40,54 @@ try:
     HAS_OPENTELEMETRY = True
 except ImportError:
     HAS_OPENTELEMETRY = False
+
+
+def _is_sensitive_key(key: str) -> bool:
+    """Check if a key matches sensitive field patterns (case-insensitive)."""
+    key_lower = key.lower()
+    return any(pattern in key_lower for pattern in SENSITIVE_FIELD_PATTERNS)
+
+
+def _mask_value(value: Any) -> str:
+    """Mask a sensitive value with partial visibility for debugging."""
+    if value is None:
+        return MASK_PLACEHOLDER
+
+    str_value = str(value)
+    if len(str_value) <= MASK_MIN_LENGTH:
+        return MASK_PLACEHOLDER
+
+    # Partial masking: show prefix...suffix
+    return f"{str_value[:MASK_PRESERVE_PREFIX]}...{str_value[-MASK_PRESERVE_SUFFIX:]}"
+
+
+def mask_sensitive_data(data: dict[str, Any]) -> dict[str, Any]:
+    """
+    Recursively mask sensitive fields in a dictionary.
+
+    Args:
+        data: Dictionary that may contain sensitive information
+
+    Returns:
+        Dictionary with sensitive values masked
+    """
+    if not isinstance(data, dict):
+        return data
+
+    result = {}
+    for key, value in data.items():
+        if _is_sensitive_key(key):
+            result[key] = _mask_value(value)
+        elif isinstance(value, dict):
+            result[key] = mask_sensitive_data(value)
+        elif isinstance(value, list):
+            result[key] = [
+                mask_sensitive_data(item) if isinstance(item, dict) else item for item in value
+            ]
+        else:
+            result[key] = value
+
+    return result
 
 
 class ECSJsonFormatter(logging.Formatter):
@@ -81,7 +134,8 @@ class ECSJsonFormatter(logging.Formatter):
             if key not in EXCLUDED_LOG_RECORD_ATTRS
         }
         if extra_fields:
-            log_obj["labels"] = extra_fields
+            # Apply PII masking to extra fields
+            log_obj["labels"] = mask_sensitive_data(extra_fields)
 
         return json.dumps(log_obj, ensure_ascii=False, default=str)
 

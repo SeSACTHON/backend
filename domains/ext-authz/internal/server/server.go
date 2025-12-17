@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"errors"
-	"log"
 	"time"
 
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
@@ -12,7 +11,9 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/code"
 	"google.golang.org/genproto/googleapis/rpc/status"
 
+	"github.com/eco2-team/backend/domains/ext-authz/internal/constants"
 	"github.com/eco2-team/backend/domains/ext-authz/internal/jwt"
+	"github.com/eco2-team/backend/domains/ext-authz/internal/logging"
 	"github.com/eco2-team/backend/domains/ext-authz/internal/metrics"
 )
 
@@ -31,34 +32,26 @@ type BlacklistStore interface {
 }
 
 // ============================================================================
-// Constants
-// ============================================================================
-
-const (
-	HeaderAuthorization = "authorization"
-	HeaderUserID        = "x-user-id"
-	HeaderAuthProvider  = "x-auth-provider"
-)
-
-// ============================================================================
 // AuthorizationServer
 // ============================================================================
 
 type AuthorizationServer struct {
 	verifier TokenVerifier
 	store    BlacklistStore
+	logger   *logging.Logger
 }
 
 func New(verifier TokenVerifier, store BlacklistStore) (*AuthorizationServer, error) {
 	if verifier == nil {
-		return nil, errors.New("verifier is required")
+		return nil, errors.New(constants.ErrVerifierRequired)
 	}
 	if store == nil {
-		return nil, errors.New("store is required")
+		return nil, errors.New(constants.ErrStoreRequired)
 	}
 	return &AuthorizationServer{
 		verifier: verifier,
 		store:    store,
+		logger:   logging.Default(),
 	}, nil
 }
 
@@ -90,18 +83,16 @@ func (s *AuthorizationServer) Check(ctx context.Context, req *authv3.CheckReques
 
 	// 1. Extract Token
 	if req.Attributes == nil || req.Attributes.Request == nil || req.Attributes.Request.Http == nil {
-		log.Printf("[DENY] method=%s path=%s host=%s reason=\"malformed_request\" duration=%s",
-			method, path, host, time.Since(start))
+		s.logger.AuthDeny(method, path, host, constants.ReasonMalformedRequest, time.Since(start), nil)
 		recordMetrics(metrics.ResultDeny, metrics.ReasonMissingHeader)
-		return denyResponse(typev3.StatusCode_BadRequest, "Malformed request"), nil
+		return denyResponse(typev3.StatusCode_BadRequest, constants.MsgMalformedRequest), nil
 	}
 
-	authHeader, ok := req.Attributes.Request.Http.Headers[HeaderAuthorization]
+	authHeader, ok := req.Attributes.Request.Http.Headers[constants.HeaderAuthorization]
 	if !ok || authHeader == "" {
-		log.Printf("[DENY] method=%s path=%s host=%s reason=\"missing_auth_header\" duration=%s",
-			method, path, host, time.Since(start))
+		s.logger.AuthDeny(method, path, host, constants.ReasonMissingHeader, time.Since(start), nil)
 		recordMetrics(metrics.ResultDeny, metrics.ReasonMissingHeader)
-		return denyResponse(typev3.StatusCode_Unauthorized, "Missing Authorization header"), nil
+		return denyResponse(typev3.StatusCode_Unauthorized, constants.MsgMissingAuthHeader), nil
 	}
 
 	// 2. Verify JWT
@@ -110,11 +101,10 @@ func (s *AuthorizationServer) Check(ctx context.Context, req *authv3.CheckReques
 	metrics.JWTVerifyDuration.Observe(time.Since(jwtStart).Seconds())
 
 	if err != nil {
-		log.Printf("[DENY] method=%s path=%s host=%s reason=\"invalid_token\" error=\"%v\" duration=%s",
-			method, path, host, err, time.Since(start))
+		s.logger.AuthDeny(method, path, host, constants.ReasonInvalidToken, time.Since(start), err)
 		recordMetrics(metrics.ResultDeny, metrics.ReasonInvalidToken)
 		metrics.ErrorsTotal.WithLabelValues(metrics.ErrorTypeJWTVerify).Inc()
-		return denyResponse(typev3.StatusCode_Unauthorized, "Invalid token"), nil
+		return denyResponse(typev3.StatusCode_Unauthorized, constants.MsgInvalidToken), nil
 	}
 
 	// Extract user info for logging
@@ -128,26 +118,23 @@ func (s *AuthorizationServer) Check(ctx context.Context, req *authv3.CheckReques
 		metrics.RedisLookupDuration.Observe(time.Since(redisStart).Seconds())
 
 		if err != nil {
-			log.Printf("[DENY] method=%s path=%s host=%s user_id=%s jti=%s reason=\"redis_error\" error=\"%v\" duration=%s",
-				method, path, host, userID, jti, err, time.Since(start))
+			s.logger.AuthDenyWithUser(method, path, host, userID, jti, constants.ReasonRedisError, time.Since(start), err)
 			recordMetrics(metrics.ResultDeny, metrics.ReasonRedisError)
 			metrics.ErrorsTotal.WithLabelValues(metrics.ErrorTypeRedis).Inc()
 			// Fail-closed: Deny on internal error
-			return denyResponse(typev3.StatusCode_InternalServerError, "Internal Authorization Error"), nil
+			return denyResponse(typev3.StatusCode_InternalServerError, constants.MsgInternalError), nil
 		}
 		if blacklisted {
-			log.Printf("[DENY] method=%s path=%s host=%s user_id=%s jti=%s reason=\"blacklisted\" duration=%s",
-				method, path, host, userID, jti, time.Since(start))
+			s.logger.AuthDenyWithUser(method, path, host, userID, jti, constants.ReasonBlacklisted, time.Since(start), nil)
 			recordMetrics(metrics.ResultDeny, metrics.ReasonBlacklisted)
 			metrics.BlacklistHits.Inc()
-			return denyResponse(typev3.StatusCode_Forbidden, "Token is blacklisted"), nil
+			return denyResponse(typev3.StatusCode_Forbidden, constants.MsgBlacklisted), nil
 		}
 	}
 
 	// 4. Allow Request (Inject Headers)
 	provider, _ := claims[jwt.ClaimProvider].(string)
-	log.Printf("[ALLOW] method=%s path=%s host=%s user_id=%s provider=%s jti=%s duration=%s",
-		method, path, host, userID, provider, jti, time.Since(start))
+	s.logger.AuthAllow(method, path, host, userID, provider, jti, time.Since(start))
 	recordMetrics(metrics.ResultAllow, metrics.ReasonSuccess)
 	return allowResponse(userID, provider), nil
 }
@@ -162,13 +149,13 @@ func allowResponse(userID, provider string) *authv3.CheckResponse {
 				Headers: []*corev3.HeaderValueOption{
 					{
 						Header: &corev3.HeaderValue{
-							Key:   HeaderUserID,
+							Key:   constants.HeaderUserID,
 							Value: userID,
 						},
 					},
 					{
 						Header: &corev3.HeaderValue{
-							Key:   HeaderAuthProvider,
+							Key:   constants.HeaderAuthProvider,
 							Value: provider,
 						},
 					},

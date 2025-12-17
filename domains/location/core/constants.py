@@ -45,3 +45,10 @@ EXCLUDED_LOG_RECORD_ATTRS = frozenset(
         "message",
     }
 )
+
+# PII Masking Configuration (OWASP compliant, codebase-specific)
+SENSITIVE_FIELD_PATTERNS = frozenset({"password", "secret", "token", "api_key", "authorization"})
+MASK_PLACEHOLDER = "***REDACTED***"
+MASK_PRESERVE_PREFIX = 4
+MASK_PRESERVE_SUFFIX = 4
+MASK_MIN_LENGTH = 10

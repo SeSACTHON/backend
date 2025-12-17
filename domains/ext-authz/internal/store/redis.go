@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
+
+	"github.com/eco2-team/backend/domains/ext-authz/internal/constants"
 )
 
 const blacklistKeyPrefix = "blacklist:"
@@ -36,12 +38,12 @@ type Store struct {
 // New creates a new Store with the given Redis URL and pool options.
 func New(ctx context.Context, redisURL string, poolOpts *PoolOptions) (*Store, error) {
 	if poolOpts == nil {
-		return nil, fmt.Errorf("pool options is required")
+		return nil, fmt.Errorf(constants.ErrPoolOptionsRequired)
 	}
 
 	opts, err := redis.ParseURL(redisURL)
 	if err != nil {
-		return nil, fmt.Errorf("failed to parse redis url: %w", err)
+		return nil, fmt.Errorf(constants.ErrRedisURLParse, err)
 	}
 
 	// Apply pool options
@@ -54,7 +56,7 @@ func New(ctx context.Context, redisURL string, poolOpts *PoolOptions) (*Store, e
 	client := redis.NewClient(opts)
 
 	if err := client.Ping(ctx).Err(); err != nil {
-		return nil, fmt.Errorf("failed to connect to redis: %w", err)
+		return nil, fmt.Errorf(constants.ErrRedisConnect, err)
 	}
 
 	return &Store{client: client}, nil
@@ -62,17 +64,17 @@ func New(ctx context.Context, redisURL string, poolOpts *PoolOptions) (*Store, e
 
 func NewWithClient(client RedisClient) (*Store, error) {
 	if client == nil {
-		return nil, fmt.Errorf("redis client is nil")
+		return nil, fmt.Errorf(constants.ErrRedisClientNil)
 	}
 	return &Store{client: client}, nil
 }
 
 func (s *Store) Close() error {
 	if s == nil {
-		return errors.New("store is nil")
+		return errors.New(constants.ErrStoreNil)
 	}
 	if s.client == nil {
-		return errors.New("redis client is nil")
+		return errors.New(constants.ErrRedisClientNil)
 	}
 	return s.client.Close()
 }
@@ -81,7 +83,7 @@ func (s *Store) IsBlacklisted(ctx context.Context, jti string) (bool, error) {
 	key := blacklistKey(jti)
 	exists, err := s.client.Exists(ctx, key).Result()
 	if err != nil {
-		return false, fmt.Errorf("redis error: %w", err)
+		return false, fmt.Errorf(constants.ErrRedisOperation, err)
 	}
 	return exists > 0, nil
 }

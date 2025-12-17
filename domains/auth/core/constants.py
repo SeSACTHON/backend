@@ -54,3 +54,27 @@ EXCLUDED_LOG_RECORD_ATTRS = frozenset(
         "message",
     }
 )
+
+# =============================================================================
+# PII Masking Configuration
+# =============================================================================
+# Sensitive field names (case-insensitive substring matching)
+# Only include patterns actually used in this codebase
+# Reference: OWASP Logging Cheat Sheet
+SENSITIVE_FIELD_PATTERNS = frozenset(
+    {
+        "password",  # Key loading, user credentials
+        "secret",  # jwt_secret_key, client_secret
+        "token",  # JWT, OAuth tokens (covers access_token, refresh_token)
+        "api_key",  # External API keys (OpenAI, etc.)
+        "authorization",  # HTTP Authorization header
+    }
+)
+
+# Masking placeholder
+MASK_PLACEHOLDER = "***REDACTED***"
+
+# Partial masking settings
+MASK_PRESERVE_PREFIX = 4  # Show first N characters for tokens
+MASK_PRESERVE_SUFFIX = 4  # Show last N characters for tokens
+MASK_MIN_LENGTH = 10  # Minimum length to apply partial masking
