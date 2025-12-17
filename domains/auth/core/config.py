@@ -4,9 +4,56 @@ from typing import Optional
 from pydantic import HttpUrl, field_validator, Field, AliasChoices
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# =============================================================================
 # Service Constants (Single Source of Truth)
+# =============================================================================
 SERVICE_NAME = "auth-api"
 SERVICE_VERSION = "1.0.7"
+
+# =============================================================================
+# Logging Constants (12-Factor App Compliance)
+# =============================================================================
+# Environment variable keys
+ENV_KEY_ENVIRONMENT = "ENVIRONMENT"
+ENV_KEY_LOG_LEVEL = "LOG_LEVEL"
+ENV_KEY_LOG_FORMAT = "LOG_FORMAT"
+
+# Default values (DEBUG for development phase)
+DEFAULT_ENVIRONMENT = "dev"
+DEFAULT_LOG_LEVEL = "DEBUG"
+DEFAULT_LOG_FORMAT = "json"
+
+# ECS (Elastic Common Schema) version
+ECS_VERSION = "8.11.0"
+
+# LogRecord attributes to exclude from extra fields
+# Reference: https://docs.python.org/3/library/logging.html#logrecord-attributes
+EXCLUDED_LOG_RECORD_ATTRS = frozenset(
+    {
+        "name",
+        "msg",
+        "args",
+        "created",
+        "filename",
+        "funcName",
+        "levelname",
+        "levelno",
+        "lineno",
+        "module",
+        "msecs",
+        "pathname",
+        "process",
+        "processName",
+        "relativeCreated",
+        "stack_info",
+        "exc_info",
+        "exc_text",
+        "thread",
+        "threadName",
+        "taskName",
+        "message",
+    }
+)
 
 
 class Settings(BaseSettings):
