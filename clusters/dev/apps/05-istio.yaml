@@ -53,7 +53,7 @@ spec:
           extensionProviders:
           - name: jaeger
             zipkin:
-              service: jaeger-collector.istio-system.svc.cluster.local
+              service: jaeger-collector-clusterip.istio-system.svc.cluster.local
               port: 9411
           - name: eco2-ext-authz
             envoyExtAuthzGrpc:
