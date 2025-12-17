@@ -47,6 +47,12 @@ spec:
       valuesObject:
         meshConfig:
           # Jaeger tracing 활성화
+          enableTracing: true
+          defaultConfig:
+            tracing:
+              sampling: 100.0
+              zipkin:
+                address: jaeger-collector-clusterip.istio-system.svc.cluster.local:9411
           defaultProviders:
             tracing:
             - jaeger
