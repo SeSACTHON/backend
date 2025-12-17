@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -17,6 +17,7 @@ import (
 
 	"github.com/eco2-team/backend/domains/ext-authz/internal/config"
 	"github.com/eco2-team/backend/domains/ext-authz/internal/jwt"
+	"github.com/eco2-team/backend/domains/ext-authz/internal/logging"
 	"github.com/eco2-team/backend/domains/ext-authz/internal/server"
 	"github.com/eco2-team/backend/domains/ext-authz/internal/store"
 )
@@ -31,6 +32,18 @@ const (
 func main() {
 	cfg := config.Load()
 
+	// Initialize structured logger
+	logLevel := slog.LevelInfo
+	if os.Getenv("LOG_LEVEL") == "DEBUG" {
+		logLevel = slog.LevelDebug
+	}
+	logging.Init(&logging.Config{
+		Level:       logLevel,
+		Output:      os.Stdout,
+		Environment: os.Getenv("ENVIRONMENT"),
+	})
+	logger := logging.Default()
+
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
@@ -41,14 +54,19 @@ func main() {
 		ReadTimeout:  time.Duration(cfg.RedisReadTimeoutMs) * time.Millisecond,
 		WriteTimeout: time.Duration(cfg.RedisWriteTimeoutMs) * time.Millisecond,
 	}
-	log.Printf("🔧 Redis pool config: PoolSize=%d, MinIdleConns=%d, PoolTimeout=%v",
-		poolOpts.PoolSize, poolOpts.MinIdleConns, poolOpts.PoolTimeout)
+	logger.Info("Redis pool configuration",
+		slog.Int("pool_size", poolOpts.PoolSize),
+		slog.Int("min_idle_conns", poolOpts.MinIdleConns),
+		slog.Duration("pool_timeout", poolOpts.PoolTimeout),
+	)
 
 	redisStore, err := store.New(ctx, cfg.RedisURL, poolOpts)
 	if err != nil {
-		log.Fatalf("Failed to connect to Redis: %v", err)
+		logger.Error("Failed to connect to Redis", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 	defer redisStore.Close()
+	logger.Info("Redis connection established")
 
 	verifier, err := jwt.NewVerifier(
 		cfg.JWTSecretKey,
@@ -59,14 +77,21 @@ func main() {
 		cfg.JWTRequiredScope,
 	)
 	if err != nil {
-		log.Fatalf("Failed to create JWT verifier: %v", err)
+		logger.Error("Failed to create JWT verifier", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
+	logger.Info("JWT verifier initialized",
+		slog.String("algorithm", cfg.JWTAlgorithm),
+		slog.String("issuer", cfg.JWTIssuer),
+	)
 
 	authServer, err := server.New(verifier, redisStore)
 	if err != nil {
-		log.Fatalf("Failed to create auth server: %v", err)
+		logger.Error("Failed to create auth server", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 
+	// Start metrics server
 	go func() {
 		mux := http.NewServeMux()
 		mux.Handle(PathMetrics, promhttp.Handler())
@@ -79,32 +104,40 @@ func main() {
 			w.Write([]byte(HealthOK))
 		})
 		metricsAddr := fmt.Sprintf(":%d", cfg.MetricsPort)
-		log.Printf("📊 Starting metrics server on %s", metricsAddr)
+		logger.Info("Starting metrics server", slog.String("address", metricsAddr))
 		if err := http.ListenAndServe(metricsAddr, mux); err != nil {
-			log.Printf("Metrics server error: %v", err)
+			logger.Error("Metrics server error", slog.String("error", err.Error()))
 		}
 	}()
 
+	// Start gRPC server
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPCPort))
 	if err != nil {
-		log.Fatalf("Failed to listen: %v", err)
+		logger.Error("Failed to listen", slog.String("error", err.Error()))
+		os.Exit(1)
 	}
 
 	grpcServer := grpc.NewServer()
 	authv3.RegisterAuthorizationServer(grpcServer, authServer)
 
 	go func() {
-		log.Printf("🚀 Starting ext-authz gRPC server on :%d", cfg.GRPCPort)
+		logger.Info("Starting ext-authz gRPC server",
+			slog.Int("port", cfg.GRPCPort),
+			slog.String("service", logging.ServiceName),
+			slog.String("version", logging.ServiceVersion),
+		)
 		if err := grpcServer.Serve(lis); err != nil {
-			log.Fatalf("Failed to serve: %v", err)
+			logger.Error("Failed to serve", slog.String("error", err.Error()))
+			os.Exit(1)
 		}
 	}()
 
+	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("Shutting down gRPC server...")
+	logger.Info("Shutting down gRPC server")
 	grpcServer.GracefulStop()
-	log.Println("Server stopped")
+	logger.Info("Server stopped")
 }

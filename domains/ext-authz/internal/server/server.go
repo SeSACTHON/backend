@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"errors"
-	"log"
 	"time"
 
 	corev3 "github.com/envoyproxy/go-control-plane/envoy/config/core/v3"
@@ -13,6 +12,7 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/status"
 
 	"github.com/eco2-team/backend/domains/ext-authz/internal/jwt"
+	"github.com/eco2-team/backend/domains/ext-authz/internal/logging"
 	"github.com/eco2-team/backend/domains/ext-authz/internal/metrics"
 )
 
@@ -40,6 +40,15 @@ const (
 	HeaderAuthProvider  = "x-auth-provider"
 )
 
+// Denial reasons for structured logging
+const (
+	ReasonMalformedRequest = "malformed_request"
+	ReasonMissingHeader    = "missing_auth_header"
+	ReasonInvalidToken     = "invalid_token"
+	ReasonRedisError       = "redis_error"
+	ReasonBlacklisted      = "blacklisted"
+)
+
 // ============================================================================
 // AuthorizationServer
 // ============================================================================
@@ -47,6 +56,7 @@ const (
 type AuthorizationServer struct {
 	verifier TokenVerifier
 	store    BlacklistStore
+	logger   *logging.Logger
 }
 
 func New(verifier TokenVerifier, store BlacklistStore) (*AuthorizationServer, error) {
@@ -59,6 +69,7 @@ func New(verifier TokenVerifier, store BlacklistStore) (*AuthorizationServer, er
 	return &AuthorizationServer{
 		verifier: verifier,
 		store:    store,
+		logger:   logging.Default(),
 	}, nil
 }
 
@@ -90,16 +101,14 @@ func (s *AuthorizationServer) Check(ctx context.Context, req *authv3.CheckReques
 
 	// 1. Extract Token
 	if req.Attributes == nil || req.Attributes.Request == nil || req.Attributes.Request.Http == nil {
-		log.Printf("[DENY] method=%s path=%s host=%s reason=\"malformed_request\" duration=%s",
-			method, path, host, time.Since(start))
+		s.logger.AuthDeny(method, path, host, ReasonMalformedRequest, time.Since(start), nil)
 		recordMetrics(metrics.ResultDeny, metrics.ReasonMissingHeader)
 		return denyResponse(typev3.StatusCode_BadRequest, "Malformed request"), nil
 	}
 
 	authHeader, ok := req.Attributes.Request.Http.Headers[HeaderAuthorization]
 	if !ok || authHeader == "" {
-		log.Printf("[DENY] method=%s path=%s host=%s reason=\"missing_auth_header\" duration=%s",
-			method, path, host, time.Since(start))
+		s.logger.AuthDeny(method, path, host, ReasonMissingHeader, time.Since(start), nil)
 		recordMetrics(metrics.ResultDeny, metrics.ReasonMissingHeader)
 		return denyResponse(typev3.StatusCode_Unauthorized, "Missing Authorization header"), nil
 	}
@@ -110,8 +119,7 @@ func (s *AuthorizationServer) Check(ctx context.Context, req *authv3.CheckReques
 	metrics.JWTVerifyDuration.Observe(time.Since(jwtStart).Seconds())
 
 	if err != nil {
-		log.Printf("[DENY] method=%s path=%s host=%s reason=\"invalid_token\" error=\"%v\" duration=%s",
-			method, path, host, err, time.Since(start))
+		s.logger.AuthDeny(method, path, host, ReasonInvalidToken, time.Since(start), err)
 		recordMetrics(metrics.ResultDeny, metrics.ReasonInvalidToken)
 		metrics.ErrorsTotal.WithLabelValues(metrics.ErrorTypeJWTVerify).Inc()
 		return denyResponse(typev3.StatusCode_Unauthorized, "Invalid token"), nil
@@ -128,16 +136,14 @@ func (s *AuthorizationServer) Check(ctx context.Context, req *authv3.CheckReques
 		metrics.RedisLookupDuration.Observe(time.Since(redisStart).Seconds())
 
 		if err != nil {
-			log.Printf("[DENY] method=%s path=%s host=%s user_id=%s jti=%s reason=\"redis_error\" error=\"%v\" duration=%s",
-				method, path, host, userID, jti, err, time.Since(start))
+			s.logger.AuthDenyWithUser(method, path, host, userID, jti, ReasonRedisError, time.Since(start), err)
 			recordMetrics(metrics.ResultDeny, metrics.ReasonRedisError)
 			metrics.ErrorsTotal.WithLabelValues(metrics.ErrorTypeRedis).Inc()
 			// Fail-closed: Deny on internal error
 			return denyResponse(typev3.StatusCode_InternalServerError, "Internal Authorization Error"), nil
 		}
 		if blacklisted {
-			log.Printf("[DENY] method=%s path=%s host=%s user_id=%s jti=%s reason=\"blacklisted\" duration=%s",
-				method, path, host, userID, jti, time.Since(start))
+			s.logger.AuthDenyWithUser(method, path, host, userID, jti, ReasonBlacklisted, time.Since(start), nil)
 			recordMetrics(metrics.ResultDeny, metrics.ReasonBlacklisted)
 			metrics.BlacklistHits.Inc()
 			return denyResponse(typev3.StatusCode_Forbidden, "Token is blacklisted"), nil
@@ -146,8 +152,7 @@ func (s *AuthorizationServer) Check(ctx context.Context, req *authv3.CheckReques
 
 	// 4. Allow Request (Inject Headers)
 	provider, _ := claims[jwt.ClaimProvider].(string)
-	log.Printf("[ALLOW] method=%s path=%s host=%s user_id=%s provider=%s jti=%s duration=%s",
-		method, path, host, userID, provider, jti, time.Since(start))
+	s.logger.AuthAllow(method, path, host, userID, provider, jti, time.Since(start))
 	recordMetrics(metrics.ResultAllow, metrics.ReasonSuccess)
 	return allowResponse(userID, provider), nil
 }
