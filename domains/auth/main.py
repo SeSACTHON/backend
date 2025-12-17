@@ -11,8 +11,12 @@ from domains.auth.core.exceptions import (
     http_exception_handler,
     validation_exception_handler,
 )
+from domains.auth.core.logging import configure_logging
 
 from domains.auth.services.key_manager import KeyManager
+
+# 구조화된 로깅 설정 (ECS JSON 포맷)
+configure_logging(service_name="auth-api", service_version="0.7.3")
 
 
 @asynccontextmanager
