@@ -31,6 +31,8 @@ spec:
       },
       "references": [
         {"id": "logs-eco2-app", "name": "kibanaSavedObjectMeta.searchSourceJSON.index", "type": "index-pattern"},
+        {"id": "logs-eco2-app", "name": "type:indexpattern-datasource-layer-layer1", "type": "index-pattern"},
+        {"id": "logs-eco2-app", "name": "service:indexpattern-datasource-layer-layer1", "type": "index-pattern"},
         {"id": "logs-eco2-app", "name": "search_details", "type": "index-pattern"},
         {"id": "logs-eco2-app", "name": "search_trace", "type": "index-pattern"}
       ]
