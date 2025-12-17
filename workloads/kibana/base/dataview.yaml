@@ -9,10 +9,7 @@ spec:
     name: eco2-kibana
   body: |
     {
-      "data_view": {
-        "id": "logs-eco2-app-dataview",
-        "name": "logs-eco2-app",
-        "title": "logs-*",
-        "timeFieldName": "@timestamp"
-      }
+      "title": "logs-*",
+      "name": "logs-eco2-app",
+      "timeFieldName": "@timestamp"
     }
