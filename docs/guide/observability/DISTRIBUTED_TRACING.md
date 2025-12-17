@@ -422,10 +422,18 @@ kubectl logs -n istio-system -l app.kubernetes.io/name=jaeger -c jaeger
 
 ## 참고 자료
 
-- [CNCF OpenTelemetry Documentation](https://opentelemetry.io/docs/)
-- [Jaeger v2 Release Notes](https://www.jaegertracing.io/docs/latest/)
-- [Google Dapper Paper](https://research.google/pubs/pub36356/)
-- [Netflix Edgar - Distributed Tracing](https://netflixtechblog.com/)
-- [Uber Jaeger Architecture](https://www.uber.com/blog/distributed-tracing/)
-- [Istio Distributed Tracing](https://istio.io/latest/docs/tasks/observability/distributed-tracing/)
-- [Kiali Documentation](https://kiali.io/docs/)
+### CNCF & OpenTelemetry
+
+- [OpenTelemetry Documentation](https://opentelemetry.io/docs/) - 공식 OTel 문서
+- [Jaeger Documentation](https://www.jaegertracing.io/docs/latest/) - Jaeger v2 공식 문서
+
+### 빅테크 아키텍처
+
+- [Google Dapper Paper](https://research.google/pubs/dapper-a-large-scale-distributed-systems-tracing-infrastructure/) - 분산 트레이싱의 시초가 된 Google 논문
+- [Uber: Evolving Distributed Tracing](https://www.uber.com/blog/distributed-tracing/) - Uber의 Jaeger 개발 배경
+- [Netflix: Lessons from Building Observability Tools](https://netflixtechblog.com/lessons-from-building-observability-tools-at-netflix-7cfafed6ab17) - Netflix의 Observability 구축 경험
+
+### Service Mesh Integration
+
+- [Istio Distributed Tracing](https://istio.io/latest/docs/tasks/observability/distributed-tracing/) - Istio 트레이싱 설정 가이드
+- [Kiali Documentation](https://kiali.io/docs/) - Service Mesh 시각화 도구
