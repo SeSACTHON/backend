@@ -3,9 +3,12 @@ kind: Kustomization
 namespace: my
 resources:
 - deployment.yaml
+- deployment-grpc.yaml
 - service.yaml
+- service-grpc.yaml
 - configmap.yaml
 - db-bootstrap-job.yaml
+- servicemonitor.yaml
 labels:
 - includeSelectors: true
   pairs:

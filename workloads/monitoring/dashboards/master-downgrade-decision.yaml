@@ -1,0 +1,299 @@
+# 마스터 노드 다운그레이드 결정 대시보드
+# 목적: t3.xlarge → t3.large 전환 가능 여부 판단
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-master-downgrade
+  namespace: prometheus
+  labels:
+    grafana_dashboard: '1'
+    app: grafana
+  annotations:
+    grafana_folder: Master Node
+data:
+  master-downgrade-decision.json: |
+    {
+      "annotations": {
+        "list": []
+      },
+      "title": "📉 Master Node - Downgrade Decision",
+      "uid": "master-downgrade-decision",
+      "version": 1,
+      "timezone": "browser",
+      "schemaVersion": 38,
+      "refresh": "1m",
+      "time": {
+        "from": "now-7d",
+        "to": "now"
+      },
+      "templating": {
+        "list": []
+      },
+      "panels": [
+        {
+          "title": "🎯 다운그레이드 판단 기준",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
+          "collapsed": false
+        },
+        {
+          "title": "✅ 다운그레이드 가능 여부",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 1 },
+          "description": "7일간 메모리 피크가 6GB 미만이면 t3.large(8GB)로 다운그레이드 가능",
+          "targets": [
+            {
+              "expr": "max_over_time((node_memory_MemTotal_bytes{instance=~\".*k8s-master.*\"} - node_memory_MemAvailable_bytes{instance=~\".*k8s-master.*\"})[7d:1h]) / 1024 / 1024 / 1024 < 6",
+              "legendFormat": "Safe to Downgrade"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "mappings": [
+                { "type": "value", "options": { "1": { "text": "✅ 가능 (피크 < 6GB)", "color": "green" } } },
+                { "type": "value", "options": { "0": { "text": "⚠️ 위험 (피크 ≥ 6GB)", "color": "red" } } }
+              ]
+            }
+          }
+        },
+        {
+          "title": "7일간 메모리 피크 (GB)",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 1 },
+          "description": "6GB 미만이어야 t3.large(8GB)로 안전하게 다운그레이드 가능",
+          "targets": [
+            {
+              "expr": "max_over_time((node_memory_MemTotal_bytes{instance=~\".*k8s-master.*\"} - node_memory_MemAvailable_bytes{instance=~\".*k8s-master.*\"})[7d:1h]) / 1024 / 1024 / 1024",
+              "legendFormat": "Peak Memory"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decgbytes",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 5 },
+                  { "color": "red", "value": 6 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "7일간 메모리 평균 (GB)",
+          "type": "stat",
+          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 1 },
+          "targets": [
+            {
+              "expr": "avg_over_time((node_memory_MemTotal_bytes{instance=~\".*k8s-master.*\"} - node_memory_MemAvailable_bytes{instance=~\".*k8s-master.*\"})[7d:1h]) / 1024 / 1024 / 1024",
+              "legendFormat": "Avg Memory"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decgbytes",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 4 },
+                  { "color": "red", "value": 5 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "📊 7일간 메모리 사용량 추이",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 7 },
+          "collapsed": false
+        },
+        {
+          "title": "메모리 사용량 vs 다운그레이드 기준선 (7일)",
+          "type": "timeseries",
+          "gridPos": { "h": 10, "w": 24, "x": 0, "y": 8 },
+          "description": "빨간선(6GB)을 넘지 않으면 t3.large로 안전하게 다운그레이드 가능",
+          "targets": [
+            {
+              "expr": "(node_memory_MemTotal_bytes{instance=~\".*k8s-master.*\"} - node_memory_MemAvailable_bytes{instance=~\".*k8s-master.*\"}) / 1024 / 1024 / 1024",
+              "legendFormat": "실제 사용량"
+            },
+            {
+              "expr": "8",
+              "legendFormat": "🔴 t3.large 제한 (8GB)"
+            },
+            {
+              "expr": "6",
+              "legendFormat": "🟡 안전 기준 (6GB)"
+            },
+            {
+              "expr": "4",
+              "legendFormat": "🟢 권장 기준 (4GB)"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decgbytes",
+              "min": 0,
+              "max": 16,
+              "custom": {
+                "lineWidth": 2,
+                "fillOpacity": 10,
+                "pointSize": 1
+              }
+            },
+            "overrides": [
+              {
+                "matcher": { "id": "byName", "options": "🔴 t3.large 제한 (8GB)" },
+                "properties": [
+                  { "id": "color", "value": { "mode": "fixed", "fixedColor": "red" } },
+                  { "id": "custom.lineStyle", "value": { "fill": "dash" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "🟡 안전 기준 (6GB)" },
+                "properties": [
+                  { "id": "color", "value": { "mode": "fixed", "fixedColor": "yellow" } },
+                  { "id": "custom.lineStyle", "value": { "fill": "dash" } }
+                ]
+              },
+              {
+                "matcher": { "id": "byName", "options": "🟢 권장 기준 (4GB)" },
+                "properties": [
+                  { "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } },
+                  { "id": "custom.lineStyle", "value": { "fill": "dash" } }
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "title": "🔍 컴포넌트별 분석",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 18 },
+          "collapsed": false
+        },
+        {
+          "title": "kube-apiserver 7일간 피크 메모리 (GB)",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 0, "y": 19 },
+          "description": "2GB 미만이어야 안전",
+          "targets": [
+            {
+              "expr": "max_over_time(container_memory_working_set_bytes{pod=~\"kube-apiserver.*\", container!=\"POD\"}[7d:1h]) / 1024 / 1024 / 1024",
+              "legendFormat": "apiserver Peak"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decgbytes",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 1.5 },
+                  { "color": "red", "value": 2 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "ArgoCD 7일간 피크 메모리 (GB)",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 6, "y": 19 },
+          "description": "1GB 미만이어야 안전",
+          "targets": [
+            {
+              "expr": "max_over_time(sum(container_memory_working_set_bytes{namespace=\"argocd\", container!=\"POD\"})[7d:1h]) / 1024 / 1024 / 1024",
+              "legendFormat": "ArgoCD Peak"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decgbytes",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 0.8 },
+                  { "color": "red", "value": 1 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "etcd 7일간 피크 메모리 (MB)",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 12, "y": 19 },
+          "targets": [
+            {
+              "expr": "max_over_time(container_memory_working_set_bytes{pod=~\"etcd.*\", container!=\"POD\"}[7d:1h]) / 1024 / 1024",
+              "legendFormat": "etcd Peak"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decmBytes",
+              "decimals": 0,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 300 },
+                  { "color": "red", "value": 500 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "전체 Pod 합계 7일 피크 (GB)",
+          "type": "stat",
+          "gridPos": { "h": 5, "w": 6, "x": 18, "y": 19 },
+          "targets": [
+            {
+              "expr": "max_over_time(sum(container_memory_working_set_bytes{node=\"k8s-master\", container!=\"\", container!=\"POD\"})[7d:1h]) / 1024 / 1024 / 1024",
+              "legendFormat": "All Pods Peak"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "decgbytes",
+              "decimals": 2,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 4 },
+                  { "color": "red", "value": 5 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "💰 비용 비교",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+          "collapsed": false
+        },
+        {
+          "title": "💵 비용 절감 예상",
+          "type": "text",
+          "gridPos": { "h": 6, "w": 24, "x": 0, "y": 25 },
+          "options": {
+            "mode": "markdown",
+            "content": "## 다운그레이드 비용 분석\n\n| 항목 | t3.xlarge (현재) | t3.large (변경 후) |\n|------|------------------|-------------------|\n| vCPU | 4 | 2 |\n| RAM | 16GB | 8GB |\n| 월 비용 | $154.18 | $77.09 |\n\n### 💰 월간 절감액: **$77.09 (~₩110,000)**\n### 💰 연간 절감액: **$925.08 (~₩1,320,000)**\n\n---\n\n### ⚠️ 다운그레이드 조건\n- ✅ 7일간 메모리 피크 < 6GB\n- ✅ kube-apiserver 피크 < 2GB\n- ✅ ArgoCD 피크 < 1GB"
+          }
+        }
+      ]
+    }

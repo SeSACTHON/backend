@@ -2,9 +2,12 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
 - ../base
+- post-sync-reset-job.yaml
 images:
 - name: docker.io/mng990/eco2
   newTag: auth-api-dev-latest
+- name: docker.io/mng990/eco2:ext-authz
+  newTag: docker.io/mng990/eco2:ext-authz-dev-3af903
 labels:
 - includeSelectors: true
   pairs:

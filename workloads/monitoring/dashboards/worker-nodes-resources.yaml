@@ -1,0 +1,476 @@
+# Worker 노드별 리소스 모니터링 대시보드
+# 목적: 각 도메인 노드의 CPU, Memory, Disk, Network 사용량 추적
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-worker-nodes
+  namespace: prometheus
+  labels:
+    grafana_dashboard: '1'
+    app: grafana
+  annotations:
+    grafana_folder: Cluster Nodes
+data:
+  worker-nodes-resources.json: |
+    {
+      "title": "🖥️ Worker Nodes - Resources",
+      "uid": "worker-nodes-resources",
+      "version": 2,
+      "timezone": "browser",
+      "schemaVersion": 38,
+      "refresh": "30s",
+      "time": { "from": "now-1h", "to": "now" },
+      "templating": {
+        "list": [
+          {
+            "name": "node",
+            "type": "query",
+            "datasource": { "type": "prometheus", "uid": "${datasource}" },
+            "query": "label_values(node_uname_info{job=\"node-exporter\"}, nodename)",
+            "refresh": 2,
+            "multi": true,
+            "includeAll": true,
+            "current": { "text": "All", "value": "$__all" }
+          },
+          {
+            "name": "datasource",
+            "type": "datasource",
+            "query": "prometheus",
+            "current": { "text": "Prometheus", "value": "prometheus" },
+            "hide": 2
+          }
+        ]
+      },
+      "panels": [
+        {
+          "title": "📊 노드별 CPU 사용률",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "100 - (avg by (nodename) (rate(node_cpu_seconds_total{mode=\"idle\", job=\"node-exporter\"}[5m]) * on(instance) group_left(nodename) node_uname_info{nodename=~\"$node\"}) * 100)",
+              "legendFormat": "{{nodename}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "custom": { "lineWidth": 2, "fillOpacity": 20 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 60 },
+                  { "color": "red", "value": 80 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "📊 노드별 Memory 사용률",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "(1 - (node_memory_MemAvailable_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\"$node\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\"$node\"})) * 100",
+              "legendFormat": "{{nodename}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "custom": { "lineWidth": 2, "fillOpacity": 20 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 85 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "📊 노드별 Disk 사용률",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "(1 - (node_filesystem_avail_bytes{job=\"node-exporter\", mountpoint=\"/\", fstype!=\"rootfs\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\"$node\"} / node_filesystem_size_bytes{job=\"node-exporter\", mountpoint=\"/\", fstype!=\"rootfs\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\"$node\"})) * 100",
+              "legendFormat": "{{nodename}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "min": 0,
+              "max": 100,
+              "custom": { "lineWidth": 2, "fillOpacity": 20 },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 85 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "📊 노드별 Network I/O (MB/s)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "sum by (nodename) (rate(node_network_receive_bytes_total{job=\"node-exporter\", device!~\"lo|veth.*|cali.*|tunl.*|docker.*\"}[5m]) * on(instance) group_left(nodename) node_uname_info{nodename=~\"$node\"}) / 1024 / 1024",
+              "legendFormat": "{{nodename}} - RX"
+            },
+            {
+              "expr": "sum by (nodename) (rate(node_network_transmit_bytes_total{job=\"node-exporter\", device!~\"lo|veth.*|cali.*|tunl.*|docker.*\"}[5m]) * on(instance) group_left(nodename) node_uname_info{nodename=~\"$node\"}) / 1024 / 1024",
+              "legendFormat": "{{nodename}} - TX"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "MBs",
+              "custom": { "lineWidth": 2, "fillOpacity": 10 }
+            }
+          }
+        },
+        {
+          "title": "🏷️ 도메인 노드별 CPU 사용률",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 16 },
+          "collapsed": false
+        },
+        {
+          "title": "k8s-api-auth",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 17 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\", job=\"node-exporter\"}[5m]) * on(instance) group_left(nodename) node_uname_info{nodename=~\".*auth.*\"}) * 100)",
+              "legendFormat": "CPU %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 60 },
+                  { "color": "red", "value": 80 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "k8s-api-scan",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 17 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\", job=\"node-exporter\"}[5m]) * on(instance) group_left(nodename) node_uname_info{nodename=~\".*scan.*\"}) * 100)",
+              "legendFormat": "CPU %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 60 },
+                  { "color": "red", "value": 80 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "k8s-api-character",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 17 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\", job=\"node-exporter\"}[5m]) * on(instance) group_left(nodename) node_uname_info{nodename=~\".*character.*\"}) * 100)",
+              "legendFormat": "CPU %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 60 },
+                  { "color": "red", "value": 80 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "k8s-api-my",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 17 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\", job=\"node-exporter\"}[5m]) * on(instance) group_left(nodename) node_uname_info{nodename=~\".*my.*|.*location.*|.*chat.*\"}) * 100)",
+              "legendFormat": "CPU %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 60 },
+                  { "color": "red", "value": 80 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "k8s-redis",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 17 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\", job=\"node-exporter\"}[5m]) * on(instance) group_left(nodename) node_uname_info{nodename=~\".*redis.*\"}) * 100)",
+              "legendFormat": "CPU %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 60 },
+                  { "color": "red", "value": 80 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "k8s-ingress",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 17 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "100 - (avg(rate(node_cpu_seconds_total{mode=\"idle\", job=\"node-exporter\"}[5m]) * on(instance) group_left(nodename) node_uname_info{nodename=~\".*ingress.*\"}) * 100)",
+              "legendFormat": "CPU %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 60 },
+                  { "color": "red", "value": 80 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "🏷️ 도메인 노드별 Memory 사용률",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 21 },
+          "collapsed": false
+        },
+        {
+          "title": "k8s-api-auth (Mem)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 0, "y": 22 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "(1 - avg(node_memory_MemAvailable_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*auth.*\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*auth.*\"})) * 100",
+              "legendFormat": "Memory %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 85 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "k8s-api-scan (Mem)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 4, "y": 22 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "(1 - avg(node_memory_MemAvailable_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*scan.*\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*scan.*\"})) * 100",
+              "legendFormat": "Memory %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 85 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "k8s-api-character (Mem)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 8, "y": 22 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "(1 - avg(node_memory_MemAvailable_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*character.*\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*character.*\"})) * 100",
+              "legendFormat": "Memory %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 85 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "k8s-api-my (Mem)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 12, "y": 22 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "(1 - avg(node_memory_MemAvailable_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*my.*|.*location.*|.*chat.*\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*my.*|.*location.*|.*chat.*\"})) * 100",
+              "legendFormat": "Memory %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 85 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "k8s-redis (Mem)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 16, "y": 22 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "(1 - avg(node_memory_MemAvailable_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*redis.*\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*redis.*\"})) * 100",
+              "legendFormat": "Memory %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 85 }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "title": "k8s-ingress (Mem)",
+          "type": "stat",
+          "gridPos": { "h": 4, "w": 4, "x": 20, "y": 22 },
+          "datasource": { "type": "prometheus", "uid": "${datasource}" },
+          "targets": [
+            {
+              "expr": "(1 - avg(node_memory_MemAvailable_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*ingress.*\"} / node_memory_MemTotal_bytes{job=\"node-exporter\"} * on(instance) group_left(nodename) node_uname_info{nodename=~\".*ingress.*\"})) * 100",
+              "legendFormat": "Memory %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "percent",
+              "decimals": 1,
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 70 },
+                  { "color": "red", "value": 85 }
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }

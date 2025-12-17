@@ -3,8 +3,14 @@ kind: Kustomization
 namespace: character
 resources:
 - deployment.yaml
+- deployment-grpc.yaml
 - service.yaml
+- service-grpc.yaml
 - configmap.yaml
+- hpa.yaml
+- servicemonitor.yaml
+# - authorization-policy.yaml
+# - peer-authentication.yaml
 labels:
 - includeSelectors: true
   pairs:
