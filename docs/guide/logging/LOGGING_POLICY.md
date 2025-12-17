@@ -1,6 +1,6 @@
 # ECO2 Backend Logging Policy
 
-> **Version**: 1.0.0  
+> **Version**: 1.1.0  
 > **Last Updated**: 2025-12-17  
 > **Status**: Active
 
@@ -15,6 +15,7 @@
 7. [민감 정보 처리](#민감-정보-처리)
 8. [성능 고려사항](#성능-고려사항)
 9. [구현 가이드](#구현-가이드)
+10. [구현 현황](#구현-현황)
 
 ---
 
@@ -26,16 +27,16 @@
 
 ### 적용 범위
 
-| 서비스 | 언어 | 적용 |
-|--------|------|------|
-| auth-api | Python/FastAPI | ✅ |
-| character-api | Python/FastAPI | ✅ |
-| chat-api | Python/FastAPI | ✅ |
-| scan-api | Python/FastAPI | ✅ |
-| location-api | Python/FastAPI | ✅ |
-| my-api | Python/FastAPI | ✅ |
-| image-api | Python/FastAPI | ✅ |
-| ext-authz | Go/gRPC | ✅ |
+| 서비스 | 언어 | 정책 적용 | ECS 로깅 구현 |
+|--------|------|----------|--------------|
+| auth-api | Python/FastAPI | ✅ | ✅ 완료 |
+| character-api | Python/FastAPI | ✅ | ⏳ 예정 |
+| chat-api | Python/FastAPI | ✅ | ⏳ 예정 |
+| scan-api | Python/FastAPI | ✅ | ⏳ 예정 |
+| location-api | Python/FastAPI | ✅ | ⏳ 예정 |
+| my-api | Python/FastAPI | ✅ | ⏳ 예정 |
+| image-api | Python/FastAPI | ✅ | ⏳ 예정 |
+| ext-authz | Go/gRPC | ✅ | ⏳ 예정 |
 
 ### 로깅 스택
 
@@ -584,12 +585,81 @@ func NewLogger(service, version, environment string) *zap.Logger {
 
 ---
 
+## 구현 현황
+
+### 구현 방식
+
+각 도메인에서 **독립적으로** 로깅 모듈을 구현합니다 (공통 모듈 미사용).
+
+```
+domains/
+├── auth/
+│   └── core/logging.py      ✅ 구현 완료
+├── character/
+│   └── core/logging.py      ⏳ 예정
+├── chat/
+│   └── core/logging.py      ⏳ 예정
+└── ...
+```
+
+### 구현 파일 구조
+
+```python
+# domains/{service}/core/logging.py
+- ECSJsonFormatter: ECS 기반 JSON 포매터
+- configure_logging(): 로깅 설정 함수
+
+# domains/{service}/main.py
+from domains.{service}.core.logging import configure_logging
+configure_logging(service_name="{service}-api", service_version="x.x.x")
+```
+
+### auth-api 구현 예시
+
+```python
+# domains/auth/core/logging.py
+class ECSJsonFormatter(logging.Formatter):
+    """Elastic Common Schema 기반 JSON 포매터"""
+    
+    def format(self, record: logging.LogRecord) -> str:
+        log_obj = {
+            "@timestamp": datetime.now(timezone.utc).isoformat(),
+            "message": record.getMessage(),
+            "log.level": record.levelname.lower(),
+            "log.logger": record.name,
+            "service.name": self.service_name,
+            "service.version": self.service_version,
+            "service.environment": self.environment,
+        }
+        
+        # OpenTelemetry trace context
+        if HAS_OPENTELEMETRY:
+            span = trace.get_current_span()
+            ctx = span.get_span_context()
+            if ctx.is_valid:
+                log_obj["trace.id"] = format(ctx.trace_id, "032x")
+                log_obj["span.id"] = format(ctx.span_id, "016x")
+        
+        return json.dumps(log_obj)
+```
+
+### 환경 변수
+
+| 변수 | 기본값 | 설명 |
+|------|--------|------|
+| `LOG_LEVEL` | `INFO` | 로그 레벨 (DEBUG, INFO, WARNING, ERROR) |
+| `LOG_FORMAT` | `json` | 로그 포맷 (json, text) |
+| `ENVIRONMENT` | `dev` | 환경 (dev, staging, prod) |
+
+---
+
 ## 참고 자료
 
 - [OpenTelemetry Python Documentation](https://opentelemetry.io/docs/languages/python/)
-- [Structlog Documentation](https://www.structlog.org/)
+- [Elastic Common Schema Reference](https://www.elastic.co/guide/en/ecs/current/ecs-reference.html)
 - [Kubernetes Logging Best Practices](https://kubernetes.io/docs/concepts/cluster-administration/logging/)
 - [Istio Distributed Tracing](https://istio.io/latest/docs/tasks/observability/distributed-tracing/)
+- [LOGGING_BEST_PRACTICES.md](./LOGGING_BEST_PRACTICES.md) - 빅테크/CNCF 벤더 사례
 
 ---
 
@@ -598,3 +668,4 @@ func NewLogger(service, version, environment string) *zap.Logger {
 | 버전 | 날짜 | 변경 내용 | 작성자 |
 |------|------|----------|--------|
 | 1.0.0 | 2025-12-17 | 초기 문서 작성 | - |
+| 1.1.0 | 2025-12-17 | 구현 현황 추가, auth-api ECS 로깅 적용 | - |
