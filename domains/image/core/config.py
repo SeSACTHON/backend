@@ -4,6 +4,10 @@ from typing import Literal
 from pydantic import AliasChoices, Field, HttpUrl
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Service Constants (Single Source of Truth)
+SERVICE_NAME = "image-api"
+SERVICE_VERSION = "1.0.7"
+
 
 class Settings(BaseSettings):
     app_name: str = "Image API"

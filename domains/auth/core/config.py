@@ -4,6 +4,10 @@ from typing import Optional
 from pydantic import HttpUrl, field_validator, Field, AliasChoices
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Service Constants (Single Source of Truth)
+SERVICE_NAME = "auth-api"
+SERVICE_VERSION = "1.0.7"
+
 
 class Settings(BaseSettings):
     app_name: str = "Auth API"

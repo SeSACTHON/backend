@@ -16,7 +16,7 @@ import sys
 from datetime import datetime, timezone
 from typing import Any
 
-from domains.auth.core.config import SERVICE_NAME, SERVICE_VERSION
+from domains.scan.core.config import SERVICE_NAME, SERVICE_VERSION
 
 try:
     from opentelemetry import trace
@@ -33,10 +33,10 @@ class ECSJsonFormatter(logging.Formatter):
     출력 예시:
     {
         "@timestamp": "2025-12-17T10:00:00.000Z",
-        "message": "User login successful",
+        "message": "Waste classification completed",
         "log.level": "info",
-        "log.logger": "domains.auth.services.auth",
-        "service.name": "auth-api",
+        "log.logger": "domains.scan.services.scan",
+        "service.name": "scan-api",
         "service.version": "1.0.7",
         "service.environment": "dev",
         "trace.id": "4bf92f3577b34da6a3ce929d0e0e4736",

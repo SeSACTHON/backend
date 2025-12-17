@@ -3,6 +3,10 @@ from functools import lru_cache
 from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Service Constants (Single Source of Truth)
+SERVICE_NAME = "scan-api"
+SERVICE_VERSION = "1.0.7"
+
 
 class Settings(BaseSettings):
     app_name: str = "Scan API"
