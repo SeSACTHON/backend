@@ -5,6 +5,7 @@ namespace: logging
 
 resources:
 - ../base
+- ../network-policies  # commonLabels 적용 제외 (ECK Pod 라벨 호환)
 
 commonLabels:
   environment: dev
