@@ -4,7 +4,6 @@ metadata:
   name: istio-ingress
   namespace: istio-system
   annotations:
-    # External DNS 호스트 목록 (쉼표 구분)
     external-dns.alpha.kubernetes.io/hostname: >-
       api.dev.growbin.app,
       argocd.dev.growbin.app,
