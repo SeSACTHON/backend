@@ -15,7 +15,7 @@ spec:
     path: workloads/kibana/dev
   destination:
     server: https://kubernetes.default.svc
-    namespace: kibana
+    namespace: logging
   syncPolicy:
     automated:
       prune: true
