@@ -16,17 +16,11 @@ import (
 	"google.golang.org/grpc"
 
 	"github.com/eco2-team/backend/domains/ext-authz/internal/config"
+	"github.com/eco2-team/backend/domains/ext-authz/internal/constants"
 	"github.com/eco2-team/backend/domains/ext-authz/internal/jwt"
 	"github.com/eco2-team/backend/domains/ext-authz/internal/logging"
 	"github.com/eco2-team/backend/domains/ext-authz/internal/server"
 	"github.com/eco2-team/backend/domains/ext-authz/internal/store"
-)
-
-const (
-	PathMetrics = "/metrics"
-	PathHealth  = "/health"
-	PathReady   = "/ready"
-	HealthOK    = "ok"
 )
 
 func main() {
@@ -34,17 +28,17 @@ func main() {
 
 	// Initialize structured logger
 	logLevel := slog.LevelInfo
-	if os.Getenv("LOG_LEVEL") == "DEBUG" {
+	if os.Getenv(constants.EnvLogLevel) == constants.LogLevelDebug {
 		logLevel = slog.LevelDebug
 	}
 	logging.Init(&logging.Config{
 		Level:       logLevel,
 		Output:      os.Stdout,
-		Environment: os.Getenv("ENVIRONMENT"),
+		Environment: os.Getenv(constants.EnvEnvironment),
 	})
 	logger := logging.Default()
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), constants.InitTimeout)
 	defer cancel()
 
 	poolOpts := &store.PoolOptions{
@@ -94,14 +88,14 @@ func main() {
 	// Start metrics server
 	go func() {
 		mux := http.NewServeMux()
-		mux.Handle(PathMetrics, promhttp.Handler())
-		mux.HandleFunc(PathHealth, func(w http.ResponseWriter, r *http.Request) {
+		mux.Handle(constants.PathMetrics, promhttp.Handler())
+		mux.HandleFunc(constants.PathHealth, func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(HealthOK))
+			w.Write([]byte(constants.HealthOK))
 		})
-		mux.HandleFunc(PathReady, func(w http.ResponseWriter, r *http.Request) {
+		mux.HandleFunc(constants.PathReady, func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(HealthOK))
+			w.Write([]byte(constants.HealthOK))
 		})
 		metricsAddr := fmt.Sprintf(":%d", cfg.MetricsPort)
 		logger.Info("Starting metrics server", slog.String("address", metricsAddr))
@@ -123,8 +117,8 @@ func main() {
 	go func() {
 		logger.Info("Starting ext-authz gRPC server",
 			slog.Int("port", cfg.GRPCPort),
-			slog.String("service", logging.ServiceName),
-			slog.String("version", logging.ServiceVersion),
+			slog.String("service", constants.ServiceName),
+			slog.String("version", constants.ServiceVersion),
 		)
 		if err := grpcServer.Serve(lis); err != nil {
 			logger.Error("Failed to serve", slog.String("error", err.Error()))

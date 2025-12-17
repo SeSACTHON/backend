@@ -1,12 +1,9 @@
 package logging
 
-import "strings"
+import (
+	"strings"
 
-const (
-	// Masking configuration (aligned with Python implementation)
-	MaskPlaceholder   = "***REDACTED***"
-	MaskPreserveLen   = 4  // Characters to preserve at start/end
-	MaskMinLength     = 10 // Minimum length for partial masking
+	"github.com/eco2-team/backend/domains/ext-authz/internal/constants"
 )
 
 // MaskJTI masks a JWT ID, preserving first and last characters.
@@ -26,14 +23,14 @@ func MaskUserID(userID string) string {
 // Example: "eyJhbGciOiJIUzI1NiJ9.xxx" -> "eyJh...REDACTED"
 func MaskToken(token string) string {
 	if token == "" {
-		return MaskPlaceholder
+		return constants.MaskPlaceholder
 	}
 
 	// For tokens, only show first few chars
-	if len(token) > MaskPreserveLen {
-		return token[:MaskPreserveLen] + "..." + MaskPlaceholder
+	if len(token) > constants.MaskPreserveLen {
+		return token[:constants.MaskPreserveLen] + constants.MaskSeparator + constants.MaskPlaceholder
 	}
-	return MaskPlaceholder
+	return constants.MaskPlaceholder
 }
 
 // maskPartial applies partial masking to a string.
@@ -41,35 +38,27 @@ func MaskToken(token string) string {
 // Otherwise, first and last MaskPreserveLen characters are preserved.
 func maskPartial(s string) string {
 	if s == "" {
-		return MaskPlaceholder
+		return constants.MaskPlaceholder
 	}
 
 	// Remove any "Bearer " prefix
-	s = strings.TrimPrefix(s, "Bearer ")
-	s = strings.TrimPrefix(s, "bearer ")
+	s = strings.TrimPrefix(s, constants.BearerPrefix)
+	s = strings.TrimPrefix(s, constants.BearerPrefixLower)
 
-	if len(s) < MaskMinLength {
-		return MaskPlaceholder
+	if len(s) < constants.MaskMinLength {
+		return constants.MaskPlaceholder
 	}
 
-	prefix := s[:MaskPreserveLen]
-	suffix := s[len(s)-MaskPreserveLen:]
-	return prefix + "..." + suffix
+	prefix := s[:constants.MaskPreserveLen]
+	suffix := s[len(s)-constants.MaskPreserveLen:]
+	return prefix + constants.MaskSeparator + suffix
 }
 
 // IsSensitiveKey checks if a key name indicates sensitive data.
 // Aligned with Python SENSITIVE_FIELD_PATTERNS.
 func IsSensitiveKey(key string) bool {
 	lower := strings.ToLower(key)
-	sensitivePatterns := []string{
-		"password",
-		"secret",
-		"token",
-		"api_key",
-		"authorization",
-	}
-
-	for _, pattern := range sensitivePatterns {
+	for _, pattern := range constants.SensitivePatterns {
 		if strings.Contains(lower, pattern) {
 			return true
 		}

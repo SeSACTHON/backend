@@ -7,15 +7,12 @@ import (
 	"log/slog"
 	"os"
 	"time"
+
+	"github.com/eco2-team/backend/domains/ext-authz/internal/constants"
 )
 
 const (
-	// Service metadata
-	ServiceName    = "ext-authz"
-	ServiceVersion = "1.0.7"
-	ECSVersion     = "8.11"
-
-	// Log levels
+	// Log levels (re-exported for convenience)
 	LevelDebug = slog.LevelDebug
 	LevelInfo  = slog.LevelInfo
 	LevelWarn  = slog.LevelWarn
@@ -39,7 +36,7 @@ func DefaultConfig() *Config {
 	return &Config{
 		Level:       LevelInfo,
 		Output:      os.Stdout,
-		Environment: getEnv("ENVIRONMENT", "dev"),
+		Environment: getEnv(constants.EnvEnvironment, constants.DefaultEnvironment),
 	}
 }
 
@@ -55,13 +52,10 @@ func New(cfg *Config) *Logger {
 			// ECS field mapping
 			switch a.Key {
 			case slog.TimeKey:
-				// ECS uses @timestamp
-				return slog.Attr{Key: "@timestamp", Value: a.Value}
+				return slog.Attr{Key: constants.ECSFieldTimestamp, Value: a.Value}
 			case slog.LevelKey:
-				// ECS uses log.level
-				return slog.Attr{Key: "log.level", Value: slog.StringValue(a.Value.String())}
+				return slog.Attr{Key: constants.ECSFieldLogLevel, Value: slog.StringValue(a.Value.String())}
 			case slog.MessageKey:
-				// ECS uses message
 				return a
 			}
 			return a
@@ -74,11 +68,11 @@ func New(cfg *Config) *Logger {
 	// Add ECS base fields
 	ecsLogger := baseLogger.With(
 		slog.Group("ecs",
-			slog.String("version", ECSVersion),
+			slog.String("version", constants.ECSVersion),
 		),
 		slog.Group("service",
-			slog.String("name", ServiceName),
-			slog.String("version", ServiceVersion),
+			slog.String("name", constants.ServiceName),
+			slog.String("version", constants.ServiceVersion),
 			slog.String("environment", cfg.Environment),
 		),
 	)
@@ -113,7 +107,7 @@ func (l *Logger) WithUser(userID, provider string) *Logger {
 			slog.Group("user",
 				slog.String("id", MaskUserID(userID)),
 			),
-			slog.String("auth.provider", provider),
+			slog.String(constants.ECSFieldAuthProvider, provider),
 		),
 	}
 }
@@ -135,9 +129,9 @@ func (l *Logger) AuthAllow(method, path, host, userID, provider, jti string, dur
 		WithUser(userID, provider).
 		WithDuration(duration).
 		Info("Authorization allowed",
-			slog.String("event.action", "authorization"),
-			slog.String("event.outcome", "success"),
-			slog.String("token.jti", MaskJTI(jti)),
+			slog.String(constants.ECSFieldEventAction, constants.EventActionAuthorization),
+			slog.String(constants.ECSFieldEventOutcome, constants.EventOutcomeSuccess),
+			slog.String(constants.ECSFieldTokenJTI, MaskJTI(jti)),
 		)
 }
 
@@ -146,13 +140,13 @@ func (l *Logger) AuthDeny(method, path, host, reason string, duration time.Durat
 	logger := l.WithRequest(method, path, host).WithDuration(duration)
 
 	attrs := []any{
-		slog.String("event.action", "authorization"),
-		slog.String("event.outcome", "failure"),
-		slog.String("event.reason", reason),
+		slog.String(constants.ECSFieldEventAction, constants.EventActionAuthorization),
+		slog.String(constants.ECSFieldEventOutcome, constants.EventOutcomeFailure),
+		slog.String(constants.ECSFieldEventReason, reason),
 	}
 
 	if err != nil {
-		attrs = append(attrs, slog.String("error.message", err.Error()))
+		attrs = append(attrs, slog.String(constants.ECSFieldErrorMessage, err.Error()))
 	}
 
 	logger.Warn("Authorization denied", attrs...)
@@ -165,14 +159,14 @@ func (l *Logger) AuthDenyWithUser(method, path, host, userID, jti, reason string
 		WithDuration(duration)
 
 	attrs := []any{
-		slog.String("event.action", "authorization"),
-		slog.String("event.outcome", "failure"),
-		slog.String("event.reason", reason),
-		slog.String("token.jti", MaskJTI(jti)),
+		slog.String(constants.ECSFieldEventAction, constants.EventActionAuthorization),
+		slog.String(constants.ECSFieldEventOutcome, constants.EventOutcomeFailure),
+		slog.String(constants.ECSFieldEventReason, reason),
+		slog.String(constants.ECSFieldTokenJTI, MaskJTI(jti)),
 	}
 
 	if err != nil {
-		attrs = append(attrs, slog.String("error.message", err.Error()))
+		attrs = append(attrs, slog.String(constants.ECSFieldErrorMessage, err.Error()))
 	}
 
 	logger.Warn("Authorization denied", attrs...)
@@ -200,4 +194,14 @@ func Default() *Logger {
 		defaultLogger = New(nil)
 	}
 	return defaultLogger
+}
+
+// ServiceName returns the service name constant (for external use).
+func ServiceName() string {
+	return constants.ServiceName
+}
+
+// ServiceVersion returns the service version constant (for external use).
+func ServiceVersion() string {
+	return constants.ServiceVersion
 }

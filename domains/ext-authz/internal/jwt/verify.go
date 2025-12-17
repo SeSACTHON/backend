@@ -7,11 +7,8 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-)
 
-// Token prefix
-const (
-	BearerPrefix = "Bearer "
+	"github.com/eco2-team/backend/domains/ext-authz/internal/constants"
 )
 
 // JWT claim keys (exported for use by other packages)
@@ -35,10 +32,10 @@ type Verifier struct {
 
 func NewVerifier(secretKey, algorithm, issuer, audience string, clockSkew time.Duration, requiredScope string) (*Verifier, error) {
 	if strings.TrimSpace(secretKey) == "" {
-		return nil, errors.New("secretKey is required")
+		return nil, errors.New(constants.ErrSecretKeyRequired)
 	}
 	if strings.TrimSpace(algorithm) == "" {
-		return nil, errors.New("algorithm is required")
+		return nil, errors.New(constants.ErrAlgorithmRequired)
 	}
 	return &Verifier{
 		secretKey: []byte(secretKey),
@@ -56,7 +53,7 @@ type Claims = map[string]any
 // Verify parses and validates the token. Returns claims if valid.
 func (v *Verifier) Verify(tokenString string) (Claims, error) {
 	// Remove "Bearer " prefix if present
-	tokenString = strings.TrimPrefix(tokenString, BearerPrefix)
+	tokenString = strings.TrimPrefix(tokenString, constants.BearerPrefix)
 
 	parser := jwt.NewParser(
 		jwt.WithValidMethods([]string{v.algorithm}),
@@ -69,36 +66,36 @@ func (v *Verifier) Verify(tokenString string) (Claims, error) {
 	})
 
 	if err != nil {
-		return nil, fmt.Errorf("invalid token: %w", err)
+		return nil, fmt.Errorf(constants.ErrInvalidToken, err)
 	}
 
 	if !token.Valid {
-		return nil, errors.New("invalid token claims")
+		return nil, errors.New(constants.ErrInvalidTokenClaims)
 	}
 
 	// Required claims
 	sub, ok := claims[ClaimSub].(string)
 	if !ok || strings.TrimSpace(sub) == "" {
-		return nil, errors.New("missing required claim: sub")
+		return nil, errors.New(constants.ErrMissingClaimSub)
 	}
 
 	jti, ok := claims[ClaimJTI].(string)
 	if !ok || strings.TrimSpace(jti) == "" {
-		return nil, errors.New("missing required claim: jti")
+		return nil, errors.New(constants.ErrMissingClaimJTI)
 	}
 
 	// exp/nbf/iat checked by parser; issuer/audience optional
 	if v.issuer != "" && !matchesIssuer(claims, v.issuer) {
-		return nil, fmt.Errorf("invalid issuer: %v", claims[ClaimIss])
+		return nil, fmt.Errorf(constants.ErrInvalidIssuer, claims[ClaimIss])
 	}
 	if v.audience != "" && !matchesAudience(claims, v.audience) {
-		return nil, fmt.Errorf("invalid audience: %v", claims[ClaimAud])
+		return nil, fmt.Errorf(constants.ErrInvalidAudience, claims[ClaimAud])
 	}
 
 	if v.reqScope != "" {
 		scope, _ := claims[ClaimScope].(string)
 		if !scopeContains(scope, v.reqScope) {
-			return nil, fmt.Errorf("required scope missing: %s", v.reqScope)
+			return nil, fmt.Errorf(constants.ErrMissingScopePattern, v.reqScope)
 		}
 	}
 
