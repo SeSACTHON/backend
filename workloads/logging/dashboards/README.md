@@ -1,52 +1,99 @@
-# Kibana Dashboards
+# Kibana 대시보드
 
-Kibana Saved Objects를 NDJSON 형식으로 관리합니다.
+> 베스트 프랙티스: Elastic 공식 가이드라인, Google SRE Golden Signals, CNCF OpenTelemetry
 
-## 대시보드 목록
+## 설계 원칙
 
-### 1. SRE/운영 대시보드 (`sre-operations.ndjson`)
+### 1. Google SRE Golden Signals
 
-운영팀을 위한 서비스 상태 모니터링 대시보드입니다.
+모든 운영 대시보드는 4가지 Golden Signals를 우선 표시:
 
-**포함 패널:**
-- Error Rate by Service (서비스별 에러 발생률 추이)
-- Log Volume by Level (로그 레벨별 분포)
-- Service Health (서비스별 로그 볼륨)
-- Top Errors (최근 에러 목록)
+| Signal | 설명 | ECO2 구현 |
+|--------|------|-----------|
+| **Latency** | 응답 시간 | (메트릭 기반 별도 구현) |
+| **Traffic** | 요청량 | 서비스별 로그 볼륨 |
+| **Errors** | 에러율 | ERROR 레벨 추이 |
+| **Saturation** | 리소스 포화 | (메트릭 기반 별도 구현) |
 
-**기본 시간 범위:** 24시간
+### 2. Elastic 공식 명명 규칙
 
-### 2. 개발자 대시보드 (`developer-debug.ndjson`)
+```
+[<Logs | Metrics> <PACKAGE>] <Name>
+```
 
-개발자를 위한 디버깅 대시보드입니다.
+| 대시보드 | ID | 설명 |
+|----------|-----|------|
+| `[Logs ECO2] Overview` | `logs-eco2-overview` | Golden Signals 개요 |
+| `[Logs ECO2] Developer Debug` | `logs-eco2-debug` | 개발자 디버깅 |
+| `[Logs ECO2] Business Metrics` | `logs-eco2-business` | 비즈니스 지표 |
 
-**포함 패널:**
-- Errors by Type (에러 타입별 분포)
-- Recent Errors (최근 에러 상세)
-- Trace ID Search (분산 추적 검색)
-- Debug Log Stream (DEBUG 레벨 로그 스트림)
+### 3. 네비게이션
 
-**기본 시간 범위:** 6시간
+- **Links Panel**: 모든 대시보드에 Markdown 기반 네비게이션 포함
+- **Controls Filter**: 서비스/레벨별 필터링
+- **Drilldown**: 에러 → Trace ID 상세 연결
 
-### 3. 비즈니스 대시보드 (`business-metrics.ndjson`)
+## 대시보드 파일
 
-비즈니스 메트릭을 추적하는 대시보드입니다.
+### 1. `sre-operations.ndjson` - [Logs ECO2] Overview
 
-**포함 패널:**
-- Daily Active Logins (일별 로그인 수, 프로바이더별)
-- Character Rewards Granted (캐릭터 보상 카운터)
-- Location Searches (위치 검색 카운터)
-- Feature Usage (채팅/이미지 업로드 사용량)
+운영팀을 위한 Golden Signals 기반 대시보드
 
-**기본 시간 범위:** 7일
+**패널 구성:**
+- Navigation Links (Markdown)
+- Service/Level Filter (Controls)
+- Service Health Grid (Tag Cloud)
+- Traffic Volume (Line Chart) - Golden Signal: Traffic
+- Error Trend (Line Chart) - Golden Signal: Errors
+- Recent Errors (Table)
+
+**기본 설정:**
+- 시간 범위: 24시간
+- 자동 새로고침: 5분
+
+### 2. `developer-debug.ndjson` - [Logs ECO2] Developer Debug
+
+개발자를 위한 디버깅 대시보드
+
+**패널 구성:**
+- Navigation Links (Markdown)
+- Multi-field Filters (Service, Level, Error Type)
+- Errors by Type (Pie Chart)
+- Errors by Service (Horizontal Bar)
+- Error Details with trace.id (Table)
+- Trace Correlation Search
+
+**기본 설정:**
+- 시간 범위: 6시간
+- 자동 새로고침: 1분
+
+### 3. `business-metrics.ndjson` - [Logs ECO2] Business Metrics
+
+비즈니스 메트릭 대시보드
+
+**패널 구성:**
+- Navigation Links (Markdown)
+- Total Logins (Metric)
+- Rewards Granted (Metric)
+- Rewards by Character (Pie Chart)
+- Daily Active Logins by Provider (Line Chart)
+- Feature Usage: Chat, Image, Location (Stacked Bar)
+
+**기본 설정:**
+- 시간 범위: 7일
+- 자동 새로고침: 비활성화 (리포트용)
 
 ## 사용법
 
 ### Import
 
 ```bash
-# Kibana API로 import
-curl -X POST "https://kibana.example.com/api/saved_objects/_import" \
+# Kibana Dev Tools에서 import
+POST kbn:/api/saved_objects/_import?overwrite=true
+# 파일 업로드: sre-operations.ndjson
+
+# 또는 curl 사용
+curl -X POST "https://kibana.example.com/api/saved_objects/_import?overwrite=true" \
   -H "kbn-xsrf: true" \
   -H "Content-Type: multipart/form-data" \
   --form file=@sre-operations.ndjson
@@ -55,28 +102,57 @@ curl -X POST "https://kibana.example.com/api/saved_objects/_import" \
 ### Export (업데이트 시)
 
 ```bash
-# Kibana에서 수정 후 export
+# 특정 대시보드 export
 curl -X POST "https://kibana.example.com/api/saved_objects/_export" \
   -H "kbn-xsrf: true" \
   -H "Content-Type: application/json" \
-  -d '{"type": ["dashboard", "visualization", "search", "index-pattern"]}' \
-  > updated-dashboard.ndjson
+  -d '{
+    "objects": [{"type": "dashboard", "id": "logs-eco2-overview"}],
+    "includeReferencesDeep": true
+  }' > sre-operations.ndjson
 ```
 
-## 의존성
+## Data View
 
-모든 대시보드는 `logs-app-*` Data View(Index Pattern)를 사용합니다.
-이 Data View는 각 NDJSON 파일에 포함되어 있습니다.
+모든 대시보드는 단일 Data View 사용:
 
-## 필드 참조
+| ID | 패턴 | 설명 |
+|----|------|------|
+| `logs-eco2-app-dataview` | `logs-app-*` | 앱 로그 |
 
-대시보드에서 사용하는 주요 필드:
+## 필수 로그 필드 (ECS 기반)
 
-| 필드 | 타입 | 설명 |
+대시보드 쿼리에 사용되는 필드:
+
+| 필드 | 타입 | 용도 |
 |------|------|------|
-| `@timestamp` | date | 로그 발생 시간 |
-| `log.level` | keyword | INFO, WARNING, ERROR 등 |
-| `service.name` | keyword | 서비스 이름 (auth-api 등) |
-| `message` | text | 로그 메시지 |
-| `trace.id` | keyword | 분산 추적 ID |
-| `labels.*` | object | 추가 메타데이터 |
+| `@timestamp` | date | 시계열 분석 |
+| `log.level` | keyword | 필터, 에러율 |
+| `service.name` | keyword | 그룹핑, 필터 |
+| `message` | text | 검색, 비즈니스 이벤트 |
+| `trace.id` | keyword | 분산 추적 연결 |
+| `labels.*` | object | 비즈니스 컨텍스트 |
+
+### 비즈니스 이벤트 메시지 (쿼리용)
+
+```
+# 인증
+"OAuth login successful"
+"Session refreshed"
+"User logged out"
+
+# 보상
+"Reward evaluation completed" + labels.received: true
+
+# 기능
+"Chat message received"
+"Upload finalized"
+"Location search completed"
+```
+
+## 참조
+
+- [Elastic Dashboard Guidelines](https://www.elastic.co/docs/extend/integrations/dashboard-guidelines)
+- [Google SRE - Monitoring](https://sre.google/sre-book/monitoring-distributed-systems/)
+- [CNCF OpenTelemetry Logging](https://opentelemetry.io/docs/specs/otel/logs/)
+- [베스트 프랙티스 문서](../../docs/guide/observability/DASHBOARD_BEST_PRACTICES.md)
