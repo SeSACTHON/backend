@@ -54,3 +54,41 @@ EXCLUDED_LOG_RECORD_ATTRS = frozenset(
         "message",
     }
 )
+
+# =============================================================================
+# PII Masking Configuration
+# =============================================================================
+# Sensitive field names (case-insensitive matching)
+SENSITIVE_FIELD_PATTERNS = frozenset(
+    {
+        "password",
+        "passwd",
+        "pwd",
+        "secret",
+        "token",
+        "access_token",
+        "refresh_token",
+        "id_token",
+        "api_key",
+        "apikey",
+        "authorization",
+        "auth",
+        "credential",
+        "private_key",
+        "privatekey",
+        "credit_card",
+        "creditcard",
+        "card_number",
+        "cvv",
+        "ssn",
+        "social_security",
+    }
+)
+
+# Masking placeholder
+MASK_PLACEHOLDER = "***REDACTED***"
+
+# Partial masking settings
+MASK_PRESERVE_PREFIX = 4  # Show first N characters for tokens
+MASK_PRESERVE_SUFFIX = 4  # Show last N characters for tokens
+MASK_MIN_LENGTH = 10  # Minimum length to apply partial masking

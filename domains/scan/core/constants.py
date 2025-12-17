@@ -45,3 +45,33 @@ EXCLUDED_LOG_RECORD_ATTRS = frozenset(
         "message",
     }
 )
+
+# PII Masking Configuration
+SENSITIVE_FIELD_PATTERNS = frozenset(
+    {
+        "password",
+        "passwd",
+        "pwd",
+        "secret",
+        "token",
+        "access_token",
+        "refresh_token",
+        "id_token",
+        "api_key",
+        "apikey",
+        "authorization",
+        "auth",
+        "credential",
+        "private_key",
+        "privatekey",
+        "credit_card",
+        "creditcard",
+        "card_number",
+        "cvv",
+        "ssn",
+    }
+)
+MASK_PLACEHOLDER = "***REDACTED***"
+MASK_PRESERVE_PREFIX = 4
+MASK_PRESERVE_SUFFIX = 4
+MASK_MIN_LENGTH = 10
