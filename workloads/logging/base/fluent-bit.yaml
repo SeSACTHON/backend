@@ -163,14 +163,17 @@ spec:
         - containerPort: 2020
           name: http
         env:
-        # ECK Elasticsearch 인증 정보
+        # Elasticsearch 인증 정보 (External Secrets에서 주입)
         - name: ES_USER
-          value: elastic
+          valueFrom:
+            secretKeyRef:
+              name: elasticsearch-credentials
+              key: ES_USER
         - name: ES_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: eco2-logs-es-elastic-user
-              key: elastic
+              name: elasticsearch-credentials
+              key: ES_PASSWORD
         resources:
           requests:
             memory: 64Mi
