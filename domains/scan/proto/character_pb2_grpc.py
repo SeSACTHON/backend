@@ -4,7 +4,7 @@ import grpc
 
 from domains.scan.proto import character_pb2 as domains_dot_scan_dot_proto_dot_character__pb2
 
-GRPC_GENERATED_VERSION = "1.76.0"
+GRPC_GENERATED_VERSION = "1.68.1"
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
