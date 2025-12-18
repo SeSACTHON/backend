@@ -1,0 +1,73 @@
+---
+# Elasticsearch Ingest Pipeline for ECS JSON Parsing
+#
+# Fluent Bit에서 JSON 파싱하지 않고, ES에서 처리하여
+# ECS 표준 필드명(trace.id, log.level 등)을 그대로 유지
+#
+# 참고: Index Template의 subobjects: false와 함께 동작
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: es-ingest-pipeline-setup
+  namespace: logging
+  labels:
+    app: elasticsearch-setup
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+      - name: setup
+        image: curlimages/curl:8.5.0
+        env:
+        - name: ES_USER
+          valueFrom:
+            secretKeyRef:
+              name: elasticsearch-credentials
+              key: ES_USER
+        - name: ES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: elasticsearch-credentials
+              key: ES_PASSWORD
+        command:
+        - /bin/sh
+        - -c
+        - |
+          # Wait for Elasticsearch to be ready
+          until curl -s -u "$ES_USER:$ES_PASSWORD" \
+            "http://eco2-logs-es-http.logging.svc.cluster.local:9200/_cluster/health" | grep -q '"status":"green"\|"status":"yellow"'; do
+            echo "Waiting for Elasticsearch..."
+            sleep 5
+          done
+
+          echo "Creating Ingest Pipeline for ECS JSON parsing..."
+
+          curl -X PUT -u "$ES_USER:$ES_PASSWORD" \
+            "http://eco2-logs-es-http.logging.svc.cluster.local:9200/_ingest/pipeline/parse-ecs-json" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "description": "Parse ECS JSON from log field, preserving dot notation field names",
+              "processors": [
+                {
+                  "json": {
+                    "field": "log",
+                    "target_field": "_parsed",
+                    "ignore_failure": true
+                  }
+                },
+                {
+                  "script": {
+                    "description": "Flatten parsed JSON to root with dot notation",
+                    "lang": "painless",
+                    "ignore_failure": true,
+                    "source": "if (ctx._parsed != null) { for (entry in ctx._parsed.entrySet()) { ctx[entry.getKey()] = entry.getValue(); } ctx.remove(\"_parsed\"); }"
+                  }
+                }
+              ]
+            }'
+
+          echo ""
+          echo "Ingest Pipeline created successfully!"

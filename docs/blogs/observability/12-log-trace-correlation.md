@@ -366,17 +366,27 @@ PUT logs-template
 | `Replace_Dots On` | 설정 간단, 호환성 보장 | ECS 필드명과 불일치 (`trace_id`) |
 | `subobjects: false` | ECS 표준 유지 (`trace.id`) | Index Template 설정 필요 |
 
-**현재 선택**: `Replace_Dots Off` + `subobjects: false` Index Template
-- ES 8.11.0에서 `subobjects: false` 기능 사용
-- ECS 표준 필드명 유지 (`trace.id`, `span.id`, `log.level` 등)
-- 새로 생성되는 인덱스부터 자동 적용
+**현재 선택**: ES Ingest Pipeline + `subobjects: false` Index Template
+
+핵심: **Fluent Bit에서 JSON 파싱하지 않고 ES에서 처리**
+
+1. Fluent Bit: `Merge_Log Off` - JSON을 `log` 필드에 그대로 전달
+2. ES Ingest Pipeline: `json` processor로 파싱 후 root로 flatten
+3. Index Template: `subobjects: false`로 dot 필드명 유지
+
+```
+App (JSON log) → Fluent Bit (pass-through) → ES Pipeline (parse) → Index (subobjects:false)
+                                                    ↓
+                                            trace.id, log.level 등 ECS 필드명 유지
+```
 
 ### 구현 파일
 
 | 파일 | 설정 |
 |------|------|
-| `workloads/logging/base/fluent-bit.yaml` | `Replace_Dots Off` |
-| `workloads/logging/base/elasticsearch-index-template.yaml` | `subobjects: false` Job |
+| `workloads/logging/base/fluent-bit.yaml` | `Merge_Log Off`, `Pipeline parse-ecs-json` |
+| `workloads/logging/base/elasticsearch-ingest-pipeline.yaml` | JSON 파싱 Pipeline Job |
+| `workloads/logging/base/elasticsearch-index-template.yaml` | `subobjects: false` Index Template |
 
 ---
 
