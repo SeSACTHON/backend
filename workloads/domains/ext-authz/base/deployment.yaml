@@ -49,6 +49,13 @@ spec:
           value: '50051'
         - name: AUTH_METRICS_PORT
           value: '9090'
+        # OTEL Tracing configuration
+        - name: OTEL_ENABLED
+          value: 'true'
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: jaeger-collector-clusterip.istio-system.svc.cluster.local:4317
+        - name: OTEL_SAMPLING_RATE
+          value: '1.0'
         livenessProbe:
           httpGet:
             path: /health
