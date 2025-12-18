@@ -6,5 +6,5 @@ package constants
 
 const (
 	ServiceName    = "ext-authz"
-	ServiceVersion = "1.1.1" // Fix Jaeger endpoint to clusterip
+	ServiceVersion = "1.1.2" // Fix OTEL schema URL conflict
 )

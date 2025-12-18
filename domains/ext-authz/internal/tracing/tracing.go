@@ -114,16 +114,17 @@ func Init(ctx context.Context, cfg *Config) (*TracerProvider, error) {
 	}
 
 	// Create resource with service metadata
-	res, err := resource.Merge(
-		resource.Default(),
-		resource.NewWithAttributes(
-			semconv.SchemaURL,
+	// Use resource.New instead of resource.Merge to avoid schema URL conflicts
+	res, err := resource.New(ctx,
+		resource.WithAttributes(
 			semconv.ServiceName(cfg.ServiceName),
 			semconv.ServiceVersion(cfg.ServiceVersion),
 			attribute.String("deployment.environment", cfg.Environment),
 			attribute.String("telemetry.sdk.name", "opentelemetry"),
 			attribute.String("telemetry.sdk.language", "go"),
 		),
+		resource.WithHost(),
+		resource.WithProcess(),
 	)
 	if err != nil {
 		return nil, err
