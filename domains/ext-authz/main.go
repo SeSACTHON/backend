@@ -13,6 +13,7 @@ import (
 
 	authv3 "github.com/envoyproxy/go-control-plane/envoy/service/auth/v3"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 
 	"github.com/eco2-team/backend/domains/ext-authz/internal/config"
@@ -121,14 +122,17 @@ func main() {
 		}
 	}()
 
-	// Start gRPC server
+	// Start gRPC server with OTEL instrumentation
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", cfg.GRPCPort))
 	if err != nil {
 		logger.Error("Failed to listen", slog.String("error", err.Error()))
 		os.Exit(1)
 	}
 
-	grpcServer := grpc.NewServer()
+	// Add OTEL gRPC interceptors for distributed tracing
+	grpcServer := grpc.NewServer(
+		grpc.StatsHandler(otelgrpc.NewServerHandler()),
+	)
 	authv3.RegisterAuthorizationServer(grpcServer, authServer)
 
 	go func() {

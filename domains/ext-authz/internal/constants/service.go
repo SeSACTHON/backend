@@ -6,5 +6,5 @@ package constants
 
 const (
 	ServiceName    = "ext-authz"
-	ServiceVersion = "1.0.9" // Extract trace from gRPC metadata
+	ServiceVersion = "1.1.0" // Full OTEL tracing with Jaeger span export
 )
