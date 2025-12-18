@@ -222,69 +222,199 @@ service_name:scan-api AND log_level:error
 trace_id:xxx AND @timestamp >= "2025-12-18T07:00:00"
 ```
 
-### 필드 매핑 참조
+---
 
-| 애플리케이션 출력 | Elasticsearch 필드 | 설명 |
-|------------------|-------------------|------|
-| `trace.id` | `trace_id` | Replace_Dots로 변환 |
-| `span.id` | `span_id` | Replace_Dots로 변환 |
-| `log.level` | `log_level` | Replace_Dots로 변환 |
-| `service.name` | `service_name` | Replace_Dots로 변환 |
-| `ecs.version` | `ecs_version` | Replace_Dots로 변환 |
+## 📊 Elasticsearch 필드 매핑 총정리
+
+### ECS 표준 필드 (현재 사용)
+
+`Replace_Dots Off` + `subobjects: false` 설정으로 **dot notation 유지**.
+
+#### 서비스 관련 필드
+
+| 필드 | 타입 | 앱 로그 | 시스템 로그 | 설명 |
+|------|------|---------|-------------|------|
+| `service.name` | keyword | ✅ 앱에서 출력 | ✅ Lua 자동 생성 | 서비스 식별자 |
+| `service.environment` | keyword | ✅ 앱에서 출력 | ✅ Lua 자동 생성 | 환경 (dev/prod) |
+| `service.version` | keyword | ✅ 앱에서 출력 | ⚠️ 라벨 있을 때만 | 버전 정보 |
+
+#### 트레이싱 필드
+
+| 필드 | 타입 | 앱 로그 | 시스템 로그 | 설명 |
+|------|------|---------|-------------|------|
+| `trace.id` | keyword | ✅ OTEL 자동 주입 | ❌ 없음 | 분산 추적 ID |
+| `span.id` | keyword | ✅ OTEL 자동 주입 | ❌ 없음 | Span ID |
+
+#### 로깅 메타데이터
+
+| 필드 | 타입 | 앱 로그 | 시스템 로그 | 설명 |
+|------|------|---------|-------------|------|
+| `log.level` | keyword | ✅ 앱에서 출력 | ⚠️ 일부만 | 로그 레벨 (info, error) |
+| `log.logger` | keyword | ✅ 앱에서 출력 | ❌ 없음 | 로거 이름 |
+| `ecs.version` | keyword | ✅ 앱에서 출력 | ❌ 없음 | ECS 버전 (8.11.0) |
+| `message` | text | ✅ 앱에서 출력 | ⚠️ log 필드 사용 | 로그 메시지 |
+
+#### Kubernetes 메타데이터 (Lua 필터 생성)
+
+| 필드 | 타입 | 앱 로그 | 시스템 로그 | 설명 |
+|------|------|---------|-------------|------|
+| `kubernetes.namespace` | keyword | ✅ | ✅ | 네임스페이스 |
+| `kubernetes.pod.name` | keyword | ✅ | ✅ | Pod 이름 |
+| `kubernetes.container.name` | keyword | ✅ | ✅ | 컨테이너 이름 |
+| `kubernetes.labels` | object | ✅ | ✅ | 주요 라벨 객체 |
+
+#### 에러 관련 필드
+
+| 필드 | 타입 | 앱 로그 | 시스템 로그 | 설명 |
+|------|------|---------|-------------|------|
+| `error.type` | keyword | ✅ 에러 시 | ❌ 없음 | 예외 타입 |
+| `error.message` | text | ✅ 에러 시 | ❌ 없음 | 에러 메시지 |
+| `error.stack_trace` | text | ✅ 에러 시 | ❌ 없음 | 스택 트레이스 |
 
 ---
 
-## 📊 최종 로그 구조
+### Fluent Bit 생성 필드
 
-### Elasticsearch 문서 스키마
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `@timestamp` | date | 로그 타임스탬프 |
+| `time` | keyword | containerd CRI 타임스탬프 |
+| `stream` | keyword | stdout / stderr |
+| `logtag` | keyword | F (Full) / P (Partial) |
+| `log` | text | 원본 로그 (JSON 문자열) |
+| `cluster` | keyword | 클러스터 이름 (eco2-dev) |
+| `environment` | keyword | 환경 (dev) |
+
+### K8s 메타데이터 (k8s_ prefix)
+
+| 필드 | 설명 |
+|------|------|
+| `k8s_namespace_name` | 네임스페이스 |
+| `k8s_pod_name` | Pod 이름 |
+| `k8s_pod_id` | Pod UID |
+| `k8s_container_name` | 컨테이너 이름 |
+| `k8s_container_image` | 컨테이너 이미지 |
+| `k8s_host` | 노드 이름 |
+| `k8s_labels` | 라벨 객체 |
+
+---
+
+### 앱 로그 vs 시스템 로그 비교
+
+#### 앱 로그 (chat-api 예시)
 
 ```json
 {
-  // === Timestamp ===
-  "@timestamp": "2025-12-18T07:04:51.886Z",
+  "@timestamp": "2025-12-18T09:50:26.958+00:00",
+  "message": "Chat message received",
+  "log.level": "info",
+  "log.logger": "domains.chat.services.chat",
+  "ecs.version": "8.11.0",
   
-  // === 원본 로그 (CRI) ===
-  "time": "2025-12-18T16:04:51.886+09:00",
-  "stream": "stdout",
-  "logtag": "F",
-  "log": "{...원본 JSON...}",
+  "service.name": "chat-api",
+  "service.version": "1.0.7",
+  "service.environment": "dev",
   
-  // === 파싱된 앱 로그 (lift 후 최상위) ===
-  "message": "Scan pipeline finished",
-  "log_level": "info",
-  "trace_id": "ef7445d2d5c540c585bcef3896fd960b",
-  "span_id": "35ecc51ed1958ea4",
-  "service_name": "scan-api",
-  "service_version": "1.0.7",
-  "service_environment": "dev",
-  "ecs_version": "8.11.0",
+  "trace.id": "632602a1d3946d5aba7ea9592034f576",
+  "span.id": "4b04fd1e7c05437f",
   
-  // === 클러스터 메타데이터 ===
+  "kubernetes.namespace": "chat",
+  "kubernetes.pod.name": "chat-api-74456ccd68-7lgml",
+  "kubernetes.container.name": "chat-api",
+  "kubernetes.labels": {
+    "app": "chat-api",
+    "domain": "chat",
+    "version": "v1",
+    "tier": "business-logic"
+  },
+  
   "cluster": "eco2-dev",
-  "environment": "dev",
-  
-  // === Kubernetes 메타데이터 (k8s_ prefix) ===
-  "k8s_namespace_name": "scan",
-  "k8s_pod_name": "scan-api-59d5788d7-q7qcc",
-  "k8s_container_name": "scan-api",
-  "k8s_host": "k8s-api-scan",
-  "k8s_labels": {
-    "app": "scan-api",
-    "domain": "scan",
-    "version": "v1"
-  }
+  "k8s_namespace_name": "chat",
+  "k8s_pod_name": "chat-api-74456ccd68-7lgml"
 }
 ```
 
-### 필드 그룹 설명
+#### 시스템 로그 (calico-node 예시)
 
-| 그룹 | Prefix | 용도 |
-|------|--------|------|
-| Timestamp | `@timestamp`, `time` | 시간 기반 쿼리 |
-| CRI 원본 | `stream`, `logtag`, `log` | 디버깅용 원본 보존 |
-| 앱 로그 | `message`, `log_level`, `trace_id` | 비즈니스 로직 추적 |
-| 클러스터 | `cluster`, `environment` | 멀티 클러스터 구분 |
-| K8s 메타 | `k8s_*` | 리소스 기반 필터링 |
+```json
+{
+  "@timestamp": "2025-12-18T10:38:54.614Z",
+  "log": "2025-12-18 10:38:54.614 [INFO][55] felix/int_dataplane.go...",
+  
+  "service.name": "calico-node",
+  "service.environment": "kube-system",
+  
+  "kubernetes.namespace": "kube-system",
+  "kubernetes.pod.name": "calico-node-xv9c8",
+  "kubernetes.container.name": "calico-node",
+  "kubernetes.labels": {
+    "k8s-app": "calico-node"
+  },
+  
+  "cluster": "eco2-dev",
+  "k8s_namespace_name": "kube-system",
+  "k8s_pod_name": "calico-node-xv9c8"
+}
+```
+
+#### 시스템 로그 (ArgoCD 예시)
+
+```json
+{
+  "@timestamp": "2025-12-18T10:38:57.428Z",
+  "msg": "Alloc=220295 TotalAlloc=9444918855...",
+  "level": "info",
+  
+  "service.name": "argocd-application-controller",
+  "service.environment": "argocd",
+  
+  "kubernetes.namespace": "argocd",
+  "kubernetes.pod.name": "argocd-application-controller-0",
+  "kubernetes.container.name": "argocd-application-controller",
+  "kubernetes.labels": {
+    "app.kubernetes.io/name": "argocd-application-controller"
+  },
+  
+  "cluster": "eco2-dev"
+}
+```
+
+---
+
+### 필드 소스 요약
+
+| 필드 그룹 | 앱 로그 소스 | 시스템 로그 소스 |
+|-----------|-------------|-----------------|
+| `service.*` | 앱 코드 (ECSJsonFormatter) | Lua 필터 (K8s 라벨) |
+| `trace.*`, `span.*` | OpenTelemetry SDK | ❌ 없음 |
+| `log.*` | 앱 코드 (ECSJsonFormatter) | ⚠️ 일부만 (level) |
+| `kubernetes.*` | Lua 필터 | Lua 필터 |
+| `k8s_*` | Fluent Bit K8s 필터 | Fluent Bit K8s 필터 |
+| `cluster`, `environment` | Fluent Bit Modify 필터 | Fluent Bit Modify 필터 |
+
+---
+
+### Kibana 검색 쿼리 예시
+
+```kql
+# 특정 서비스 로그
+service.name:auth-api
+
+# 트레이스 추적 (앱 로그만)
+trace.id:632602a1d3946d5aba7ea9592034f576
+
+# 에러 로그
+log.level:error OR log.level:ERROR
+
+# 시스템 로그 제외
+service.name:* AND NOT kubernetes.namespace:(kube-system OR argocd OR logging)
+
+# 특정 Pod 로그
+kubernetes.pod.name:auth-api-*
+
+# 라벨 기반 필터
+kubernetes.labels.tier:business-logic
+```
 
 ---
 
@@ -740,4 +870,177 @@ feat(logging): add ECS enrichment for system logs via Lua filter
 - Preserve app logs' existing ECS fields (conditional mapping)
 - Add kubernetes.labels object for label preservation
 - All logs now have service.name for consistent Kibana filtering
+```
+
+---
+
+## 🔧 시스템 컴포넌트 OTEL 적용
+
+### 개요
+
+시스템 컴포넌트(Istio, ArgoCD)에도 분산 추적을 적용하여 `trace.id`를 로그에 포함.
+
+### 적용 대상
+
+| 시스템 | OTEL 지원 | 적용 방법 | 결과 |
+|--------|----------|----------|------|
+| **Istio (Envoy)** | ✅ | EnvoyFilter | Access log에 `trace.id` 포함 |
+| **ArgoCD** | ✅ | ConfigMap | Jaeger에 트레이스 전송 |
+| **Calico** | ❌ | 미지원 | - |
+| **Kubernetes** | ⚠️ | 제한적 | - |
+
+### 1. Istio Access Log with Trace ID
+
+#### 문제: ext-authz 거부/404 요청에 trace.id 없음
+
+초기 설정에서 `%REQ(X-B3-TRACEID)%`를 사용했으나, 클라이언트가 헤더를 보내지 않으면 빈 값:
+
+```
+# 문제 상황
+/api/v1/auth/register → 401 (ext-authz 거부) → trace.id: 없음
+/api/v1/nonexistent  → 404 (라우팅 실패)   → trace.id: 없음
+/api/v1/auth/refresh → 401 (앱 도달)       → trace.id: 있음
+```
+
+#### 해결: `%TRACE_ID%` 사용
+
+Envoy 내부 변수 `%TRACE_ID%`를 사용하면 모든 요청에 trace가 자동 생성됩니다.
+
+| 변수 | 설명 | 값 보장 |
+|------|------|---------|
+| `%REQ(X-B3-TRACEID)%` | 클라이언트가 보낸 헤더 | ❌ 없으면 빈 값 |
+| `%TRACE_ID%` | Envoy 내부 trace ID | ✅ 항상 자동 생성 |
+
+**EnvoyFilter 설정** (`workloads/istio/base/envoy-filter-access-log.yaml`):
+
+```yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: EnvoyFilter
+metadata:
+  name: enable-access-log
+  namespace: istio-system
+spec:
+  configPatches:
+    - applyTo: NETWORK_FILTER
+      match:
+        context: ANY
+        listener:
+          filterChain:
+            filter:
+              name: "envoy.filters.network.http_connection_manager"
+      patch:
+        operation: MERGE
+        value:
+          typed_config:
+            "@type": "type.googleapis.com/envoy.extensions.filters.network.http_connection_manager.v3.HttpConnectionManager"
+            access_log:
+              - name: envoy.access_loggers.file
+                typed_config:
+                  "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog"
+                  path: "/dev/stdout"
+                  log_format:
+                    json_format:
+                      # ECS 표준 필드명 (dot notation)
+                      trace.id: "%TRACE_ID%"      # ✅ Envoy 자동 생성
+                      span.id: "%REQ(X-B3-SPANID)%"
+                      http.request.method: "%REQ(:METHOD)%"
+                      url.path: "%REQ(:PATH)%"
+                      http.response.status_code: "%RESPONSE_CODE%"
+                      http.response.body.bytes: "%BYTES_SENT%"
+                      start_time: "%START_TIME%"
+                      duration_ms: "%DURATION%"
+                      upstream_host: "%UPSTREAM_HOST%"
+                      source.address: "%REQ(X-FORWARDED-FOR)%"
+                      request_id: "%REQ(X-REQUEST-ID)%"
+```
+
+#### 검증 결과
+
+```
+# %TRACE_ID% 적용 후
+/api/v1/auth/register → 401 (ext-authz 거부) → trace.id: e8f47ed65ec9ece3... ✅
+/api/v1/test404       → 404 (라우팅 실패)   → trace.id: e05895c1b6571707... ✅
+/api/v1/auth/refresh  → 401 (앱 도달)       → trace.id: 4698731e87d0b18b... ✅
+```
+
+**모든 요청에 trace.id가 포함되어 에러 추적 가능!**
+
+#### 출력 예시
+
+```json
+{
+  "trace.id": "e8f47ed65ec9ece3d4c629cf2374f680",
+  "http.request.method": "POST",
+  "url.path": "/api/v1/auth/register",
+  "http.response.status_code": 401
+}
+```
+
+### 2. ArgoCD OTEL 트레이싱
+
+**ConfigMap 설정** (`workloads/argocd/base/otel-config.yaml`):
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cmd-params-cm
+  namespace: argocd
+data:
+  otlp.address: jaeger-collector-clusterip.istio-system.svc.cluster.local:4317
+```
+
+ArgoCD 작업(sync, refresh 등)이 Jaeger에 트레이스로 표시됨.
+
+### 적용 명령
+
+```bash
+# Istio 설정 적용
+kubectl apply -f workloads/istio/base/
+
+# ArgoCD 설정 적용 후 재시작
+kubectl apply -f workloads/argocd/base/
+kubectl rollout restart deployment argocd-server -n argocd
+kubectl rollout restart deployment argocd-repo-server -n argocd
+kubectl rollout restart statefulset argocd-application-controller -n argocd
+```
+
+### Kibana 검색
+
+```kql
+# istio-proxy 로그에서 특정 trace 검색
+trace_id:15434b0153e43190afcbfb316469ccfe AND k8s_container_name:istio-proxy
+
+# 앱 로그 + istio-proxy 같이 검색
+trace_id:* AND (service.name:auth-api OR k8s_container_name:istio-proxy)
+```
+
+---
+
+## 🏷️ 커밋
+
+```
+feat(istio): add EnvoyFilter for JSON access log with trace.id
+
+- Enable structured JSON access logging via EnvoyFilter
+- Include trace.id, span.id, request_id in access logs
+- Add Telemetry API configuration for mesh-wide access logging
+- Use ECS standard field names (dot notation)
+```
+
+```
+fix(istio): use %TRACE_ID% for all requests including ext-authz denials
+
+- Change from %REQ(X-B3-TRACEID)% to %TRACE_ID% in EnvoyFilter
+- %TRACE_ID% is auto-generated by Envoy for all requests
+- Enables trace correlation for 401 (ext-authz denied) and 404 errors
+- Before: ext-authz denied requests had no trace.id
+- After: all requests have trace.id for full error tracking
+```
+
+```
+feat(argocd): enable OTEL tracing to Jaeger
+
+- Configure otlp.address in argocd-cmd-params-cm
+- ArgoCD operations now visible in Jaeger
 ```
