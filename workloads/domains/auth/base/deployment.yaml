@@ -42,11 +42,14 @@ spec:
         - name: OTEL_TRACES_EXPORTER
           value: otlp
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
-          value: http://jaeger-collector.istio-system.svc.cluster.local:4317
+          value: http://jaeger-collector-clusterip.istio-system.svc.cluster.local:4317
         - name: OTEL_METRICS_EXPORTER
           value: none
         - name: OTEL_LOGS_EXPORTER
           value: none
+        # Istio B3 trace context propagation
+        - name: OTEL_PROPAGATORS
+          value: b3,b3multi,tracecontext,baggage
         envFrom:
         - configMapRef:
             name: auth-config
