@@ -129,10 +129,18 @@ sequenceDiagram
 
 | 리소스 타입 | 이름 | 상태 |
 |-------------|------|------|
-| DataView | `logs-eco2-app` | ✅ Active |
-| Dashboard | `logs-eco2-overview` | ✅ Active |
-| Dashboard | `logs-eco2-debug` | ✅ Active |
-| Dashboard | `logs-eco2-business` | ✅ Active |
+| KibanaInstance | `eco2-kibana` | ✅ Active |
+| DataView | `logs-eco2-app` | ✅ Kibana에 생성됨 |
+| Dashboard | `logs-eco2-test` | ✅ Kibana에 생성됨 |
+
+### Operator 로그 (성공 예시)
+
+```
+INFO  Creating/Updating dashboard  {"name":"logs-eco2-test"}
+INFO  Creating/Updating data view  {"name":"logs-eco2-app"}
+DEBUG Created/Updated kibana.eck.github.com/v1alpha1/Dashboard logs-eco2-test
+DEBUG Created/Updated kibana.eck.github.com/v1alpha1/DataView logs-eco2-app
+```
 
 ### Operator 상태
 
@@ -141,7 +149,7 @@ sequenceDiagram
 kubectl get pods -n elastic-system -l app.kubernetes.io/name=eck-custom-resources-operator
 
 NAME                                                              READY   STATUS
-eck-custom-resources-eck-custom-resources-operator-558bd79vxgf9   1/1     Running
+eck-custom-resources-eck-custom-resources-operator-xxx            1/1     Running
 ```
 
 ### CRD 목록 (설치됨)
@@ -179,18 +187,35 @@ indexlifecyclepolicies.es.eck.github.com                # ILM
 # → DataView, Dashboard CR 배포
 ```
 
-### 2. DataView CR (Index Pattern)
+### 2. KibanaInstance CR (Kibana 연결 설정) ⚠️ 필수
 
 ```yaml
-# 현재 배포된 DataView
+# workloads/kibana/base/kibana-instance.yaml
+apiVersion: kibana.eck.github.com/v1alpha1
+kind: KibanaInstance
+metadata:
+  name: eco2-kibana
+  namespace: logging
+spec:
+  enabled: true  # ⚠️ Required 필드!
+  url: http://eco2-kibana-kb-http.logging.svc:5601  # ⚠️ HTTP (TLS disabled이므로)
+  authentication:
+    usernamePasswordSecret:
+      secretName: eco2-logs-es-elastic-user
+      userName: elastic
+```
+
+> **주의**: Kibana CR에서 `selfSignedCertificate.disabled: true`로 설정된 경우, URL은 **HTTP**를 사용해야 합니다.
+
+### 3. DataView CR (Index Pattern)
+
+```yaml
+# workloads/kibana/base/dataview.yaml
 apiVersion: kibana.eck.github.com/v1alpha1
 kind: DataView
 metadata:
   name: logs-eco2-app
   namespace: logging
-  labels:
-    app.kubernetes.io/part-of: ecoeco-observability
-    environment: dev
 spec:
   targetInstance:
     name: eco2-kibana
@@ -394,49 +419,94 @@ spec:
 
 ## ⚠️ 트러블슈팅
 
-### Issue 1: CRD 스키마 오류
+### Issue 1: KibanaInstance not found
+
+```
+ERROR: KibanaInstance.kibana.eck.github.com "eco2-kibana" not found
+```
+
+**원인:** Dashboard/DataView CR만 있고 KibanaInstance CR이 없음
+
+**해결:** KibanaInstance CR 먼저 생성
+```yaml
+apiVersion: kibana.eck.github.com/v1alpha1
+kind: KibanaInstance
+metadata:
+  name: eco2-kibana
+  namespace: logging
+spec:
+  enabled: true
+  url: http://eco2-kibana-kb-http.logging.svc:5601
+  authentication:
+    usernamePasswordSecret:
+      secretName: eco2-logs-es-elastic-user
+      userName: elastic
+```
+
+### Issue 2: Certificate not configured
+
+```
+ERROR: Failed to configure http client, certificate not configured (kibana.certificate)
+```
+
+**원인:** KibanaInstance URL이 HTTPS인데 Kibana가 TLS disabled 상태
+
+**해결:** URL을 HTTP로 변경 (Kibana CR에서 `selfSignedCertificate.disabled: true`인 경우)
+```yaml
+spec:
+  url: http://eco2-kibana-kb-http.logging.svc:5601  # https → http
+```
+
+### Issue 3: spec.enabled Required
+
+```
+The KibanaInstance "eco2-kibana" is invalid: spec.enabled: Required value
+```
+
+**원인:** `spec.enabled` 필드가 CRD에서 필수임
+
+**해결:** `enabled: true` 추가
+```yaml
+spec:
+  enabled: true  # ⚠️ 필수!
+```
+
+### Issue 4: CRD 스키마 오류 (namespace)
 
 ```
 targetInstance.namespace: field not declared in schema
 ```
 
-**원인:** eck-custom-resources CRD에서 `targetInstance`는 `name` 필드만 지원
+**원인:** `targetInstance`는 `name` 필드만 지원
 
-**해결:**
+**해결:** CR을 KibanaInstance와 같은 namespace에 배치
 ```yaml
-# ❌ 잘못된 설정
-targetInstance:
-  name: eco2-kibana
-  namespace: logging  # 지원 안 함!
-
-# ✅ 올바른 설정 (CR이 같은 namespace에 있어야 함)
+# ✅ 올바른 설정 (같은 namespace)
 targetInstance:
   name: eco2-kibana
 ```
 
-### Issue 2: Dashboard가 Kibana에 안 뜸
+### Issue 5: Dashboard가 Kibana에 안 뜸
 
 **원인:** eck-custom-resources Operator 미설치 (CRD만 설치)
 
 **해결:** Helm으로 Operator 배포
-
 ```bash
 helm install eck-custom-resources \
   eck-custom-resources/eck-custom-resources-operator \
   -n elastic-system
 ```
 
-### Issue 3: DataView ID 충돌
+### Issue 6: Finalizer로 삭제 실패
 
-**원인:** DataView body에서 `id` 필드를 명시하지 않음
+**증상:** CR 삭제 시 Pending 상태로 무한 대기
 
-**해결:** 명시적 ID 지정
-```json
-{
-  "title": "logs-*",
-  "name": "logs-eco2-app",
-  "id": "logs-eco2-app"  // 명시적 ID
-}
+**원인:** KibanaInstance가 없거나 연결 실패로 finalizer 처리 불가
+
+**해결:** Finalizer 강제 제거
+```bash
+kubectl patch dashboard logs-eco2-test -n logging \
+  --type=merge -p '{"metadata":{"finalizers":[]}}'
 ```
 
 ---
