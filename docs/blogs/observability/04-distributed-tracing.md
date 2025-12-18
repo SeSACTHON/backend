@@ -20,7 +20,7 @@
 1. **서비스 토폴로지 시각화**: Kiali로 서비스 간 관계 파악
 2. **분산 트레이싱**: Jaeger로 요청 흐름 추적
 3. **자동 계측**: OpenTelemetry로 코드 수정 없이 트레이싱
-4. **외부 서비스 시각화**: OAuth, OpenAI 등 외부 의존성 표시
+4. **외부 서비스 시각화**: OAuth, OpenAI, AWS 등 외부 의존성 표시
 5. **E2E 트레이스 연결**: Istio Sidecar ↔ App OTEL SDK 트레이스 통합
 
 ---
@@ -91,47 +91,30 @@ flowchart TB
 | App OTEL SDK | Jaeger | **OTLP gRPC** | 4317 | 앱 트레이스 전송 |
 | Sidecar → App | - | **B3 Headers** | - | Trace Context 전파 |
 
-### Trace Context 연결 (B3 Propagation)
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│  Request Header (B3 Format)                                         │
-│  x-b3-traceid: 525f6e625d8086f9d3ce929d0e0e4736                     │
-│  x-b3-spanid: a3ce929d0e0e4736                                      │
-│  x-b3-sampled: 1                                                    │
-└─────────────────────────────────────────────────────────────────────┘
-                                │
-        ┌───────────────────────┼───────────────────────┐
-        ▼                       ▼                       ▼
-┌───────────────┐       ┌───────────────┐       ┌───────────────┐
-│ Istio Gateway │       │ Envoy Sidecar │       │ App OTEL SDK  │
-│   (Span 1)    │──────▶│   (Span 2)    │──────▶│   (Span 3)    │
-│               │       │               │       │               │
-│ traceID: 525f │       │ traceID: 525f │       │ traceID: 525f │
-└───────────────┘       └───────────────┘       └───────────────┘
-        │                       │                       │
-        └───────────────────────┴───────────────────────┘
-                                │
-                    ┌───────────▼───────────┐
-                    │      Jaeger UI        │
-                    │  동일 traceID로 조회  │
-                    │  → 3개 서비스 연결    │
-                    └───────────────────────┘
-```
-
 ---
 
-## 🏛️ 아키텍처 결정: Trace Source of Truth
+## 🎯 핵심 아키텍처 결정
 
-### 핵심 결정
+### 결정 1: Trace Source of Truth = Istio Ingress Gateway
 
-**Trace의 Source of Truth는 Istio Ingress Gateway (Envoy)입니다.**
+```mermaid
+flowchart LR
+    subgraph options["옵션 비교"]
+        opt1["① Istio Gateway<br/>✅ 선택"]
+        opt2["② App OTEL SDK"]
+        opt3["③ 클라이언트"]
+    end
+    
+    subgraph result["결과"]
+        r1["모든 요청 추적<br/>앱 미도달도 가능"]
+    end
+    
+    opt1 --> result
+    
+    style opt1 fill:#2ecc71,stroke:#333
+```
 
-모든 요청은 Istio Ingress Gateway에서 trace가 시작되며, 이 trace.id가 전체 요청 흐름에서 공유됩니다.
-
-### 결정 배경
-
-분산 트레이싱에서 "누가 trace를 시작하는가"는 중요한 아키텍처 결정입니다:
+**결정 배경:**
 
 | 옵션 | 장점 | 단점 |
 |------|------|------|
@@ -139,369 +122,316 @@ flowchart TB
 | ② App OTEL SDK | 앱 로직 세밀 추적 | 인프라 레벨 blind spot |
 | ③ 클라이언트 | E2E 완전 추적 | 클라이언트 통제 필요 |
 
-**선택 이유**:
-- 100% 샘플링으로 모든 요청 추적
-- ext-authz 거부, 404 등 앱 미도달 요청도 추적 가능
-- B3 헤더 전파로 앱 OTEL SDK와 자연스럽게 연결
+**선택 이유:**
+1. **100% 샘플링으로 모든 요청 추적** - dev 환경에서 디버깅 용이
+2. **ext-authz 거부, 404 등 앱 미도달 요청도 추적 가능** - 인프라 레벨 문제 파악
+3. **B3 헤더 전파로 앱 OTEL SDK와 자연스럽게 연결** - 추가 설정 최소화
 
-### Trace Propagation 흐름
+### 결정 2: Jaeger All-in-One (메모리 저장소)
 
-```
-┌──────────────────────────────────────────────────────────────────────┐
-│                    Trace ID Propagation Path                         │
-├──────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  [Client] ─────────────────────────────────────────────────────────▶ │
-│     │                                                                │
-│     │ (no trace header)                                              │
-│     ▼                                                                │
-│  ┌──────────────────┐                                               │
-│  │ Istio Ingress    │  ◀── SOURCE OF TRUTH                          │
-│  │ Gateway          │      trace.id = %TRACE_ID% (Envoy 생성)       │
-│  └────────┬─────────┘                                               │
-│           │                                                          │
-│           │ X-B3-TraceId: <generated>                               │
-│           │ X-B3-SpanId: <generated>                                │
-│           ▼                                                          │
-│  ┌──────────────────┐                                               │
-│  │ ext-authz        │  ◀── 헤더 수신 (includeHeadersInCheck)        │
-│  │ (인증 서비스)    │      x-b3-traceid, x-b3-spanid 포함          │
-│  └────────┬─────────┘                                               │
-│           │                                                          │
-│           │ 인증 성공 시 계속                                        │
-│           ▼                                                          │
-│  ┌──────────────────┐                                               │
-│  │ App Sidecar      │  ◀── trace context 유지                       │
-│  │ (istio-proxy)    │      access log: trace.id 기록               │
-│  └────────┬─────────┘                                               │
-│           │                                                          │
-│           │ X-B3-TraceId: <same>                                    │
-│           ▼                                                          │
-│  ┌──────────────────┐                                               │
-│  │ App Container    │  ◀── OTEL SDK가 B3 헤더 읽음                  │
-│  │ (auth-api)       │      동일한 trace.id로 span 생성             │
-│  └──────────────────┘                                               │
-│                                                                      │
-│  ═══════════════════════════════════════════════════════════════════ │
-│  All components share the SAME trace.id generated by Istio Ingress  │
-└──────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph options["저장소 옵션"]
+        mem["Memory<br/>✅ 선택"]
+        es["Elasticsearch"]
+        cassandra["Cassandra"]
+    end
+    
+    subgraph reason["이유"]
+        r1["• 개발 환경<br/>• 리소스 절약<br/>• 빠른 구축"]
+    end
+    
+    mem --> reason
+    
+    style mem fill:#2ecc71,stroke:#333
 ```
 
-### 설정 요약
+**선택 이유:**
+1. **개발 환경** - 트레이스 영구 보존 불필요
+2. **리소스 절약** - ES 추가 배포 없이 512MB로 운영
+3. **빠른 구축** - Helm All-in-One으로 5분 내 배포
 
-#### 1. Istio MeshConfig (Trace 생성)
+### 결정 3: 듀얼 프로토콜 (Zipkin + OTLP)
 
-```yaml
-meshConfig:
-  enableTracing: true
-  defaultConfig:
-    tracing:
-      sampling: 100  # 100% 샘플링
-      zipkin:
-        address: jaeger-collector-clusterip.istio-system.svc.cluster.local:9411
-  defaultProviders:
-    tracing:
-    - jaeger
+```mermaid
+flowchart TB
+    subgraph istio["Istio Layer"]
+        sidecar["Envoy Sidecar"]
+    end
+    
+    subgraph app["App Layer"]
+        otel["OTEL SDK"]
+    end
+    
+    subgraph jaeger["Jaeger"]
+        collector["Collector"]
+    end
+    
+    sidecar -->|"Zipkin :9411<br/>(Envoy 네이티브)"| collector
+    otel -->|"OTLP :4317<br/>(OTEL 네이티브)"| collector
+    
+    style sidecar fill:#9b59b6
+    style otel fill:#2ecc71
 ```
 
-#### 2. ext-authz 헤더 전달
+**왜 두 프로토콜인가?**
+- **Zipkin (9411)**: Envoy/Istio가 네이티브로 지원, 설정 변경 없이 사용
+- **OTLP (4317)**: OpenTelemetry SDK 표준, 더 풍부한 메타데이터
 
-```yaml
-meshConfig:
-  extensionProviders:
-  - envoyExtAuthzGrpc:
-      includeHeadersInCheck:
-      - authorization
-      - x-request-id
-      - x-b3-traceid    # ✅ trace 전파
-      - x-b3-spanid     # ✅ span 전파
+### 결정 4: B3 Propagator로 Trace Context 연결
+
+**문제:** Istio Sidecar와 App OTEL SDK가 별도 traceID 생성
+
+```
+❌ Before: 같은 요청인데 traceID가 다름
+Sidecar: traceID=abc123
+App:     traceID=xyz789  (연결 안됨)
 ```
 
-#### 3. EnvoyFilter Access Log (`%TRACE_ID%`)
-
-```yaml
-# workloads/istio/base/envoy-filter-access-log.yaml
-log_format:
-  json_format:
-    trace.id: '%TRACE_ID%'  # Envoy 내부 trace ID (항상 생성)
-    span.id: '%REQ(X-B3-SPANID)%'
-```
-
-> **중요**: `%REQ(X-B3-TRACEID)%` 대신 `%TRACE_ID%`를 사용합니다.
-> - `%REQ(X-B3-TRACEID)%`: 클라이언트가 보낸 헤더 (없으면 빈 값)
-> - `%TRACE_ID%`: Envoy 내부 trace ID (항상 자동 생성) ✅
-
-#### 4. App OTEL SDK (Trace 연결)
+**해결:** App에서 B3 헤더를 읽어 동일 traceID 사용
 
 ```yaml
 env:
-- name: OTEL_PROPAGATORS
-  value: "b3,tracecontext,baggage"  # B3 헤더 읽기
+  - name: OTEL_PROPAGATORS
+    value: "b3,tracecontext,baggage"  # B3 먼저!
 ```
 
-### 검증 결과
+```
+✅ After: 동일 traceID로 연결
+Sidecar: traceID=abc123
+App:     traceID=abc123  (Jaeger에서 하나의 trace로 표시)
+```
 
-| 항목 | 상태 | 설명 |
+---
+
+## 🔧 Trace Propagation 흐름
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Gateway as Istio Gateway
+    participant Sidecar as App Sidecar
+    participant App as App (OTEL SDK)
+    participant Jaeger
+    
+    Client->>Gateway: HTTP Request (no trace header)
+    Gateway->>Gateway: Generate trace.id (Envoy)
+    Gateway->>Jaeger: Zipkin span
+    Gateway->>Sidecar: X-B3-TraceId, X-B3-SpanId
+    Sidecar->>Jaeger: Zipkin span (same trace)
+    Sidecar->>App: X-B3-TraceId, X-B3-SpanId
+    App->>App: OTEL SDK extracts B3 headers
+    App->>Jaeger: OTLP span (same trace)
+    
+    Note over Jaeger: 3개 span이 동일 traceID로 연결
+```
+
+---
+
+## 🔧 구현: Python tracing.py
+
+### 왜 커스텀 tracing.py인가?
+
+| 방식 | 장점 | 단점 |
 |------|------|------|
-| Istio trace 생성 | ✅ | `enableTracing: true`, `sampling: 100` |
-| ext-authz 헤더 전파 | ✅ | `includeHeadersInCheck`에 B3 헤더 포함 |
-| App trace 연결 | ✅ | OTEL SDK B3 Propagator로 동일 trace 사용 |
-| 앱 미도달 요청 | ✅ | `%TRACE_ID%`로 모든 요청에 trace.id 포함 |
-| Jaeger 연결 | ✅ | 여러 span이 같은 trace로 연결 |
+| `opentelemetry-instrument` 만 | 제로 코드 | 세부 제어 어려움 |
+| **커스텀 tracing.py** ✅ | 세부 제어, 조건부 비활성화 | 코드 필요 |
 
-### 실제 검증 예시
+**선택 이유:**
+1. `OTEL_ENABLED=false`로 완전 비활성화 가능
+2. 샘플링 레이트 동적 조절
+3. 수동 span 생성 헬퍼 제공
 
-```bash
-# 같은 요청의 istio-proxy와 auth-api 로그
-{
-  "service.name": "istio-proxy",
-  "trace.id": "49069056832712b6d1a76403290e3520",
-  "url.path": "/api/v1/auth/refresh"
-}
+### 전체 코드
 
-{
-  "service.name": "auth-api",
-  "trace.id": "49069056832712b6d1a76403290e3520",  # ✅ 동일
-  "message": "HTTP 401 UNAUTHORIZED: Missing refresh token"
-}
+```python
+# domains/auth/core/tracing.py
+"""
+OpenTelemetry Distributed Tracing Configuration
+
+Architecture:
+  App (OTel SDK) → OTLP/gRPC (4317) → Jaeger Collector → (Memory)
+"""
+
+import logging
+import os
+from typing import Optional
+
+from fastapi import FastAPI
+
+logger = logging.getLogger(__name__)
+
+# Environment variables
+OTEL_EXPORTER_ENDPOINT = os.getenv(
+    "OTEL_EXPORTER_OTLP_ENDPOINT",
+    "jaeger-collector-clusterip.istio-system.svc.cluster.local:4317",
+)
+OTEL_SAMPLING_RATE = float(os.getenv("OTEL_SAMPLING_RATE", "1.0"))
+OTEL_ENABLED = os.getenv("OTEL_ENABLED", "true").lower() == "true"
+
+_tracer_provider = None
+
+
+def configure_tracing(
+    service_name: str,
+    service_version: str,
+    environment: str = "dev",
+) -> bool:
+    """OpenTelemetry 트레이싱 설정"""
+    global _tracer_provider
+
+    if not OTEL_ENABLED:
+        logger.info("OpenTelemetry tracing disabled (OTEL_ENABLED=false)")
+        return False
+
+    try:
+        from opentelemetry import trace
+        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+        from opentelemetry.sdk.resources import Resource
+        from opentelemetry.sdk.trace import TracerProvider
+        from opentelemetry.sdk.trace.export import BatchSpanProcessor
+        from opentelemetry.sdk.trace.sampling import TraceIdRatioBased
+
+        # Resource attributes (ECS/OTel semantic conventions)
+        resource = Resource.create({
+            "service.name": service_name,
+            "service.version": service_version,
+            "deployment.environment": environment,
+            "telemetry.sdk.name": "opentelemetry",
+            "telemetry.sdk.language": "python",
+        })
+
+        # Sampler (production: 1%, dev: 100%)
+        sampler = TraceIdRatioBased(OTEL_SAMPLING_RATE)
+
+        _tracer_provider = TracerProvider(resource=resource, sampler=sampler)
+
+        # OTLP gRPC Exporter
+        exporter = OTLPSpanExporter(
+            endpoint=OTEL_EXPORTER_ENDPOINT,
+            insecure=True,  # ClusterIP, no TLS needed
+        )
+
+        # BatchSpanProcessor (async, low overhead)
+        _tracer_provider.add_span_processor(
+            BatchSpanProcessor(
+                exporter,
+                max_queue_size=2048,
+                max_export_batch_size=512,
+                schedule_delay_millis=1000,
+            )
+        )
+
+        trace.set_tracer_provider(_tracer_provider)
+
+        logger.info("OpenTelemetry tracing configured", extra={
+            "service": service_name,
+            "endpoint": OTEL_EXPORTER_ENDPOINT,
+            "sampling_rate": OTEL_SAMPLING_RATE,
+        })
+        return True
+
+    except ImportError as e:
+        logger.warning(f"OpenTelemetry not available: {e}")
+        return False
+
+
+def instrument_fastapi(app: FastAPI) -> None:
+    """FastAPI 자동 계측"""
+    if not OTEL_ENABLED:
+        return
+
+    try:
+        from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+        FastAPIInstrumentor.instrument_app(
+            app,
+            excluded_urls="health,ready,metrics",  # Health check 제외
+        )
+        logger.info("FastAPI instrumentation enabled")
+    except ImportError:
+        logger.warning("FastAPIInstrumentor not available")
+
+
+def instrument_httpx() -> None:
+    """HTTPX 자동 계측 (외부 API 호출 추적)"""
+    if not OTEL_ENABLED:
+        return
+
+    try:
+        from opentelemetry.instrumentation.httpx import HTTPXClientInstrumentor
+        HTTPXClientInstrumentor().instrument()
+        logger.info("HTTPX instrumentation enabled")
+    except ImportError:
+        logger.warning("HTTPXClientInstrumentor not available")
+
+
+def shutdown_tracing() -> None:
+    """트레이싱 종료 (graceful shutdown)"""
+    global _tracer_provider
+    if _tracer_provider is not None:
+        _tracer_provider.shutdown()
+        logger.info("OpenTelemetry tracing shutdown complete")
 ```
 
 ---
 
-## 🔧 Step 1: Kiali 배포
+## 🔧 외부 서비스 시각화 (ServiceEntry)
 
-### ArgoCD Application
+### 현재 등록된 외부 서비스
 
-```yaml
-# clusters/dev/apps/60-kiali.yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: kiali
-  namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "60"
-spec:
-  project: default
-  source:
-    chart: kiali-server
-    repoURL: https://kiali.org/helm-charts
-    targetRevision: 2.1.0
-    helm:
-      values: |
-        auth:
-          strategy: anonymous  # 개발 환경
-        
-        deployment:
-          accessible_namespaces:
-          - "**"
-          
-        external_services:
-          prometheus:
-            url: "http://prometheus-operated.prometheus.svc.cluster.local:9090"
-          grafana:
-            enabled: true
-            url: "http://grafana.prometheus.svc.cluster.local"
-          tracing:
-            enabled: true
-            provider: jaeger
-            use_grpc: false
-            in_cluster_url: "http://jaeger-query.istio-system.svc.cluster.local:16686"
-            url: "https://jaeger.dev.growbin.app"
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: istio-system
+| ServiceEntry | 호스트 | 용도 |
+|--------------|--------|------|
+| `google-external` | accounts.google.com, www.googleapis.com | Google OAuth |
+| `kakao-external` | kauth.kakao.com, kapi.kakao.com | Kakao OAuth |
+| `naver-external` | nid.naver.com, openapi.naver.com | Naver OAuth |
+| `openai-external` | api.openai.com | AI 챗봇 |
+| `aws-s3-external` | *.s3.amazonaws.com | 이미지 저장 |
+| `aws-cloudfront` | *.cloudfront.net, images.dev.growbin.app | CDN |
+
+### 왜 ServiceEntry가 필요한가?
+
+```mermaid
+flowchart LR
+    subgraph before["❌ ServiceEntry 없이"]
+        app1[App] --> pass1[PassthroughCluster]
+    end
+    
+    subgraph after["✅ ServiceEntry 등록"]
+        app2[App] --> kakao[kakao-external]
+        app2 --> google[google-external]
+        app2 --> openai[openai-external]
+    end
+    
+    style pass1 fill:#e74c3c
+    style kakao fill:#2ecc71
+    style google fill:#2ecc71
+    style openai fill:#2ecc71
 ```
 
-### DNS 설정 (ExternalDNS)
+**문제:** 외부 호출이 `PassthroughCluster`로 표시되어 구분 불가  
+**해결:** ServiceEntry로 외부 서비스 명시적 등록
 
-```yaml
-# workloads/routing/gateway/dev/patch-ingress.yaml
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  annotations:
-    external-dns.alpha.kubernetes.io/hostname: >-
-      api.dev.growbin.app,
-      kibana.dev.growbin.app,
-      kiali.dev.growbin.app,
-      jaeger.dev.growbin.app
-```
-
----
-
-## 🔧 Step 2: Jaeger 배포
-
-### ArgoCD Application
-
-```yaml
-# clusters/dev/apps/61-jaeger.yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: jaeger
-  namespace: argocd
-  annotations:
-    argocd.argoproj.io/sync-wave: "61"
-spec:
-  project: default
-  source:
-    chart: jaeger
-    repoURL: https://jaegertracing.github.io/helm-charts
-    targetRevision: 3.4.1
-    helm:
-      values: |
-        # All-in-One 배포 (개발 환경)
-        allInOne:
-          enabled: true
-          replicas: 1
-          resources:
-            requests:
-              memory: 256Mi
-              cpu: 100m
-            limits:
-              memory: 512Mi
-              cpu: 500m
-          
-        storage:
-          type: memory  # 개발 환경: 메모리 저장소
-          
-        collector:
-          enabled: false  # All-in-One 사용
-          
-        query:
-          enabled: false  # All-in-One 사용
-  destination:
-    server: https://kubernetes.default.svc
-    namespace: istio-system
-```
-
----
-
-## 🔧 Step 3: OpenTelemetry Auto-Instrumentation
-
-### 전략: Zero-code Change
-
-코드 수정 없이 Dockerfile의 실행 명령어만 변경하여 자동 계측을 적용합니다.
-
-### requirements.txt
-
-```txt
-# OpenTelemetry - 2025.12 stable versions
-opentelemetry-distro==0.50b0
-opentelemetry-exporter-otlp==1.29.0
-opentelemetry-instrumentation-fastapi==0.50b0
-opentelemetry-instrumentation-sqlalchemy==0.50b0
-opentelemetry-instrumentation-httpx==0.50b0
-opentelemetry-instrumentation-redis==0.50b0
-opentelemetry-instrumentation-asyncpg==0.50b0
-
-# Istio Sidecar와 Trace Context 연결을 위한 B3 Propagator
-opentelemetry-propagator-b3==1.29.0
-```
-
-### Dockerfile
-
-```dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-COPY . .
-
-# OpenTelemetry 자동 계측 적용
-CMD ["opentelemetry-instrument", \
-     "uvicorn", "domains.auth.main:app", \
-     "--host", "0.0.0.0", "--port", "8000"]
-```
-
-### Deployment 환경변수
-
-```yaml
-# workloads/domains/auth/base/deployment.yaml
-spec:
-  template:
-    spec:
-      containers:
-      - name: auth-api
-        env:
-        # OpenTelemetry 설정
-        - name: OTEL_SERVICE_NAME
-          value: "auth-api"
-        - name: OTEL_TRACES_EXPORTER
-          value: "otlp"
-        # ⚠️ ClusterIP Service 사용 (Headless Service 호환 이슈로 변경)
-        - name: OTEL_EXPORTER_OTLP_ENDPOINT
-          value: "http://jaeger-collector-clusterip.istio-system.svc.cluster.local:4317"
-        - name: OTEL_METRICS_EXPORTER
-          value: "none"
-        - name: OTEL_LOGS_EXPORTER
-          value: "none"
-        # ✅ B3 Propagator: Istio Sidecar와 Trace Context 연결
-        - name: OTEL_PROPAGATORS
-          value: "b3,tracecontext,baggage"
-```
-
-> **중요**: `OTEL_PROPAGATORS`에 `b3`를 추가해야 Istio Envoy Sidecar가 전파하는 B3 헤더를 앱의 OTEL SDK가 인식합니다. 이 설정 없이는 Sidecar 트레이스와 App 트레이스가 별도의 traceID로 분리됩니다.
-
-### 자동 계측되는 라이브러리
-
-| 라이브러리 | 계측 내용 |
-|------------|----------|
-| FastAPI | HTTP 요청/응답 |
-| SQLAlchemy | DB 쿼리 |
-| asyncpg | PostgreSQL 연결 |
-| Redis | 캐시 조회/저장 |
-| httpx | 외부 API 호출 |
-
----
-
-## 🔧 Step 4: 외부 서비스 시각화 (ServiceEntry)
-
-### 문제: PassthroughCluster
-
-Istio 외부로 나가는 트래픽은 기본적으로 `PassthroughCluster`로 표시되어 어떤 외부 서비스인지 알 수 없습니다.
-
-### 해결: ServiceEntry 등록
+### 매니페스트
 
 ```yaml
 # workloads/routing/global/external-services.yaml
-apiVersion: networking.istio.io/v1beta1
+apiVersion: networking.istio.io/v1alpha3
 kind: ServiceEntry
 metadata:
-  name: google-oauth
-  namespace: istio-system
-spec:
-  hosts:
-  - accounts.google.com
-  - oauth2.googleapis.com
-  - www.googleapis.com
-  location: MESH_EXTERNAL
-  ports:
-  - number: 443
-    name: https
-    protocol: HTTPS
-  resolution: DNS
----
-apiVersion: networking.istio.io/v1beta1
-kind: ServiceEntry
-metadata:
-  name: kakao-oauth
+  name: kakao-external
   namespace: istio-system
 spec:
   hosts:
   - kauth.kakao.com
   - kapi.kakao.com
-  location: MESH_EXTERNAL
   ports:
   - number: 443
     name: https
     protocol: HTTPS
   resolution: DNS
+  location: MESH_EXTERNAL
 ---
-apiVersion: networking.istio.io/v1beta1
+apiVersion: networking.istio.io/v1alpha3
 kind: ServiceEntry
 metadata:
   name: openai-external
@@ -509,78 +439,57 @@ metadata:
 spec:
   hosts:
   - api.openai.com
-  location: MESH_EXTERNAL
   ports:
   - number: 443
     name: https
     protocol: HTTPS
   resolution: DNS
-```
-
-### 결과
-
-Kiali 그래프에서:
-- Before: `PassthroughCluster` → 불명확
-- After: `google-oauth`, `kakao-oauth`, `openai-external` → 명확한 노드 표시
-
+  location: MESH_EXTERNAL
 ---
-
-## 🔧 Step 5: Trace Sampling 100%
-
-개발 환경에서 모든 요청을 분석하기 위해 100% 샘플링을 설정합니다.
-
-### Telemetry 리소스
-
-```yaml
-# workloads/routing/global/telemetry.yaml
-apiVersion: telemetry.istio.io/v1alpha1
-kind: Telemetry
+# AWS는 와일드카드 DNS라 resolution: NONE
+apiVersion: networking.istio.io/v1alpha3
+kind: ServiceEntry
 metadata:
-  name: global-sampling
+  name: aws-s3-external
   namespace: istio-system
 spec:
-  tracing:
-  - providers:
-    - name: jaeger
-    randomSamplingPercentage: 100.00
+  hosts:
+  - '*.s3.amazonaws.com'
+  - '*.s3.ap-northeast-2.amazonaws.com'
+  ports:
+  - number: 443
+    name: https
+    protocol: HTTPS
+  resolution: NONE  # 와일드카드는 DNS 해석 불가
+  location: MESH_EXTERNAL
 ```
 
 ---
 
-## 🔧 Step 6: Istio MeshConfig (Jaeger 연동)
+## 🔧 Jaeger ClusterIP Service
 
-Istio Sidecar(Envoy)가 Jaeger로 트레이스를 전송하려면 MeshConfig에 tracing provider를 설정해야 합니다.
+### 왜 별도 ClusterIP가 필요한가?
 
-### Istiod Helm Values
-
-```yaml
-# clusters/dev/apps/05-istio.yaml
-valuesObject:
-  meshConfig:
-    # Jaeger tracing 활성화
-    enableTracing: true
-    defaultConfig:
-      tracing:
-        sampling: 100.0
-        zipkin:
-          # ⚠️ ClusterIP Service 사용 (Headless 호환 이슈)
-          address: jaeger-collector-clusterip.istio-system.svc.cluster.local:9411
-    defaultProviders:
-      tracing:
-      - jaeger
-    extensionProviders:
-    - name: jaeger
-      zipkin:
-        service: jaeger-collector-clusterip.istio-system.svc.cluster.local
-        port: 9411
+```mermaid
+flowchart TB
+    subgraph problem["❌ Headless Service 문제"]
+        istio1[Istio] --> |"DNS 조회"| headless["jaeger-collector<br/>clusterIP: None"]
+        headless --> |"Pod IP 직접 반환"| pod1[Pod IP]
+        pod1 --> |"503 오류"| fail[연결 실패]
+    end
+    
+    subgraph solution["✅ ClusterIP Service 해결"]
+        istio2[Istio] --> |"DNS 조회"| clusterip["jaeger-collector-clusterip<br/>clusterIP: 10.x.x.x"]
+        clusterip --> |"로드밸런싱"| pod2[Pod]
+    end
 ```
 
-### Jaeger Collector ClusterIP Service
+**문제:** Jaeger Helm Chart가 생성하는 Service가 Headless  
+**증상:** Istio VirtualService로 접근 시 503 오류
 
-Jaeger Helm Chart는 기본적으로 Headless Service를 생성합니다. Istio가 안정적으로 연결하려면 별도의 ClusterIP Service가 필요합니다.
+**해결:** 별도 ClusterIP Service 생성
 
 ```yaml
-# 수동 생성 필요
 apiVersion: v1
 kind: Service
 metadata:
@@ -591,34 +500,42 @@ spec:
   ports:
   - name: http-zipkin
     port: 9411
-    targetPort: 9411
   - name: grpc-otlp
     port: 4317
-    targetPort: 4317
   - name: http-otlp
     port: 4318
-    targetPort: 4318
   selector:
     app.kubernetes.io/component: all-in-one
-    app.kubernetes.io/instance: jaeger
     app.kubernetes.io/name: jaeger
 ```
 
 ---
 
-## 🔧 Step 7: NetworkPolicy 설정
+## 🔧 NetworkPolicy 설정
 
-분산 트레이싱이 동작하려면 두 가지 경로의 egress가 모두 허용되어야 합니다.
+### 왜 9411 포트가 중요한가?
 
-### 필수 포트 목록
+```mermaid
+flowchart LR
+    subgraph app["App Namespace"]
+        sidecar["Istio Sidecar"]
+        otel["OTEL SDK"]
+    end
+    
+    subgraph jaeger["istio-system"]
+        collector["Jaeger Collector"]
+    end
+    
+    sidecar -->|"9411 (Zipkin)<br/>⚠️ 필수!"| collector
+    otel -->|"4317 (OTLP)"| collector
+    
+    style sidecar fill:#9b59b6
+```
 
-| 프로토콜 | 포트 | 사용처 | 
-|----------|------|--------|
-| OTLP gRPC | 4317 | App OTEL SDK → Jaeger |
-| OTLP HTTP | 4318 | App OTEL SDK → Jaeger |
-| **Zipkin** | **9411** | **Istio Sidecar → Jaeger** |
+**문제:** 9411 누락 시 Sidecar 트레이스가 전송 안됨  
+**증상:** Jaeger Dependencies에 "No service dependencies found"
 
-### allow-jaeger-egress NetworkPolicy
+### 매니페스트
 
 ```yaml
 # workloads/network-policies/base/allow-jaeger-egress.yaml
@@ -640,149 +557,42 @@ spec:
         matchLabels:
           app.kubernetes.io/name: jaeger
     ports:
-    - port: 4317
-      protocol: TCP
-    - port: 4318
-      protocol: TCP
-    - port: 9411      # ⚠️ 필수! Istio Sidecar용
-      protocol: TCP
+    - port: 4317   # OTLP gRPC (App SDK)
+    - port: 4318   # OTLP HTTP
+    - port: 9411   # ⚠️ Zipkin (Istio Sidecar) - 필수!
 ```
-
-> **⚠️ 주의**: `port: 9411`이 누락되면 Istio Sidecar의 트레이스가 Jaeger에 전송되지 않아 "No service dependencies found" 오류가 발생합니다.
 
 ---
 
-## ✅ 결과 확인
+## 📊 텔레메트리 신호별 수집 전략
 
-### Jaeger Dependencies (Service Map)
+### 왜 Traces만 OTEL인가?
 
 ```mermaid
-flowchart LR
-    IG[istio-ingressgateway<br/>istio-system]
-    AUTH_S[auth-api.auth<br/>Sidecar]
-    AUTH_A[auth-api<br/>OTEL SDK]
-    CHAR_S[character-api.character]
-    CHAT_S[chat-api.chat]
-    SCAN_S[scan-api.scan]
-    LOC_S[location-api.location]
-    IMG_S[image-api.image]
-
-    IG --> AUTH_S
-    AUTH_S --> AUTH_A
-    IG --> CHAR_S
-    IG --> CHAT_S
-    IG --> SCAN_S
-    IG --> LOC_S
-    IG --> IMG_S
-
-    style IG fill:#3498db
-    style AUTH_S fill:#9b59b6
-    style AUTH_A fill:#2ecc71
+flowchart TB
+    subgraph traces["Traces ✅ OTEL"]
+        app1[App] -->|"OTLP"| jaeger[Jaeger]
+    end
+    
+    subgraph metrics["Metrics ❌ OTEL 미사용"]
+        app2[App] -->|"/metrics"| prometheus[Prometheus Scrape]
+    end
+    
+    subgraph logs["Logs ❌ OTEL 미사용"]
+        app3[App] -->|"stdout"| fluentbit[Fluent Bit]
+    end
+    
+    style traces fill:#2ecc71
 ```
 
-### Jaeger API 검증
+| 신호 | 수집 방법 | OTEL 사용 | 이유 |
+|------|----------|----------|------|
+| **Traces** | OTLP → Jaeger | ✅ | 신규 도입, 표준화 |
+| **Metrics** | Prometheus scrape | ❌ | 기존 인프라 활용, Pull 모델 장점 |
+| **Logs** | Fluent Bit → ES | ❌ | EFK 스택 이미 구축 |
 
-```bash
-# Dependencies 확인
-curl "http://jaeger:16686/api/dependencies?endTs=$(date +%s)000&lookback=300000" | jq ".data"
-
-# 결과 예시
-[
-  {"parent": "istio-ingressgateway.istio-system", "child": "auth-api.auth", "callCount": 5},
-  {"parent": "auth-api.auth", "child": "auth-api", "callCount": 5}
-]
-```
-
-### 동일 traceID에 연결된 서비스
-
-```json
-{
-  "traceID": "525f6e625d8086f9",
-  "services": [
-    "auth-api",                          // App OTEL SDK
-    "auth-api.auth",                     // Istio Sidecar
-    "istio-ingressgateway.istio-system"  // Ingress Gateway
-  ],
-  "spanCount": 5
-}
-```
-
-### Kiali Graph
-
-**접속**: `https://kiali.dev.growbin.app`
-
-**캡처 포인트:**
-1. Display 설정: Traffic Animation, Security 활성화
-2. OAuth 흐름: `Gateway` → `auth` → `google-oauth` → `auth` → `postgres`
-3. AI 파이프라인: `chat` → `openai-external`
-
-### Jaeger Trace
-
-**접속**: `https://jaeger.dev.growbin.app`
-
-**검색 방법:**
-1. Service: `auth-api` 선택
-2. Operation: `POST /api/v1/auth/kakao/callback` 선택
-3. Find Traces 클릭
-
-**Span 구조 예시 (E2E 연결):**
-```
-istio-ingressgateway: POST /api/v1/auth/health (traceID: 525f6e625d8086f9)
-└── auth-api.auth: inbound (Envoy Sidecar)
-    └── auth-api: POST /api/v1/auth/health (OTEL SDK)
-        ├── asyncpg: SELECT users... (5ms)
-        └── redis: GET auth:session:xxx (2ms)
-```
-
----
-
-## 🔗 로그-트레이스 연결
-
-### Kibana에서 trace_id 검색
-
-```
-trace.id: "4bf92f3577b34da6a3ce929d0e0e4736"
-```
-
-### Jaeger에서 동일 trace 확인
-
-```
-https://jaeger.dev.growbin.app/trace/4bf92f3577b34da6a3ce929d0e0e4736
-```
-
-### 연결 흐름
-
-```
-Kibana (로그)  ←── trace.id ──→  Jaeger (트레이스)
-     ↓                                ↓
-  에러 발생 시점               어떤 span에서 지연?
-  컨텍스트 정보               서비스 간 호출 순서
-```
-
----
-
-## 📊 OpenTelemetry Exporter 설정 전략
-
-### 세 가지 텔레메트리 신호
-
-OpenTelemetry는 **Traces, Metrics, Logs** 세 가지 신호를 지원합니다. ECO2에서는 각 신호별로 최적의 수집 파이프라인을 선택했습니다.
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                         ECO2 Service                            │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                 │
-│  [Traces]     OTel SDK → OTLP/gRPC → Jaeger → Elasticsearch     │
-│               (OTEL_TRACES_EXPORTER=otlp) ✅                    │
-│                                                                 │
-│  [Metrics]    prometheus-client → /metrics → Prometheus scrape  │
-│               (OTEL_METRICS_EXPORTER=none) ❌ OTel 미사용       │
-│                                                                 │
-│  [Logs]       JSON stdout → Fluent Bit → Elasticsearch          │
-│               (OTEL_LOGS_EXPORTER=none) ❌ OTel 미사용          │
-│                                                                 │
-└─────────────────────────────────────────────────────────────────┘
-```
+**설계 원칙:** *"Don't fix what isn't broken"*  
+기존에 잘 동작하는 Prometheus/Fluent Bit 유지, 없었던 **Traces만 추가**
 
 ### Deployment 환경변수 (전체)
 
@@ -798,33 +608,78 @@ env:
     value: "none"                    # ❌ Prometheus가 scrape
   - name: OTEL_LOGS_EXPORTER
     value: "none"                    # ❌ Fluent Bit가 수집
-  # ✅ B3 Propagator: Istio Sidecar 트레이스와 연결
   - name: OTEL_PROPAGATORS
-    value: "b3,tracecontext,baggage"
+    value: "b3,tracecontext,baggage" # ✅ Istio와 연결
 ```
 
-### 왜 Metrics/Logs는 `none`인가?
+---
 
-| 신호 | 기존 스택 | OTel 대체 시 장점 | 전환 비용 |
-|------|----------|------------------|----------|
-| **Traces** | 없음 → Jaeger | ✅ 신규 도입 | 낮음 |
-| **Metrics** | Prometheus (de facto 표준) | 거의 없음 | 높음 (대시보드 재작성) |
-| **Logs** | Fluent Bit + EFK | Log correlation 개선 | 중간 |
+## ✅ 검증 결과
 
-**설계 원칙**: *"Don't fix what isn't broken"* — 기존에 잘 동작하는 Prometheus/Fluent Bit 파이프라인을 유지하면서, 없었던 **Traces만 OTel로 추가**
+### Jaeger에서 확인
 
-### Prometheus Pull vs OTel Push
+```bash
+# 같은 요청의 istio-proxy와 auth-api 로그
+{
+  "service.name": "istio-proxy",
+  "trace.id": "49069056832712b6d1a76403290e3520",
+  "url.path": "/api/v1/auth/refresh"
+}
 
-```yaml
-# Prometheus Pull 모델 장점:
-# ✅ 서비스가 죽어도 "scrape 실패" 자체가 알림
-# ✅ PromQL - 강력한 쿼리 언어
-# ✅ Grafana 생태계 완벽 호환
-# ✅ ServiceMonitor CRD로 자동 발견
+{
+  "service.name": "auth-api",
+  "trace.id": "49069056832712b6d1a76403290e3520",  # ✅ 동일
+  "message": "HTTP 401 UNAUTHORIZED: Missing refresh token"
+}
+```
 
-# OTel Push 모델:
-# ❌ 서비스가 죽으면 데이터 유실 가능
-# ❌ 추가 Collector 인프라 필요
+### Span 구조 예시
+
+```
+istio-ingressgateway: POST /api/v1/auth/kakao/callback (traceID: 525f...)
+└── auth-api.auth: inbound (Envoy Sidecar)
+    └── auth-api: POST /api/v1/auth/kakao/callback (OTEL SDK)
+        ├── httpx: POST kauth.kakao.com/oauth/token (15ms)
+        ├── asyncpg: INSERT users... (5ms)
+        └── redis: SET auth:session:xxx (2ms)
+```
+
+### 현재 클러스터 상태
+
+| 항목 | 상태 |
+|------|------|
+| Telemetry 리소스 | `global-sampling` (100%), `mesh-default` (access logging) |
+| Jaeger Services | `jaeger-collector-clusterip`, `jaeger-query-clusterip` |
+| ServiceEntry | 6개 (Google, Kakao, Naver, OpenAI, AWS S3, CloudFront) |
+| B3 Propagation | ✅ App OTEL SDK에서 활성화 |
+
+---
+
+## 🔗 로그-트레이스 연결
+
+```mermaid
+flowchart LR
+    kibana["Kibana<br/>(Logs)"]
+    jaeger["Jaeger<br/>(Traces)"]
+    
+    kibana <-->|"trace.id"| jaeger
+    
+    subgraph usecase["활용"]
+        k1["에러 발생 시점<br/>컨텍스트 정보"]
+        j1["어떤 span에서 지연?<br/>서비스 간 호출 순서"]
+    end
+    
+    kibana --> k1
+    jaeger --> j1
+```
+
+**검색 예시:**
+```
+# Kibana에서 trace.id 검색
+trace.id: "4bf92f3577b34da6a3ce929d0e0e4736"
+
+# Jaeger에서 동일 trace 확인
+https://jaeger.dev.growbin.app/trace/4bf92f3577b34da6a3ce929d0e0e4736
 ```
 
 ---
@@ -833,77 +688,28 @@ env:
 
 ### 📝 상세 트러블슈팅 문서
 
-분산 트레이싱 구축 과정에서 발생한 주요 이슈들은 별도 문서로 상세히 정리되어 있습니다:
-
 | 이슈 | 문서 | 소요시간 |
 |------|------|----------|
-| NetworkPolicy Zipkin 포트 누락 | [분산 트레이싱 트러블슈팅: NetworkPolicy, Zipkin, OpenTelemetry](https://rooftopsnow.tistory.com/29) | ~2시간 |
-| Fluent Bit CRI Parser 오류 | [분산 트레이싱 트러블슈팅: Fluent Bit CRI Parser 오류](https://rooftopsnow.tistory.com/28) | ~30분 |
+| NetworkPolicy Zipkin 포트 누락 | [트러블슈팅 블로그](https://rooftopsnow.tistory.com/29) | ~2시간 |
+| Fluent Bit CRI Parser 오류 | [트러블슈팅 블로그](https://rooftopsnow.tistory.com/28) | ~30분 |
 
----
+### Issue 1: "No service dependencies found"
 
-### Issue 1: Kiali에서 Prometheus 연결 실패
+**증상:** 개별 서비스 트레이스는 있지만 dependencies 없음  
+**원인:** NetworkPolicy에서 Zipkin 포트(9411) 누락  
+**해결:** port 9411 추가
 
-```
-Could not fetch health
-```
+### Issue 2: App traceID가 Sidecar와 다름
 
-**원인**: Prometheus URL 오설정
+**증상:** 같은 요청인데 별도 traceID  
+**원인:** App OTEL SDK가 B3 헤더 미인식  
+**해결:** `OTEL_PROPAGATORS=b3,tracecontext,baggage`
 
-**해결**: `external_services.prometheus.url` 수정
-```yaml
-prometheus:
-  url: "http://prometheus-operated.prometheus.svc.cluster.local:9090"
-```
+### Issue 3: Jaeger UI 503 오류
 
-### Issue 2: Jaeger에서 "No service dependencies found"
-
-**증상**: 개별 서비스 트레이스는 수집되지만 서비스 간 dependencies가 표시되지 않음
-
-**원인**: NetworkPolicy에서 Zipkin 포트(9411) 누락
-
-**해결**: `allow-jaeger-egress` NetworkPolicy에 port 9411 추가
-```yaml
-ports:
-  - port: 4317  # OTLP gRPC
-  - port: 4318  # OTLP HTTP
-  - port: 9411  # ✅ Zipkin (Istio Sidecar용)
-```
-
-**상세**: [트러블슈팅 블로그](https://rooftopsnow.tistory.com/29)
-
-### Issue 3: App OTEL SDK 트레이스가 Sidecar와 연결 안됨
-
-**증상**: Jaeger에서 동일 요청에 대해 Sidecar 트레이스와 App 트레이스가 별도 traceID로 분리됨
-
-**원인**: App의 OTEL SDK가 B3 헤더를 인식하지 못함
-
-**해결**: 
-1. `opentelemetry-propagator-b3==1.29.0` 패키지 설치
-2. 환경변수 설정: `OTEL_PROPAGATORS=b3,tracecontext,baggage`
-
-### Issue 4: Jaeger Headless Service 호환성
-
-**증상**: Istio VirtualService로 Jaeger UI 접근 시 503 오류
-
-**원인**: Jaeger Helm Chart가 생성하는 Service가 Headless (`clusterIP: None`)
-
-**해결**: 별도 ClusterIP Service 생성
-```yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: jaeger-collector-clusterip
-  name: jaeger-query-clusterip
-spec:
-  type: ClusterIP  # Headless 대신 ClusterIP
-```
-
-### Issue 5: 외부 서비스 NXDOMAIN
-
-**원인**: ServiceEntry의 `resolution: NONE`으로 설정
-
-**해결**: `resolution: DNS`로 변경
+**증상:** VirtualService로 접근 시 503  
+**원인:** Headless Service  
+**해결:** ClusterIP Service 별도 생성
 
 ---
 
@@ -917,26 +723,22 @@ spec:
 
 ### 트러블슈팅 사례 (ECO2)
 
-- [분산 트레이싱 트러블슈팅: NetworkPolicy, Zipkin, OpenTelemetry](https://rooftopsnow.tistory.com/29) - Zipkin 포트 누락 이슈
-- [분산 트레이싱 트러블슈팅: Fluent Bit CRI Parser 오류](https://rooftopsnow.tistory.com/28) - containerd 로그 파싱 이슈
+- [분산 트레이싱 트러블슈팅: NetworkPolicy, Zipkin](https://rooftopsnow.tistory.com/29)
+- [분산 트레이싱 트러블슈팅: Fluent Bit CRI Parser](https://rooftopsnow.tistory.com/28)
 
 ### CNCF & OpenTelemetry
 
-- [OpenTelemetry Documentation](https://opentelemetry.io/docs/) - 공식 OTel 문서
-- [OpenTelemetry Python Auto-Instrumentation](https://opentelemetry.io/docs/zero-code/python/) - Python 자동 계측
-- [OpenTelemetry B3 Propagator](https://opentelemetry.io/docs/specs/otel/context/api-propagators/#b3-requirements) - B3 헤더 전파
-- [Jaeger Documentation](https://www.jaegertracing.io/docs/latest/) - Jaeger v2 공식 문서
+- [OpenTelemetry Documentation](https://opentelemetry.io/docs/)
+- [OpenTelemetry B3 Propagator](https://opentelemetry.io/docs/specs/otel/context/api-propagators/)
+- [Jaeger Documentation](https://www.jaegertracing.io/docs/latest/)
 
 ### 빅테크 아키텍처
 
-- [Google Dapper Paper](https://research.google/pubs/dapper-a-large-scale-distributed-systems-tracing-infrastructure/) - 분산 트레이싱의 시초
-- [Uber: Evolving Distributed Tracing](https://www.uber.com/blog/distributed-tracing/) - Jaeger 개발 배경
-- [Netflix: Lessons from Building Observability Tools](https://netflixtechblog.com/lessons-from-building-observability-tools-at-netflix-7cfafed6ab17) - Netflix Observability 경험
+- [Google Dapper Paper](https://research.google/pubs/dapper-a-large-scale-distributed-systems-tracing-infrastructure/)
+- [Uber: Evolving Distributed Tracing](https://www.uber.com/blog/distributed-tracing/)
 
 ### Service Mesh Integration
 
-- [Istio Distributed Tracing](https://istio.io/latest/docs/tasks/observability/distributed-tracing/) - Istio 트레이싱 설정
-- [Istio Telemetry API](https://istio.io/latest/docs/reference/config/telemetry/) - Telemetry 리소스 설정
-- [Istio ServiceEntry](https://istio.io/latest/docs/reference/config/networking/service-entry/) - 외부 서비스 등록
-- [Kiali Documentation](https://kiali.io/docs/) - Service Mesh 시각화
-
+- [Istio Distributed Tracing](https://istio.io/latest/docs/tasks/observability/distributed-tracing/)
+- [Istio ServiceEntry](https://istio.io/latest/docs/reference/config/networking/service-entry/)
+- [Kiali Documentation](https://kiali.io/docs/)
