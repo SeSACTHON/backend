@@ -115,7 +115,9 @@ data:
         Logstash_Prefix logs
         Logstash_DateFormat %Y.%m.%d
         Retry_Limit     False
-        Replace_Dots    On
+        # ECS 표준 필드명 유지 (trace.id, span.id 등)
+        # ES 8.x Index Template에서 subobjects: false로 처리
+        Replace_Dots    Off
         Suppress_Type_Name On
         Buffer_Size     5MB
         Generate_ID     On

@@ -366,9 +366,17 @@ PUT logs-template
 | `Replace_Dots On` | 설정 간단, 호환성 보장 | ECS 필드명과 불일치 (`trace_id`) |
 | `subobjects: false` | ECS 표준 유지 (`trace.id`) | Index Template 설정 필요 |
 
-**현재 선택**: `Replace_Dots On`
-- 이유: Fluent Bit 단일 설정으로 모든 인덱스에 적용
-- 향후: ECS 표준 준수가 필요하면 `subobjects: false` Index Template으로 마이그레이션 고려
+**현재 선택**: `Replace_Dots Off` + `subobjects: false` Index Template
+- ES 8.11.0에서 `subobjects: false` 기능 사용
+- ECS 표준 필드명 유지 (`trace.id`, `span.id`, `log.level` 등)
+- 새로 생성되는 인덱스부터 자동 적용
+
+### 구현 파일
+
+| 파일 | 설정 |
+|------|------|
+| `workloads/logging/base/fluent-bit.yaml` | `Replace_Dots Off` |
+| `workloads/logging/base/elasticsearch-index-template.yaml` | `subobjects: false` Job |
 
 ---
 
