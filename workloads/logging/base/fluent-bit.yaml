@@ -95,6 +95,13 @@ data:
         Nested_under  kubernetes
         Add_prefix    k8s_
 
+    # log_processed 필드를 최상위로 올림 (trace_id 검색 지원)
+    [FILTER]
+        Name          nest
+        Match         kube.*
+        Operation     lift
+        Nested_under  log_processed
+
     # 모든 로그를 단일 인덱스로 전송 (간소화)
     # 인덱스: logs-YYYY.MM.DD
     [OUTPUT]
