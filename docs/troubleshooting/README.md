@@ -33,7 +33,7 @@ docs/
 | Application | ArgoCD 리디렉션 / Prometheus 메모리 / Atlantis CrashLoop | `argocd-ingress-issues.md`, `monitoring-issues.md`, `atlantis-issues.md` |
 | CNI/Calico | Operator vs Helm 충돌, VXLAN 구성, **Typha 포트 5473** | `calico-operator-helm-conflict.md`, `ansible-label-sync.md#3`, **`CALICO_TYPHA_PORT_5473_ISSUE.md`** |
 | **Logging/EFK** | **로그 파싱 실패** / Raw 로그 저장 / CRI 형식 미지원 | **`2025-12-18-fluent-bit-cri-parser.md`** |
-| **Tracing/Jaeger** | **Dependencies 미표시** / Sidecar 트레이스 누락 / NetworkPolicy 차단 | **[`11-distributed-tracing-troubleshooting.md`](../blogs/observability/11-distributed-tracing-troubleshooting.md)** |
+| **Tracing/Jaeger** | **Dependencies 미표시** / Sidecar 트레이스 누락 / NetworkPolicy 차단 | NetworkPolicy에 Zipkin 포트(9411) 추가 필요 |
 
 > 현장 대응이 필요하면 `TROUBLESHOOTING.md`(Rapid Diagnostics Runbook)으로 곧장 이동해 절차를 따라가세요.
 
@@ -41,21 +41,7 @@ docs/
 
 ## 🔥 최신 문제 (2025-12-18)
 
-### [11-distributed-tracing-troubleshooting.md](../blogs/observability/11-distributed-tracing-troubleshooting.md) ⭐ NEW
-**분산 트레이싱 NetworkPolicy 트러블슈팅**
-
-해결된 문제:
-1. **Jaeger Dependencies 미표시**: 서비스 간 호출 관계가 보이지 않음
-2. **Istio Sidecar 트레이스 누락**: Envoy sidecar가 Jaeger에 트레이스를 전송하지 않음
-3. **NetworkPolicy 차단**: Zipkin 포트(9411)가 egress 정책에서 누락됨
-
-**특징**: ✅ Mermaid 진단 플로우차트, ✅ Envoy stats 분석, ✅ 7개 도메인 전체 적용
-
-**위치**: `docs/blogs/observability/11-distributed-tracing-troubleshooting.md`
-
----
-
-### [2025-12-18-fluent-bit-cri-parser.md](./2025-12-18-fluent-bit-cri-parser.md)
+### [2025-12-18-fluent-bit-cri-parser.md](./2025-12-18-fluent-bit-cri-parser.md) ⭐ NEW
 **Fluent Bit CRI Parser 설정 트러블슈팅**
 
 해결된 문제:
