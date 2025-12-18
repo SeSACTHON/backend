@@ -327,7 +327,7 @@ sequenceDiagram
 
 ### 문제: Elasticsearch 필드명 제약
 
-Elasticsearch 7.x 이하에서 필드명에 `.`이 포함되면 object hierarchy로 해석됨.
+Elasticsearch는 기본적으로 필드명에 `.`이 포함되면 object hierarchy로 해석한다.
 
 ```json
 // 의도: 단일 필드
@@ -337,22 +337,38 @@ Elasticsearch 7.x 이하에서 필드명에 `.`이 포함되면 object hierarchy
 { "trace": { "id": "abc" } }
 ```
 
-### 해결: Fluent Bit Replace_Dots
+### ES 8.x 이후: subobjects 옵션
 
-```ini
-[OUTPUT]
-    Name            es
-    Replace_Dots    On    # trace.id → trace_id
+Elasticsearch 8.3+에서 `subobjects: false` 매핑 옵션이 추가되었다.
+
+```json
+PUT logs-template
+{
+  "mappings": {
+    "subobjects": false,
+    "properties": {
+      "trace.id": { "type": "keyword" },
+      "span.id": { "type": "keyword" },
+      "log.level": { "type": "keyword" }
+    }
+  }
+}
 ```
 
-### 트레이드오프
+이 설정으로 dot 필드명을 평탄하게 유지할 수 있다. 현재 클러스터 버전 **8.11.0**에서 사용 가능.
+
+> 📎 참고: [Elasticsearch subobjects 공식 문서](https://www.elastic.co/docs/reference/elasticsearch/mapping-reference/subobjects)
+
+### 현재 선택: Replace_Dots On
 
 | 옵션 | 장점 | 단점 |
 |------|------|------|
-| `Replace_Dots On` | ES 호환성 보장 | ECS 필드명과 불일치 |
-| `Replace_Dots Off` | ECS 표준 유지 | ES 매핑 복잡 |
+| `Replace_Dots On` | 설정 간단, 호환성 보장 | ECS 필드명과 불일치 (`trace_id`) |
+| `subobjects: false` | ECS 표준 유지 (`trace.id`) | Index Template 설정 필요 |
 
-**선택**: `Replace_Dots On` (운영 안정성 우선)
+**현재 선택**: `Replace_Dots On`
+- 이유: Fluent Bit 단일 설정으로 모든 인덱스에 적용
+- 향후: ECS 표준 준수가 필요하면 `subobjects: false` Index Template으로 마이그레이션 고려
 
 ---
 
