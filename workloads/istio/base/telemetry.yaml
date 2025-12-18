@@ -1,0 +1,12 @@
+# Istio Telemetry API for mesh-wide access logging
+# Enables access logging via Telemetry API (recommended for Istio 1.22+)
+apiVersion: telemetry.istio.io/v1alpha1
+kind: Telemetry
+metadata:
+  name: mesh-default
+  namespace: istio-system
+spec:
+  # Enable access logging for all workloads
+  accessLogging:
+  - providers:
+    - name: envoy

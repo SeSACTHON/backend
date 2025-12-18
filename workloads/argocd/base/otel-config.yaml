@@ -1,0 +1,15 @@
+# ArgoCD OpenTelemetry Configuration
+# Enables distributed tracing for ArgoCD operations
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cmd-params-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cmd-params-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # OTEL collector endpoint for tracing
+  otlp.address: jaeger-collector-clusterip.istio-system.svc.cluster.local:4317
+  # Insecure mode for ArgoCD server (behind ingress)
+  server.insecure: 'true'
