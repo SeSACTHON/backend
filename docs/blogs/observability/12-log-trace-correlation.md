@@ -1044,3 +1044,175 @@ feat(argocd): enable OTEL tracing to Jaeger
 - Configure otlp.address in argocd-cmd-params-cm
 - ArgoCD operations now visible in Jaeger
 ```
+
+---
+
+## 📊 OpenTelemetry 커버리지 분석
+
+### OTEL이 커버하는 범위
+
+| 컴포넌트 | 방식 | trace.id 지원 | 비고 |
+|----------|------|---------------|------|
+| **Python API (auth, chat 등)** | OTEL SDK 자동 계측 | ✅ | `opentelemetry-instrument` |
+| **Istio Sidecar** | Envoy 내장 tracing | ✅ | `%TRACE_ID%` 변수 |
+| **Istio Ingress Gateway** | Envoy 내장 tracing | ✅ | Trace 생성 원점 |
+| **ArgoCD** | 내장 OTLP 지원 | ✅ | `otlp.address` 설정 |
+
+### OTEL이 커버하지 않는 범위
+
+| 컴포넌트 | 문제 | 해결 방법 |
+|----------|------|----------|
+| **ext-authz (Go gRPC)** | OTEL SDK 미적용 | gRPC 메타데이터에서 B3 헤더 추출 |
+| **Calico** | 네트워크 레이어 | N/A (trace 불필요) |
+| **Kubernetes 컴포넌트** | 제한적 지원 | N/A |
+
+---
+
+## 🔧 gRPC 서비스 Trace 추적 (ext-authz)
+
+### 문제 상황
+
+ext-authz는 Go로 작성된 gRPC 서비스로, Python API처럼 OTEL 자동 계측이 불가능.
+
+```
+초기 상태:
+- ext-authz 로그에 trace.id 없음
+- istio-proxy 로그에만 trace.id 존재
+- 인증 실패 원인 추적 시 trace 연결 불가
+```
+
+### 해결: gRPC 메타데이터에서 Trace Context 추출
+
+Istio sidecar가 ext-authz로 gRPC 요청 시 **메타데이터에 B3 헤더를 주입**합니다.
+
+#### 1. 상수 정의 (`constants/http.go`)
+
+```go
+const (
+    // B3 Trace Context headers (Istio/Envoy)
+    HeaderB3TraceID = "x-b3-traceid"
+    HeaderB3SpanID  = "x-b3-spanid"
+)
+```
+
+#### 2. gRPC 메타데이터 추출 (`server/server.go`)
+
+```go
+import "google.golang.org/grpc/metadata"
+
+// extractTraceInfo extracts B3 trace context from gRPC metadata
+func extractTraceInfo(ctx context.Context, req *authv3.CheckRequest) logging.TraceInfo {
+    trace := logging.TraceInfo{}
+
+    // 1. gRPC metadata (Istio sidecar가 주입)
+    if md, ok := metadata.FromIncomingContext(ctx); ok {
+        if vals := md.Get("x-b3-traceid"); len(vals) > 0 {
+            trace.TraceID = vals[0]
+        }
+        if vals := md.Get("x-b3-spanid"); len(vals) > 0 {
+            trace.SpanID = vals[0]
+        }
+    }
+
+    // 2. Fallback: HTTP 헤더 (클라이언트가 직접 전송한 경우)
+    if trace.TraceID == "" && req.Attributes != nil {
+        headers := req.Attributes.Request.Http.Headers
+        trace.TraceID = headers["x-b3-traceid"]
+    }
+
+    return trace
+}
+```
+
+#### 3. 로그에 trace.id 포함 (`logging/logger.go`)
+
+```go
+func (l *Logger) WithTrace(traceID, spanID string) *Logger {
+    if traceID == "" {
+        return l
+    }
+    return &Logger{
+        Logger: l.With(
+            slog.String("trace.id", traceID),
+            slog.String("span.id", spanID),
+        ),
+    }
+}
+```
+
+### 결과
+
+```json
+{
+  "@timestamp": "2025-12-18T12:02:06.845Z",
+  "service.name": "ext-authz",
+  "trace.id": "a593d6809fe6f036728dc73cfd170b0e",
+  "span.id": "3e491beac3443f3c",
+  "msg": "Authorization denied",
+  "event.outcome": "failure",
+  "event.reason": "missing_auth_header"
+}
+```
+
+### 전체 요청 흐름 추적 (동일 trace.id)
+
+```kql
+trace.id:a593d6809fe6f036728dc73cfd170b0e
+```
+
+| 시간 | 서비스 | 내용 |
+|------|--------|------|
+| 12:02:06.845 | **ext-authz** | Authorization denied |
+| 12:02:06.846 | istio-proxy | gRPC /Authorization/Check → 200 |
+| 12:02:07.742 | istio-proxy | HTTP /api/v1/auth/register → 401 |
+
+---
+
+## 📋 Trace 전파 경로 요약
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                       Trace ID Propagation                              │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│  [Client Request]                                                       │
+│       │                                                                 │
+│       ▼                                                                 │
+│  ┌──────────────────┐                                                  │
+│  │ Istio Ingress    │ ◀── trace.id 생성 (%TRACE_ID%)                   │
+│  │ Gateway          │                                                   │
+│  └────────┬─────────┘                                                  │
+│           │ gRPC + B3 메타데이터                                        │
+│           ▼                                                             │
+│  ┌──────────────────┐                                                  │
+│  │ ext-authz        │ ◀── gRPC metadata에서 trace.id 추출              │
+│  │ (Go gRPC)        │     → 로그에 포함                                │
+│  └────────┬─────────┘                                                  │
+│           │ 인증 결과                                                   │
+│           ▼                                                             │
+│  ┌──────────────────┐                                                  │
+│  │ App Sidecar      │ ◀── X-B3-TraceId 헤더 전파                       │
+│  │ (istio-proxy)    │                                                   │
+│  └────────┬─────────┘                                                  │
+│           │ HTTP + B3 헤더                                              │
+│           ▼                                                             │
+│  ┌──────────────────┐                                                  │
+│  │ App (Python)     │ ◀── OTEL SDK가 B3 헤더 읽음                      │
+│  │ + OTEL SDK       │     → 동일 trace.id로 span 생성                  │
+│  └──────────────────┘                                                  │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 🏷️ 커밋
+
+```
+feat(ext-authz): add B3 trace context to authorization logs
+
+- Extract x-b3-traceid from gRPC metadata (Istio sidecar injects here)
+- Fallback to HTTP headers if client sent them
+- Add trace.id and span.id to all authorization log entries
+- Enables end-to-end trace correlation in Kibana
+```
