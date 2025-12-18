@@ -68,9 +68,10 @@ data:
         Kube_CA_File        /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
         Kube_Token_File     /var/run/secrets/kubernetes.io/serviceaccount/token
         Kube_Tag_Prefix     kube.var.log.containers.
-        # JSON 파싱 비활성화 (ES Ingest Pipeline에서 처리)
-        Merge_Log           Off
-        K8S-Logging.Parser  Off
+        # JSON 파싱 활성화 - root에 직접 병합
+        Merge_Log           On
+        Keep_Log            Off
+        K8S-Logging.Parser  On
         K8S-Logging.Exclude Off
         Labels              On
         Annotations         Off
@@ -94,8 +95,7 @@ data:
         Nested_under  kubernetes
         Add_prefix    k8s_
 
-    # ES로 전송 - Ingest Pipeline에서 ECS JSON 파싱
-    # Index Template의 subobjects: false로 trace.id 등 dot 필드명 유지
+    # ES로 전송 - Fluent Bit에서 JSON 파싱, ES subobjects:false로 dot 필드 유지
     [OUTPUT]
         Name            es
         Match           kube.*
@@ -107,12 +107,11 @@ data:
         Logstash_Prefix logs
         Logstash_DateFormat %Y.%m.%d
         Retry_Limit     False
+        # ECS dot notation 유지 (ES Index Template subobjects:false 필수)
         Replace_Dots    Off
         Suppress_Type_Name On
         Buffer_Size     5MB
         Generate_ID     On
-        # ES Ingest Pipeline으로 JSON 파싱 위임
-        Pipeline        parse-ecs-json
 
   parsers.conf: |
     # CRI Parser for containerd runtime

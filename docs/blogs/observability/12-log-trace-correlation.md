@@ -366,27 +366,32 @@ PUT logs-template
 | `Replace_Dots On` | 설정 간단, 호환성 보장 | ECS 필드명과 불일치 (`trace_id`) |
 | `subobjects: false` | ECS 표준 유지 (`trace.id`) | Index Template 설정 필요 |
 
-**현재 선택**: ES Ingest Pipeline + `subobjects: false` Index Template
+**현재 선택**: Fluent Bit 파싱 + `Replace_Dots Off` + `subobjects: false` Index Template
 
-핵심: **Fluent Bit에서 JSON 파싱하지 않고 ES에서 처리**
+핵심: **Fluent Bit에서 JSON 파싱 (부하분산) + ES에서 dot 필드명 유지**
 
-1. Fluent Bit: `Merge_Log Off` - JSON을 `log` 필드에 그대로 전달
-2. ES Ingest Pipeline: `json` processor로 파싱 후 root로 flatten
-3. Index Template: `subobjects: false`로 dot 필드명 유지
+1. Fluent Bit: `Merge_Log On` - JSON 파싱하여 필드 추출 (각 노드에서 분산 처리)
+2. Fluent Bit OUTPUT: `Replace_Dots Off` - dot notation 그대로 ES 전송
+3. Index Template: `subobjects: false` - ES가 dot을 nested로 해석하지 않음
 
 ```
-App (JSON log) → Fluent Bit (pass-through) → ES Pipeline (parse) → Index (subobjects:false)
-                                                    ↓
-                                            trace.id, log.level 등 ECS 필드명 유지
+App (JSON log) → Fluent Bit (parse + distributed) → ES (subobjects:false) → Index
+                      ↓                                    ↓
+              각 노드에서 분산 파싱                  trace.id, log.level 등 ECS 필드명 유지
 ```
 
 ### 구현 파일
 
 | 파일 | 설정 |
 |------|------|
-| `workloads/logging/base/fluent-bit.yaml` | `Merge_Log Off`, `Pipeline parse-ecs-json` |
-| `workloads/logging/base/elasticsearch-ingest-pipeline.yaml` | JSON 파싱 Pipeline Job |
+| `workloads/logging/base/fluent-bit.yaml` | `Merge_Log On`, `Replace_Dots Off` |
 | `workloads/logging/base/elasticsearch-index-template.yaml` | `subobjects: false` Index Template |
+
+### 장점
+
+- **부하분산**: 각 노드의 DaemonSet에서 분산 파싱 (ES 부하 감소)
+- **ECS 표준**: dot notation 필드명 유지 (`trace.id`, `log.level`)
+- **단순성**: ES Ingest Pipeline 불필요
 
 ---
 
