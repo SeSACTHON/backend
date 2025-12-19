@@ -90,6 +90,25 @@ class Settings(BaseSettings):
         description="Maximum delay in seconds for exponential backoff retry.",
     )
 
+    # === Redis Cache Settings ===
+    redis_url: str = Field(
+        "redis://localhost:6379/0",
+        validation_alias=AliasChoices("CHARACTER_REDIS_URL"),
+        description="Redis connection URL for caching.",
+    )
+    cache_enabled: bool = Field(
+        True,
+        validation_alias=AliasChoices("CHARACTER_CACHE_ENABLED"),
+        description="Enable/disable caching layer.",
+    )
+    cache_ttl_seconds: int = Field(
+        300,  # 5 minutes
+        ge=60,
+        le=3600,
+        validation_alias=AliasChoices("CHARACTER_CACHE_TTL_SECONDS"),
+        description="Default cache TTL in seconds.",
+    )
+
     # === CORS Settings ===
     cors_origins: list[str] = Field(
         default=[

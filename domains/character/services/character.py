@@ -9,10 +9,9 @@ from fastapi import Depends
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from domains.character.core.cache import CATALOG_KEY, get_cached, set_cached
 from domains.character.core.constants import (
     DEFAULT_CHARACTER_NAME,
-    MATCH_REASON_UNDEFINED,
-    RECYCLABLE_WASTE_CATEGORY,
     REWARD_SOURCE_SCAN,
 )
 from domains.character.core.tracing import get_tracer
@@ -27,9 +26,8 @@ from domains.character.schemas.reward import (
     CharacterRewardFailureReason,
     CharacterRewardRequest,
     CharacterRewardResponse,
-    CharacterRewardSource,
-    ClassificationSummary,
 )
+from domains.character.services.evaluators import EvaluationContext, get_evaluator
 
 logger = logging.getLogger(__name__)
 
@@ -41,10 +39,29 @@ class CharacterService:
         self.ownership_repo = CharacterOwnershipRepository(session)
 
     async def catalog(self) -> list[CharacterProfile]:
+        """캐릭터 카탈로그 조회 (캐시 적용).
+
+        Cache Strategy:
+            1. Redis에서 캐시 조회 (hit → 즉시 반환)
+            2. Cache miss → DB 조회 후 캐시 저장
+            3. Redis 실패 → Graceful degradation (DB 직접 조회)
+        """
+        # 1. 캐시 조회
+        cached = await get_cached(CATALOG_KEY)
+        if cached is not None:
+            return [CharacterProfile(**item) for item in cached]
+
+        # 2. DB 조회
         characters = await self.character_repo.list_all()
         if not characters:
             raise CatalogEmptyError()
-        return [self._to_profile(character) for character in characters]
+
+        profiles = [self._to_profile(character) for character in characters]
+
+        # 3. 캐시 저장 (비동기, 실패해도 무시)
+        await set_cached(CATALOG_KEY, [p.model_dump() for p in profiles])
+
+        return profiles
 
     async def get_default_character(self) -> Character | None:
         """기본 캐릭터(이코) 정보 조회. my 도메인에서 사용."""
@@ -59,6 +76,10 @@ class CharacterService:
 
     async def evaluate_reward(self, payload: CharacterRewardRequest) -> CharacterRewardResponse:
         """캐릭터 리워드 평가 및 지급.
+
+        Strategy 패턴으로 소스별 평가 로직을 분리합니다.
+        - SCAN: ScanRewardEvaluator (재활용 분류 기반)
+        - QUEST: QuestRewardEvaluator (향후 확장)
 
         Jaeger에서 다음 span 구조로 추적됨:
             evaluate_reward
@@ -82,48 +103,59 @@ class CharacterService:
                 extra={"user_id": user_id_str, "source": payload.source.value},
             )
 
-            classification = payload.classification
+            # Strategy 패턴: 소스에 맞는 evaluator 조회
+            evaluator = get_evaluator(payload.source)
+            if evaluator is None:
+                logger.warning(
+                    "No evaluator registered for source",
+                    extra={"source": payload.source.value},
+                )
+                self._record_reward_metrics(source=payload.source.value, status="no_evaluator")
+                return self._to_reward_response(None, False, False, None)
+
+            # Evaluator 컨텍스트 생성
+            context = EvaluationContext(
+                character_repo=self.character_repo,
+                ownership_repo=self.ownership_repo,
+                grant_callback=self._grant_and_sync,
+            )
+
+            # 평가 조건 확인 및 캐릭터 매칭
             reward_profile: CharacterProfile | None = None
             already_owned = False
             received = False
             match_reason: str | None = None
+            failure_reason: CharacterRewardFailureReason | None = None
 
-            should_evaluate = (
-                payload.source == CharacterRewardSource.SCAN
-                and classification.major_category.strip() == RECYCLABLE_WASTE_CATEGORY
-                and payload.disposal_rules_present
-                and not payload.insufficiencies_present
-            )
+            # 캐릭터 매칭 span
+            with tracer.start_as_current_span("match_characters") if tracer else nullcontext():
+                eval_result = await evaluator.evaluate(payload, context)
 
-            if should_evaluate:
-                match_reason = self._build_match_reason(classification)
-
-                # 캐릭터 매칭 span
-                with tracer.start_as_current_span("match_characters") if tracer else nullcontext():
-                    matches = await self._match_characters(classification)
-
-                if matches:
-                    # 리워드 지급 span
-                    with tracer.start_as_current_span("apply_reward") if tracer else nullcontext():
-                        reward_profile, already_owned, failure_reason = await self._apply_reward(
-                            payload.user_id, matches
-                        )
-
-                    received = (
-                        failure_reason is None and reward_profile is not None and not already_owned
-                    )
-
-                    self._record_reward_metrics(
-                        source=payload.source.value,
-                        received=received,
-                        already_owned=already_owned,
-                        failure_reason=failure_reason,
-                        reward_profile=reward_profile,
-                    )
-                else:
-                    self._record_reward_metrics(source=payload.source.value, status="no_match")
-            else:
+            if not eval_result.should_evaluate:
                 self._record_reward_metrics(source=payload.source.value, status="skipped")
+            elif not eval_result.matches:
+                self._record_reward_metrics(source=payload.source.value, status="no_match")
+                match_reason = eval_result.match_reason
+            else:
+                match_reason = eval_result.match_reason
+
+                # 리워드 지급 span
+                with tracer.start_as_current_span("apply_reward") if tracer else nullcontext():
+                    reward_profile, already_owned, failure_reason = await self._apply_reward(
+                        payload.user_id, eval_result.matches
+                    )
+
+                received = (
+                    failure_reason is None and reward_profile is not None and not already_owned
+                )
+
+                self._record_reward_metrics(
+                    source=payload.source.value,
+                    received=received,
+                    already_owned=already_owned,
+                    failure_reason=failure_reason,
+                    reward_profile=reward_profile,
+                )
 
             # span에 결과 기록
             if span:
@@ -186,33 +218,6 @@ class CharacterService:
             character_type=reward_type,
             type=reward_type,
         )
-
-    async def _match_characters(self, classification: ClassificationSummary) -> list[Character]:
-        match_label = self._resolve_match_label(classification)
-        if not match_label:
-            return []
-        return await self.character_repo.list_by_match_label(match_label)
-
-    @staticmethod
-    def _resolve_match_label(classification: ClassificationSummary) -> str | None:
-        major = (classification.major_category or "").strip()
-        middle = (classification.middle_category or "").strip()
-        if major == RECYCLABLE_WASTE_CATEGORY:
-            return middle or None
-        return middle or major or None
-
-    @staticmethod
-    def _build_match_reason(classification: ClassificationSummary) -> str:
-        middle = (classification.middle_category or "").strip()
-        minor = (classification.minor_category or "").strip()
-        if middle and minor:
-            return f"{middle}>{minor}"
-        if middle:
-            return middle
-        major = (classification.major_category or "").strip()
-        if major:
-            return major
-        return MATCH_REASON_UNDEFINED
 
     async def _apply_reward(
         self,

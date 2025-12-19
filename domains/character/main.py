@@ -24,6 +24,7 @@ from domains.character.core.tracing import (
     instrument_httpx,
     shutdown_tracing,
 )
+from domains.character.core.cache import close_cache
 from domains.character.metrics import register_metrics
 from domains.character.rpc.my_client import close_my_client
 
@@ -48,6 +49,7 @@ async def lifespan(app: FastAPI):
     yield
     # Graceful shutdown
     await close_my_client()
+    await close_cache()
     shutdown_tracing()
 
 

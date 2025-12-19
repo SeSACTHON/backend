@@ -1,0 +1,33 @@
+"""Reward Evaluator Strategy Pattern.
+
+리워드 소스별 평가 로직을 분리하여 확장성을 제공합니다.
+
+Usage:
+    from domains.character.services.evaluators import get_evaluator
+
+    evaluator = get_evaluator(CharacterRewardSource.SCAN)
+    result = await evaluator.evaluate(payload, context)
+
+Architecture:
+    CharacterRewardSource
+    ├── SCAN   → ScanRewardEvaluator
+    ├── QUEST  → QuestRewardEvaluator (향후)
+    └── EVENT  → EventRewardEvaluator (향후)
+"""
+
+from domains.character.services.evaluators.base import (
+    EvaluationContext,
+    EvaluationResult,
+    RewardEvaluator,
+)
+from domains.character.services.evaluators.registry import get_evaluator, register_evaluator
+from domains.character.services.evaluators.scan import ScanRewardEvaluator
+
+__all__ = [
+    "EvaluationContext",
+    "EvaluationResult",
+    "RewardEvaluator",
+    "ScanRewardEvaluator",
+    "get_evaluator",
+    "register_evaluator",
+]
