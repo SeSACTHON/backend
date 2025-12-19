@@ -7,15 +7,20 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Sequence
+from typing import TYPE_CHECKING, Awaitable, Callable, Sequence
+from uuid import UUID
 
-from domains.character.schemas.catalog import CharacterProfile
-from domains.character.schemas.reward import CharacterRewardFailureReason
 
 if TYPE_CHECKING:
     from domains.character.models import Character
     from domains.character.repositories import CharacterOwnershipRepository, CharacterRepository
     from domains.character.schemas.reward import CharacterRewardRequest
+
+# 타입 안전한 콜백 시그니처
+GrantCallback = Callable[
+    [UUID, "Character", str],  # (user_id, character, source)
+    Awaitable[None],
+]
 
 
 @dataclass
@@ -28,9 +33,9 @@ class EvaluationContext:
         grant_callback: 캐릭터 지급 콜백 (DB 저장 + gRPC 동기화)
     """
 
-    character_repo: CharacterRepository
-    ownership_repo: CharacterOwnershipRepository
-    grant_callback: callable  # async (user_id, character, source) -> None
+    character_repo: "CharacterRepository"
+    ownership_repo: "CharacterOwnershipRepository"
+    grant_callback: GrantCallback
 
 
 @dataclass
@@ -40,27 +45,14 @@ class EvaluationResult:
     Attributes:
         should_evaluate: 평가 조건 충족 여부
         matches: 매칭된 캐릭터 목록
-        reward_profile: 지급된 캐릭터 프로필
-        already_owned: 이미 소유 여부
-        failure_reason: 실패 사유
+        source_label: 리워드 소스 식별자 (예: "scan-reward")
         match_reason: 매칭 사유 문자열
     """
 
     should_evaluate: bool = False
-    matches: Sequence[Character] = field(default_factory=list)
-    reward_profile: CharacterProfile | None = None
-    already_owned: bool = False
-    failure_reason: CharacterRewardFailureReason | None = None
+    matches: Sequence["Character"] = field(default_factory=list)
+    source_label: str = ""
     match_reason: str | None = None
-
-    @property
-    def received(self) -> bool:
-        """새로 지급되었는지 여부."""
-        return (
-            self.failure_reason is None
-            and self.reward_profile is not None
-            and not self.already_owned
-        )
 
 
 class RewardEvaluator(ABC):
@@ -70,6 +62,8 @@ class RewardEvaluator(ABC):
 
     Example:
         class QuestRewardEvaluator(RewardEvaluator):
+            SOURCE_LABEL = "quest-reward"
+
             async def should_evaluate(self, payload):
                 return payload.quest_completed
 
@@ -78,8 +72,18 @@ class RewardEvaluator(ABC):
                 ...
     """
 
+    @property
     @abstractmethod
-    async def should_evaluate(self, payload: CharacterRewardRequest) -> bool:
+    def source_label(self) -> str:
+        """리워드 소스 식별자 (DB 저장용).
+
+        Returns:
+            예: "scan-reward", "quest-reward"
+        """
+        ...
+
+    @abstractmethod
+    async def should_evaluate(self, payload: "CharacterRewardRequest") -> bool:
         """평가 조건을 충족하는지 확인.
 
         Args:
@@ -93,9 +97,9 @@ class RewardEvaluator(ABC):
     @abstractmethod
     async def match_characters(
         self,
-        payload: CharacterRewardRequest,
+        payload: "CharacterRewardRequest",
         context: EvaluationContext,
-    ) -> Sequence[Character]:
+    ) -> Sequence["Character"]:
         """조건에 맞는 캐릭터 매칭.
 
         Args:
@@ -108,7 +112,7 @@ class RewardEvaluator(ABC):
         ...
 
     @abstractmethod
-    def build_match_reason(self, payload: CharacterRewardRequest) -> str:
+    def build_match_reason(self, payload: "CharacterRewardRequest") -> str:
         """매칭 사유 문자열 생성.
 
         Args:
@@ -121,7 +125,7 @@ class RewardEvaluator(ABC):
 
     async def evaluate(
         self,
-        payload: CharacterRewardRequest,
+        payload: "CharacterRewardRequest",
         context: EvaluationContext,
     ) -> EvaluationResult:
         """평가 실행 (Template Method).
@@ -138,7 +142,7 @@ class RewardEvaluator(ABC):
             평가 결과
         """
         if not await self.should_evaluate(payload):
-            return EvaluationResult(should_evaluate=False)
+            return EvaluationResult(should_evaluate=False, source_label=self.source_label)
 
         match_reason = self.build_match_reason(payload)
         matches = await self.match_characters(payload, context)
@@ -146,5 +150,6 @@ class RewardEvaluator(ABC):
         return EvaluationResult(
             should_evaluate=True,
             matches=matches,
+            source_label=self.source_label,
             match_reason=match_reason,
         )

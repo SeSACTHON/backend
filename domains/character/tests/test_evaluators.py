@@ -244,6 +244,15 @@ class TestScanRewardEvaluatorMatchCharacters:
         mock_context.character_repo.list_by_match_label.assert_not_called()
 
 
+class TestScanRewardEvaluatorSourceLabel:
+    """ScanRewardEvaluator.source_label 테스트."""
+
+    def test_source_label_is_scan_reward(self):
+        """source_label이 'scan-reward'."""
+        evaluator = ScanRewardEvaluator()
+        assert evaluator.source_label == "scan-reward"
+
+
 class TestEvaluatorRegistry:
     """Evaluator Registry 테스트."""
 
@@ -296,10 +305,11 @@ class TestEvaluatorEvaluate:
 
         assert result.should_evaluate is False
         assert result.matches == []
+        assert result.source_label == "scan-reward"  # 항상 source_label 포함
 
     @pytest.mark.asyncio
-    async def test_evaluate_returns_matches(self, evaluator, mock_context):
-        """조건 충족 시 매칭된 캐릭터 반환."""
+    async def test_evaluate_returns_matches_with_source_label(self, evaluator, mock_context):
+        """조건 충족 시 매칭된 캐릭터와 source_label 반환."""
         mock_character = MagicMock()
         mock_character.name = "플라봇"
         mock_context.character_repo.list_by_match_label = AsyncMock(return_value=[mock_character])
@@ -321,3 +331,4 @@ class TestEvaluatorEvaluate:
         assert result.should_evaluate is True
         assert len(result.matches) == 1
         assert result.match_reason == "플라스틱"
+        assert result.source_label == "scan-reward"  # Strategy에서 제공

@@ -10,10 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from domains.character.core.cache import CATALOG_KEY, get_cached, set_cached
-from domains.character.core.constants import (
-    DEFAULT_CHARACTER_NAME,
-    REWARD_SOURCE_SCAN,
-)
+from domains.character.core.constants import DEFAULT_CHARACTER_NAME
 from domains.character.core.tracing import get_tracer
 from domains.character.database.session import get_db_session
 from domains.character.exceptions import CatalogEmptyError
@@ -27,7 +24,7 @@ from domains.character.schemas.reward import (
     CharacterRewardRequest,
     CharacterRewardResponse,
 )
-from domains.character.services.evaluators import EvaluationContext, get_evaluator
+from domains.character.services.evaluators import EvaluationContext, EvaluationResult, get_evaluator
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +75,7 @@ class CharacterService:
         """캐릭터 리워드 평가 및 지급.
 
         Strategy 패턴으로 소스별 평가 로직을 분리합니다.
-        - SCAN: ScanRewardEvaluator (재활용 분류 기반)
+        - SCAN: ScanRewardEvaluator (source_label: "scan-reward")
         - QUEST: QuestRewardEvaluator (향후 확장)
 
         Jaeger에서 다음 span 구조로 추적됨:
@@ -92,7 +89,6 @@ class CharacterService:
         tracer = get_tracer(__name__)
         user_id_str = str(payload.user_id)
 
-        # 최상위 span 시작
         with tracer.start_as_current_span("evaluate_reward") if tracer else nullcontext() as span:
             if span:
                 span.set_attribute("user_id", user_id_str)
@@ -120,44 +116,26 @@ class CharacterService:
                 grant_callback=self._grant_and_sync,
             )
 
-            # 평가 조건 확인 및 캐릭터 매칭
-            reward_profile: CharacterProfile | None = None
-            already_owned = False
-            received = False
-            match_reason: str | None = None
-            failure_reason: CharacterRewardFailureReason | None = None
-
-            # 캐릭터 매칭 span
+            # 1. 평가 조건 확인 및 캐릭터 매칭
             with tracer.start_as_current_span("match_characters") if tracer else nullcontext():
                 eval_result = await evaluator.evaluate(payload, context)
 
-            if not eval_result.should_evaluate:
-                self._record_reward_metrics(source=payload.source.value, status="skipped")
-            elif not eval_result.matches:
-                self._record_reward_metrics(source=payload.source.value, status="no_match")
-                match_reason = eval_result.match_reason
-            else:
-                match_reason = eval_result.match_reason
+            # 2. 평가 결과 처리
+            reward_profile, already_owned, failure_reason, received = (
+                await self._process_evaluation(payload.user_id, eval_result, tracer)
+            )
 
-                # 리워드 지급 span
-                with tracer.start_as_current_span("apply_reward") if tracer else nullcontext():
-                    reward_profile, already_owned, failure_reason = await self._apply_reward(
-                        payload.user_id, eval_result.matches
-                    )
+            # 3. 메트릭 기록
+            self._record_reward_metrics(
+                source=payload.source.value,
+                eval_result=eval_result,
+                received=received,
+                already_owned=already_owned,
+                failure_reason=failure_reason,
+                reward_profile=reward_profile,
+            )
 
-                received = (
-                    failure_reason is None and reward_profile is not None and not already_owned
-                )
-
-                self._record_reward_metrics(
-                    source=payload.source.value,
-                    received=received,
-                    already_owned=already_owned,
-                    failure_reason=failure_reason,
-                    reward_profile=reward_profile,
-                )
-
-            # span에 결과 기록
+            # 4. span에 결과 기록
             if span:
                 span.set_attribute("received", received)
                 span.set_attribute("already_owned", already_owned)
@@ -174,24 +152,60 @@ class CharacterService:
                 },
             )
 
-            return self._to_reward_response(reward_profile, already_owned, received, match_reason)
+            return self._to_reward_response(
+                reward_profile, already_owned, received, eval_result.match_reason
+            )
+
+    async def _process_evaluation(
+        self,
+        user_id: UUID,
+        eval_result: EvaluationResult,
+        tracer,
+    ) -> tuple[CharacterProfile | None, bool, CharacterRewardFailureReason | None, bool]:
+        """평가 결과를 처리하고 리워드를 지급합니다.
+
+        Returns:
+            (reward_profile, already_owned, failure_reason, received)
+        """
+        if not eval_result.should_evaluate or not eval_result.matches:
+            return None, False, None, False
+
+        # 리워드 지급 span
+        with tracer.start_as_current_span("apply_reward") if tracer else nullcontext():
+            reward_profile, already_owned, failure_reason = await self._apply_reward(
+                user_id=user_id,
+                matches=eval_result.matches,
+                source_label=eval_result.source_label,  # Strategy에서 제공
+            )
+
+        received = failure_reason is None and reward_profile is not None and not already_owned
+        return reward_profile, already_owned, failure_reason, received
 
     @staticmethod
     def _record_reward_metrics(
         source: str,
-        status: str | None = None,
+        eval_result: EvaluationResult | None = None,
         received: bool = False,
         already_owned: bool = False,
         failure_reason: CharacterRewardFailureReason | None = None,
         reward_profile: CharacterProfile | None = None,
+        status: str | None = None,
     ) -> None:
         """리워드 평가 메트릭 기록."""
+        # 상태 결정
         if status is None:
-            status = "success" if received else "failed"
-            if already_owned:
+            if eval_result and not eval_result.should_evaluate:
+                status = "skipped"
+            elif eval_result and not eval_result.matches:
+                status = "no_match"
+            elif already_owned:
                 status = "already_owned"
             elif failure_reason:
                 status = f"failed_{failure_reason.value}"
+            elif received:
+                status = "success"
+            else:
+                status = "failed"
 
         REWARD_EVALUATION_TOTAL.labels(status=status, source=source).inc()
 
@@ -223,7 +237,18 @@ class CharacterService:
         self,
         user_id: UUID,
         matches: Sequence[Character],
+        source_label: str,
     ) -> tuple[CharacterProfile | None, bool, CharacterRewardFailureReason | None]:
+        """매칭된 캐릭터 중 첫 번째로 지급 가능한 캐릭터를 지급합니다.
+
+        Args:
+            user_id: 사용자 ID
+            matches: 매칭된 캐릭터 목록 (우선순위 순)
+            source_label: 리워드 소스 식별자 (Strategy에서 제공)
+
+        Returns:
+            (reward_profile, already_owned, failure_reason)
+        """
         for match in matches:
             existing = await self.ownership_repo.get_by_user_and_character(
                 user_id=user_id, character_id=match.id
@@ -233,7 +258,9 @@ class CharacterService:
 
             try:
                 await self._grant_and_sync(
-                    user_id=user_id, character=match, source=REWARD_SOURCE_SCAN
+                    user_id=user_id,
+                    character=match,
+                    source=source_label,  # Strategy에서 제공된 source 사용
                 )
                 return self._to_profile(match), False, None
             except IntegrityError:

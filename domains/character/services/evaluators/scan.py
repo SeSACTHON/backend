@@ -20,6 +20,7 @@ from typing import TYPE_CHECKING, Sequence
 from domains.character.core.constants import (
     MATCH_REASON_UNDEFINED,
     RECYCLABLE_WASTE_CATEGORY,
+    REWARD_SOURCE_SCAN,
 )
 from domains.character.schemas.reward import CharacterRewardSource
 from domains.character.services.evaluators.base import EvaluationContext, RewardEvaluator
@@ -37,6 +38,11 @@ class ScanRewardEvaluator(RewardEvaluator):
     """
 
     RECYCLABLE_CATEGORY = RECYCLABLE_WASTE_CATEGORY
+
+    @property
+    def source_label(self) -> str:
+        """SCAN 리워드 소스 식별자."""
+        return REWARD_SOURCE_SCAN
 
     async def should_evaluate(self, payload: CharacterRewardRequest) -> bool:
         """스캔 리워드 평가 조건 확인.

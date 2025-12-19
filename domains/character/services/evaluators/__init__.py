@@ -10,7 +10,7 @@ Usage:
 
 Architecture:
     CharacterRewardSource
-    ├── SCAN   → ScanRewardEvaluator
+    ├── SCAN   → ScanRewardEvaluator (source_label: "scan-reward")
     ├── QUEST  → QuestRewardEvaluator (향후)
     └── EVENT  → EventRewardEvaluator (향후)
 """
@@ -18,6 +18,7 @@ Architecture:
 from domains.character.services.evaluators.base import (
     EvaluationContext,
     EvaluationResult,
+    GrantCallback,
     RewardEvaluator,
 )
 from domains.character.services.evaluators.registry import get_evaluator, register_evaluator
@@ -26,6 +27,7 @@ from domains.character.services.evaluators.scan import ScanRewardEvaluator
 __all__ = [
     "EvaluationContext",
     "EvaluationResult",
+    "GrantCallback",
     "RewardEvaluator",
     "ScanRewardEvaluator",
     "get_evaluator",
