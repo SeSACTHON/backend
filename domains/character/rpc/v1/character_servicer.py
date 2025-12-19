@@ -55,11 +55,13 @@ class CharacterServicer(character_pb2_grpc.CharacterServiceServicer):
                 )
 
                 logger.info(
-                    "Evaluated reward for user %s (task=%s): received=%s, owned=%s",
-                    payload.user_id,
-                    payload.task_id,
-                    result.received,
-                    result.already_owned,
+                    "Evaluated reward",
+                    extra={
+                        "user_id": str(payload.user_id),
+                        "task_id": payload.task_id,
+                        "received": result.received,
+                        "already_owned": result.already_owned,
+                    },
                 )
                 return response
 
@@ -88,7 +90,10 @@ class CharacterServicer(character_pb2_grpc.CharacterServiceServicer):
                     logger.warning("Default character not found")
                     return character_pb2.GetDefaultCharacterResponse(found=False)
 
-                logger.info("Returning default character: %s", character.name)
+                logger.info(
+                    "Returning default character",
+                    extra={"character_name": character.name, "character_id": str(character.id)},
+                )
                 return character_pb2.GetDefaultCharacterResponse(
                     found=True,
                     character_id=str(character.id),
