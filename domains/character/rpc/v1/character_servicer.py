@@ -65,11 +65,17 @@ class CharacterServicer(character_pb2_grpc.CharacterServiceServicer):
 
             except ValueError as e:
                 # UUID 변환 실패 등 validation 에러
-                logger.error(f"Invalid argument: {e}")
+                logger.error(
+                    "Invalid argument in GetCharacterReward",
+                    extra={"error": str(e), "user_id": request.user_id},
+                )
                 await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
-            except Exception as e:
-                logger.exception("Internal error in GetCharacterReward")
-                await context.abort(grpc.StatusCode.INTERNAL, str(e))
+            except Exception:
+                logger.exception(
+                    "Internal error in GetCharacterReward",
+                    extra={"user_id": request.user_id, "task_id": request.task_id},
+                )
+                await context.abort(grpc.StatusCode.INTERNAL, "Internal server error")
 
     async def GetDefaultCharacter(self, request, context):
         """기본 캐릭터(이코) 정보 조회."""
@@ -92,6 +98,6 @@ class CharacterServicer(character_pb2_grpc.CharacterServiceServicer):
                     character_dialog=character.dialog or "",
                 )
 
-        except Exception as e:
+        except Exception:
             logger.exception("Internal error in GetDefaultCharacter")
-            await context.abort(grpc.StatusCode.INTERNAL, str(e))
+            await context.abort(grpc.StatusCode.INTERNAL, "Internal server error")
