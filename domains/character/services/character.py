@@ -222,6 +222,24 @@ class CharacterService:
         # 2. my 도메인에 gRPC로 동기화 (best-effort, 실패해도 로컬 저장은 유지)
         await self._sync_to_my_domain(user_id=user_id, character=character, source=source)
 
+    async def _grant_and_sync(
+        self,
+        user_id: UUID,
+        character: Character,
+        source: str,
+    ) -> None:
+        """캐릭터 소유권 저장 및 my 도메인 동기화 (공통 로직)."""
+        # 1. character.character_ownerships에 저장
+        await self.ownership_repo.upsert_owned(
+            user_id=user_id,
+            character=character,
+            source=source,
+        )
+        await self.session.commit()
+
+        # 2. my 도메인에 gRPC로 동기화
+        await self._sync_to_my_domain(user_id=user_id, character=character, source=source)
+
     async def _sync_to_my_domain(
         self,
         user_id: UUID,
