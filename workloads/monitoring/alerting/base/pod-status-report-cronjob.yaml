@@ -15,12 +15,15 @@ spec:
   jobTemplate:
     spec:
       template:
+        metadata:
+          annotations:
+            sidecar.istio.io/inject: 'false'  # CronJob doesn't need Istio sidecar
         spec:
           serviceAccountName: pod-status-reporter
           restartPolicy: OnFailure
           containers:
           - name: reporter
-            image: bitnami/kubectl:1.28
+            image: alpine/k8s:1.28.4  # lightweight kubectl image
             env:
             - name: SLACK_WEBHOOK_URL
               valueFrom:
