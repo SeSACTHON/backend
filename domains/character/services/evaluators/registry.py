@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
 # Global registry
 _evaluators: dict[CharacterRewardSource, RewardEvaluator] = {}
+_defaults_registered: bool = False
 
 
 def register_evaluator(source: CharacterRewardSource, evaluator: RewardEvaluator) -> None:
@@ -45,11 +46,44 @@ def get_evaluator(source: CharacterRewardSource) -> RewardEvaluator | None:
     return _evaluators.get(source)
 
 
+def reset_registry() -> None:
+    """Registry 리셋 후 기본값 재등록 (테스트용).
+
+    테스트 간 상태 격리를 위해 registry를 초기화합니다.
+
+    Usage:
+        @pytest.fixture(autouse=True)
+        def reset_evaluators():
+            reset_registry()
+            yield
+    """
+    global _evaluators, _defaults_registered
+    _evaluators = {}
+    _defaults_registered = False
+    _register_defaults()
+
+
+def clear_registry() -> None:
+    """Registry 완전 초기화 (테스트용).
+
+    기본 evaluator도 등록하지 않고 빈 상태로 만듭니다.
+    커스텀 evaluator만 테스트할 때 사용합니다.
+    """
+    global _evaluators, _defaults_registered
+    _evaluators = {}
+    _defaults_registered = True  # 자동 재등록 방지
+
+
 def _register_defaults() -> None:
     """기본 evaluator 등록."""
+    global _defaults_registered
+    if _defaults_registered:
+        return
+
     from domains.character.services.evaluators.scan import ScanRewardEvaluator
 
     register_evaluator(CharacterRewardSource.SCAN, ScanRewardEvaluator())
+    _defaults_registered = True
 
 
 # 모듈 로드 시 기본 evaluator 등록

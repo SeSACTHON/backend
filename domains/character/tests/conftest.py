@@ -25,9 +25,35 @@ extra_path = project_root / "domains"
 if str(extra_path) not in sys.path:
     sys.path.insert(0, str(extra_path))
 
-# Disable tracing for tests
+# Disable tracing and cache for tests
 os.environ["OTEL_ENABLED"] = "false"
 os.environ["AUTH_DISABLED"] = "true"
+os.environ["CHARACTER_CACHE_ENABLED"] = "false"
+
+
+# ============================================================================
+# Global State Reset Fixtures (테스트 격리)
+# ============================================================================
+
+
+@pytest.fixture(autouse=True)
+def reset_global_state():
+    """모든 테스트 전후로 글로벌 상태를 리셋합니다.
+
+    이 fixture는 autouse=True로 설정되어 모든 테스트에 자동 적용됩니다.
+    테스트 간 상태 오염을 방지합니다.
+    """
+    # Setup: 테스트 전 상태 리셋
+    from domains.character.core.cache import reset_cache_client
+    from domains.character.services.evaluators import reset_registry
+
+    reset_cache_client()
+    reset_registry()
+
+    yield
+
+    # Teardown: 테스트 후 상태 정리
+    reset_cache_client()
 
 
 # ============================================================================

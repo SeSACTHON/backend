@@ -14,6 +14,7 @@ from sqlalchemy import func, text
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
 
+from domains.character.core.cache import invalidate_catalog_cache
 from domains.character.database.base import Base
 from domains.character.models.character import Character
 from domains.character.schemas.catalog import CharacterProfile
@@ -182,6 +183,12 @@ async def main() -> None:
         total += len(batch)
     await engine.dispose()
     print(f"Upserted {total} character rows into database")
+
+    # 캐시 무효화 - 새 데이터가 즉시 반영되도록
+    if await invalidate_catalog_cache():
+        print("Cache invalidated successfully")
+    else:
+        print("Cache invalidation skipped (Redis unavailable or disabled)")
 
 
 if __name__ == "__main__":

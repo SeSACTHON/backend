@@ -166,3 +166,32 @@ async def close_cache() -> None:
             logger.warning("Error closing Redis connection", extra={"error": str(e)})
         finally:
             _redis_client = None
+
+
+def reset_cache_client() -> None:
+    """캐시 클라이언트 리셋 (테스트용).
+
+    테스트 간 상태 격리를 위해 글로벌 클라이언트를 초기화합니다.
+    프로덕션 코드에서는 사용하지 마세요.
+
+    Usage:
+        @pytest.fixture(autouse=True)
+        def reset_cache():
+            reset_cache_client()
+            yield
+            reset_cache_client()
+    """
+    global _redis_client
+    _redis_client = None
+
+
+def set_cache_client(client) -> None:
+    """캐시 클라이언트 주입 (테스트용).
+
+    테스트에서 mock Redis 클라이언트를 주입할 때 사용합니다.
+
+    Args:
+        client: Redis 클라이언트 또는 Mock 객체
+    """
+    global _redis_client
+    _redis_client = client
