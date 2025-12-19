@@ -16,6 +16,12 @@ class Settings(BaseSettings):
 
     app_name: str = "Scan API"
 
+    # Database
+    database_url: str = Field(
+        "postgresql+asyncpg://test:test@localhost:5432/test",
+        description="PostgreSQL connection URL for async operations.",
+    )
+
     character_api_base_url: str = Field(
         "http://character-api.character.svc.cluster.local:8000",
         description="Base URL for the Character service (no trailing slash).",
@@ -43,6 +49,29 @@ class Settings(BaseSettings):
         False,
         validation_alias=AliasChoices("SCAN_AUTH_DISABLED"),
         description="When true, skips token validation (use only for local dev).",
+    )
+
+    # === Image URL Validation ===
+    allowed_image_hosts: frozenset[str] = Field(
+        default_factory=lambda: frozenset(
+            {
+                "images.dev.growbin.app",
+                "images.growbin.app",
+            }
+        ),
+        description="허용된 이미지 CDN 호스트 목록",
+    )
+    allowed_image_channels: frozenset[str] = Field(
+        default_factory=lambda: frozenset({"chat", "scan", "my"}),
+        description="허용된 이미지 채널 (URL 경로의 첫 번째 세그먼트)",
+    )
+    allowed_image_extensions: frozenset[str] = Field(
+        default_factory=lambda: frozenset({".jpg", ".jpeg", ".png", ".webp", ".gif"}),
+        description="허용된 이미지 확장자",
+    )
+    image_filename_pattern: str = Field(
+        r"^[a-f0-9]{32}$",
+        description="이미지 파일명 패턴 (확장자 제외, UUID hex 32자)",
     )
 
     model_config = SettingsConfigDict(
