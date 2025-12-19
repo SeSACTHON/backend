@@ -37,82 +37,82 @@ spec:
               #!/bin/bash
               set -e
 
-              # Namespace 목록 (API 서비스)
-              NAMESPACES="auth character chat scan my location image"
+              # Namespace 목록
+              API_NS="auth character chat scan my location image"
+              INFRA_NS="istio-system prometheus logging argocd postgres redis"
 
-              # 현재 시간
               TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S KST')
 
-              # Pod 상태 수집
+              total_pods=0
+              running_pods=0
+
+              # Pod 상태를 파싱하는 함수
+              parse_pods() {
+                local ns=$1
+                local pods=$(kubectl get pods -n $ns --no-headers 2>/dev/null || echo "")
+
+                if [ -z "$pods" ]; then
+                  echo "  _No pods_"
+                  return
+                fi
+
+                while IFS= read -r line; do
+                  name=$(echo "$line" | awk '{print $1}')
+                  ready=$(echo "$line" | awk '{print $2}')
+                  status=$(echo "$line" | awk '{print $3}')
+                  restarts=$(echo "$line" | awk '{print $4}')
+
+                  case "$status" in
+                    Running) emoji="🟢"; ((running_pods++)) ;;
+                    Pending|ContainerCreating) emoji="🟡" ;;
+                    Error|CrashLoopBackOff|ImagePullBackOff|OOMKilled) emoji="🔴" ;;
+                    Completed) emoji="✅"; ((running_pods++)) ;;
+                    *) emoji="⚪" ;;
+                  esac
+
+                  ((total_pods++))
+                  short_name=$(echo "$name" | sed 's/-[a-z0-9]\{8,10\}-[a-z0-9]\{5\}$//' | sed 's/-[a-z0-9]\{5\}$//')
+                  echo "${emoji} \`${short_name}\` ${ready} (restarts: ${restarts})"
+                done <<< "$pods"
+              }
+
+              # 리포트 생성
               generate_report() {
-                echo "*📊 Pod Status Report*"
+                echo "*📊 Cluster Status Report*"
                 echo "*Time:* ${TIMESTAMP}"
                 echo "*Cluster:* eco2-dev"
                 echo ""
+                echo "*━━━━━ 🚀 API Services ━━━━━*"
 
-                total_pods=0
-                running_pods=0
-
-                for ns in $NAMESPACES; do
-                  echo "*━━━ ${ns} ━━━*"
-
-                  # Pod 정보 수집
-                  pods=$(kubectl get pods -n $ns --no-headers 2>/dev/null || echo "")
-
-                  if [ -z "$pods" ]; then
-                    echo "No pods found"
-                    echo ""
-                    continue
-                  fi
-
-                  while IFS= read -r line; do
-                    name=$(echo "$line" | awk '{print $1}')
-                    ready=$(echo "$line" | awk '{print $2}')
-                    status=$(echo "$line" | awk '{print $3}')
-                    restarts=$(echo "$line" | awk '{print $4}')
-
-                    # 상태별 이모지
-                    case "$status" in
-                      Running)
-                        emoji="🟢"
-                        ((running_pods++))
-                        ;;
-                      Pending|ContainerCreating)
-                        emoji="🟡"
-                        ;;
-                      Error|CrashLoopBackOff|ImagePullBackOff)
-                        emoji="🔴"
-                        ;;
-                      Completed)
-                        emoji="✅"
-                        ;;
-                      *)
-                        emoji="⚪"
-                        ;;
-                    esac
-
-                    ((total_pods++))
-
-                    # Pod 이름 축약 (너무 길면)
-                    short_name=$(echo "$name" | sed 's/-[a-z0-9]\{8,10\}-[a-z0-9]\{5\}$//')
-
-                    echo "${emoji} \`${short_name}\` ${ready} (${status}, restarts: ${restarts})"
-                  done <<< "$pods"
-
+                for ns in $API_NS; do
                   echo ""
+                  echo "*${ns}*"
+                  parse_pods $ns
                 done
 
-                echo "*━━━ Summary ━━━*"
-                echo "Total: ${total_pods} pods | Running: ${running_pods} | Issues: $((total_pods - running_pods))"
+                echo ""
+                echo "*━━━━━ ⚙️ Infrastructure ━━━━━*"
+
+                for ns in $INFRA_NS; do
+                  echo ""
+                  echo "*${ns}*"
+                  parse_pods $ns
+                done
+
+                echo ""
+                echo "*━━━━━ 📈 Summary ━━━━━*"
+                issues=$((total_pods - running_pods))
+                if [ $issues -eq 0 ]; then
+                  echo "✅ All ${total_pods} pods healthy"
+                else
+                  echo "⚠️ Total: ${total_pods} | Healthy: ${running_pods} | Issues: ${issues}"
+                fi
               }
 
-              # Slack 메시지 전송
               REPORT=$(generate_report)
-
-              # JSON escape
               REPORT_ESCAPED=$(echo "$REPORT" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
 
-              curl -X POST "$SLACK_WEBHOOK_URL" \
+              curl -s -X POST "$SLACK_WEBHOOK_URL" \
                 -H "Content-Type: application/json" \
                 -d "{
                   \"blocks\": [
