@@ -16,7 +16,7 @@ spec:
     groupWait: 30s
     groupInterval: 5m
     repeatInterval: 4h
-    receiver: slack-critical
+    receiver: slack-warning
     routes:
     # Critical alerts - 즉시 알림
     - receiver: slack-critical
@@ -32,11 +32,11 @@ spec:
         value: warning
         matchType: =
       continue: false
-    # Info alerts
+    # Watchdog 무시
     - receiver: slack-info
       matchers:
-      - name: severity
-        value: info
+      - name: alertname
+        value: Watchdog
         matchType: =
       continue: false
 
