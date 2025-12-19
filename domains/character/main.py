@@ -20,6 +20,7 @@ from domains.character.core.logging import configure_logging
 from domains.character.core.tracing import (
     configure_tracing,
     instrument_fastapi,
+    instrument_grpc,
     instrument_httpx,
     shutdown_tracing,
 )
@@ -39,6 +40,7 @@ configure_tracing(
 
 # 글로벌 instrumentation
 instrument_httpx()
+instrument_grpc()
 
 
 @asynccontextmanager

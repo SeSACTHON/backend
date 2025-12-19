@@ -196,6 +196,23 @@ def instrument_httpx() -> None:
         logger.error(f"Failed to instrument HTTPX: {e}")
 
 
+def instrument_grpc() -> None:
+    """gRPC 클라이언트 자동 계측 (my 도메인 호출 추적)"""
+    if not OTEL_ENABLED:
+        return
+
+    try:
+        from opentelemetry.instrumentation.grpc import GrpcAioInstrumentorClient
+
+        GrpcAioInstrumentorClient().instrument()
+        logger.info("gRPC client instrumentation enabled")
+
+    except ImportError:
+        logger.warning("GrpcAioInstrumentorClient not available")
+    except Exception as e:
+        logger.error(f"Failed to instrument gRPC: {e}")
+
+
 def shutdown_tracing() -> None:
     """트레이싱 종료 (graceful shutdown)"""
     global _tracer_provider

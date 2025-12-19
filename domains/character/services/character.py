@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from contextlib import nullcontext
 from typing import Sequence
 from uuid import UUID
 
@@ -14,6 +15,7 @@ from domains.character.core.constants import (
     RECYCLABLE_WASTE_CATEGORY,
     REWARD_SOURCE_SCAN,
 )
+from domains.character.core.tracing import get_tracer
 from domains.character.database.session import get_db_session
 from domains.character.exceptions import CatalogEmptyError
 from domains.character.metrics import REWARD_EVALUATION_TOTAL, REWARD_GRANTED_TOTAL
@@ -56,66 +58,116 @@ class CharacterService:
         }
 
     async def evaluate_reward(self, payload: CharacterRewardRequest) -> CharacterRewardResponse:
-        logger.info(
-            "Reward evaluation started",
-            extra={"user_id": str(payload.user_id), "source": payload.source.value},
-        )
+        """캐릭터 리워드 평가 및 지급.
 
-        classification = payload.classification
-        reward_profile: CharacterProfile | None = None
-        already_owned = False
-        received = False
-        match_reason: str | None = None
+        Jaeger에서 다음 span 구조로 추적됨:
+            evaluate_reward
+            ├── match_characters (캐릭터 매칭)
+            │   └── asyncpg: SELECT characters...
+            └── apply_reward (소유권 지급)
+                ├── asyncpg: SELECT/INSERT ownerships...
+                └── grpc: my.UserCharacterService/Grant
+        """
+        tracer = get_tracer(__name__)
+        user_id_str = str(payload.user_id)
 
-        should_evaluate = (
-            payload.source == CharacterRewardSource.SCAN
-            and classification.major_category.strip() == RECYCLABLE_WASTE_CATEGORY
-            and payload.disposal_rules_present
-            and not payload.insufficiencies_present
-        )
+        # 최상위 span 시작
+        with tracer.start_as_current_span("evaluate_reward") if tracer else nullcontext() as span:
+            if span:
+                span.set_attribute("user_id", user_id_str)
+                span.set_attribute("source", payload.source.value)
 
-        if should_evaluate:
-            match_reason = self._build_match_reason(classification)
-            matches = await self._match_characters(classification)
-            if matches:
-                reward_profile, already_owned, failure_reason = await self._apply_reward(
-                    payload.user_id, matches
-                )
-                received = (
-                    failure_reason is None and reward_profile is not None and not already_owned
-                )
+            logger.info(
+                "Reward evaluation started",
+                extra={"user_id": user_id_str, "source": payload.source.value},
+            )
 
-                # Record metrics
-                status_label = "success" if received else "failed"
-                if already_owned:
-                    status_label = "already_owned"
-                elif failure_reason:
-                    status_label = f"failed_{failure_reason.value}"
+            classification = payload.classification
+            reward_profile: CharacterProfile | None = None
+            already_owned = False
+            received = False
+            match_reason: str | None = None
 
-                REWARD_EVALUATION_TOTAL.labels(
-                    status=status_label, source=payload.source.value
-                ).inc()
+            should_evaluate = (
+                payload.source == CharacterRewardSource.SCAN
+                and classification.major_category.strip() == RECYCLABLE_WASTE_CATEGORY
+                and payload.disposal_rules_present
+                and not payload.insufficiencies_present
+            )
 
-                if received and reward_profile:
-                    REWARD_GRANTED_TOTAL.labels(
-                        character_name=reward_profile.name, type=reward_profile.type or "unknown"
-                    ).inc()
+            if should_evaluate:
+                match_reason = self._build_match_reason(classification)
+
+                # 캐릭터 매칭 span
+                with tracer.start_as_current_span("match_characters") if tracer else nullcontext():
+                    matches = await self._match_characters(classification)
+
+                if matches:
+                    # 리워드 지급 span
+                    with tracer.start_as_current_span("apply_reward") if tracer else nullcontext():
+                        reward_profile, already_owned, failure_reason = await self._apply_reward(
+                            payload.user_id, matches
+                        )
+
+                    received = (
+                        failure_reason is None and reward_profile is not None and not already_owned
+                    )
+
+                    self._record_reward_metrics(
+                        source=payload.source.value,
+                        received=received,
+                        already_owned=already_owned,
+                        failure_reason=failure_reason,
+                        reward_profile=reward_profile,
+                    )
+                else:
+                    self._record_reward_metrics(source=payload.source.value, status="no_match")
             else:
-                REWARD_EVALUATION_TOTAL.labels(status="no_match", source=payload.source.value).inc()
-        else:
-            REWARD_EVALUATION_TOTAL.labels(status="skipped", source=payload.source.value).inc()
+                self._record_reward_metrics(source=payload.source.value, status="skipped")
 
-        logger.info(
-            "Reward evaluation completed",
-            extra={
-                "user_id": str(payload.user_id),
-                "received": received,
-                "already_owned": already_owned,
-                "character_name": reward_profile.name if reward_profile else None,
-            },
-        )
+            # span에 결과 기록
+            if span:
+                span.set_attribute("received", received)
+                span.set_attribute("already_owned", already_owned)
+                if reward_profile:
+                    span.set_attribute("character_name", reward_profile.name)
 
-        return self._to_reward_response(reward_profile, already_owned, received, match_reason)
+            logger.info(
+                "Reward evaluation completed",
+                extra={
+                    "user_id": user_id_str,
+                    "received": received,
+                    "already_owned": already_owned,
+                    "character_name": reward_profile.name if reward_profile else None,
+                },
+            )
+
+            return self._to_reward_response(reward_profile, already_owned, received, match_reason)
+
+    @staticmethod
+    def _record_reward_metrics(
+        source: str,
+        status: str | None = None,
+        received: bool = False,
+        already_owned: bool = False,
+        failure_reason: CharacterRewardFailureReason | None = None,
+        reward_profile: CharacterProfile | None = None,
+    ) -> None:
+        """리워드 평가 메트릭 기록."""
+        if status is None:
+            status = "success" if received else "failed"
+            if already_owned:
+                status = "already_owned"
+            elif failure_reason:
+                status = f"failed_{failure_reason.value}"
+
+        REWARD_EVALUATION_TOTAL.labels(status=status, source=source).inc()
+
+        if received and reward_profile:
+            REWARD_GRANTED_TOTAL.labels(
+                character_name=reward_profile.name,
+                type=reward_profile.type or "unknown",
+            ).inc()
 
     @staticmethod
     def _to_reward_response(
@@ -220,24 +272,6 @@ class CharacterService:
         await self.session.commit()
 
         # 2. my 도메인에 gRPC로 동기화 (best-effort, 실패해도 로컬 저장은 유지)
-        await self._sync_to_my_domain(user_id=user_id, character=character, source=source)
-
-    async def _grant_and_sync(
-        self,
-        user_id: UUID,
-        character: Character,
-        source: str,
-    ) -> None:
-        """캐릭터 소유권 저장 및 my 도메인 동기화 (공통 로직)."""
-        # 1. character.character_ownerships에 저장
-        await self.ownership_repo.upsert_owned(
-            user_id=user_id,
-            character=character,
-            source=source,
-        )
-        await self.session.commit()
-
-        # 2. my 도메인에 gRPC로 동기화
         await self._sync_to_my_domain(user_id=user_id, character=character, source=source)
 
     async def _sync_to_my_domain(
