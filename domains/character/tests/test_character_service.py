@@ -353,7 +353,7 @@ class TestApplyRewardRaceCondition:
         service.ownership_repo.get_by_user_and_character = AsyncMock(return_value=None)
         service._grant_and_sync = AsyncMock(side_effect=IntegrityError("duplicate", {}, None))
 
-        result = await service._apply_reward(user_id, [mock_character])
+        result = await service._apply_reward(user_id, [mock_character], source_label="scan-reward")
 
         profile, already_owned, failure = result
         assert profile.name == "플라봇"

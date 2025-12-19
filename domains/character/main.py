@@ -24,7 +24,7 @@ from domains.character.core.tracing import (
     instrument_httpx,
     shutdown_tracing,
 )
-from domains.character.core.cache import close_cache
+from domains.character.core.cache import close_cache, warmup_catalog_cache
 from domains.character.metrics import register_metrics
 from domains.character.rpc.my_client import close_my_client
 
@@ -46,6 +46,8 @@ instrument_grpc()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Startup: 캐시 워밍업 (best-effort, 실패해도 서버 시작)
+    await warmup_catalog_cache()
     yield
     # Graceful shutdown
     await close_my_client()

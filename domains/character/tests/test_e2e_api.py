@@ -8,20 +8,62 @@ Test Coverage:
 - Request/Response serialization
 - Error handling
 - Header validation
+
+Requirements:
+    - pytest-asyncio
+    - httpx
+
+Run:
+    AUTH_DISABLED=true pytest domains/character/tests/test_e2e_api.py -v
 """
 
 from __future__ import annotations
 
+import os
 from unittest.mock import AsyncMock, patch
+from uuid import uuid4
 
 import pytest
-from httpx import AsyncClient
 
-from domains.character.exceptions import CatalogEmptyError
-from domains.character.schemas.catalog import CharacterProfile
-from domains.character.schemas.reward import CharacterRewardResponse
+# E2E 테스트는 환경 설정이 필요 - httpx 미설치 시 skip
+httpx = pytest.importorskip("httpx")
+from httpx import AsyncClient  # noqa: E402
 
-from .conftest import create_reward_request_payload
+# 환경 변수 설정 (앱 로드 전)
+os.environ["AUTH_DISABLED"] = "true"
+os.environ["CHARACTER_AUTH_DISABLED"] = "true"
+os.environ["OTEL_ENABLED"] = "false"
+os.environ["CHARACTER_CACHE_ENABLED"] = "false"
+
+# E2E 테스트 전체에 마커 적용
+pytestmark = pytest.mark.e2e
+
+from domains.character.exceptions import CatalogEmptyError  # noqa: E402
+from domains.character.schemas.catalog import CharacterProfile  # noqa: E402
+from domains.character.schemas.reward import CharacterRewardResponse  # noqa: E402
+
+
+def create_reward_request_payload(
+    user_id=None,
+    major_category: str = "재활용폐기물",
+    middle_category: str = "플라스틱",
+    minor_category: str | None = "페트병",
+    disposal_rules_present: bool = True,
+    insufficiencies_present: bool = False,
+) -> dict:
+    """Helper to create reward request payloads for testing."""
+    return {
+        "source": "scan",
+        "user_id": str(user_id or uuid4()),
+        "task_id": f"test-task-{uuid4().hex[:8]}",
+        "classification": {
+            "major_category": major_category,
+            "middle_category": middle_category,
+            "minor_category": minor_category,
+        },
+        "disposal_rules_present": disposal_rules_present,
+        "insufficiencies_present": insufficiencies_present,
+    }
 
 
 class TestCatalogEndpoint:

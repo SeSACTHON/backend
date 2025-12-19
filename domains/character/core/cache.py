@@ -154,6 +154,81 @@ async def invalidate_catalog_cache() -> bool:
     return await invalidate_cache(CATALOG_KEY)
 
 
+async def warmup_catalog_cache() -> bool:
+    """서버 시작 시 카탈로그 캐시 워밍업.
+
+    첫 요청 시 캐시 미스를 방지하기 위해 미리 카탈로그를 로드합니다.
+
+    Returns:
+        워밍업 성공 여부
+
+    Note:
+        DB 연결 실패 시에도 서버 시작을 차단하지 않습니다.
+        캐시 워밍업은 best-effort로 동작합니다.
+    """
+    settings = get_settings()
+    if not settings.cache_enabled:
+        logger.info("Cache warmup skipped (cache disabled)")
+        return False
+
+    try:
+        # Lazy import to avoid circular dependency
+        from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+
+        from domains.character.repositories import CharacterRepository
+        from domains.character.schemas.catalog import CharacterProfile
+
+        engine = create_async_engine(
+            settings.database_url,
+            echo=False,
+            pool_pre_ping=True,
+        )
+        async_session_factory = async_sessionmaker(
+            bind=engine,
+            class_=AsyncSession,
+            expire_on_commit=False,
+        )
+
+        async with async_session_factory() as session:
+            repo = CharacterRepository(session)
+            characters = await repo.list_all()
+
+            if not characters:
+                logger.warning("Cache warmup: no characters found in database")
+                await engine.dispose()
+                return False
+
+            profiles = [
+                CharacterProfile(
+                    name=char.name,
+                    type=str(char.type_label or "").strip(),
+                    dialog=str(char.dialog or char.description or "").strip(),
+                    match=str(char.match_label or "").strip() or None,
+                )
+                for char in characters
+            ]
+
+            success = await set_cached(CATALOG_KEY, [p.model_dump() for p in profiles])
+
+            if success:
+                logger.info(
+                    "Cache warmup completed",
+                    extra={"catalog_size": len(profiles)},
+                )
+            else:
+                logger.warning("Cache warmup: failed to set cache")
+
+        await engine.dispose()
+        return success
+
+    except Exception as e:
+        logger.warning(
+            "Cache warmup failed (non-blocking)",
+            extra={"error": str(e)},
+        )
+        return False
+
+
 async def close_cache() -> None:
     """Redis 연결 종료 (graceful shutdown)."""
     global _redis_client
