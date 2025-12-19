@@ -165,15 +165,25 @@ data:
     -- 앱 로그: 기존 service.name 유지
     -- 시스템 로그: K8s 라벨에서 자동 추출
 
+    -- k8s_labels에서 라벨 값 가져오기 (nested object 또는 flat 키 모두 지원)
+    local function get_label(record, key)
+        -- 1. k8s_labels가 테이블인 경우 (nested object)
+        if type(record["k8s_labels"]) == "table" then
+            return record["k8s_labels"][key]
+        end
+        -- 2. flat 키로 접근 (k8s_labels_app 형태)
+        return record["k8s_labels_" .. key]
+    end
+
     function enrich_with_ecs_fields(tag, timestamp, record)
         local modified = false
 
         -- 1. service.name 매핑 (앱 로그에서 이미 있으면 유지)
         if not record["service.name"] then
             -- 우선순위: app > app.kubernetes.io/name > k8s-app > container_name
-            local service_name = record["k8s_labels_app"]
-                              or record["k8s_labels_app.kubernetes.io/name"]
-                              or record["k8s_labels_k8s-app"]
+            local service_name = get_label(record, "app")
+                              or get_label(record, "app.kubernetes.io/name")
+                              or get_label(record, "k8s-app")
                               or record["k8s_container_name"]
 
             if service_name then
@@ -184,7 +194,7 @@ data:
 
         -- 2. service.environment 매핑
         if not record["service.environment"] then
-            local env = record["k8s_labels_environment"]
+            local env = get_label(record, "environment")
                      or record["k8s_namespace_name"]
 
             if env then
@@ -195,8 +205,8 @@ data:
 
         -- 3. service.version 매핑
         if not record["service.version"] then
-            local version = record["k8s_labels_version"]
-                         or record["k8s_labels_app.kubernetes.io/version"]
+            local version = get_label(record, "version")
+                         or get_label(record, "app.kubernetes.io/version")
 
             if version then
                 record["service.version"] = version
@@ -217,27 +227,6 @@ data:
 
         if record["k8s_container_name"] then
             record["kubernetes.container.name"] = record["k8s_container_name"]
-            modified = true
-        end
-
-        -- 5. kubernetes.labels 객체로 라벨 보존 (주요 라벨만)
-        local labels = {}
-        local label_keys = {
-            "app", "domain", "environment", "version", "tier",
-            "app.kubernetes.io/name", "app.kubernetes.io/part-of",
-            "app.kubernetes.io/version", "app.kubernetes.io/instance",
-            "k8s-app"
-        }
-
-        for _, key in ipairs(label_keys) do
-            local label_field = "k8s_labels_" .. key
-            if record[label_field] then
-                labels[key] = record[label_field]
-            end
-        end
-
-        if next(labels) ~= nil then
-            record["kubernetes.labels"] = labels
             modified = true
         end
 
