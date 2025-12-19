@@ -19,6 +19,7 @@ from domains.character.schemas.reward import (
 )
 from domains.scan.core.config import Settings, get_settings
 from domains.scan.core.grpc_client import get_character_stub
+from domains.scan.core.validators import ImageUrlValidator
 from domains.scan.database.session import get_db_session
 from domains.scan.metrics import GRPC_CALL_COUNTER, GRPC_CALL_LATENCY
 from domains.scan.models.scan_task import ScanTask as ScanTaskModel
@@ -55,6 +56,7 @@ class ScanService:
     ):
         self.settings = settings
         self.repository = repository
+        self.image_validator = ImageUrlValidator(settings)
 
     async def classify(
         self, payload: ClassificationRequest, user_id: UUID
@@ -68,6 +70,24 @@ class ScanService:
                 status="failed",
                 message="이미지 URL이 필요합니다.",
                 error="IMAGE_URL_REQUIRED",
+            )
+
+        # Validate image URL (allowlist + SSRF prevention)
+        validation = self.image_validator.validate(image_url)
+        if not validation.valid:
+            logger.warning(
+                "Image URL validation failed",
+                extra={
+                    "url": image_url,
+                    "error": validation.error.value if validation.error else None,
+                    "message": validation.message,
+                },
+            )
+            return ClassificationResponse(
+                task_id=str(uuid4()),
+                status="failed",
+                message=validation.message or "이미지 URL 검증 실패",
+                error=validation.error.value if validation.error else "VALIDATION_ERROR",
             )
 
         task_id = uuid4()
