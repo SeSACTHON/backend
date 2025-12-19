@@ -16,6 +16,12 @@ class Settings(BaseSettings):
 
     app_name: str = "Scan API"
 
+    # Database
+    database_url: str = Field(
+        "postgresql+asyncpg://test:test@localhost:5432/test",
+        description="PostgreSQL connection URL for async operations.",
+    )
+
     character_api_base_url: str = Field(
         "http://character-api.character.svc.cluster.local:8000",
         description="Base URL for the Character service (no trailing slash).",

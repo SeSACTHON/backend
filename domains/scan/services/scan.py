@@ -5,11 +5,12 @@ import json
 import logging
 from datetime import datetime, timezone
 from time import perf_counter
-from typing import Dict, List
+from typing import List
 from uuid import UUID, uuid4
 
 import grpc
 from fastapi import Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from domains.character.schemas.reward import (
     CharacterRewardRequest,
@@ -17,30 +18,44 @@ from domains.character.schemas.reward import (
     CharacterRewardSource,
     ClassificationSummary,
 )
+from domains.scan.core.config import Settings, get_settings
+from domains.scan.core.grpc_client import get_character_stub
+from domains.scan.database.session import get_db_session
 from domains.scan.metrics import GRPC_CALL_COUNTER, GRPC_CALL_LATENCY
+from domains.scan.models.scan_task import ScanTask as ScanTaskModel
+from domains.scan.proto import character_pb2
+from domains.scan.repositories.scan_task_repository import ScanTaskRepository
 from domains.scan.schemas.scan import (
     ClassificationRequest,
     ClassificationResponse,
     ScanCategory,
     ScanTask,
 )
-from domains.scan.core.config import Settings, get_settings
-from domains.scan.core.grpc_client import get_character_stub
-from domains.scan.proto import character_pb2
 from domains._shared.schemas.waste import WasteClassificationResult
 from domains._shared.waste_pipeline import PipelineError, process_waste_classification
 from domains._shared.waste_pipeline.utils import ITEM_CLASS_PATH, load_yaml
 
 DEFAULT_SCAN_PROMPT = "이 폐기물을 어떻게 분리배출해야 하나요?"
-_TASK_STORE: Dict[str, ScanTask] = {}
 logger = logging.getLogger(__name__)
+
+
+def get_scan_task_repository(
+    session: AsyncSession = Depends(get_db_session),
+) -> ScanTaskRepository:
+    """Factory for ScanTaskRepository with injected session."""
+    return ScanTaskRepository(session)
 
 
 class ScanService:
     _category_cache: List[ScanCategory] | None = None
 
-    def __init__(self, settings: Settings = Depends(get_settings)):
+    def __init__(
+        self,
+        settings: Settings = Depends(get_settings),
+        repository: ScanTaskRepository = Depends(get_scan_task_repository),
+    ):
         self.settings = settings
+        self.repository = repository
 
     async def classify(
         self, payload: ClassificationRequest, user_id: UUID
@@ -55,7 +70,7 @@ class ScanService:
                 error="IMAGE_URL_REQUIRED",
             )
 
-        task_id = str(uuid4())
+        task_id = uuid4()
         started_at = datetime.now(timezone.utc)
         logger.info(
             "Scan pipeline started at %s (task_id=%s, user_id=%s)",
@@ -63,6 +78,15 @@ class ScanService:
             task_id,
             user_id,
         )
+
+        # Create task in DB with pending status
+        await self.repository.create(
+            task_id=task_id,
+            user_id=user_id,
+            image_url=image_url,
+            user_input=payload.user_input,
+        )
+
         pipeline_started = perf_counter()
         prompt_text = payload.user_input or DEFAULT_SCAN_PROMPT
         if logger.isEnabledFor(logging.DEBUG):
@@ -71,6 +95,7 @@ class ScanService:
                 task_id,
                 prompt_text,
             )
+
         try:
             pipeline_payload = await asyncio.to_thread(
                 process_waste_classification,
@@ -88,8 +113,15 @@ class ScanService:
                 task_id,
                 elapsed_ms,
             )
+
+            # Mark task as failed in DB
+            await self.repository.update_failed(
+                task_id,
+                error_message=str(exc),
+            )
+
             return ClassificationResponse(
-                task_id=task_id,
+                task_id=str(task_id),
                 status="failed",
                 message="분류 파이프라인 처리에 실패했습니다.",
                 error=str(exc),
@@ -98,8 +130,8 @@ class ScanService:
         # Record metrics
         from domains.scan.metrics import (
             PIPELINE_STEP_LATENCY,
-            REWARD_MATCH_LATENCY,
             REWARD_MATCH_COUNTER,
+            REWARD_MATCH_LATENCY,
         )
 
         metadata = pipeline_payload.get("metadata", {})
@@ -130,14 +162,13 @@ class ScanService:
         pipeline_result = WasteClassificationResult(**pipeline_payload)
         classification = pipeline_result.classification_result.get("classification", {})
         category = classification.get("major_category")
-        completed_at = datetime.now(timezone.utc)
 
         reward = None
         if self._should_attempt_reward(pipeline_result):
             with REWARD_MATCH_LATENCY.time():
                 reward_request = self._build_reward_request(
                     user_id,
-                    task_id,
+                    str(task_id),
                     pipeline_result,
                 )
                 if reward_request:
@@ -150,19 +181,17 @@ class ScanService:
         else:
             REWARD_MATCH_COUNTER.labels(status="skipped").inc()
 
-        task = ScanTask(
-            task_id=task_id,
-            status="completed",
+        # Update task as completed in DB
+        await self.repository.update_completed(
+            task_id,
             category=category,
             confidence=None,
-            completed_at=completed_at,
             pipeline_result=pipeline_result,
             reward=reward,
         )
-        _TASK_STORE[task_id] = task
 
         return ClassificationResponse(
-            task_id=task_id,
+            task_id=str(task_id),
             status="completed",
             message="classification completed",
             pipeline_result=pipeline_result,
@@ -170,10 +199,17 @@ class ScanService:
         )
 
     async def task(self, task_id: str) -> ScanTask:
+        """Retrieve a scan task by ID."""
         try:
-            return _TASK_STORE[task_id]
-        except KeyError as exc:
-            raise LookupError(f"task {task_id} not found") from exc
+            task_uuid = UUID(task_id)
+        except ValueError as exc:
+            raise LookupError(f"invalid task_id format: {task_id}") from exc
+
+        db_task = await self.repository.get_by_id(task_uuid)
+        if db_task is None:
+            raise LookupError(f"task {task_id} not found")
+
+        return self._to_schema(db_task)
 
     async def categories(self) -> list[ScanCategory]:
         if ScanService._category_cache is None:
@@ -181,17 +217,34 @@ class ScanService:
         return ScanService._category_cache
 
     async def metrics(self) -> dict:
-        completed = len(_TASK_STORE)
-        last_completed = max(
-            (task.completed_at for task in _TASK_STORE.values() if task.completed_at),
-            default=None,
-        )
+        completed = await self.repository.count_completed()
+        last_completed = await self.repository.get_last_completed_at()
         categories = await self.categories()
         return {
             "completed_tasks": completed,
             "last_completed_at": last_completed.isoformat() if last_completed else None,
             "supported_categories": len(categories),
         }
+
+    def _to_schema(self, db_task: ScanTaskModel) -> ScanTask:
+        """Convert ORM model to Pydantic schema."""
+        pipeline_result = None
+        if db_task.pipeline_result:
+            pipeline_result = WasteClassificationResult(**db_task.pipeline_result)
+
+        reward = None
+        if db_task.reward:
+            reward = CharacterRewardResponse(**db_task.reward)
+
+        return ScanTask(
+            task_id=str(db_task.id),
+            status=db_task.status,
+            category=db_task.category,
+            confidence=db_task.confidence,
+            completed_at=db_task.completed_at,
+            pipeline_result=pipeline_result,
+            reward=reward,
+        )
 
     def _load_categories(self) -> list[ScanCategory]:
         yaml_data = load_yaml(ITEM_CLASS_PATH) or {}
