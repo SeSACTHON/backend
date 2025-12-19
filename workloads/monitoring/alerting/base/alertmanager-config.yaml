@@ -49,7 +49,7 @@ spec:
         key: webhook-url
       channel: '#alerts'
       sendResolved: true
-      title: 🔴 [CRITICAL] {{ .GroupLabels.alertname }}
+      title: '{{ if eq .Status "resolved" }}🟢 [RESOLVED]{{ else }}🔴 [CRITICAL]{{ end }} {{ .GroupLabels.alertname }}'
       text: |
         *Cluster:* eco2-dev
         *Namespace:* {{ .GroupLabels.namespace }}
@@ -58,9 +58,9 @@ spec:
         {{ range .Alerts }}
         *Alert:* {{ .Labels.alertname }}
         *Description:* {{ .Annotations.description }}
-        *Started:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}
+        {{ if eq $.Status "resolved" }}*Resolved:* {{ .EndsAt.Format "2006-01-02 15:04:05" }}{{ else }}*Started:* {{ .StartsAt.Format "2006-01-02 15:04:05" }}{{ end }}
         {{ end }}
-      color: '#ff0000'
+      color: '{{ if eq .Status "resolved" }}#36a64f{{ else }}#ff0000{{ end }}'
 
   - name: slack-warning
     slackConfigs:
@@ -69,7 +69,7 @@ spec:
         key: webhook-url
       channel: '#alerts'
       sendResolved: true
-      title: 🟠 [WARNING] {{ .GroupLabels.alertname }}
+      title: '{{ if eq .Status "resolved" }}🟢 [RESOLVED]{{ else }}🟠 [WARNING]{{ end }} {{ .GroupLabels.alertname }}'
       text: |
         *Cluster:* eco2-dev
         *Namespace:* {{ .GroupLabels.namespace }}
@@ -78,8 +78,9 @@ spec:
         {{ range .Alerts }}
         *Alert:* {{ .Labels.alertname }}
         *Description:* {{ .Annotations.description }}
+        {{ if eq $.Status "resolved" }}*Resolved:* {{ .EndsAt.Format "2006-01-02 15:04:05" }}{{ end }}
         {{ end }}
-      color: '#ffa500'
+      color: '{{ if eq .Status "resolved" }}#36a64f{{ else }}#ffa500{{ end }}'
 
   - name: slack-info
     slackConfigs:
@@ -88,7 +89,7 @@ spec:
         key: webhook-url
       channel: '#alerts'
       sendResolved: true
-      title: 🟡 [INFO] {{ .GroupLabels.alertname }}
+      title: '{{ if eq .Status "resolved" }}🟢 [RESOLVED]{{ else }}🟡 [INFO]{{ end }} {{ .GroupLabels.alertname }}'
       text: |
         *Cluster:* eco2-dev
         *Namespace:* {{ .GroupLabels.namespace }}
@@ -97,4 +98,4 @@ spec:
         *Alert:* {{ .Labels.alertname }}
         *Description:* {{ .Annotations.description }}
         {{ end }}
-      color: '#ffff00'
+      color: '{{ if eq .Status "resolved" }}#36a64f{{ else }}#ffff00{{ end }}'
