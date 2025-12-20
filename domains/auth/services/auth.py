@@ -289,7 +289,11 @@ class AuthService:
         )
 
     def _clear_session_cookies(self, response: Response) -> None:
-        cookie_kwargs = {"path": COOKIE_PATH}
+        cookie_kwargs = {
+            "path": COOKIE_PATH,
+            "secure": True,
+            "samesite": COOKIE_SAMESITE,
+        }
         if self.settings.cookie_domain:
             cookie_kwargs["domain"] = self.settings.cookie_domain
         response.delete_cookie(ACCESS_COOKIE_NAME, **cookie_kwargs)
