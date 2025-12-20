@@ -123,15 +123,7 @@ async def character_service(db_session):
     """Create CharacterService with real database session."""
     from domains.character.services.character import CharacterService
 
-    service = CharacterService.__new__(CharacterService)
-    service.session = db_session
-
-    from domains.character.repositories import CharacterOwnershipRepository, CharacterRepository
-
-    service.character_repo = CharacterRepository(db_session)
-    service.ownership_repo = CharacterOwnershipRepository(db_session)
-
-    return service
+    return CharacterService.create_for_test(session=db_session)
 
 
 @pytest.fixture

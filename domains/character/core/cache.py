@@ -171,6 +171,7 @@ async def warmup_catalog_cache() -> bool:
         logger.info("Cache warmup skipped (cache disabled)")
         return False
 
+    engine = None
     try:
         # Lazy import to avoid circular dependency
         from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -195,7 +196,6 @@ async def warmup_catalog_cache() -> bool:
 
             if not characters:
                 logger.warning("Cache warmup: no characters found in database")
-                await engine.dispose()
                 return False
 
             profiles = [
@@ -218,8 +218,7 @@ async def warmup_catalog_cache() -> bool:
             else:
                 logger.warning("Cache warmup: failed to set cache")
 
-        await engine.dispose()
-        return success
+            return success
 
     except Exception as e:
         logger.warning(
@@ -227,6 +226,10 @@ async def warmup_catalog_cache() -> bool:
             extra={"error": str(e)},
         )
         return False
+
+    finally:
+        if engine is not None:
+            await engine.dispose()
 
 
 async def close_cache() -> None:

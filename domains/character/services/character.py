@@ -24,7 +24,7 @@ from domains.character.schemas.reward import (
     CharacterRewardRequest,
     CharacterRewardResponse,
 )
-from domains.character.services.evaluators import EvaluationContext, EvaluationResult, get_evaluator
+from domains.character.services.evaluators import EvaluationResult, get_evaluator
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +34,31 @@ class CharacterService:
         self.session = session
         self.character_repo = CharacterRepository(session)
         self.ownership_repo = CharacterOwnershipRepository(session)
+
+    @classmethod
+    def create_for_test(
+        cls,
+        session: AsyncSession,
+        character_repo: CharacterRepository | None = None,
+        ownership_repo: CharacterOwnershipRepository | None = None,
+    ) -> "CharacterService":
+        """테스트용 팩토리 메서드.
+
+        __new__를 우회하지 않고 테스트 의존성을 주입합니다.
+
+        Args:
+            session: DB 세션
+            character_repo: 캐릭터 레포지토리 (None이면 기본 생성)
+            ownership_repo: 소유권 레포지토리 (None이면 기본 생성)
+
+        Returns:
+            CharacterService 인스턴스
+        """
+        service = cls.__new__(cls)
+        service.session = session
+        service.character_repo = character_repo or CharacterRepository(session)
+        service.ownership_repo = ownership_repo or CharacterOwnershipRepository(session)
+        return service
 
     async def catalog(self) -> list[CharacterProfile]:
         """캐릭터 카탈로그 조회 (캐시 적용).
@@ -109,16 +134,11 @@ class CharacterService:
                 self._record_reward_metrics(source=payload.source.value, status="no_evaluator")
                 return self._to_reward_response(None, False, False, None)
 
-            # Evaluator 컨텍스트 생성
-            context = EvaluationContext(
-                character_repo=self.character_repo,
-                ownership_repo=self.ownership_repo,
-                grant_callback=self._grant_and_sync,
-            )
-
-            # 1. 평가 조건 확인 및 캐릭터 매칭
+            # 1. 캐릭터 목록 조회 및 평가
             with tracer.start_as_current_span("match_characters") if tracer else nullcontext():
-                eval_result = await evaluator.evaluate(payload, context)
+                # Service에서 캐릭터 조회 후 Evaluator에 전달 (책임 분리)
+                characters = await self.character_repo.list_all()
+                eval_result = evaluator.evaluate(payload, characters)
 
             # 2. 평가 결과 처리
             reward_profile, already_owned, failure_reason, received = (
@@ -320,8 +340,10 @@ class CharacterService:
             "source": source,
         }
         try:
+            from domains.character.schemas.catalog import GrantCharacterRequest
+
             client = get_my_client()
-            success, already_owned = await client.grant_character(
+            grant_request = GrantCharacterRequest(
                 user_id=user_id,
                 character_id=character.id,
                 character_code=character.code,
@@ -330,6 +352,7 @@ class CharacterService:
                 character_dialog=character.dialog,
                 source=source,
             )
+            success, already_owned = await client.grant_character(grant_request)
             if success:
                 logger.info(
                     "Synced character to my domain",

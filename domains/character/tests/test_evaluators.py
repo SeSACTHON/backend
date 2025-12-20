@@ -3,7 +3,7 @@
 평가 전략 로직의 단위 테스트.
 """
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
@@ -14,7 +14,6 @@ from domains.character.schemas.reward import (
     ClassificationSummary,
 )
 from domains.character.services.evaluators import (
-    EvaluationContext,
     ScanRewardEvaluator,
     get_evaluator,
 )
@@ -31,8 +30,7 @@ class TestScanRewardEvaluatorShouldEvaluate:
     def evaluator(self):
         return ScanRewardEvaluator()
 
-    @pytest.mark.asyncio
-    async def test_returns_true_when_all_conditions_met(self, evaluator):
+    def test_returns_true_when_all_conditions_met(self, evaluator):
         """모든 조건 충족 시 True."""
         payload = CharacterRewardRequest(
             source=CharacterRewardSource.SCAN,
@@ -46,11 +44,10 @@ class TestScanRewardEvaluatorShouldEvaluate:
             insufficiencies_present=False,
         )
 
-        result = await evaluator.should_evaluate(payload)
+        result = evaluator.should_evaluate(payload)
         assert result is True
 
-    @pytest.mark.asyncio
-    async def test_returns_false_when_not_recyclable(self, evaluator):
+    def test_returns_false_when_not_recyclable(self, evaluator):
         """재활용폐기물이 아닐 때 False."""
         payload = CharacterRewardRequest(
             source=CharacterRewardSource.SCAN,
@@ -64,11 +61,10 @@ class TestScanRewardEvaluatorShouldEvaluate:
             insufficiencies_present=False,
         )
 
-        result = await evaluator.should_evaluate(payload)
+        result = evaluator.should_evaluate(payload)
         assert result is False
 
-    @pytest.mark.asyncio
-    async def test_returns_false_when_insufficiencies_present(self, evaluator):
+    def test_returns_false_when_insufficiencies_present(self, evaluator):
         """부족한 정보가 있을 때 False."""
         payload = CharacterRewardRequest(
             source=CharacterRewardSource.SCAN,
@@ -82,11 +78,10 @@ class TestScanRewardEvaluatorShouldEvaluate:
             insufficiencies_present=True,
         )
 
-        result = await evaluator.should_evaluate(payload)
+        result = evaluator.should_evaluate(payload)
         assert result is False
 
-    @pytest.mark.asyncio
-    async def test_returns_false_when_no_disposal_rules(self, evaluator):
+    def test_returns_false_when_no_disposal_rules(self, evaluator):
         """분리배출 규칙이 없을 때 False."""
         payload = CharacterRewardRequest(
             source=CharacterRewardSource.SCAN,
@@ -100,7 +95,7 @@ class TestScanRewardEvaluatorShouldEvaluate:
             insufficiencies_present=False,
         )
 
-        result = await evaluator.should_evaluate(payload)
+        result = evaluator.should_evaluate(payload)
         assert result is False
 
 
@@ -192,19 +187,24 @@ class TestScanRewardEvaluatorMatchCharacters:
         return ScanRewardEvaluator()
 
     @pytest.fixture
-    def mock_context(self):
-        context = MagicMock(spec=EvaluationContext)
-        context.character_repo = MagicMock()
-        context.ownership_repo = MagicMock()
-        return context
+    def mock_characters(self):
+        """테스트용 캐릭터 목록."""
+        plastic_char = MagicMock()
+        plastic_char.name = "플라봇"
+        plastic_char.match_label = "플라스틱"
 
-    @pytest.mark.asyncio
-    async def test_matches_by_middle_category(self, evaluator, mock_context):
+        glass_char = MagicMock()
+        glass_char.name = "유리봇"
+        glass_char.match_label = "유리"
+
+        default_char = MagicMock()
+        default_char.name = "이코"
+        default_char.match_label = None
+
+        return [plastic_char, glass_char, default_char]
+
+    def test_matches_by_middle_category(self, evaluator, mock_characters):
         """middle_category로 캐릭터 매칭."""
-        mock_character = MagicMock()
-        mock_character.name = "플라봇"
-        mock_context.character_repo.list_by_match_label = AsyncMock(return_value=[mock_character])
-
         payload = CharacterRewardRequest(
             source=CharacterRewardSource.SCAN,
             user_id=uuid4(),
@@ -217,14 +217,12 @@ class TestScanRewardEvaluatorMatchCharacters:
             insufficiencies_present=False,
         )
 
-        result = await evaluator.match_characters(payload, mock_context)
+        result = evaluator.match_characters(payload, mock_characters)
 
         assert len(result) == 1
         assert result[0].name == "플라봇"
-        mock_context.character_repo.list_by_match_label.assert_called_once_with("플라스틱")
 
-    @pytest.mark.asyncio
-    async def test_returns_empty_when_no_match_label(self, evaluator, mock_context):
+    def test_returns_empty_when_no_match_label(self, evaluator, mock_characters):
         """match_label이 없으면 빈 리스트 반환."""
         payload = CharacterRewardRequest(
             source=CharacterRewardSource.SCAN,
@@ -238,10 +236,28 @@ class TestScanRewardEvaluatorMatchCharacters:
             insufficiencies_present=False,
         )
 
-        result = await evaluator.match_characters(payload, mock_context)
+        result = evaluator.match_characters(payload, mock_characters)
 
         assert result == []
-        mock_context.character_repo.list_by_match_label.assert_not_called()
+
+    def test_matches_glass_category(self, evaluator, mock_characters):
+        """유리 카테고리 매칭."""
+        payload = CharacterRewardRequest(
+            source=CharacterRewardSource.SCAN,
+            user_id=uuid4(),
+            task_id="test-123",
+            classification=ClassificationSummary(
+                major_category=RECYCLABLE_WASTE_CATEGORY,
+                middle_category="유리",
+            ),
+            disposal_rules_present=True,
+            insufficiencies_present=False,
+        )
+
+        result = evaluator.match_characters(payload, mock_characters)
+
+        assert len(result) == 1
+        assert result[0].name == "유리봇"
 
 
 class TestScanRewardEvaluatorSourceLabel:
@@ -264,8 +280,6 @@ class TestEvaluatorRegistry:
 
     def test_get_unknown_source_returns_none(self):
         """등록되지 않은 소스는 None 반환."""
-        # 현재 SCAN만 등록되어 있으므로, 새 enum 값이 추가되면 None 반환
-        # 테스트를 위해 mock 사용
         from domains.character.services.evaluators.registry import _evaluators
 
         # _evaluators는 내부 구현이므로 존재하지 않는 키 테스트
@@ -280,14 +294,14 @@ class TestEvaluatorEvaluate:
         return ScanRewardEvaluator()
 
     @pytest.fixture
-    def mock_context(self):
-        context = MagicMock(spec=EvaluationContext)
-        context.character_repo = MagicMock()
-        context.ownership_repo = MagicMock()
-        return context
+    def mock_characters(self):
+        """테스트용 캐릭터 목록."""
+        plastic_char = MagicMock()
+        plastic_char.name = "플라봇"
+        plastic_char.match_label = "플라스틱"
+        return [plastic_char]
 
-    @pytest.mark.asyncio
-    async def test_evaluate_returns_should_not_evaluate(self, evaluator, mock_context):
+    def test_evaluate_returns_should_not_evaluate(self, evaluator):
         """조건 미충족 시 should_evaluate=False."""
         payload = CharacterRewardRequest(
             source=CharacterRewardSource.SCAN,
@@ -301,19 +315,14 @@ class TestEvaluatorEvaluate:
             insufficiencies_present=False,
         )
 
-        result = await evaluator.evaluate(payload, mock_context)
+        result = evaluator.evaluate(payload, [])
 
         assert result.should_evaluate is False
         assert result.matches == []
         assert result.source_label == "scan-reward"  # 항상 source_label 포함
 
-    @pytest.mark.asyncio
-    async def test_evaluate_returns_matches_with_source_label(self, evaluator, mock_context):
+    def test_evaluate_returns_matches_with_source_label(self, evaluator, mock_characters):
         """조건 충족 시 매칭된 캐릭터와 source_label 반환."""
-        mock_character = MagicMock()
-        mock_character.name = "플라봇"
-        mock_context.character_repo.list_by_match_label = AsyncMock(return_value=[mock_character])
-
         payload = CharacterRewardRequest(
             source=CharacterRewardSource.SCAN,
             user_id=uuid4(),
@@ -326,7 +335,7 @@ class TestEvaluatorEvaluate:
             insufficiencies_present=False,
         )
 
-        result = await evaluator.evaluate(payload, mock_context)
+        result = evaluator.evaluate(payload, mock_characters)
 
         assert result.should_evaluate is True
         assert len(result.matches) == 1

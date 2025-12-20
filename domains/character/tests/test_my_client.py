@@ -11,6 +11,7 @@ from domains.character.rpc.my_client import (
     MyUserCharacterClient,
     reset_my_client,
 )
+from domains.character.schemas.catalog import GrantCharacterRequest
 
 
 class MockSettings:
@@ -22,6 +23,23 @@ class MockSettings:
     grpc_max_retries = 3
     grpc_retry_base_delay = 0.01  # Fast retries for testing
     grpc_retry_max_delay = 0.1
+    circuit_fail_max = 5
+    circuit_timeout_duration = 30
+
+
+def create_grant_request(user_id=None, character_id=None, **kwargs):
+    """Helper to create GrantCharacterRequest for testing."""
+    defaults = {
+        "user_id": user_id or uuid4(),
+        "character_id": character_id or uuid4(),
+        "character_code": "ECO001",
+        "character_name": "이코",
+        "character_type": "default",
+        "character_dialog": "안녕하세요!",
+        "source": "test",
+    }
+    defaults.update(kwargs)
+    return GrantCharacterRequest(**defaults)
 
 
 class TestMyUserCharacterClient:
@@ -59,16 +77,10 @@ class TestMyUserCharacterClient:
         mock_stub = AsyncMock()
         mock_stub.GrantCharacter = AsyncMock(return_value=mock_response)
 
+        request = create_grant_request(user_id=user_id, character_id=character_id)
+
         with patch.object(client, "_get_stub", return_value=mock_stub):
-            success, already_owned = await client.grant_character(
-                user_id=user_id,
-                character_id=character_id,
-                character_code="ECO001",
-                character_name="이코",
-                character_type="default",
-                character_dialog="안녕하세요!",
-                source="test",
-            )
+            success, already_owned = await client.grant_character(request)
 
         assert success is True
         assert already_owned is False
@@ -86,16 +98,15 @@ class TestMyUserCharacterClient:
         mock_stub = AsyncMock()
         mock_stub.GrantCharacter = AsyncMock(return_value=mock_response)
 
+        request = create_grant_request(
+            user_id=user_id,
+            character_id=character_id,
+            character_type=None,
+            character_dialog=None,
+        )
+
         with patch.object(client, "_get_stub", return_value=mock_stub):
-            success, already_owned = await client.grant_character(
-                user_id=user_id,
-                character_id=character_id,
-                character_code="ECO001",
-                character_name="이코",
-                character_type=None,
-                character_dialog=None,
-                source="test",
-            )
+            success, already_owned = await client.grant_character(request)
 
         assert success is True
         assert already_owned is True
@@ -121,16 +132,14 @@ class TestMyUserCharacterClient:
         mock_stub = AsyncMock()
         mock_stub.GrantCharacter = AsyncMock(side_effect=[error, error, mock_response])
 
+        request = create_grant_request(
+            user_id=user_id,
+            character_id=character_id,
+            character_dialog="안녕!",
+        )
+
         with patch.object(client, "_get_stub", return_value=mock_stub):
-            success, already_owned = await client.grant_character(
-                user_id=user_id,
-                character_id=character_id,
-                character_code="ECO001",
-                character_name="이코",
-                character_type="default",
-                character_dialog="안녕!",
-                source="test",
-            )
+            success, already_owned = await client.grant_character(request)
 
         assert success is True
         assert already_owned is False
@@ -152,16 +161,14 @@ class TestMyUserCharacterClient:
         mock_stub = AsyncMock()
         mock_stub.GrantCharacter = AsyncMock(side_effect=error)
 
+        request = create_grant_request(
+            user_id=user_id,
+            character_id=character_id,
+            character_dialog="안녕!",
+        )
+
         with patch.object(client, "_get_stub", return_value=mock_stub):
-            success, already_owned = await client.grant_character(
-                user_id=user_id,
-                character_id=character_id,
-                character_code="ECO001",
-                character_name="이코",
-                character_type="default",
-                character_dialog="안녕!",
-                source="test",
-            )
+            success, already_owned = await client.grant_character(request)
 
         # Should return False after all retries fail
         assert success is False
@@ -185,16 +192,14 @@ class TestMyUserCharacterClient:
         mock_stub = AsyncMock()
         mock_stub.GrantCharacter = AsyncMock(side_effect=error)
 
+        request = create_grant_request(
+            user_id=user_id,
+            character_id=character_id,
+            character_dialog="안녕!",
+        )
+
         with patch.object(client, "_get_stub", return_value=mock_stub):
-            success, already_owned = await client.grant_character(
-                user_id=user_id,
-                character_id=character_id,
-                character_code="ECO001",
-                character_name="이코",
-                character_type="default",
-                character_dialog="안녕!",
-                source="test",
-            )
+            success, already_owned = await client.grant_character(request)
 
         assert success is False
         assert already_owned is False
@@ -273,18 +278,16 @@ class TestCircuitBreaker:
         mock_stub = AsyncMock()
         mock_stub.GrantCharacter = AsyncMock(side_effect=error)
 
+        request = create_grant_request(
+            user_id=user_id,
+            character_id=character_id,
+            character_dialog="안녕!",
+        )
+
         with patch.object(client, "_get_stub", return_value=mock_stub):
             # Call enough times to trip the circuit breaker
-            for _ in range(client.CIRCUIT_FAIL_MAX + 1):
-                await client.grant_character(
-                    user_id=user_id,
-                    character_id=character_id,
-                    character_code="ECO001",
-                    character_name="이코",
-                    character_type="default",
-                    character_dialog="안녕!",
-                    source="test",
-                )
+            for _ in range(client._circuit_fail_max + 1):
+                await client.grant_character(request)
 
         # Circuit should be open after consecutive failures
         assert client.circuit_state == "OPEN"
@@ -299,16 +302,14 @@ class TestCircuitBreaker:
 
         mock_stub = AsyncMock()
 
+        request = create_grant_request(
+            user_id=user_id,
+            character_id=character_id,
+            character_dialog="안녕!",
+        )
+
         with patch.object(client, "_get_stub", return_value=mock_stub):
-            success, already_owned = await client.grant_character(
-                user_id=user_id,
-                character_id=character_id,
-                character_code="ECO001",
-                character_name="이코",
-                character_type="default",
-                character_dialog="안녕!",
-                source="test",
-            )
+            success, already_owned = await client.grant_character(request)
 
         # Should fail fast
         assert success is False
@@ -347,17 +348,15 @@ class TestCircuitBreaker:
             side_effect=[error, error, error, error, mock_response]
         )
 
+        request = create_grant_request(
+            user_id=user_id,
+            character_id=character_id,
+            character_dialog="안녕!",
+        )
+
         with patch.object(client, "_get_stub", return_value=mock_stub):
             # This should succeed (after retries)
-            success, _ = await client.grant_character(
-                user_id=user_id,
-                character_id=character_id,
-                character_code="ECO001",
-                character_name="이코",
-                character_type="default",
-                character_dialog="안녕!",
-                source="test",
-            )
+            success, _ = await client.grant_character(request)
 
         # Circuit should still be closed after successful call
         assert client.circuit_state == "CLOSED"

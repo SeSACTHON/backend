@@ -9,7 +9,7 @@
     4. insufficiencies_present == False
 
 매칭 로직:
-    middle_category를 기준으로 캐릭터 조회
+    middle_category를 기준으로 캐릭터 필터링
     예: 플라스틱 → 플라봇, 유리 → 유리봇
 """
 
@@ -23,7 +23,7 @@ from domains.character.core.constants import (
     REWARD_SOURCE_SCAN,
 )
 from domains.character.schemas.reward import CharacterRewardSource
-from domains.character.services.evaluators.base import EvaluationContext, RewardEvaluator
+from domains.character.services.evaluators.base import RewardEvaluator
 
 if TYPE_CHECKING:
     from domains.character.models import Character
@@ -44,7 +44,7 @@ class ScanRewardEvaluator(RewardEvaluator):
         """SCAN 리워드 소스 식별자."""
         return REWARD_SOURCE_SCAN
 
-    async def should_evaluate(self, payload: CharacterRewardRequest) -> bool:
+    def should_evaluate(self, payload: "CharacterRewardRequest") -> bool:
         """스캔 리워드 평가 조건 확인.
 
         조건:
@@ -61,18 +61,19 @@ class ScanRewardEvaluator(RewardEvaluator):
             and not payload.insufficiencies_present
         )
 
-    async def match_characters(
+    def match_characters(
         self,
-        payload: CharacterRewardRequest,
-        context: EvaluationContext,
-    ) -> Sequence[Character]:
-        """middle_category 기반 캐릭터 매칭."""
+        payload: "CharacterRewardRequest",
+        characters: Sequence["Character"],
+    ) -> list["Character"]:
+        """주어진 캐릭터 목록에서 match_label 기반 필터링."""
         match_label = self._resolve_match_label(payload)
         if not match_label:
             return []
-        return await context.character_repo.list_by_match_label(match_label)
 
-    def build_match_reason(self, payload: CharacterRewardRequest) -> str:
+        return [c for c in characters if c.match_label == match_label]
+
+    def build_match_reason(self, payload: "CharacterRewardRequest") -> str:
         """분류 결과로부터 매칭 사유 생성.
 
         Format: "{middle}>{minor}" or "{middle}" or "{major}"
@@ -92,7 +93,7 @@ class ScanRewardEvaluator(RewardEvaluator):
 
         return MATCH_REASON_UNDEFINED
 
-    def _resolve_match_label(self, payload: CharacterRewardRequest) -> str | None:
+    def _resolve_match_label(self, payload: "CharacterRewardRequest") -> str | None:
         """캐릭터 매칭에 사용할 label 결정.
 
         재활용폐기물: middle_category 사용

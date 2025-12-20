@@ -10,7 +10,6 @@ import asyncio
 import logging
 import random
 from typing import TYPE_CHECKING
-from uuid import UUID
 
 import grpc
 from aiobreaker import CircuitBreaker, CircuitBreakerError, CircuitBreakerListener
@@ -19,6 +18,7 @@ from domains.character.proto.my import user_character_pb2, user_character_pb2_gr
 
 if TYPE_CHECKING:
     from domains.character.core.config import Settings
+    from domains.character.schemas.catalog import GrantCharacterRequest
 
 logger = logging.getLogger(__name__)
 
@@ -51,12 +51,6 @@ class CircuitBreakerLoggingListener(CircuitBreakerListener):
 class MyUserCharacterClient:
     """gRPC client for my.UserCharacterService with retry and circuit breaker support."""
 
-    # Circuit Breaker 설정
-    # fail_max: 연속 실패 횟수 임계치 (5회 실패 시 회로 개방)
-    # timeout_duration: 회로 개방 후 반개방까지 대기 시간 (30초)
-    CIRCUIT_FAIL_MAX = 5
-    CIRCUIT_TIMEOUT_DURATION = 30
-
     def __init__(self, settings: Settings) -> None:
         self.host = settings.my_grpc_host
         self.port = settings.my_grpc_port
@@ -67,11 +61,13 @@ class MyUserCharacterClient:
         self._channel: grpc.aio.Channel | None = None
         self._stub: user_character_pb2_grpc.UserCharacterServiceStub | None = None
 
-        # Circuit Breaker 초기화
+        # Circuit Breaker 초기화 (설정값 주입)
+        self._circuit_fail_max = settings.circuit_fail_max
+        self._circuit_timeout_duration = settings.circuit_timeout_duration
         self._circuit_breaker = CircuitBreaker(
             name="my-grpc-client",
-            fail_max=self.CIRCUIT_FAIL_MAX,
-            timeout_duration=self.CIRCUIT_TIMEOUT_DURATION,
+            fail_max=self._circuit_fail_max,
+            timeout_duration=self._circuit_timeout_duration,
             listeners=[CircuitBreakerLoggingListener()],
         )
 
@@ -147,26 +143,29 @@ class MyUserCharacterClient:
 
     async def grant_character(
         self,
-        user_id: UUID,
-        character_id: UUID,
-        character_code: str,
-        character_name: str,
-        character_type: str | None,
-        character_dialog: str | None,
-        source: str,
+        request: "GrantCharacterRequest",
     ) -> tuple[bool, bool]:
         """
         캐릭터를 사용자에게 지급합니다.
 
+        Args:
+            request: 캐릭터 지급 요청 DTO
+
         Returns:
             tuple[bool, bool]: (success, already_owned)
         """
+        # Lazy import to avoid circular dependency
+        from domains.character.schemas.catalog import GrantCharacterRequest as GrantDTO
+
+        # Type hint for IDE (실제 런타임에서는 위 import 사용)
+        req: GrantDTO = request
+
         log_ctx = {
             "method": "GrantCharacter",
-            "user_id": str(user_id),
-            "character_id": str(character_id),
-            "character_name": character_name,
-            "source": source,
+            "user_id": str(req.user_id),
+            "character_id": str(req.character_id),
+            "character_name": req.character_name,
+            "source": req.source,
         }
 
         # Circuit Breaker가 열려 있으면 빠른 실패
@@ -179,18 +178,18 @@ class MyUserCharacterClient:
 
         try:
             stub = await self._get_stub()
-            request = user_character_pb2.GrantCharacterRequest(
-                user_id=str(user_id),
-                character_id=str(character_id),
-                character_code=character_code,
-                character_name=character_name,
-                character_type=character_type or "",
-                character_dialog=character_dialog or "",
-                source=source,
+            grpc_request = user_character_pb2.GrantCharacterRequest(
+                user_id=str(req.user_id),
+                character_id=str(req.character_id),
+                character_code=req.character_code,
+                character_name=req.character_name,
+                character_type=req.character_type or "",
+                character_dialog=req.character_dialog or "",
+                source=req.source,
             )
 
             async def call_func():
-                return await stub.GrantCharacter(request, timeout=self.timeout)
+                return await stub.GrantCharacter(grpc_request, timeout=self.timeout)
 
             # Circuit Breaker로 감싸서 호출
             response = await self._circuit_breaker.call_async(

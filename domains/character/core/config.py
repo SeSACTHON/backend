@@ -90,6 +90,22 @@ class Settings(BaseSettings):
         description="Maximum delay in seconds for exponential backoff retry.",
     )
 
+    # === Circuit Breaker Settings ===
+    circuit_fail_max: int = Field(
+        5,
+        ge=1,
+        le=20,
+        validation_alias=AliasChoices("CHARACTER_CIRCUIT_FAIL_MAX"),
+        description="Number of consecutive failures before opening the circuit.",
+    )
+    circuit_timeout_duration: int = Field(
+        30,
+        ge=5,
+        le=300,
+        validation_alias=AliasChoices("CHARACTER_CIRCUIT_TIMEOUT_DURATION"),
+        description="Seconds to wait before attempting recovery (half-open state).",
+    )
+
     # === Redis Cache Settings ===
     redis_url: str = Field(
         "redis://localhost:6379/0",

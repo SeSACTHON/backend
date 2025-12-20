@@ -6,7 +6,8 @@ Usage:
     from domains.character.services.evaluators import get_evaluator
 
     evaluator = get_evaluator(CharacterRewardSource.SCAN)
-    result = await evaluator.evaluate(payload, context)
+    characters = await character_repo.list_all()
+    result = evaluator.evaluate(payload, characters)
 
 Architecture:
     CharacterRewardSource
@@ -16,9 +17,7 @@ Architecture:
 """
 
 from domains.character.services.evaluators.base import (
-    EvaluationContext,
     EvaluationResult,
-    GrantCallback,
     RewardEvaluator,
 )
 from domains.character.services.evaluators.registry import (
@@ -30,9 +29,7 @@ from domains.character.services.evaluators.registry import (
 from domains.character.services.evaluators.scan import ScanRewardEvaluator
 
 __all__ = [
-    "EvaluationContext",
     "EvaluationResult",
-    "GrantCallback",
     "RewardEvaluator",
     "ScanRewardEvaluator",
     "clear_registry",

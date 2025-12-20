@@ -128,6 +128,8 @@ class TestEvaluateReward:
         service.session = mock_session
         service.character_repo = MagicMock()
         service.ownership_repo = MagicMock()
+        # 기본적으로 빈 캐릭터 목록 반환
+        service.character_repo.list_all = AsyncMock(return_value=[])
         return service
 
     @pytest.mark.asyncio
@@ -228,7 +230,8 @@ class TestEvaluateReward:
             insufficiencies_present=False,
         )
 
-        service.character_repo.list_by_match_label = AsyncMock(return_value=[])
+        # 빈 목록 반환 (매칭 없음)
+        service.character_repo.list_all = AsyncMock(return_value=[])
 
         result = await service.evaluate_reward(payload)
 
@@ -266,7 +269,8 @@ class TestEvaluateReward:
             insufficiencies_present=False,
         )
 
-        service.character_repo.list_by_match_label = AsyncMock(return_value=[mock_character])
+        # list_all이 전체 캐릭터 반환, Evaluator가 필터링
+        service.character_repo.list_all = AsyncMock(return_value=[mock_character])
         service.ownership_repo.get_by_user_and_character = AsyncMock(return_value=None)
         service._grant_and_sync = AsyncMock()
 
@@ -309,7 +313,8 @@ class TestEvaluateReward:
             insufficiencies_present=False,
         )
 
-        service.character_repo.list_by_match_label = AsyncMock(return_value=[mock_character])
+        # list_all이 전체 캐릭터 반환
+        service.character_repo.list_all = AsyncMock(return_value=[mock_character])
         service.ownership_repo.get_by_user_and_character = AsyncMock(return_value=mock_ownership)
 
         result = await service.evaluate_reward(payload)
@@ -334,6 +339,7 @@ class TestApplyRewardRaceCondition:
         service.session = mock_session
         service.character_repo = MagicMock()
         service.ownership_repo = MagicMock()
+        service.character_repo.list_all = AsyncMock(return_value=[])
         return service
 
     @pytest.mark.asyncio

@@ -1,41 +1,21 @@
 """Base classes for Reward Evaluators.
 
 Strategy Pattern을 위한 추상 인터페이스 정의.
+
+Note:
+    Evaluator는 순수한 평가/매칭 로직만 담당합니다.
+    DB 조회, 지급 등의 부수 효과는 Service 레이어에서 처리합니다.
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Awaitable, Callable, Sequence
-from uuid import UUID
-
+from typing import TYPE_CHECKING, Sequence
 
 if TYPE_CHECKING:
     from domains.character.models import Character
-    from domains.character.repositories import CharacterOwnershipRepository, CharacterRepository
     from domains.character.schemas.reward import CharacterRewardRequest
-
-# 타입 안전한 콜백 시그니처
-GrantCallback = Callable[
-    [UUID, "Character", str],  # (user_id, character, source)
-    Awaitable[None],
-]
-
-
-@dataclass
-class EvaluationContext:
-    """평가에 필요한 의존성을 담는 컨텍스트.
-
-    Attributes:
-        character_repo: 캐릭터 조회 레포지토리
-        ownership_repo: 소유권 관리 레포지토리
-        grant_callback: 캐릭터 지급 콜백 (DB 저장 + gRPC 동기화)
-    """
-
-    character_repo: "CharacterRepository"
-    ownership_repo: "CharacterOwnershipRepository"
-    grant_callback: GrantCallback
 
 
 @dataclass
@@ -50,7 +30,7 @@ class EvaluationResult:
     """
 
     should_evaluate: bool = False
-    matches: Sequence["Character"] = field(default_factory=list)
+    matches: list["Character"] = field(default_factory=list)
     source_label: str = ""
     match_reason: str | None = None
 
@@ -58,18 +38,24 @@ class EvaluationResult:
 class RewardEvaluator(ABC):
     """리워드 평가 추상 클래스 (Strategy Interface).
 
-    새로운 리워드 소스 추가 시 이 클래스를 상속합니다.
+    Evaluator는 순수한 평가 로직만 담당합니다:
+    - should_evaluate(): 평가 조건 확인 (순수 함수)
+    - match_characters(): 주어진 캐릭터 목록에서 매칭 (순수 함수)
+    - build_match_reason(): 매칭 사유 생성 (순수 함수)
+
+    DB 조회는 Service에서 수행 후 결과를 Evaluator에 전달합니다.
 
     Example:
         class QuestRewardEvaluator(RewardEvaluator):
-            SOURCE_LABEL = "quest-reward"
+            @property
+            def source_label(self) -> str:
+                return "quest-reward"
 
-            async def should_evaluate(self, payload):
+            def should_evaluate(self, payload) -> bool:
                 return payload.quest_completed
 
-            async def match_characters(self, payload, context):
-                # Quest 기반 매칭 로직
-                ...
+            def match_characters(self, payload, characters):
+                return [c for c in characters if c.quest_id == payload.quest_id]
     """
 
     @property
@@ -83,7 +69,7 @@ class RewardEvaluator(ABC):
         ...
 
     @abstractmethod
-    async def should_evaluate(self, payload: "CharacterRewardRequest") -> bool:
+    def should_evaluate(self, payload: "CharacterRewardRequest") -> bool:
         """평가 조건을 충족하는지 확인.
 
         Args:
@@ -91,23 +77,29 @@ class RewardEvaluator(ABC):
 
         Returns:
             bool: 평가를 진행할지 여부
+
+        Note:
+            순수 함수여야 합니다 (부수 효과 없음).
         """
         ...
 
     @abstractmethod
-    async def match_characters(
+    def match_characters(
         self,
         payload: "CharacterRewardRequest",
-        context: EvaluationContext,
-    ) -> Sequence["Character"]:
-        """조건에 맞는 캐릭터 매칭.
+        characters: Sequence["Character"],
+    ) -> list["Character"]:
+        """주어진 캐릭터 목록에서 조건에 맞는 캐릭터 매칭.
 
         Args:
             payload: 리워드 요청
-            context: 평가 컨텍스트
+            characters: 매칭 대상 캐릭터 목록 (Service에서 조회)
 
         Returns:
             매칭된 캐릭터 목록 (우선순위 순)
+
+        Note:
+            순수 함수여야 합니다 (부수 효과 없음).
         """
         ...
 
@@ -123,10 +115,10 @@ class RewardEvaluator(ABC):
         """
         ...
 
-    async def evaluate(
+    def evaluate(
         self,
         payload: "CharacterRewardRequest",
-        context: EvaluationContext,
+        characters: Sequence["Character"],
     ) -> EvaluationResult:
         """평가 실행 (Template Method).
 
@@ -136,20 +128,20 @@ class RewardEvaluator(ABC):
 
         Args:
             payload: 리워드 요청
-            context: 평가 컨텍스트
+            characters: 매칭 대상 캐릭터 목록
 
         Returns:
             평가 결과
         """
-        if not await self.should_evaluate(payload):
+        if not self.should_evaluate(payload):
             return EvaluationResult(should_evaluate=False, source_label=self.source_label)
 
         match_reason = self.build_match_reason(payload)
-        matches = await self.match_characters(payload, context)
+        matches = self.match_characters(payload, characters)
 
         return EvaluationResult(
             should_evaluate=True,
-            matches=matches,
+            matches=list(matches),
             source_label=self.source_label,
             match_reason=match_reason,
         )
