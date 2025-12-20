@@ -1,3 +1,8 @@
+"""Chat API Application
+
+FastAPI 애플리케이션 설정 및 미들웨어 구성
+"""
+
 import os
 from contextlib import asynccontextmanager
 
@@ -5,6 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from domains.chat.api.v1.routers import api_router, health_router
+from domains.chat.core.config import get_settings
 from domains.chat.core.constants import (
     DEFAULT_ENVIRONMENT,
     ENV_KEY_ENVIRONMENT,
@@ -19,6 +25,10 @@ from domains.chat.core.tracing import (
     shutdown_tracing,
 )
 from domains.chat.metrics import register_metrics
+
+# =============================================================================
+# 초기화
+# =============================================================================
 
 # 구조화된 로깅 설정 (ECS JSON 포맷)
 configure_logging()
@@ -35,13 +45,31 @@ configure_tracing(
 instrument_httpx()
 
 
+# =============================================================================
+# Lifespan
+# =============================================================================
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """Application lifespan handler"""
     yield
     shutdown_tracing()
 
 
+# =============================================================================
+# Application Factory
+# =============================================================================
+
+
 def create_app() -> FastAPI:
+    """FastAPI 애플리케이션 생성
+
+    Returns:
+        FastAPI: 구성된 애플리케이션 인스턴스
+    """
+    settings = get_settings()
+
     app = FastAPI(
         title="Chat API",
         description="Conversational assistant for recycling topics",
@@ -52,16 +80,11 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # CORS 미들웨어 (설정에서 origins 가져옴)
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[
-            "https://frontend1.dev.growbin.app",
-            "https://frontend2.dev.growbin.app",
-            "https://frontend.dev.growbin.app",
-            "http://localhost:5173",
-            "https://localhost:5173",
-        ],
-        allow_credentials=True,
+        allow_origins=settings.cors_origins,
+        allow_credentials=settings.cors_allow_credentials,
         allow_methods=["*"],
         allow_headers=["*"],
     )
@@ -69,11 +92,19 @@ def create_app() -> FastAPI:
     # OpenTelemetry FastAPI instrumentation
     instrument_fastapi(app)
 
+    # 라우터 등록
     app.include_router(health_router)
     app.include_router(api_router, prefix="/api/v1")
+
+    # Prometheus 메트릭 등록
     register_metrics(app)
+
     return app
 
+
+# =============================================================================
+# Application Instance
+# =============================================================================
 
 app = create_app()
 

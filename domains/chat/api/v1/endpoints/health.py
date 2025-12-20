@@ -2,16 +2,18 @@
 
 from fastapi import APIRouter
 
-SERVICE_NAME = "chat"
+from domains.chat.core.constants import SERVICE_NAME
 
 router = APIRouter(tags=["health"])
 
 
 @router.get("/health")
 async def health():
-    return {"status": "healthy", "service": f"{SERVICE_NAME}-api"}
+    """Liveness probe - 서비스 생존 확인"""
+    return {"status": "healthy", "service": SERVICE_NAME}
 
 
 @router.get("/ready")
 async def readiness():
-    return {"status": "ready", "service": f"{SERVICE_NAME}-api"}
+    """Readiness probe - 트래픽 수신 준비 확인"""
+    return {"status": "ready", "service": SERVICE_NAME}
