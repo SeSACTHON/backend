@@ -56,9 +56,9 @@ class Settings(BaseSettings):
 
     # === gRPC Client Settings (for calling My service) ===
     my_grpc_host: str = Field(
-        "my-api.my.svc.cluster.local",
+        "my-grpc.my.svc.cluster.local",
         validation_alias=AliasChoices("CHARACTER_MY_GRPC_HOST"),
-        description="My service gRPC host.",
+        description="My service gRPC host (K8s Service: my-grpc).",
     )
     my_grpc_port: int = Field(
         50052,
