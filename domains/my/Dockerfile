@@ -37,4 +37,10 @@ EXPOSE 8000 50052
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
 
-CMD ["opentelemetry-instrument", "uvicorn", "domains.my.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Startup script to run both FastAPI and gRPC servers
+COPY domains/my/entrypoint.sh /app/entrypoint.sh
+USER root
+RUN chmod +x /app/entrypoint.sh
+USER appuser
+
+CMD ["/app/entrypoint.sh"]
