@@ -284,6 +284,8 @@ class CharacterService:
                 user_id=user_id, character_id=match.id
             )
             if existing:
+                # my 도메인과의 정합성 보장을 위해 sync 재시도 (idempotent)
+                await self._sync_to_my_domain(user_id=user_id, character=match, source=source_label)
                 return self._to_profile(match), True, None
 
             try:
