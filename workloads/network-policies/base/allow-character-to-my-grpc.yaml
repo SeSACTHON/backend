@@ -1,0 +1,46 @@
+---
+# character 도메인에서 my-grpc로의 gRPC 통신 허용
+# 보상 지급 시 character → my gRPC 호출에 필요
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-character-to-my-grpc
+  namespace: my
+spec:
+  podSelector:
+    matchLabels:
+      app: my-grpc
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: character
+      podSelector:
+        matchLabels:
+          app: character-grpc
+    ports:
+    - protocol: TCP
+      port: 50052
+---
+# character-grpc에서 my namespace로의 egress 허용
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-character-egress-to-my
+  namespace: character
+spec:
+  podSelector:
+    matchLabels:
+      app: character-grpc
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: my
+    ports:
+    - protocol: TCP
+      port: 50052
