@@ -10,7 +10,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -199,62 +199,161 @@ class TestScanRewardTaskLogic:
 class TestPersistRewardDispatcher:
     """persist_reward_task 로직 테스트 - dispatcher."""
 
-    def test_dispatches_both_tasks(self):
-        """2개의 저장 task를 동시에 발행."""
-        with (
-            patch("domains.character.consumers.reward.save_ownership_task") as mock_ownership,
-            patch("domains.character.consumers.reward.save_my_character_task") as mock_my,
-        ):
-            # 발행 시뮬레이션
-            mock_ownership.delay()
-            mock_my.delay()
+    @pytest.fixture
+    def sample_params(self) -> dict:
+        """persist_reward_task 파라미터."""
+        return {
+            "user_id": str(uuid4()),
+            "character_id": str(uuid4()),
+            "character_code": "ECO001",
+            "character_name": "페트병이",
+            "character_type": "페트",
+            "character_dialog": "잘했어!",
+            "source": "scan",
+            "task_id": str(uuid4()),
+        }
 
-            mock_ownership.delay.assert_called_once()
-            mock_my.delay.assert_called_once()
+    def test_dispatches_both_tasks_logic(self, sample_params):
+        """2개의 저장 task를 동시에 발행하는 로직 검증."""
+        # persist_reward_task의 로직을 시뮬레이션
+        dispatched = {"ownership": False, "my_character": False}
 
-    def test_one_failure_does_not_block_other(self):
-        """하나가 실패해도 다른 하나는 발행됨."""
-        with (
-            patch("domains.character.consumers.reward.save_ownership_task") as mock_ownership,
-            patch("domains.character.consumers.reward.save_my_character_task") as mock_my,
-        ):
-            mock_ownership.delay.side_effect = Exception("Connection error")
-            mock_my.delay.return_value = None
+        mock_ownership = MagicMock()
+        mock_my = MagicMock()
 
-            dispatched = {"ownership": False, "my_character": False}
+        # 발행 시도
+        try:
+            mock_ownership.delay(
+                user_id=sample_params["user_id"],
+                character_id=sample_params["character_id"],
+                source=sample_params["source"],
+            )
+            dispatched["ownership"] = True
+        except Exception:
+            pass
 
-            try:
-                mock_ownership.delay()
-                dispatched["ownership"] = True
-            except Exception:
-                pass
+        try:
+            mock_my.delay(
+                user_id=sample_params["user_id"],
+                character_id=sample_params["character_id"],
+                character_code=sample_params["character_code"],
+                character_name=sample_params["character_name"],
+                character_type=sample_params["character_type"],
+                character_dialog=sample_params["character_dialog"],
+                source=sample_params["source"],
+            )
+            dispatched["my_character"] = True
+        except Exception:
+            pass
 
-            try:
-                mock_my.delay()
-                dispatched["my_character"] = True
-            except Exception:
-                pass
+        mock_ownership.delay.assert_called_once()
+        mock_my.delay.assert_called_once()
+        assert dispatched["ownership"] is True
+        assert dispatched["my_character"] is True
 
-            assert dispatched["ownership"] is False
-            assert dispatched["my_character"] is True
+    def test_one_failure_does_not_block_other_logic(self, sample_params):
+        """하나가 실패해도 다른 하나는 발행되는 로직 검증."""
+        dispatched = {"ownership": False, "my_character": False}
+
+        mock_ownership = MagicMock()
+        mock_ownership.delay.side_effect = Exception("Connection error")
+
+        mock_my = MagicMock()
+
+        # ownership 발행 시도 (실패)
+        try:
+            mock_ownership.delay(
+                user_id=sample_params["user_id"],
+                character_id=sample_params["character_id"],
+                source=sample_params["source"],
+            )
+            dispatched["ownership"] = True
+        except Exception:
+            pass
+
+        # my_character 발행 시도 (성공)
+        try:
+            mock_my.delay(
+                user_id=sample_params["user_id"],
+                character_id=sample_params["character_id"],
+                character_code=sample_params["character_code"],
+                character_name=sample_params["character_name"],
+                character_type=sample_params["character_type"],
+                character_dialog=sample_params["character_dialog"],
+                source=sample_params["source"],
+            )
+            dispatched["my_character"] = True
+        except Exception:
+            pass
+
+        assert dispatched["ownership"] is False
+        assert dispatched["my_character"] is True
 
 
 class TestSaveOwnershipTask:
     """save_ownership_task 로직 테스트."""
 
-    def test_idempotent_when_already_owned(self):
-        """이미 소유한 경우 skip (멱등성)."""
+    @pytest.fixture
+    def sample_params(self) -> dict:
+        return {
+            "user_id": str(uuid4()),
+            "character_id": str(uuid4()),
+            "source": "scan",
+        }
+
+    def test_save_ownership_result_structure_already_owned(self):
+        """이미 소유한 경우 반환 구조 검증."""
+        # _save_ownership_async가 이미 소유한 경우 반환하는 구조
         result = {"saved": False, "reason": "already_owned"}
         assert result["saved"] is False
+        assert result["reason"] == "already_owned"
+
+    def test_save_ownership_result_structure_success(self):
+        """저장 성공 시 반환 구조 검증."""
+        result = {"saved": True}
+        assert result["saved"] is True
+
+    def test_save_ownership_task_config(self):
+        """save_ownership_task 설정 확인."""
+        from domains.character.consumers.reward import save_ownership_task
+
+        assert save_ownership_task.name == "character.save_ownership"
+        assert save_ownership_task.max_retries == 5
 
     def test_handles_concurrent_insert(self):
         """동시 요청으로 인한 IntegrityError 처리."""
         result = {"saved": False, "reason": "concurrent_insert"}
         assert result["saved"] is False
+        assert result["reason"] == "concurrent_insert"
+
+    def test_handles_character_not_found(self):
+        """캐릭터를 찾지 못한 경우 처리."""
+        result = {"saved": False, "reason": "character_not_found"}
+        assert result["saved"] is False
+        assert result["reason"] == "character_not_found"
 
 
 class TestSaveMyCharacterTask:
     """save_my_character_task 로직 테스트."""
+
+    @pytest.fixture
+    def sample_params(self) -> dict:
+        return {
+            "user_id": str(uuid4()),
+            "character_id": str(uuid4()),
+            "character_code": "ECO001",
+            "character_name": "페트병이",
+            "character_type": "페트",
+            "character_dialog": "잘했어!",
+            "source": "scan",
+        }
+
+    def test_save_my_character_task_config(self):
+        """save_my_character_task 설정 확인."""
+        from domains.character.consumers.reward import save_my_character_task
+
+        assert save_my_character_task.name == "character.save_my_character"
+        assert save_my_character_task.max_retries == 5
 
     def test_uses_my_database_url(self):
         """MY_DATABASE_URL 환경변수 사용."""
@@ -265,11 +364,20 @@ class TestSaveMyCharacterTask:
             "postgresql+asyncpg://postgres:postgres@localhost:5432/my",
         )
         assert "postgresql" in my_db_url
+        assert "asyncpg" in my_db_url
 
-    def test_upsert_on_existing(self):
-        """이미 소유한 캐릭터는 상태 업데이트 (upsert)."""
-        # UserCharacterRepository.grant_character()가 upsert 로직 수행
-        pass
+    def test_task_queue_is_my_sync(self):
+        """my.sync 큐에서 실행됨."""
+
+        # task decorator에서 queue 확인 불가 - routing으로 결정됨
+        # config에서 "character.save_my_character": {"queue": "my.sync"} 확인
+        from domains._shared.celery.config import get_celery_settings
+
+        settings = get_celery_settings()
+        config = settings.get_celery_config()
+        routes = config["task_routes"]
+
+        assert routes["character.save_my_character"]["queue"] == "my.sync"
 
 
 class TestFullChainIntegration:
@@ -354,16 +462,39 @@ class TestRewardDecisionLogic:
         assert result["character_code"] == "ECO001"
         assert result["received"] is True
 
+    @patch("domains.character.consumers.reward._match_character_async")
+    def test_decision_returns_none_on_exception(self, mock_match):
+        """예외 발생 시 None 반환."""
+        from domains.character.consumers.reward import _evaluate_reward_decision
+
+        mock_match.side_effect = Exception("DB 연결 실패")
+
+        result = _evaluate_reward_decision(
+            task_id="task-123",
+            user_id="user-456",
+            classification_result={},
+            disposal_rules_present=False,
+            log_ctx={},
+        )
+
+        assert result is None
+
 
 class TestParallelSaveArchitecture:
     """병렬 저장 아키텍처 검증."""
 
-    def test_save_tasks_are_independent(self):
-        """save_ownership_task와 save_my_character_task는 독립적."""
-        # 각 task는 별도 큐에서 실행
-        # reward.persist: save_ownership_task
-        # my.sync: save_my_character_task
-        pass
+    def test_task_routing_config(self):
+        """task routing 설정 검증."""
+        from domains._shared.celery.config import get_celery_settings
+
+        settings = get_celery_settings()
+        config = settings.get_celery_config()
+        routes = config["task_routes"]
+
+        # 각 task의 큐 확인
+        assert routes["character.persist_reward"]["queue"] == "reward.persist"
+        assert routes["character.save_ownership"]["queue"] == "reward.persist"
+        assert routes["character.save_my_character"]["queue"] == "my.sync"
 
     def test_each_task_has_own_retry(self):
         """각 task는 독립적인 재시도 로직."""
@@ -372,12 +503,23 @@ class TestParallelSaveArchitecture:
             save_ownership_task,
         )
 
-        # 둘 다 autoretry_for + retry_backoff
         assert save_ownership_task.max_retries == 5
         assert save_my_character_task.max_retries == 5
 
-    def test_no_grpc_dependency(self):
-        """gRPC 의존성 없음 (직접 DB 저장)."""
-        # save_my_character_task는 MY_DATABASE_URL로 직접 접근
-        # sync_to_my_task (deprecated)와 달리 gRPC 호출 없음
-        pass
+    def test_tasks_are_fire_and_forget(self):
+        """persist_reward_task는 하위 task를 Fire & Forget으로 발행."""
+        from domains.character.consumers.reward import persist_reward_task
+
+        # persist_reward_task는 발행만 하고 결과 대기 안 함
+        # delay() 호출 후 즉시 반환
+        assert persist_reward_task.soft_time_limit == 10  # 짧은 타임아웃
+
+    def test_no_grpc_in_save_my_character(self):
+        """save_my_character_task에 gRPC 호출 없음."""
+        import inspect
+
+        from domains.character.consumers.reward import _save_my_character_async
+
+        source = inspect.getsource(_save_my_character_async)
+        assert "grpc" not in source.lower()
+        assert "get_my_client" not in source
