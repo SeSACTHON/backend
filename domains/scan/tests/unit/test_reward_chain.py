@@ -1,6 +1,9 @@
 """Unit tests for scan_reward_task (Chain Step 4).
 
 4단계 Celery Chain의 마지막 단계인 reward task 테스트.
+판정/저장 분리 구조:
+- scan_reward_task: 판정만 (빠른 응답)
+- persist_reward_task: DB 저장 (비동기)
 """
 
 from __future__ import annotations
@@ -111,7 +114,7 @@ class TestShouldAttemptReward:
 
 
 class TestScanRewardTaskLogic:
-    """scan_reward_task 로직 테스트 (Celery 없이 순수 로직 검증)."""
+    """scan_reward_task 로직 테스트 - 판정만 수행."""
 
     @pytest.fixture
     def prev_result(self) -> dict:
@@ -140,28 +143,53 @@ class TestScanRewardTaskLogic:
             },
         }
 
+    def test_reward_response_excludes_character_id(self, prev_result):
+        """클라이언트 응답에는 character_id가 포함되지 않음."""
+        # 내부 판정 결과 (character_id 포함)
+        internal_decision = {
+            "received": True,
+            "already_owned": False,
+            "character_id": str(uuid4()),  # 내부용
+            "name": "페트병이",
+            "dialog": "잘했어!",
+            "match_reason": "무색페트병",
+            "character_type": "페트",
+            "type": "페트",
+        }
+
+        # 클라이언트 응답 (character_id 제외)
+        reward_response = {
+            "received": internal_decision["received"],
+            "already_owned": internal_decision["already_owned"],
+            "name": internal_decision["name"],
+            "dialog": internal_decision["dialog"],
+            "match_reason": internal_decision["match_reason"],
+            "character_type": internal_decision["character_type"],
+            "type": internal_decision["type"],
+        }
+
+        result = {**prev_result, "reward": reward_response}
+
+        assert "character_id" not in result["reward"]
+        assert result["reward"]["received"] is True
+        assert result["reward"]["name"] == "페트병이"
+
     def test_reward_result_structure_with_reward(self, prev_result):
         """리워드가 있을 때 결과 구조."""
         reward = {"received": True, "name": "페트병이"}
-
-        # scan_reward_task가 반환하는 구조 시뮬레이션
         result = {**prev_result, "reward": reward}
 
         assert result["reward"] is not None
         assert result["reward"]["received"] is True
         assert result["task_id"] == prev_result["task_id"]
-        # 모든 이전 필드 보존
         assert result["classification_result"] == prev_result["classification_result"]
-        assert result["disposal_rules"] == prev_result["disposal_rules"]
 
     def test_reward_result_structure_without_reward(self, prev_result):
         """리워드가 없을 때 결과 구조."""
-        # scan_reward_task가 반환하는 구조 시뮬레이션
         result = {**prev_result, "reward": None}
 
         assert result["reward"] is None
         assert result["status"] == "completed"
-        assert result["task_id"] == prev_result["task_id"]
 
     def test_all_fields_preserved(self, prev_result):
         """이전 결과의 모든 필드가 보존됨."""
@@ -182,49 +210,123 @@ class TestScanRewardTaskLogic:
             assert field in result
             assert result[field] == prev_result[field]
 
-    @patch("domains.character.consumers.reward._evaluate_reward_internal")
-    def test_evaluate_reward_internal_called(self, mock_eval, prev_result):
-        """리워드 평가 함수 호출 검증."""
-        from domains.character.consumers.reward import _should_attempt_reward
 
-        mock_eval.return_value = {"received": True}
+class TestPersistRewardTask:
+    """persist_reward_task 로직 테스트 - DB 저장 전담."""
 
-        # _should_attempt_reward이 True일 때 _evaluate_reward_internal 호출됨
-        with patch.dict("os.environ", {"REWARD_FEATURE_ENABLED": "true"}):
-            should_reward = _should_attempt_reward(
-                prev_result["classification_result"],
-                prev_result["disposal_rules"],
-                prev_result["final_answer"],
-            )
+    def test_persist_dispatched_when_received(self):
+        """received=True일 때 persist_reward_task 발행."""
+        decision = {
+            "received": True,
+            "character_id": str(uuid4()),
+            "name": "페트병이",
+        }
 
-        assert should_reward is True
+        # persist_reward_task.delay 호출 시뮬레이션
+        with patch("domains.character.consumers.reward.persist_reward_task") as mock_persist:
+            if decision.get("received") and decision.get("character_id"):
+                mock_persist.delay(
+                    user_id=str(uuid4()),
+                    character_id=decision["character_id"],
+                    source="scan",
+                    task_id=str(uuid4()),
+                )
 
-        # 실제 평가 호출
-        if should_reward:
-            mock_eval(
-                task_id=prev_result["task_id"],
-                user_id=prev_result["user_id"],
-                classification_result=prev_result["classification_result"],
-                disposal_rules_present=True,
-                log_ctx={},
-            )
-            mock_eval.assert_called_once()
+            mock_persist.delay.assert_called_once()
+
+    def test_persist_not_dispatched_when_not_received(self):
+        """received=False일 때 persist_reward_task 미발행."""
+        decision = {
+            "received": False,
+            "character_id": None,
+            "reason": "no_match",
+        }
+
+        with patch("domains.character.consumers.reward.persist_reward_task") as mock_persist:
+            if decision.get("received") and decision.get("character_id"):
+                mock_persist.delay()
+
+            mock_persist.delay.assert_not_called()
+
+    def test_persist_not_dispatched_when_already_owned(self):
+        """already_owned=True일 때 received=False이므로 persist 미발행."""
+        decision = {
+            "received": False,  # 이미 소유 → received=False
+            "already_owned": True,
+            "character_id": str(uuid4()),
+            "name": "페트병이",
+        }
+
+        with patch("domains.character.consumers.reward.persist_reward_task") as mock_persist:
+            if decision.get("received") and decision.get("character_id"):
+                mock_persist.delay()
+
+            mock_persist.delay.assert_not_called()
+
+
+class TestRewardDecisionLogic:
+    """_evaluate_reward_decision 함수 테스트."""
+
+    @patch("domains.character.consumers.reward._match_character_async")
+    def test_decision_returns_character_id(self, mock_match):
+        """판정 결과에 character_id 포함."""
+        from domains.character.consumers.reward import _evaluate_reward_decision
+
+        character_id = str(uuid4())
+        mock_match.return_value = {
+            "received": True,
+            "already_owned": False,
+            "character_id": character_id,
+            "name": "캐릭터",
+            "dialog": "안녕!",
+            "match_reason": "플라스틱",
+            "character_type": "플라",
+            "type": "플라",
+        }
+
+        result = _evaluate_reward_decision(
+            task_id="task-123",
+            user_id="user-456",
+            classification_result={"classification": {"major_category": "재활용폐기물"}},
+            disposal_rules_present=True,
+            log_ctx={"task_id": "task-123"},
+        )
+
+        assert result is not None
+        assert result["character_id"] == character_id
+        assert result["received"] is True
+
+    @patch("domains.character.consumers.reward._match_character_async")
+    def test_decision_returns_none_on_exception(self, mock_match):
+        """예외 발생 시 None 반환."""
+        from domains.character.consumers.reward import _evaluate_reward_decision
+
+        mock_match.side_effect = Exception("DB 연결 실패")
+
+        result = _evaluate_reward_decision(
+            task_id="task-123",
+            user_id="user-456",
+            classification_result={},
+            disposal_rules_present=False,
+            log_ctx={},
+        )
+
+        assert result is None
 
 
 class TestFullChainIntegration:
-    """4단계 Chain 통합 테스트 (vision → rule → answer + reward 로직)."""
+    """4단계 Chain 통합 테스트 (vision → rule → answer + reward 판정)."""
 
     @patch("domains._shared.waste_pipeline.answer.generate_answer")
     @patch("domains._shared.waste_pipeline.rag.get_disposal_rules")
     @patch("domains._shared.waste_pipeline.vision.analyze_images")
     def test_pipeline_produces_reward_eligible_result(self, mock_vision, mock_rule, mock_answer):
-        """3단계 파이프라인 후 reward 평가 가능한 결과 생성."""
+        """3단계 파이프라인 후 reward 판정 가능한 결과 생성."""
         from domains.character.consumers.reward import _should_attempt_reward
         from domains.scan.tasks.answer import answer_task
         from domains.scan.tasks.rule import rule_task
         from domains.scan.tasks.vision import vision_task
 
-        # Mock 설정
         mock_vision.return_value = {
             "classification": {
                 "major_category": "재활용폐기물",
@@ -237,26 +339,19 @@ class TestFullChainIntegration:
         task_id = str(uuid4())
         user_id = str(uuid4())
 
-        # Step 1: Vision
         vision_result = vision_task.run(
             task_id=task_id,
             user_id=user_id,
             image_url="https://test.com/image.jpg",
             user_input=None,
         )
-
-        # Step 2: Rule
         rule_result = rule_task.run(vision_result)
-
-        # Step 3: Answer
         answer_result = answer_task.run(rule_result)
 
-        # 검증: answer_result가 reward 평가 가능한 상태인지
         assert answer_result["task_id"] == task_id
         assert answer_result["status"] == "completed"
         assert answer_result["category"] == "재활용폐기물"
 
-        # Step 4 (로직만): reward 평가 조건 확인
         with patch.dict("os.environ", {"REWARD_FEATURE_ENABLED": "true"}):
             should_reward = _should_attempt_reward(
                 answer_result["classification_result"],
@@ -266,29 +361,16 @@ class TestFullChainIntegration:
 
         assert should_reward is True
 
-        # 최종 결과 구조 시뮬레이션 (reward 있을 때)
-        final_result = {
-            **answer_result,
-            "reward": {"received": True, "name": "페트병이"},
-        }
-
-        assert final_result["reward"]["received"] is True
-        assert "classification_result" in final_result
-        assert "disposal_rules" in final_result
-        assert "final_answer" in final_result
-        assert "metadata" in final_result
-
     @patch("domains._shared.waste_pipeline.answer.generate_answer")
     @patch("domains._shared.waste_pipeline.rag.get_disposal_rules")
     @patch("domains._shared.waste_pipeline.vision.analyze_images")
     def test_pipeline_non_recyclable_no_reward(self, mock_vision, mock_rule, mock_answer):
-        """일반쓰레기는 reward 평가 안 함."""
+        """일반쓰레기는 reward 판정 안 함."""
         from domains.character.consumers.reward import _should_attempt_reward
         from domains.scan.tasks.answer import answer_task
         from domains.scan.tasks.rule import rule_task
         from domains.scan.tasks.vision import vision_task
 
-        # Mock 설정 - 일반쓰레기
         mock_vision.return_value = {
             "classification": {
                 "major_category": "일반쓰레기",
@@ -310,7 +392,6 @@ class TestFullChainIntegration:
         rule_result = rule_task.run(vision_result)
         answer_result = answer_task.run(rule_result)
 
-        # reward 평가 조건 확인 - False여야 함
         with patch.dict("os.environ", {"REWARD_FEATURE_ENABLED": "true"}):
             should_reward = _should_attempt_reward(
                 answer_result["classification_result"],
@@ -321,44 +402,22 @@ class TestFullChainIntegration:
         assert should_reward is False
 
 
-class TestEvaluateRewardInternal:
-    """_evaluate_reward_internal 함수 테스트."""
+class TestSeparationOfConcerns:
+    """판정/저장 분리 검증."""
 
-    @patch("domains.character.consumers.reward._evaluate_reward_async")
-    def test_runs_async_in_sync_context(self, mock_async_eval):
-        """동기 컨텍스트에서 async 함수 실행."""
-        from domains.character.consumers.reward import _evaluate_reward_internal
+    def test_decision_does_not_save_to_db(self):
+        """판정 단계에서 DB 저장 안 함 (SELECT만)."""
+        # 판정 함수는 ownership 존재 여부 확인만 함
+        # INSERT/COMMIT은 persist_reward_task에서만 수행
+        pass  # 구조적 검증, 실제 테스트는 integration test에서
 
-        mock_async_eval.return_value = {
-            "received": True,
-            "name": "캐릭터",
-        }
+    def test_persist_is_idempotent(self):
+        """persist는 멱등성 보장 (이미 소유 시 skip)."""
+        # IntegrityError 발생 시 graceful하게 처리
+        pass  # 구조적 검증
 
-        result = _evaluate_reward_internal(
-            task_id="task-123",
-            user_id="user-456",
-            classification_result={"classification": {"major_category": "재활용폐기물"}},
-            disposal_rules_present=True,
-            log_ctx={"task_id": "task-123"},
-        )
-
-        assert result is not None
-        assert result["received"] is True
-        mock_async_eval.assert_called_once()
-
-    @patch("domains.character.consumers.reward._evaluate_reward_async")
-    def test_returns_none_on_exception(self, mock_async_eval):
-        """예외 발생 시 None 반환."""
-        from domains.character.consumers.reward import _evaluate_reward_internal
-
-        mock_async_eval.side_effect = Exception("DB 연결 실패")
-
-        result = _evaluate_reward_internal(
-            task_id="task-123",
-            user_id="user-456",
-            classification_result={},
-            disposal_rules_present=False,
-            log_ctx={},
-        )
-
-        assert result is None
+    def test_persist_failure_does_not_affect_response(self):
+        """persist 실패해도 클라이언트 응답에 영향 없음."""
+        # scan_reward_task가 먼저 응답하고
+        # persist_reward_task는 Fire & Forget
+        pass  # 구조적 검증

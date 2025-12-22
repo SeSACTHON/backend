@@ -114,8 +114,9 @@ class CelerySettings(BaseSettings):
                 "scan.vision": {"queue": "scan.vision"},
                 "scan.rule": {"queue": "scan.rule"},
                 "scan.answer": {"queue": "scan.answer"},
-                # Reward (character-worker: 도메인 동기화)
-                "scan.reward": {"queue": "reward.character"},  # Chain 마지막 단계
+                # Reward (character-worker: 판정 + DB 저장)
+                "scan.reward": {"queue": "reward.character"},  # 판정만 (빠른 응답)
+                "character.persist_reward": {"queue": "reward.persist"},  # DB 저장 (비동기)
                 "reward.*": {"queue": "reward.character"},  # Legacy 호환
                 "character.sync_to_my": {"queue": "my.sync"},  # my 도메인 동기화
                 # DLQ 재처리

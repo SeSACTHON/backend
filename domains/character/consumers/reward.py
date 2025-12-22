@@ -1,8 +1,9 @@
 """
 Character Reward Consumer
 
-Celery Chain 기반 리워드 처리 + Webhook 전송 (Pipeline Step 4)
-scan 도메인의 Chain에서 호출됨
+Celery Chain 기반 리워드 처리 (Pipeline Step 4)
+- scan_reward_task: 보상 판정만 (빠른 응답)
+- persist_reward_task: DB 저장 (비동기, Fire & Forget)
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ celery_app.config_from_object(settings.get_celery_config())
 
 
 # ============================================================
-# Scan Chain용 Reward Task (scan.reward)
+# Scan Chain용 Reward Task (scan.reward) - 판정만
 # ============================================================
 
 
@@ -45,19 +46,17 @@ def scan_reward_task(
 ) -> dict[str, Any]:
     """Step 4: Reward Evaluation (Chain 마지막 단계).
 
-    캐릭터 리워드 조건을 평가하고 최종 결과를 반환합니다.
-    클라이언트는 SSE를 통해 진행상황과 최종 결과를 수신합니다.
+    보상 **판정만** 수행하고 즉시 클라이언트에게 응답합니다.
+    DB 저장은 별도 task(persist_reward_task)에서 비동기로 처리됩니다.
+
+    Flow:
+        1. 조건 검증 (_should_attempt_reward)
+        2. 캐릭터 매칭 (DB 조회만, 저장 X)
+        3. 즉시 응답 (SSE로 클라이언트에게 전달)
+        4. persist_reward_task 발행 (Fire & Forget)
 
     Args:
         prev_result: answer_task의 결과
-            - task_id: str
-            - user_id: str
-            - status: str
-            - category: str
-            - classification_result: dict
-            - disposal_rules: dict | None
-            - final_answer: dict
-            - metadata: dict
 
     Returns:
         최종 결과 (reward 포함) - Celery Events로 SSE에 전달됨
@@ -78,10 +77,11 @@ def scan_reward_task(
     }
     logger.info("Scan reward task started", extra=log_ctx)
 
-    # Reward 평가
+    # 1. 조건 확인
     reward = None
     if _should_attempt_reward(classification_result, disposal_rules, final_answer):
-        reward = _evaluate_reward_internal(
+        # 2. 판정만 수행 (DB 저장 X)
+        reward = _evaluate_reward_decision(
             task_id=task_id,
             user_id=user_id,
             classification_result=classification_result,
@@ -89,13 +89,42 @@ def scan_reward_task(
             log_ctx=log_ctx,
         )
 
-    # 최종 결과 구성
+        # 3. DB 저장은 별도 task로 발행 (Fire & Forget)
+        if reward and reward.get("received") and reward.get("character_id"):
+            try:
+                persist_reward_task.delay(
+                    user_id=user_id,
+                    character_id=reward["character_id"],
+                    source="scan",
+                    task_id=task_id,
+                )
+                logger.info(
+                    "Persist reward task dispatched",
+                    extra={**log_ctx, "character_id": reward["character_id"]},
+                )
+            except Exception:
+                # 발행 실패해도 판정 결과는 반환 (eventual consistency)
+                logger.exception("Failed to dispatch persist_reward_task", extra=log_ctx)
+
+    # 4. 최종 결과 구성 (character_id는 내부용이므로 제거)
+    reward_response = None
+    if reward:
+        reward_response = {
+            "received": reward.get("received", False),
+            "already_owned": reward.get("already_owned", False),
+            "name": reward.get("name"),
+            "dialog": reward.get("dialog"),
+            "match_reason": reward.get("match_reason"),
+            "character_type": reward.get("character_type"),
+            "type": reward.get("type"),
+        }
+
     result = {
         **prev_result,
-        "reward": reward,
+        "reward": reward_response,
     }
 
-    # 구조화된 로그 출력 (EFK 파이프라인으로 수집)
+    # 구조화된 로그
     logger.info(
         "scan_task_completed",
         extra={
@@ -108,14 +137,172 @@ def scan_reward_task(
             "duration_rule_ms": metadata.get("duration_rule_ms"),
             "duration_answer_ms": metadata.get("duration_answer_ms"),
             "has_disposal_rules": disposal_rules is not None,
-            "has_reward": reward is not None,
-            "reward_received": reward.get("received") if reward else None,
+            "has_reward": reward_response is not None,
+            "reward_received": reward_response.get("received") if reward_response else None,
         },
     )
 
-    # 결과는 Celery Events의 task-succeeded 이벤트로 SSE에 전달됨
-    # Webhook 불필요 - 클라이언트가 SSE로 실시간 수신
     return result
+
+
+# ============================================================
+# Persist Reward Task - DB 저장 전담
+# ============================================================
+
+
+@celery_app.task(
+    bind=True,
+    base=BaseTask,
+    name="character.persist_reward",
+    queue="reward.persist",
+    max_retries=5,
+    soft_time_limit=30,
+    time_limit=60,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=300,
+)
+def persist_reward_task(
+    self: BaseTask,
+    user_id: str,
+    character_id: str,
+    source: str,
+    task_id: str | None = None,
+) -> dict[str, Any]:
+    """보상 DB 저장 (Fire & Forget).
+
+    scan_reward_task에서 판정 완료 후 발행됩니다.
+    클라이언트 응답과 무관하게 비동기로 실행됩니다.
+
+    처리 내용:
+        1. character_ownerships 테이블에 소유권 저장
+        2. my 도메인에 sync_to_my_task 발행
+
+    Idempotency:
+        - 이미 소유한 캐릭터는 skip (IntegrityError 무시)
+        - 재시도해도 안전함
+    """
+    log_ctx = {
+        "task_id": task_id,
+        "user_id": user_id,
+        "character_id": character_id,
+        "source": source,
+        "celery_task_id": self.request.id,
+    }
+    logger.info("Persist reward task started", extra=log_ctx)
+
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(
+                _persist_reward_async(
+                    user_id=user_id,
+                    character_id=character_id,
+                    source=source,
+                )
+            )
+        finally:
+            loop.close()
+
+        logger.info(
+            "Persist reward completed",
+            extra={**log_ctx, "persisted": result.get("persisted", False)},
+        )
+        return result
+
+    except Exception:
+        logger.exception("Persist reward failed", extra=log_ctx)
+        raise  # Celery가 재시도
+
+
+async def _persist_reward_async(
+    user_id: str,
+    character_id: str,
+    source: str,
+) -> dict[str, Any]:
+    """DB 저장 + my 도메인 동기화."""
+    from sqlalchemy.exc import IntegrityError
+    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+    from sqlalchemy.orm import sessionmaker
+
+    from domains.character.core.config import get_settings
+    from domains.character.repositories.character import CharacterRepository
+    from domains.character.repositories.ownership import OwnershipRepository
+
+    settings = get_settings()
+    engine = create_async_engine(settings.database_url, echo=False)
+    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+
+    async with async_session() as session:
+        character_repo = CharacterRepository(session)
+        ownership_repo = OwnershipRepository(session)
+
+        # 캐릭터 조회
+        character = await character_repo.get_by_id(UUID(character_id))
+        if not character:
+            return {"persisted": False, "reason": "character_not_found"}
+
+        # 이미 소유 여부 확인
+        existing = await ownership_repo.get_by_user_and_character(
+            user_id=UUID(user_id), character_id=UUID(character_id)
+        )
+        if existing:
+            # 이미 소유 → my 동기화만 재시도 (idempotent)
+            _dispatch_sync_to_my(
+                user_id=user_id,
+                character=character,
+                source=source,
+            )
+            return {"persisted": False, "reason": "already_owned"}
+
+        # 소유권 저장
+        try:
+            await ownership_repo.insert_owned(
+                user_id=UUID(user_id),
+                character=character,
+                source=source,
+            )
+            await session.commit()
+        except IntegrityError:
+            # Race condition: 동시 요청으로 인한 중복 INSERT
+            await session.rollback()
+            return {"persisted": False, "reason": "concurrent_insert"}
+
+        # my 도메인 동기화
+        _dispatch_sync_to_my(
+            user_id=user_id,
+            character=character,
+            source=source,
+        )
+
+        return {"persisted": True}
+
+
+def _dispatch_sync_to_my(user_id: str, character: Any, source: str) -> None:
+    """my 도메인 동기화 task 발행."""
+    from domains.character.consumers.sync_my import sync_to_my_task
+
+    try:
+        sync_to_my_task.delay(
+            user_id=user_id,
+            character_id=str(character.id),
+            character_code=character.code,
+            character_name=character.name,
+            character_type=character.type_label,
+            character_dialog=character.dialog,
+            source=source,
+        )
+    except Exception:
+        logger.exception(
+            "Failed to dispatch sync_to_my_task",
+            extra={"user_id": user_id, "character_id": str(character.id)},
+        )
+
+
+# ============================================================
+# 판정 로직 (DB 저장 없음)
+# ============================================================
 
 
 def _should_attempt_reward(
@@ -123,17 +310,9 @@ def _should_attempt_reward(
     disposal_rules: dict | None,
     final_answer: dict[str, Any],
 ) -> bool:
-    """리워드 평가 조건 확인.
-
-    동기 로직(scan/services/scan.py)과 동일한 조건:
-    1. reward_feature_enabled == True
-    2. insufficiencies가 없어야 함
-    3. major_category == "재활용폐기물"
-    4. disposal_rules가 있어야 함
-    """
+    """리워드 평가 조건 확인."""
     import os
 
-    # Feature flag 확인 (환경변수, 기본값 True)
     reward_enabled = os.getenv("REWARD_FEATURE_ENABLED", "true").lower() == "true"
     if not reward_enabled:
         return False
@@ -151,7 +330,6 @@ def _should_attempt_reward(
     if not disposal_rules:
         return False
 
-    # insufficiencies 체크 (동기 로직과 동일)
     insufficiencies = final_answer.get("insufficiencies", [])
     for entry in insufficiencies:
         if isinstance(entry, str) and entry.strip():
@@ -162,21 +340,20 @@ def _should_attempt_reward(
     return True
 
 
-def _evaluate_reward_internal(
+def _evaluate_reward_decision(
     task_id: str,
     user_id: str,
     classification_result: dict[str, Any],
     disposal_rules_present: bool,
     log_ctx: dict,
 ) -> dict[str, Any] | None:
-    """CharacterService를 통해 리워드 평가."""
+    """캐릭터 매칭 판정 (DB 저장 없음)."""
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
             result = loop.run_until_complete(
-                _evaluate_reward_async(
-                    task_id=task_id,
+                _match_character_async(
                     user_id=user_id,
                     classification_result=classification_result,
                     disposal_rules_present=disposal_rules_present,
@@ -186,42 +363,51 @@ def _evaluate_reward_internal(
             loop.close()
 
         logger.info(
-            "Reward evaluation completed",
+            "Reward decision completed",
             extra={
                 **log_ctx,
                 "received": result.get("received") if result else False,
                 "character_name": result.get("name") if result else None,
             },
         )
-
         return result
 
     except Exception:
-        logger.exception("Reward evaluation failed", extra=log_ctx)
+        logger.exception("Reward decision failed", extra=log_ctx)
         return None
 
 
-async def _evaluate_reward_async(
-    task_id: str,
+async def _match_character_async(
     user_id: str,
     classification_result: dict[str, Any],
     disposal_rules_present: bool,
 ) -> dict[str, Any]:
-    """Async reward processing logic via CharacterService."""
+    """캐릭터 매칭만 수행 (DB 저장 없음).
+
+    Returns:
+        {
+            "received": bool,
+            "already_owned": bool,
+            "character_id": str | None,  # persist_reward_task에서 사용
+            "name": str | None,
+            "dialog": str | None,
+            ...
+        }
+    """
     from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
     from sqlalchemy.orm import sessionmaker
 
     from domains.character.core.config import get_settings
+    from domains.character.repositories.character import CharacterRepository
+    from domains.character.repositories.ownership import OwnershipRepository
+    from domains.character.services.evaluators import get_evaluator
     from domains.character.schemas.reward import (
         CharacterRewardRequest,
         CharacterRewardSource,
         ClassificationSummary,
     )
-    from domains.character.services.character import CharacterService
 
     settings = get_settings()
-
-    # DB 세션 생성
     engine = create_async_engine(settings.database_url, echo=False)
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
@@ -229,12 +415,24 @@ async def _evaluate_reward_async(
     situation_tags = classification_result.get("situation_tags", [])
 
     async with async_session() as session:
-        service = CharacterService.create_for_test(session)
+        character_repo = CharacterRepository(session)
+        ownership_repo = OwnershipRepository(session)
 
+        # Evaluator 조회
+        evaluator = get_evaluator(CharacterRewardSource.SCAN)
+        if evaluator is None:
+            return {"received": False, "reason": "no_evaluator"}
+
+        # 캐릭터 목록 조회
+        characters = await character_repo.list_all()
+        if not characters:
+            return {"received": False, "reason": "no_characters"}
+
+        # 평가 요청 생성
         request = CharacterRewardRequest(
             source=CharacterRewardSource.SCAN,
             user_id=UUID(user_id),
-            task_id=task_id,
+            task_id="",  # 판정에는 불필요
             classification=ClassificationSummary(
                 major_category=classification.get("major_category", ""),
                 middle_category=classification.get("middle_category", ""),
@@ -245,16 +443,29 @@ async def _evaluate_reward_async(
             insufficiencies_present=False,
         )
 
-        response = await service.evaluate_reward(request)
+        # 평가 실행
+        eval_result = evaluator.evaluate(request, characters)
+
+        if not eval_result.should_evaluate or not eval_result.matches:
+            return {"received": False, "reason": "no_match"}
+
+        # 첫 번째 매칭 캐릭터
+        matched_character = eval_result.matches[0]
+
+        # 이미 소유 여부 확인
+        existing = await ownership_repo.get_by_user_and_character(
+            user_id=UUID(user_id), character_id=matched_character.id
+        )
 
         return {
-            "received": response.received,
-            "already_owned": response.already_owned,
-            "name": response.name,
-            "dialog": response.dialog,
-            "match_reason": response.match_reason,
-            "character_type": response.character_type,
-            "type": response.type,
+            "received": not existing,  # 소유하지 않은 경우만 received=True
+            "already_owned": existing is not None,
+            "character_id": str(matched_character.id),  # persist_reward_task에서 사용
+            "name": matched_character.name,
+            "dialog": matched_character.dialog,
+            "match_reason": eval_result.match_reason,
+            "character_type": matched_character.type_label,
+            "type": str(matched_character.type_label or "").strip(),
         }
 
 
@@ -289,7 +500,7 @@ def reward_consumer_task(
         extra={"task_id": task_id, "user_id": user_id},
     )
 
-    return _evaluate_reward_internal(
+    result = _evaluate_reward_decision(
         task_id=task_id,
         user_id=user_id,
         classification_result={
@@ -298,4 +509,14 @@ def reward_consumer_task(
         },
         disposal_rules_present=disposal_rules_present,
         log_ctx={"task_id": task_id, "user_id": user_id},
-    ) or {"received": False, "reason": "evaluation_failed"}
+    )
+
+    if result and result.get("received") and result.get("character_id"):
+        persist_reward_task.delay(
+            user_id=user_id,
+            character_id=result["character_id"],
+            source="scan",
+            task_id=task_id,
+        )
+
+    return result or {"received": False, "reason": "evaluation_failed"}
