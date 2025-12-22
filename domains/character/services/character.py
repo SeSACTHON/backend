@@ -17,7 +17,6 @@ from domains.character.exceptions import CatalogEmptyError
 from domains.character.metrics import REWARD_EVALUATION_TOTAL, REWARD_GRANTED_TOTAL
 from domains.character.models import Character
 from domains.character.repositories import CharacterOwnershipRepository, CharacterRepository
-from domains.character.rpc.my_client import get_my_client
 from domains.character.schemas.catalog import CharacterProfile
 from domains.character.schemas.reward import (
     CharacterRewardFailureReason,
@@ -285,7 +284,7 @@ class CharacterService:
             )
             if existing:
                 # my 도메인과의 정합성 보장을 위해 sync 재시도 (idempotent)
-                await self._sync_to_my_domain(user_id=user_id, character=match, source=source_label)
+                self._sync_to_my_domain(user_id=user_id, character=match, source=source_label)
                 return self._to_profile(match), True, None
 
             try:
@@ -335,49 +334,53 @@ class CharacterService:
         )
         await self.session.commit()
 
-        # 2. my 도메인에 gRPC로 동기화 (best-effort, 실패해도 로컬 저장은 유지)
-        await self._sync_to_my_domain(user_id=user_id, character=character, source=source)
+        # 2. my 도메인에 Celery task로 비동기 동기화 (Fire & Forget)
+        self._sync_to_my_domain(user_id=user_id, character=character, source=source)
 
-    async def _sync_to_my_domain(
+    def _sync_to_my_domain(
         self,
         user_id: UUID,
         character: Character,
         source: str,
     ) -> None:
-        """my 도메인의 user_characters 테이블에 캐릭터 소유 정보 동기화."""
+        """my 도메인의 user_characters 테이블에 캐릭터 소유 정보 비동기 동기화.
+
+        Celery task로 발행하여 gRPC 호출을 비동기로 처리합니다.
+        character.character_ownerships 저장 후 즉시 반환되며,
+        my 도메인 동기화는 별도 worker에서 처리됩니다.
+
+        Consistency Model:
+            - 로컬 ownership 저장은 동기로 완료됨
+            - my 도메인 동기화는 비동기 (eventual consistency)
+            - 실패 시 Celery가 자동 재시도 (max 5회, exponential backoff)
+        """
+        from domains.character.consumers.sync_my import sync_to_my_task
+
         log_ctx = {
             "user_id": str(user_id),
             "character_id": str(character.id),
             "character_name": character.name,
             "source": source,
         }
-        try:
-            from domains.character.schemas.catalog import GrantCharacterRequest
 
-            client = get_my_client()
-            grant_request = GrantCharacterRequest(
-                user_id=user_id,
-                character_id=character.id,
+        try:
+            sync_to_my_task.delay(
+                user_id=str(user_id),
+                character_id=str(character.id),
                 character_code=character.code,
                 character_name=character.name,
                 character_type=character.type_label,
                 character_dialog=character.dialog,
                 source=source,
             )
-            success, already_owned = await client.grant_character(grant_request)
-            if success:
-                logger.info(
-                    "Synced character to my domain",
-                    extra={**log_ctx, "already_owned": already_owned},
-                )
-            else:
-                logger.warning(
-                    "Failed to sync character to my domain",
-                    extra=log_ctx,
-                )
+            logger.info(
+                "Sync to my domain task dispatched",
+                extra=log_ctx,
+            )
         except Exception:
-            # 동기화 실패해도 기존 로직은 성공으로 처리 (eventual consistency)
-            logger.exception("Error syncing to my domain", extra=log_ctx)
+            # Task 발행 실패해도 로컬 ownership은 유지 (eventual consistency)
+            # 후속 배치 동기화로 복구 가능
+            logger.exception("Failed to dispatch sync task", extra=log_ctx)
 
     @staticmethod
     def _to_profile(character: Character) -> CharacterProfile:

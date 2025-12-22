@@ -36,10 +36,17 @@ python3 <<'PY'
 import pathlib
 import sys
 
-APPS = [
-    ("dev", pathlib.Path("clusters/dev/apps/40-apis-appset.yaml")),
-    ("prod", pathlib.Path("clusters/prod/apps/60-apis-appset.yaml")),
-]
+# APIs + Workers ApplicationSets (each env can have multiple)
+APPSETS = {
+    "dev": [
+        pathlib.Path("clusters/dev/apps/40-apis-appset.yaml"),
+        pathlib.Path("clusters/dev/apps/41-workers-appset.yaml"),
+    ],
+    "prod": [
+        pathlib.Path("clusters/prod/apps/60-apis-appset.yaml"),
+        pathlib.Path("clusters/prod/apps/61-workers-appset.yaml"),
+    ],
+}
 
 services = sorted(
     p.name
@@ -72,23 +79,31 @@ def parse_elements(path: pathlib.Path):
 errors = []
 env_maps = {}
 
-for env, path in APPS:
-    if not path.exists():
-        errors.append(f"{env}: missing {path}")
-        continue
-    names, phases = parse_elements(path)
-    env_maps[env] = names
-    missing = sorted(set(services) - set(names))
-    extra = sorted(set(names) - set(services))
+for env, paths in APPSETS.items():
+    all_names = []
+    all_phases = {}
+    for path in paths:
+        if not path.exists():
+            # Workers appset is optional for backward compat
+            if "workers" in str(path):
+                continue
+            errors.append(f"{env}: missing {path}")
+            continue
+        names, phases = parse_elements(path)
+        all_names.extend(names)
+        all_phases.update(phases)
+    env_maps[env] = sorted(all_names)
+    missing = sorted(set(services) - set(all_names))
+    extra = sorted(set(all_names) - set(services))
     if missing:
         errors.append(f"{env}: services missing from ApplicationSet list → {', '.join(missing)}")
     if extra:
         errors.append(f"{env}: ApplicationSet lists unknown services → {', '.join(extra)}")
-    orphan_phase = sorted(set(names) - set(phases))
+    orphan_phase = sorted(set(all_names) - set(all_phases))
     if orphan_phase:
         errors.append(f"{env}: services missing phase label → {', '.join(orphan_phase)}")
 
-if len(env_maps) == len(APPS):
+if len(env_maps) == len(APPSETS):
     if env_maps["dev"] != env_maps["prod"]:
         errors.append("dev/prod ApplicationSet service lists diverged")
 

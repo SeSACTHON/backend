@@ -69,6 +69,24 @@ spec:
     namespace: rabbitmq
 ---
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# My Domain Sync Bindings
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: my-sync-binding
+  namespace: rabbitmq
+spec:
+  source: my.direct
+  destination: my.sync
+  destinationType: queue
+  routingKey: my.sync
+  vhost: eco2
+  rabbitmqClusterReference:
+    name: eco2-rabbitmq
+    namespace: rabbitmq
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Dead Letter Bindings
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apiVersion: rabbitmq.com/v1beta1
@@ -126,6 +144,21 @@ spec:
   destination: dlq.reward
   destinationType: queue
   routingKey: dlq.reward
+  vhost: eco2
+  rabbitmqClusterReference:
+    name: eco2-rabbitmq
+    namespace: rabbitmq
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: dlq-my-sync-binding
+  namespace: rabbitmq
+spec:
+  source: dlx
+  destination: dlq.my.sync
+  destinationType: queue
+  routingKey: dlq.my.sync
   vhost: eco2
   rabbitmqClusterReference:
     name: eco2-rabbitmq

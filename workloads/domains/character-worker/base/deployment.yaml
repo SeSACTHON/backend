@@ -1,0 +1,118 @@
+# Character Worker Celery Deployment
+# reward.character, my.sync 큐 처리
+# worker-storage 노드에 배포
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: character-worker
+  namespace: character
+  labels:
+    app: character-worker
+    version: v1
+    tier: worker
+    domain: character
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: character-worker
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: character-worker
+        version: v1
+        tier: worker
+        domain: character
+    spec:
+      containers:
+      - name: character-worker
+        image: docker.io/mng990/eco2:character-api-dev-latest
+        imagePullPolicy: Always
+        command: [celery]
+        args:
+        - -A
+        - domains.character.consumers
+        - worker
+        - --loglevel=info
+        - -Q
+        - reward.character,my.sync
+        - -c
+        - '2'
+        env:
+        # Celery Broker (RabbitMQ)
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            secretKeyRef:
+              name: character-secret
+              key: CELERY_BROKER_URL
+        # OpenTelemetry
+        - name: OTEL_SERVICE_NAME
+          value: character-worker
+        - name: OTEL_TRACES_EXPORTER
+          value: otlp
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://jaeger-collector-clusterip.istio-system.svc.cluster.local:4317
+        - name: OTEL_METRICS_EXPORTER
+          value: none
+        - name: OTEL_LOGS_EXPORTER
+          value: none
+        # Database
+        - name: POSTGRES_HOST
+          value: postgresql.postgres.svc.cluster.local
+        - name: REDIS_HOST
+          value: redis.redis.svc.cluster.local
+        # gRPC (my-api 연결용)
+        - name: MY_GRPC_HOST
+          value: my-api-grpc.my.svc.cluster.local
+        - name: MY_GRPC_PORT
+          value: '50051'
+        envFrom:
+        - configMapRef:
+            name: character-worker-config
+        - secretRef:
+            name: character-secret
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 2Gi
+        livenessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - domains.character.consumers.reward
+            - inspect
+            - ping
+            - -t
+            - '10'
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 15
+        readinessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - domains.character.consumers.reward
+            - inspect
+            - ping
+            - -t
+            - '10'
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 15
+      imagePullSecrets:
+      - name: dockerhub-secret
+      # worker-storage 노드에 배치
+      nodeSelector:
+        domain: worker-storage
+      # Taint 허용
+      tolerations:
+      - key: domain
+        operator: Equal
+        value: worker-storage
+        effect: NoSchedule

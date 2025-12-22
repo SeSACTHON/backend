@@ -6,6 +6,7 @@ namespace: rabbitmq
 resources:
 - namespace.yaml
 - cluster.yaml
+- servicemonitor.yaml
 
 commonLabels:
   tier: platform

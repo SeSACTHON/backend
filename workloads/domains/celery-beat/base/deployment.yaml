@@ -1,0 +1,91 @@
+# Celery Beat Scheduler Deployment
+# DLQ 재처리 및 주기적 작업 스케줄링
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: celery-beat
+  namespace: scan
+  labels:
+    app: celery-beat
+    version: v1
+    tier: scheduler
+    domain: scan
+spec:
+  # Beat는 단일 인스턴스만 실행
+  replicas: 1
+  strategy:
+    type: Recreate  # 동시 실행 방지
+  selector:
+    matchLabels:
+      app: celery-beat
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: celery-beat
+        version: v1
+        tier: scheduler
+        domain: scan
+    spec:
+      containers:
+      - name: celery-beat
+        image: docker.io/mng990/eco2:scan-api-dev-latest
+        imagePullPolicy: Always
+        command: [celery]
+        args:
+        - -A
+        - domains.scan.celery_app
+        - beat
+        - --loglevel=info
+        - --scheduler=celery.beat:PersistentScheduler
+        - --schedule=/tmp/celerybeat-schedule
+        env:
+        # Celery Broker (RabbitMQ)
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            secretKeyRef:
+              name: scan-secret
+              key: CELERY_BROKER_URL
+        # OpenTelemetry
+        - name: OTEL_SERVICE_NAME
+          value: celery-beat
+        - name: OTEL_TRACES_EXPORTER
+          value: otlp
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://jaeger-collector-clusterip.istio-system.svc.cluster.local:4317
+        - name: OTEL_METRICS_EXPORTER
+          value: none
+        - name: OTEL_LOGS_EXPORTER
+          value: none
+        # Database (for DLQ tasks)
+        - name: POSTGRES_HOST
+          value: postgresql.postgres.svc.cluster.local
+        - name: REDIS_HOST
+          value: redis.redis.svc.cluster.local
+        envFrom:
+        - configMapRef:
+            name: celery-beat-config
+        - secretRef:
+            name: scan-secret
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        # Beat는 단순히 스케줄러이므로 간단한 probe
+        livenessProbe:
+          exec:
+            command:
+            - sh
+            - -c
+            - test -f /tmp/celerybeat-schedule
+          initialDelaySeconds: 30
+          periodSeconds: 60
+          timeoutSeconds: 5
+      imagePullSecrets:
+      - name: dockerhub-secret
+      # worker-ai 노드에 배치
+      nodeSelector:
+        domain: worker-ai

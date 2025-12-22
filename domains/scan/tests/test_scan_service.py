@@ -269,18 +269,16 @@ class TestClassify:
     async def test_successful_classification(
         self,
         mock_settings,
-        mock_repository,
         mock_pipeline_result,
         test_user_id,
         valid_image_url,
     ):
-        """성공적인 분류 플로우."""
+        """성공적인 분류 플로우 (DB 없이 로그 기반)."""
         from domains.scan.core.validators import ImageUrlValidator
         from domains.scan.services.scan import ScanService
 
         service = ScanService.__new__(ScanService)
         service.settings = mock_settings
-        service.repository = mock_repository
         service.image_validator = ImageUrlValidator(mock_settings)
 
         # Mock pipeline
@@ -334,23 +332,21 @@ class TestMetrics:
     """metrics 메서드 테스트."""
 
     @pytest.mark.asyncio
-    async def test_returns_metrics_dict(self, mock_settings, mock_repository):
-        """메트릭 딕셔너리 반환."""
+    async def test_returns_metrics_dict(self, mock_settings):
+        """메트릭 딕셔너리 반환 (DB 없이 로그 기반)."""
         from domains.scan.services.scan import ScanService
 
         service = ScanService.__new__(ScanService)
         service.settings = mock_settings
-        service.repository = mock_repository
 
         # 캐시 초기화
         ScanService._category_cache = None
 
         metrics = await service.metrics()
 
-        assert "completed_tasks" in metrics
-        assert metrics["completed_tasks"] == 10  # mock_repository 반환값
-        assert "last_completed_at" in metrics
+        # DB 제거 후 간소화된 metrics
         assert "supported_categories" in metrics
+        assert "note" in metrics
 
         # 캐시 정리
         ScanService._category_cache = None
