@@ -26,15 +26,9 @@ async def test_scan_service_grpc_call():
         character_api_timeout_seconds=5.0,
     )
 
-    # Mock repository
-    mock_repository = MagicMock()
-    mock_repository.create = AsyncMock(return_value=None)
-    mock_repository.update_completed = AsyncMock(return_value=None)
-
-    # Create service with injected dependencies
+    # Create service with injected dependencies (DB 없이 로그 기반)
     service = ScanService.__new__(ScanService)
     service.settings = mock_settings
-    service.repository = mock_repository
     service.image_validator = ImageUrlValidator(mock_settings)
 
     # Mock payload (유효한 이미지 URL 형식)

@@ -92,6 +92,29 @@ spec:
     namespace: rabbitmq
 ---
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# My Domain Sync Queue (character → my 동기화)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: rabbitmq.com/v1beta1
+kind: Queue
+metadata:
+  name: my-sync-queue
+  namespace: rabbitmq
+spec:
+  name: my.sync
+  type: quorum
+  durable: true
+  autoDelete: false
+  vhost: eco2
+  arguments:
+    x-dead-letter-exchange: dlx
+    x-dead-letter-routing-key: dlq.my.sync
+    x-message-ttl: 86400000  # 24시간 (동기화 중요)
+    x-delivery-limit: 5      # 재시도 5회
+  rabbitmqClusterReference:
+    name: eco2-rabbitmq
+    namespace: rabbitmq
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Dead Letter Queues (실패 메시지 보관)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apiVersion: rabbitmq.com/v1beta1
@@ -158,6 +181,23 @@ spec:
   vhost: eco2
   arguments:
     x-message-ttl: 604800000
+  rabbitmqClusterReference:
+    name: eco2-rabbitmq
+    namespace: rabbitmq
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Queue
+metadata:
+  name: dlq-my-sync
+  namespace: rabbitmq
+spec:
+  name: dlq.my.sync
+  type: quorum
+  durable: true
+  autoDelete: false
+  vhost: eco2
+  arguments:
+    x-message-ttl: 604800000  # 7일 보관
   rabbitmqClusterReference:
     name: eco2-rabbitmq
     namespace: rabbitmq

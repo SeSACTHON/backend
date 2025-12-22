@@ -36,7 +36,24 @@ spec:
     name: eco2-rabbitmq
     namespace: rabbitmq
 ---
-# 3. Dead Letter Exchange (Direct)
+# 3. My Domain Exchange (Direct)
+# 라우팅 키: my.sync (character → my 동기화)
+apiVersion: rabbitmq.com/v1beta1
+kind: Exchange
+metadata:
+  name: my-direct
+  namespace: rabbitmq
+spec:
+  name: my.direct
+  type: direct
+  durable: true
+  autoDelete: false
+  vhost: eco2
+  rabbitmqClusterReference:
+    name: eco2-rabbitmq
+    namespace: rabbitmq
+---
+# 4. Dead Letter Exchange (Direct)
 # 실패한 메시지 수집용
 apiVersion: rabbitmq.com/v1beta1
 kind: Exchange
@@ -53,7 +70,7 @@ spec:
     name: eco2-rabbitmq
     namespace: rabbitmq
 ---
-# 4. Auth Blacklist Exchange (Fanout)
+# 5. Auth Blacklist Exchange (Fanout)
 # ext-authz 로컬 캐시 동기화용 - 모든 인스턴스가 수신
 apiVersion: rabbitmq.com/v1beta1
 kind: Exchange
@@ -70,7 +87,7 @@ spec:
     name: eco2-rabbitmq
     namespace: rabbitmq
 ---
-# 5. Celery Default Exchange (Topic)
+# 6. Celery Default Exchange (Topic)
 # Celery 기본 Exchange (celery.* 라우팅)
 apiVersion: rabbitmq.com/v1beta1
 kind: Exchange

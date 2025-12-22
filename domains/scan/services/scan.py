@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from time import perf_counter
 from typing import List
 from uuid import UUID, uuid4
 
 from fastapi import Depends
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from domains.character.schemas.reward import (
     CharacterRewardRequest,
@@ -19,16 +17,12 @@ from domains.character.schemas.reward import (
 from domains.scan.core.config import Settings, get_settings
 from domains.scan.core.grpc_client import get_character_client
 from domains.scan.core.validators import ImageUrlValidator
-from domains.scan.database.session import get_db_session
 from domains.scan.metrics import GRPC_CALL_COUNTER, GRPC_CALL_LATENCY
-from domains.scan.models.scan_task import ScanTask as ScanTaskModel
 from domains.scan.proto import character_pb2
-from domains.scan.repositories.scan_task_repository import ScanTaskRepository
 from domains.scan.schemas.scan import (
     ClassificationRequest,
     ClassificationResponse,
     ScanCategory,
-    ScanTask,
 )
 from domains._shared.schemas.waste import WasteClassificationResult
 from domains._shared.waste_pipeline import PipelineError, process_waste_classification
@@ -38,86 +32,192 @@ DEFAULT_SCAN_PROMPT = "이 폐기물을 어떻게 분리배출해야 하나요?"
 logger = logging.getLogger(__name__)
 
 
-def get_scan_task_repository(
-    session: AsyncSession = Depends(get_db_session),
-) -> ScanTaskRepository:
-    """Factory for ScanTaskRepository with injected session."""
-    return ScanTaskRepository(session)
-
-
 class ScanService:
+    """Scan Service - DB 없이 로그 기반 추적.
+
+    모든 task 진행 정보와 결과는 구조화된 로그로 출력되어
+    EFK 파이프라인(Fluent Bit → Elasticsearch)으로 수집됩니다.
+    """
+
     _category_cache: List[ScanCategory] | None = None
 
-    def __init__(
-        self,
-        settings: Settings = Depends(get_settings),
-        repository: ScanTaskRepository = Depends(get_scan_task_repository),
-    ):
+    def __init__(self, settings: Settings = Depends(get_settings)):
         self.settings = settings
-        self.repository = repository
         self.image_validator = ImageUrlValidator(settings)
 
-    async def classify(
-        self, payload: ClassificationRequest, user_id: UUID
-    ) -> ClassificationResponse:
-        """Classify waste image and return results."""
+    def _validate_request(
+        self, payload: ClassificationRequest
+    ) -> tuple[str | None, ClassificationResponse | None]:
+        """요청 검증. (image_url, error_response) 반환."""
         image_url = str(payload.image_url) if payload.image_url else None
 
         if not image_url:
-            return ClassificationResponse(
+            return None, ClassificationResponse(
                 task_id=str(uuid4()),
                 status="failed",
                 message="이미지 URL이 필요합니다.",
                 error="IMAGE_URL_REQUIRED",
             )
 
-        # Validate image URL (allowlist + SSRF prevention)
         validation = self.image_validator.validate(image_url)
         if not validation.valid:
             logger.warning(
-                "Image URL validation failed",
+                "image_url_validation_failed",
                 extra={
+                    "event_type": "scan_validation_failed",
                     "url": image_url,
                     "error_code": validation.error.value if validation.error else None,
                     "error_message": validation.message,
                 },
             )
-            return ClassificationResponse(
+            return None, ClassificationResponse(
                 task_id=str(uuid4()),
                 status="failed",
                 message=validation.message or "이미지 URL 검증 실패",
                 error=validation.error.value if validation.error else "VALIDATION_ERROR",
             )
 
+        return image_url, None
+
+    async def classify_sync(
+        self, payload: ClassificationRequest, user_id: UUID
+    ) -> ClassificationResponse:
+        """동기 방식으로 폐기물 분류 (즉시 결과 반환)."""
+        image_url, error = self._validate_request(payload)
+        if error:
+            return error
+
         task_id = uuid4()
         log_ctx = {"task_id": str(task_id), "user_id": str(user_id)}
 
-        logger.info("Scan pipeline started", extra=log_ctx)
+        logger.info(
+            "scan_task_created",
+            extra={
+                "event_type": "scan_created",
+                "task_id": str(task_id),
+                "user_id": str(user_id),
+                "image_url": image_url,
+                "user_input": payload.user_input,
+                "mode": "sync",
+            },
+        )
 
-        # Create task in DB with pending status
+        return await self._classify_sync_internal(
+            task_id, user_id, image_url, payload.user_input, log_ctx
+        )
+
+    async def classify_async(
+        self, payload: ClassificationRequest, user_id: UUID
+    ) -> ClassificationResponse:
+        """비동기 방식으로 폐기물 분류 (SSE로 결과 수신)."""
+        image_url, error = self._validate_request(payload)
+        if error:
+            return error
+
+        task_id = uuid4()
+        log_ctx = {"task_id": str(task_id), "user_id": str(user_id)}
+
+        logger.info(
+            "scan_task_created",
+            extra={
+                "event_type": "scan_created",
+                "task_id": str(task_id),
+                "user_id": str(user_id),
+                "image_url": image_url,
+                "user_input": payload.user_input,
+                "mode": "async",
+            },
+        )
+
+        return await self._classify_async_internal(
+            task_id, user_id, image_url, payload.user_input, log_ctx
+        )
+
+    async def classify(
+        self, payload: ClassificationRequest, user_id: UUID
+    ) -> ClassificationResponse:
+        """[DEPRECATED] callback_url 여부로 동기/비동기 결정. classify_sync/classify_async 사용 권장."""
+        if payload.callback_url:
+            return await self.classify_async(payload, user_id)
+        return await self.classify_sync(payload, user_id)
+
+    async def _classify_async_internal(
+        self,
+        task_id: UUID,
+        user_id: UUID,
+        image_url: str,
+        user_input: str | None,
+        log_ctx: dict,
+    ) -> ClassificationResponse:
+        """Celery Chain을 발행하여 비동기 처리."""
+        from celery import chain
+
+        from domains.character.consumers.reward import scan_reward_task
+        from domains.scan.tasks.answer import answer_task
+        from domains.scan.tasks.rule import rule_task
+        from domains.scan.tasks.vision import vision_task
+
         try:
-            await self.repository.create(
-                task_id=task_id,
-                user_id=user_id,
-                image_url=image_url,
-                user_input=payload.user_input,
+            # 4단계 Chain: vision → rule → answer → reward
+            # vision, rule, answer: scan-worker (worker-ai)
+            # reward: character-worker (worker-storage)
+            # 클라이언트는 SSE로 진행상황 및 최종 결과 수신
+            pipeline = chain(
+                vision_task.s(str(task_id), str(user_id), image_url, user_input),
+                rule_task.s(),
+                answer_task.s(),
+                scan_reward_task.s(),
+            )
+            pipeline.delay()
+
+            logger.info(
+                "scan_chain_dispatched",
+                extra={
+                    "event_type": "scan_chain_dispatched",
+                    "task_id": str(task_id),
+                    "user_id": str(user_id),
+                    "stages": ["vision", "rule", "answer", "reward"],
+                },
             )
         except Exception:
-            logger.exception("Failed to create scan task in DB", extra=log_ctx)
+            logger.exception(
+                "scan_chain_dispatch_failed",
+                extra={**log_ctx, "event_type": "scan_chain_failed"},
+            )
             return ClassificationResponse(
                 task_id=str(task_id),
                 status="failed",
-                message="데이터베이스 저장에 실패했습니다.",
-                error="DB_ERROR",
+                message="비동기 작업 발행에 실패했습니다.",
+                error="TASK_DISPATCH_ERROR",
             )
 
-        # Run AI pipeline
-        pipeline_result, error = await self._run_pipeline(
-            task_id, image_url, payload.user_input, log_ctx
+        return ClassificationResponse(
+            task_id=str(task_id),
+            status="processing",
+            message="AI 분석이 진행 중입니다. GET /scan/{task_id}/progress (SSE)로 진행상황을 확인하세요.",
         )
 
+    async def _classify_sync_internal(
+        self,
+        task_id: UUID,
+        user_id: UUID,
+        image_url: str,
+        user_input: str | None,
+        log_ctx: dict,
+    ) -> ClassificationResponse:
+        """동기 처리 방식."""
+        pipeline_result, error = await self._run_pipeline(task_id, image_url, user_input, log_ctx)
+
         if error:
-            await self._handle_pipeline_failure(task_id, error, log_ctx)
+            logger.info(
+                "scan_task_failed",
+                extra={
+                    "event_type": "scan_failed",
+                    "task_id": str(task_id),
+                    "user_id": str(user_id),
+                    "error": error,
+                },
+            )
             return ClassificationResponse(
                 task_id=str(task_id),
                 status="failed",
@@ -125,27 +225,31 @@ class ScanService:
                 error=error,
             )
 
-        # Process reward
         reward = await self._process_reward(task_id, user_id, pipeline_result, log_ctx)
 
-        # Update task as completed
         classification = pipeline_result.classification_result.get("classification", {})
         category = classification.get("major_category")
+        # metadata는 classification_result 내부에 있거나 없을 수 있음
+        metadata = pipeline_result.classification_result.get("metadata", {})
 
-        try:
-            await self.repository.update_completed(
-                task_id,
-                category=category,
-                confidence=None,
-                pipeline_result=pipeline_result,
-                reward=reward,
-            )
-        except Exception:
-            logger.exception("Failed to update scan task in DB", extra=log_ctx)
-            # Task completed but DB update failed - still return success to user
-            # The data is in pipeline_result anyway
-
-        logger.info("Scan pipeline completed", extra={**log_ctx, "category": category})
+        # 완료 로그 (EFK로 수집)
+        logger.info(
+            "scan_task_completed",
+            extra={
+                "event_type": "scan_completed",
+                "task_id": str(task_id),
+                "user_id": str(user_id),
+                "category": category,
+                "middle_category": classification.get("middle_category"),
+                "duration_total_ms": metadata.get("duration_total"),
+                "duration_vision_ms": metadata.get("duration_vision"),
+                "duration_rag_ms": metadata.get("duration_rag"),
+                "duration_answer_ms": metadata.get("duration_answer"),
+                "has_disposal_rules": pipeline_result.disposal_rules is not None,
+                "has_reward": reward is not None,
+                "reward_received": reward.received if reward else None,
+            },
+        )
 
         return ClassificationResponse(
             task_id=str(task_id),
@@ -162,14 +266,11 @@ class ScanService:
         user_input: str | None,
         log_ctx: dict,
     ) -> tuple[WasteClassificationResult | None, str | None]:
-        """Run AI classification pipeline. Returns (result, error)."""
+        """Run AI classification pipeline."""
         from domains.scan.metrics import PIPELINE_STEP_LATENCY
 
         pipeline_started = perf_counter()
         prompt_text = user_input or DEFAULT_SCAN_PROMPT
-
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug("Scan prompt text", extra={**log_ctx, "prompt": prompt_text})
 
         try:
             pipeline_payload = await asyncio.to_thread(
@@ -182,12 +283,11 @@ class ScanService:
         except PipelineError as exc:
             elapsed_ms = (perf_counter() - pipeline_started) * 1000
             logger.info(
-                "Scan pipeline failed",
+                "scan_pipeline_error",
                 extra={**log_ctx, "elapsed_ms": elapsed_ms, "error": str(exc)},
             )
             return None, str(exc)
 
-        # Record metrics
         elapsed_ms = (perf_counter() - pipeline_started) * 1000
         metadata = pipeline_payload.get("metadata", {})
         if metadata:
@@ -198,25 +298,7 @@ class ScanService:
                 metadata.get("duration_total", 0)
             )
 
-        logger.info("Scan pipeline succeeded", extra={**log_ctx, "elapsed_ms": elapsed_ms})
-
-        if logger.isEnabledFor(logging.DEBUG):
-            logger.debug(
-                "Scan pipeline raw payload",
-                extra={
-                    **log_ctx,
-                    "payload": json.dumps(pipeline_payload, ensure_ascii=False),
-                },
-            )
-
         return WasteClassificationResult(**pipeline_payload), None
-
-    async def _handle_pipeline_failure(self, task_id: UUID, error: str, log_ctx: dict) -> None:
-        """Mark task as failed in DB."""
-        try:
-            await self.repository.update_failed(task_id, error_message=error)
-        except Exception:
-            logger.exception("Failed to update failed task in DB", extra=log_ctx)
 
     async def _process_reward(
         self,
@@ -240,59 +322,24 @@ class ScanService:
 
         if reward:
             REWARD_MATCH_COUNTER.labels(status="success").inc()
-            logger.debug("Reward granted", extra={**log_ctx, "reward_name": reward.name})
         else:
             REWARD_MATCH_COUNTER.labels(status="failed").inc()
 
         return reward
 
-    async def task(self, task_id: str) -> ScanTask:
-        """Retrieve a scan task by ID."""
-        try:
-            task_uuid = UUID(task_id)
-        except ValueError as exc:
-            raise LookupError(f"invalid task_id format: {task_id}") from exc
-
-        db_task = await self.repository.get_by_id(task_uuid)
-        if db_task is None:
-            raise LookupError(f"task {task_id} not found")
-
-        return self._to_schema(db_task)
-
     async def categories(self) -> list[ScanCategory]:
+        """지원하는 폐기물 카테고리 목록."""
         if ScanService._category_cache is None:
             ScanService._category_cache = self._load_categories()
         return ScanService._category_cache
 
     async def metrics(self) -> dict:
-        completed = await self.repository.count_completed()
-        last_completed = await self.repository.get_last_completed_at()
+        """서비스 메트릭 (Prometheus metrics 기반)."""
         categories = await self.categories()
         return {
-            "completed_tasks": completed,
-            "last_completed_at": last_completed.isoformat() if last_completed else None,
             "supported_categories": len(categories),
+            "note": "상세 메트릭은 /metrics 엔드포인트 또는 Kibana에서 확인",
         }
-
-    def _to_schema(self, db_task: ScanTaskModel) -> ScanTask:
-        """Convert ORM model to Pydantic schema."""
-        pipeline_result = None
-        if db_task.pipeline_result:
-            pipeline_result = WasteClassificationResult(**db_task.pipeline_result)
-
-        reward = None
-        if db_task.reward:
-            reward = CharacterRewardResponse(**db_task.reward)
-
-        return ScanTask(
-            task_id=str(db_task.id),
-            status=db_task.status,
-            category=db_task.category,
-            confidence=db_task.confidence,
-            completed_at=db_task.completed_at,
-            pipeline_result=pipeline_result,
-            reward=reward,
-        )
 
     def _load_categories(self) -> list[ScanCategory]:
         yaml_data = load_yaml(ITEM_CLASS_PATH) or {}
@@ -371,8 +418,7 @@ class ScanService:
     async def _call_character_reward_api(
         self, reward_request: CharacterRewardRequest
     ) -> CharacterRewardResponse | None:
-        """Call Character service gRPC API with retry and circuit breaker."""
-        # Create Protobuf request
+        """Call Character service gRPC API."""
         classification_msg = character_pb2.ClassificationSummary(
             major_category=reward_request.classification.major_category,
             middle_category=reward_request.classification.middle_category,
@@ -395,7 +441,6 @@ class ScanService:
             "user_id": str(reward_request.user_id),
         }
 
-        # Call gRPC with retry and circuit breaker
         client = get_character_client()
         with GRPC_CALL_LATENCY.labels(service="character", method="GetCharacterReward").time():
             response = await client.get_character_reward(grpc_req, log_ctx)
@@ -406,7 +451,6 @@ class ScanService:
             ).inc()
             return None
 
-        # Convert Protobuf response to Pydantic model
         result = CharacterRewardResponse(
             received=response.received,
             already_owned=response.already_owned,

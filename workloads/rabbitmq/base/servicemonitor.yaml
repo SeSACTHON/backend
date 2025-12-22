@@ -1,0 +1,23 @@
+# RabbitMQ Prometheus ServiceMonitor
+# Prometheus Operator가 RabbitMQ 메트릭을 자동 수집하도록 설정
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: rabbitmq
+  namespace: rabbitmq
+  labels:
+    app: rabbitmq
+    tier: platform
+    release: prometheus  # Prometheus Operator selector
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: eco2-rabbitmq
+  namespaceSelector:
+    matchNames:
+    - rabbitmq
+  endpoints:
+  - port: prometheus  # 15692 포트
+    interval: 30s
+    scrapeTimeout: 10s
+    path: /metrics

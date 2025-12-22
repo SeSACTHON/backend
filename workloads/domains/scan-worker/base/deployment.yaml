@@ -1,0 +1,108 @@
+# Scan Worker Celery Deployment
+# 비동기 AI 파이프라인 처리
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scan-worker
+  namespace: scan
+  labels:
+    app: scan-worker
+    version: v1
+    tier: worker
+    domain: scan
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: scan-worker
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: scan-worker
+        version: v1
+        tier: worker
+        domain: scan
+    spec:
+      containers:
+      - name: scan-worker
+        image: docker.io/mng990/eco2:scan-api-dev-latest
+        imagePullPolicy: Always
+        command: [celery]
+        args:
+        - -A
+        - domains.scan.celery_app
+        - worker
+        - --loglevel=info
+        - -Q
+        - scan.vision,scan.rule,scan.answer
+        - -c
+        - '2'
+        env:
+        # Celery Broker (RabbitMQ)
+        - name: CELERY_BROKER_URL
+          valueFrom:
+            secretKeyRef:
+              name: scan-secret
+              key: CELERY_BROKER_URL
+        # OpenTelemetry
+        - name: OTEL_SERVICE_NAME
+          value: scan-worker
+        - name: OTEL_TRACES_EXPORTER
+          value: otlp
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://jaeger-collector-clusterip.istio-system.svc.cluster.local:4317
+        - name: OTEL_METRICS_EXPORTER
+          value: none
+        - name: OTEL_LOGS_EXPORTER
+          value: none
+        # Database & Redis
+        - name: POSTGRES_HOST
+          value: postgresql.postgres.svc.cluster.local
+        - name: REDIS_HOST
+          value: redis.redis.svc.cluster.local
+        # API Keys
+        envFrom:
+        - configMapRef:
+            name: scan-config
+        - secretRef:
+            name: scan-secret
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 4Gi
+        livenessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - domains.scan.celery_app
+            - inspect
+            - ping
+            - -t
+            - '10'
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 15
+        readinessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - domains.scan.celery_app
+            - inspect
+            - ping
+            - -t
+            - '10'
+          initialDelaySeconds: 30
+          periodSeconds: 15
+          timeoutSeconds: 15
+      imagePullSecrets:
+      - name: dockerhub-secret
+      # worker-ai 노드에 배치
+      nodeSelector:
+        domain: worker-ai
+      # Taint가 없으므로 toleration 불필요

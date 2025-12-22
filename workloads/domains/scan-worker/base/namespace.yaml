@@ -1,0 +1,10 @@
+# scan-worker namespace
+# scan-api와 동일한 namespace 사용
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: scan
+  labels:
+    domain: scan
+    tier: worker
+    istio-injection: enabled
