@@ -42,6 +42,16 @@ spec:
             - key: node-role.kubernetes.io/control-plane
               operator: Exists
               effect: NoSchedule
+      # Namespace는 Cluster Operator(sync-wave 29)에서 생성
+      - target:
+          kind: Namespace
+          name: rabbitmq-system
+        patch: |
+          $patch: delete
+          apiVersion: v1
+          kind: Namespace
+          metadata:
+            name: rabbitmq-system
   destination:
     server: https://kubernetes.default.svc
     namespace: rabbitmq-system
@@ -50,7 +60,7 @@ spec:
       prune: true
       selfHeal: true
     syncOptions:
-    - CreateNamespace=true
+    - CreateNamespace=false   # Cluster Operator가 이미 생성
     - ServerSideApply=true    # CRD 충돌 방지
     retry:
       limit: 5
