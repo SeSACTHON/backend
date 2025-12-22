@@ -89,23 +89,5 @@ spec:
   # tls:
   #   secretName: rabbitmq-tls-secret
 
-  # 오버라이드 (환경별 Secret 참조)
-  override:
-    statefulSet:
-      spec:
-        template:
-          spec:
-            containers:
-            - name: rabbitmq
-              env:
-                  # 기본 사용자 비밀번호 (External Secret에서 주입)
-              - name: RABBITMQ_DEFAULT_USER
-                valueFrom:
-                  secretKeyRef:
-                    name: rabbitmq-default-user
-                    key: username
-              - name: RABBITMQ_DEFAULT_PASS
-                valueFrom:
-                  secretKeyRef:
-                    name: rabbitmq-default-user
-                    key: password
+  # Credentials: Operator가 자동 생성하는 eco2-rabbitmq-default-user secret 사용
+  # Topology Operator가 이 secret을 참조하여 Management API 인증
