@@ -37,7 +37,7 @@ spec:
     ports:
     - protocol: TCP
       port: 5672
-    # Management UI (15672) - 모니터링 접근
+    # Management UI (15672) - 모니터링 + Topology Operator 접근
   - from:
     - namespaceSelector:
         matchLabels:
@@ -45,6 +45,9 @@ spec:
     - namespaceSelector:
         matchLabels:
           kubernetes.io/metadata.name: istio-system
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: rabbitmq-system
     ports:
     - protocol: TCP
       port: 15672
