@@ -26,3 +26,5 @@ opentelemetry-instrumentation-grpc==0.50b0
 opentelemetry-propagator-b3==1.29.0
 # Circuit Breaker
 aiobreaker==1.2.0
+# Celery (for async task dispatch)
+celery==5.4.0
