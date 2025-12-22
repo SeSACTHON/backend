@@ -92,5 +92,5 @@ pyproject.toml
 # Large artifacts
 domains/location/data/location_common_dataset.csv
 
-# Blog drafts (local only)
-docs/blogs/
+# Documentation (local only, not exposed)
+docs/

@@ -1,12 +1,14 @@
 # Eco² Backend
 
-> **Version**: v1.0.5 | [Changelog](CHANGELOG.md)
+> **Version**: v1.0.7 | [Changelog](CHANGELOG.md)
 
 <img width="3840" height="2160" alt="515829337-6a4f523a-fa37-49de-b8e1-0a5befe26605" src="https://github.com/user-attachments/assets/e6c7d948-aa06-4bbb-b2fc-237aa7f01223" />
 
 
-- Self-managed Kubernetes, ArgoCD/Helm-charts/Kustomize 기반 GitOps Sync-wave로 개발 및 운영하는 14-Nodes 마이크로서비스 플랫폼입니다.
-- AI 폐기물 분류·근처 제로웨이스트샵 안내·챗봇 등 도메인 API와 데이터 계층, AI-Classification 파이프라인, GitOps 파이프라인을 모노레포로 관리합니다.
+- **GPT Vision + Rule-based-retrieval** 기반 AI 어시스턴트로, 폐기물 이미지 분류·분리배출 안내·챗봇 기능을 제공합니다.
+- Self-managed Kubernetes 16-Nodes 클러스터에서 **Istio Service Mesh**(mTLS, Auth Offloading)와 **ArgoCD GitOps**로 운영합니다.
+- **RabbitMQ + Celery** 비동기 Task Queue로 AI 파이프라인을 처리하고, **EFK + Jaeger**로 로깅·트레이싱을 수집합니다.
+- 7개 도메인 마이크로서비스(auth, my, scan, chat, character, location, image)를 모노레포로 관리합니다.
 - 정상 배포 중: [https://frontend.dev.growbin.app](https://frontend.dev.growbin.app)
 
 ---
@@ -62,11 +64,26 @@ flowchart TB
             subgraph Data["Data Infrastructure"]
                 Redis[("Redis<br/>(cache/blacklist)")]
                 PostgreSQL[("PostgreSQL<br/>(database)")]
+                RabbitMQ[("RabbitMQ<br/>(message broker)")]
+            end
+
+            subgraph Workers["Celery Workers"]
+                ScanWorker["scan-worker"]
+                CharWorker["character-worker"]
+                CeleryBeat["celery-beat"]
             end
 
             subgraph Obs["Observability"]
                 Prometheus["Prometheus"]
                 Grafana["Grafana"]
+                Kiali["Kiali"]
+                Jaeger["Jaeger"]
+            end
+
+            subgraph Logging["EFK Stack"]
+                FluentBit["Fluent Bit"]
+                Elasticsearch[("Elasticsearch")]
+                Kibana["Kibana"]
             end
         end
     end
@@ -107,10 +124,26 @@ flowchart TB
     Image --> PostgreSQL
     Chat --> PostgreSQL
 
+    %% Async Task Queue
+    Scan -->|Dispatch Task| RabbitMQ
+    RabbitMQ --> ScanWorker
+    RabbitMQ --> CharWorker
+    ScanWorker --> PostgreSQL
+    CharWorker --> PostgreSQL
+    CeleryBeat -.->|Schedule| RabbitMQ
+
     %% Observability
     Prometheus -.->|Scrape| Services
     Prometheus -.->|Scrape| ExtAuthz
     Grafana -.->|Query| Prometheus
+    Kiali -.->|Query| Prometheus
+    Jaeger -.->|Traces| Services
+
+    %% Logging Pipeline
+    Services -.->|stdout/stderr| FluentBit
+    Workers -.->|stdout/stderr| FluentBit
+    FluentBit -->|Forward| Elasticsearch
+    Kibana -.->|Query| Elasticsearch
 
     classDef external fill:#f9f,stroke:#333,stroke-width:2px
     classDef cp fill:#bbf,stroke:#333,stroke-width:2px
@@ -121,20 +154,22 @@ flowchart TB
 
 
 ```yaml
-Tier 1 Presentation : Route 53, AWS ALB, Istio Ingress Gateway
-Tier 2 Business Logic : auth, my, scan, character, location, info, chat (w/ Sidecar)
-Tier 3 Data : PostgreSQL, Redis, RabbitMQ(Pending), Celery(Pending)
-Tier 0 Monitoring & Control : Prometheus, Grafana, ArgoCD, Istiod, Controllers
+Edge Layer        : Route 53, AWS ALB, Istio Ingress Gateway
+Service Layer     : auth, my, scan, character, location, chat (w/ Envoy Sidecar)
+Messaging Layer   : RabbitMQ ✅, Celery Workers 🚧 (scan-worker, character-worker, celery-beat)
+Persistence Layer : PostgreSQL, Redis
+Platform Layer    : ArgoCD, Istiod, Controllers, Prometheus, Grafana, Kiali, Jaeger, EFK Stack
 ```
 
-본 서비스는 4-Tier Layered Architecture로 구성되었습니다.
+본 서비스는 5-Layer Architecture로 구성되었습니다.
 
-- **Tier 1 (Presentation)**: AWS ALB가 SSL Termination을 처리하고, 트래픽을 `Istio Ingress Gateway`로 전달합니다. Gateway는 `VirtualService` 규칙에 따라 API 및 Grafana 대시보드로 라우팅을 수행합니다.
-- **Tier 2 (Business Logic)**: 모든 마이크로서비스는 **Istio Service Mesh** 내에서 동작하며, `Envoy Sidecar`를 통해 mTLS 통신, 트래픽 제어, 메트릭 수집을 수행합니다.
-- **Tier 3 (Data)**: 서비스는 영속성을 위해 PostgreSQL 및 Redis를 사용하며, 이는 Helm Chart로 관리되는 독립적인 데이터 인프라입니다.
-- **Tier 0 (Monitoring & Control)**: `Istiod`가 메시를 제어하고, `ArgoCD`가 GitOps 동기화를 담당하며, `Prometheus/Grafana`가 클러스터 상태를 관측합니다.
+- **Edge Layer**: AWS ALB가 SSL Termination을 처리하고, 트래픽을 `Istio Ingress Gateway`로 전달합니다. Gateway는 `VirtualService` 규칙에 따라 North-South 트래픽을 라우팅합니다.
+- **Service Layer**: 모든 마이크로서비스는 **Istio Service Mesh** 내에서 동작하며, `Envoy Sidecar`를 통해 mTLS 통신, 트래픽 제어, 메트릭 수집을 수행합니다.
+- **Messaging Layer**: **RabbitMQ** 인프라 구축 완료. **Celery Worker**를 통한 비동기 태스크 처리 개발 중입니다. Scan API의 AI 파이프라인(Vision→Rule→Answer→Reward)은 Chain으로 구성됩니다.
+- **Persistence Layer**: 서비스는 영속성을 위해 PostgreSQL, Redis를 사용합니다. Helm Chart로 관리되는 독립적인 데이터 인프라입니다.
+- **Platform Layer**: `Istiod`가 Service Mesh를 제어하고, `ArgoCD`가 GitOps 동기화를 담당합니다. Observability 스택(`Prometheus/Grafana/Kiali`, `Jaeger`, `EFK Stack`)이 메트릭·트레이싱·로깅을 통합 관리합니다.
 
-각 계층은 서로 독립적으로 기능하도록 설계되었으며, 모니터링 스택을 제외한 상위 계층의 의존성은 단일 하위 계층으로 제한됩니다.
+각 계층은 서로 독립적으로 기능하도록 설계되었으며, Platform Layer가 전 계층을 횡단하며 제어 및 관측합니다.
 프로덕션 환경을 전제로 한 Self-manged Kubernetes 기반 클러스터로 컨테이너화된 어플리케이션의 오케스트레이션을 지원합니다.
 **Istio Service Mesh**를 도입하여 mTLS 보안 통신, 트래픽 제어(VirtualService), 인증 위임(Auth Offloading)을 구현했습니다.
 클러스터의 안정성과 성능을 보장하기 위해 모니터링 시스템을 도입, IaC(Infrastructure as Code) 및 GitOps 파이프라인을 구축해 모노레포 기반 코드베이스가 SSOT(Single Source Of Truth)로 기능하도록 제작되었습니다.
@@ -154,6 +189,16 @@ Tier 0 Monitoring & Control : Prometheus, Grafana, ArgoCD, Istiod, Controllers
 | location | 지도/수거함 검색 | `docker.io/mng990/eco2:location-{env}-latest` |
 | images | 이미지 업로드 | `docker.io/mng990/eco2:image-{env}-latest` |
 
+### Celery Workers 🚧
+
+> **Status**: 개발 중
+
+| Worker | 설명 | Queue | Status |
+|--------|------|-------|--------|
+| scan-worker | AI 파이프라인 처리 (Vision→Rule→Answer) | `scan.vision`, `scan.rule`, `scan.answer` | 🚧 |
+| character-worker | 보상 판정 및 DB 저장 | `reward.character`, `reward.persist`, `my.sync` | 🚧 |
+| celery-beat | DLQ 재처리 스케줄링 | - | 🚧 |
+
 각 도메인은 공통 FastAPI 템플릿·Dockerfile·테스트를 공유하고, Kustomize overlay에서 이미지 태그와 ConfigMap/Secret만 분기합니다.
 
 ---
@@ -172,112 +217,145 @@ Tier 0 Monitoring & Control : Prometheus, Grafana, ArgoCD, Istiod, Controllers
 
 ---
 
-### Network Topology
+## Async Task Pipeline (Celery) 🚧
+
+> **Status**: RabbitMQ 인프라 구축 완료, Celery Worker 개발 중
+
 ```mermaid
-graph TD
-    User["User/Client"]
-    R53["Route53 DNS Zones (Global)"]
+sequenceDiagram
+    participant Client
+    participant ScanAPI as Scan API
+    participant RabbitMQ
+    participant VisionWorker as Vision Worker
+    participant RuleWorker as Rule Worker
+    participant AnswerWorker as Answer Worker
+    participant RewardWorker as Reward Worker
+    participant PostgreSQL
 
-    subgraph AWS_VPC ["AWS VPC"]
-        ALB["AWS ALB (HTTPS 443)"]
-        TG["AWS Target Group (Instance Mode)"]
+    Client->>ScanAPI: POST /classify/async
+    ScanAPI->>RabbitMQ: Dispatch Chain (task_id)
+    ScanAPI-->>Client: 202 Accepted {task_id}
 
-        subgraph K8s ["Self-managed K8s Cluster"]
-            IngressRes["Bridge Ingress (K8s Ingress Resource)"]
-            IstioRes["Istio VirtualService (Routing Rules)"]
+    Client->>ScanAPI: GET /progress/{task_id} (SSE)
 
-            subgraph Master ["Master Node"]
-                ALB_Controller["AWS LB Controller Pod"]
-                EDNS["ExternalDNS Controller Pod"]
-                Istiod["Istiod Control Plane"]
-            end
+    RabbitMQ->>VisionWorker: scan.vision queue
+    VisionWorker->>VisionWorker: GPT Vision 분석
+    VisionWorker-->>ScanAPI: Event: vision_complete
+    ScanAPI-->>Client: SSE: stage=vision
 
-            subgraph IngressNode ["Ingress Gateway Node"]
-                subgraph ServicePortMapping ["Istio-ingressgateway"]
-                    NP["NodePort (30xxx) - Receives Traffic from TG"]
-                    TP["TargetPort: 80 (Protocol: HTTP)"]
-                end
-                IGW["Istio Ingress Gateway Pod (Listening on Port 80)"]
-            end
+    VisionWorker->>RabbitMQ: Chain → scan.rule
+    RabbitMQ->>RuleWorker: scan.rule queue
+    RuleWorker->>RuleWorker: RAG 규정 검색
+    RuleWorker-->>ScanAPI: Event: rule_complete
+    ScanAPI-->>Client: SSE: stage=rule
 
-            subgraph Worker ["Worker Node"]
-                Sidecar["Envoy Sidecar"]
-                App["Scan API Pod (Backend Service)"]
-            end
-        end
+    RuleWorker->>RabbitMQ: Chain → scan.answer
+    RabbitMQ->>AnswerWorker: scan.answer queue
+    AnswerWorker->>AnswerWorker: GPT 답변 생성
+    AnswerWorker-->>ScanAPI: Event: answer_complete
+    ScanAPI-->>Client: SSE: stage=answer
+
+    AnswerWorker->>RabbitMQ: Chain → reward.character
+    RabbitMQ->>RewardWorker: reward.character queue
+    RewardWorker->>PostgreSQL: 보상 저장
+    RewardWorker-->>ScanAPI: Event: complete
+    ScanAPI-->>Client: SSE: stage=complete (result)
+```
+
+| 컴포넌트 | 역할 | Queue |
+|----------|------|-------|
+| **scan-worker** | Vision 분석, RAG 검색, 답변 생성 | `scan.vision`, `scan.rule`, `scan.answer` |
+| **character-worker** | 보상 판정, DB 저장, my 도메인 동기화 | `reward.character`, `reward.persist`, `my.sync` |
+| **celery-beat** | DLQ 재처리 스케줄링 (5분 주기) | - |
+| **RabbitMQ** | AMQP 메시지 브로커 | vhost: `eco2` |
+
+---
+
+## Logging Pipeline (EFK Stack)
+
+```mermaid
+flowchart LR
+    subgraph Pods["Kubernetes Pods"]
+        API["API Pods<br/>(auth, scan, chat...)"]
+        Workers["Celery Workers<br/>(scan-worker, character-worker)"]
+        Infra["Infra Pods<br/>(istio, argocd...)"]
     end
 
-    %% DNS & User Flow
-    R53 -.->|CNAME / A Record| ALB
-    User -->|HTTPS Request| ALB
+    subgraph FluentBit["Fluent Bit (DaemonSet)"]
+        Tail["Tail Input<br/>(/var/log/containers/*.log)"]
+        Parser["Parser<br/>(JSON, regex)"]
+        Filter["Filter<br/>(kubernetes metadata)"]
+        Output["Output<br/>(es plugin)"]
+    end
 
-    %% Controllers Watching
-    IngressRes -.->|Watched by| ALB_Controller
-    IngressRes -.->|Watched by| EDNS
-    EDNS -->|Updates via AWS API| R53
-    IstioRes -.->|Watched by| Istiod
+    subgraph EFK["EFK Stack"]
+        ES[("Elasticsearch<br/>(3 nodes)")]
+        Kibana["Kibana<br/>(UI)"]
+    end
 
-    %% Control Plane Logic
-    ALB_Controller -.->|"AWS API Calls (Create/Update)"| ALB
-    ALB_Controller -.->|"AWS API Calls (Register Targets)"| TG
-    Istiod -.->|"xDS Config (Gateway/Routes)"| IGW
-    Istiod -.->|xDS Config| Sidecar
+    API -->|stdout/stderr| Tail
+    Workers -->|stdout/stderr| Tail
+    Infra -->|stdout/stderr| Tail
 
-    %% Data Plane Traffic
-    ALB -->|Forward| TG
-    TG -->|"Health Check / Traffic (HTTP)"| NP
-    NP -->|Forward| TP
-    TP -->|Traffic| IGW
-    IGW -->|VirtualService Routing| Sidecar
-    Sidecar -->|Localhost| App
+    Tail --> Parser
+    Parser --> Filter
+    Filter --> Output
+    Output -->|HTTP/9200| ES
 
-    %% Styling
-    classDef aws fill:#FF9900,stroke:#232F3E,stroke-width:2px,color:white;
-    classDef k8s fill:#326CE5,stroke:#fff,stroke-width:2px,color:white;
-    classDef control fill:#0073BB,stroke:#fff,stroke-width:2px,color:white;
-    classDef ingress fill:#466BB0,stroke:#fff,stroke-width:2px,color:white;
-    classDef app fill:#009688,stroke:#fff,stroke-width:2px,color:white;
-    classDef user fill:#24292e,stroke:#fff,stroke-width:2px,color:white;
-    classDef res fill:#666,stroke:#fff,stroke-width:1px,color:white,stroke-dasharray: 5 5;
+    ES --> Kibana
 
-    class ALB,TG,R53 aws;
-    class ALB_Controller,EDNS,Istiod control;
-    class IGW,Sidecar ingress;
-    class App app;
-    class User user;
-    class IngressRes,IstioRes res;
-    class NP,TP res;
+    classDef pods fill:#326CE5,stroke:#fff,color:white
+    classDef fluent fill:#009688,stroke:#fff,color:white
+    classDef efk fill:#FF9800,stroke:#fff,color:white
+
+    class API,Workers,Infra pods
+    class Tail,Parser,Filter,Output fluent
+    class ES,Kibana efk
 ```
-**1. AWS Ingress Flow (North-South)**
-- Route53 DNS → AWS ALB (HTTPS 종료) → AWS Target Group (Instance Mode) → NodePort (3xxxx) → **Istio Ingress Gateway Pod**
-- ALB는 SSL Offloading을 담당하고, 클러스터 내부로는 HTTP 트래픽을 전달합니다.
-- Istio Gateway는 `VirtualService` 규칙에 따라 각 서비스(my, chat, scan 등)로 라우팅을 분배합니다.
 
-**2. Service Mesh (East-West)**
-- 모든 마이크로서비스 파드에는 **Envoy Sidecar**가 주입되어 있습니다.
-- 서비스 간 통신(예: Scan → Character)은 Sidecar Proxy를 통해 mTLS로 암호화되어 전달됩니다.
-- **Auth Offloading**: 외부 요청은 Ingress Gateway 단계에서 JWT 검증(`RequestAuthentication`)과 인가(`AuthorizationPolicy`)를 거친 후 애플리케이션에 도달합니다.
+| 컴포넌트 | 역할 | 설정 |
+|----------|------|------|
+| **Fluent Bit** | 로그 수집 및 포워딩 (DaemonSet) | `/var/log/containers/*.log` 수집, JSON 파싱 |
+| **Elasticsearch** | 로그 저장 및 인덱싱 | 3-node cluster, 인덱스: `logstash-YYYY.MM.DD` |
+| **Kibana** | 로그 검색 및 시각화 | Discover, Dashboard, Alerting |
 
-**3. Infrastructure Components**
-- **Istiod**: 서비스 메시 컨트롤 플레인으로, Envoy 프록시들에게 설정(xDS)을 배포합니다.
-- **ExternalDNS**: Route53 레코드를 K8s 리소스와 동기화합니다.
-- **AWS LB Controller**: Ingress 리소스를 감지하여 ALB 및 Target Group을 프로비저닝합니다.
+### 로그 포맷 (JSON 구조화)
+
+```json
+{
+  "timestamp": "2025-12-22T10:30:00.000Z",
+  "level": "INFO",
+  "logger": "scan.vision_task",
+  "message": "Vision analysis completed",
+  "task_id": "550e8400-e29b-41d4-a716-446655440000",
+  "user_id": "123e4567-e89b-12d3-a456-426614174000",
+  "duration_ms": 2340,
+  "kubernetes": {
+    "namespace": "scan",
+    "pod_name": "scan-worker-5d8f9b7c4-x2k9p",
+    "container_name": "scan-worker"
+  }
+}
+```
 
 ---
 
 ## Bootstrap Overview
 
 ```yaml
-Cluster  : kubeadm Self-Managed (14 Nodes)
-GitOps   :
+Cluster   : kubeadm Self-Managed (16 Nodes)
+GitOps    :
   Layer0 - Terraform (AWS 인프라)
   Layer1 - Ansible (kubeadm, CNI)
   Layer2 - ArgoCD App-of-Apps Sync-wave + Kustomize/Helm
   Layer3 - GitHub Actions + Docker Hub
-Domains  : auth, my, scan, character, location, info, chat
-Data     : PostgreSQL, Redis, RabbitMQ (paused), Monitoring stack
-Ingress  : Istio Ingress Gateway + VirtualService -> Envoy Sidecar
-Network  : Calico CNI + Istio Service Mesh (mTLS)
+Architecture :
+  Edge Layer        - Route 53, AWS ALB, Istio Ingress Gateway
+  Service Layer     - auth, my, scan, character, location, chat
+  Messaging Layer   - RabbitMQ (✅), Celery Workers (🚧 개발 중)
+  Persistence Layer - PostgreSQL, Redis
+  Platform Layer    - ArgoCD, Istiod, Observability (Prometheus, Grafana, EFK, Jaeger)
+Network   : Calico CNI + Istio Service Mesh (mTLS)
 ```
 1. Terraform으로 AWS 인프라를 구축합니다.
 2. Ansible로 구축된 AWS 인프라를 엮어 K8s 클러스터를 구성하고, ArgoCD root-app을 설치합니다.
@@ -333,9 +411,16 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 | 16 | `16-external-dns.yaml` | ExternalDNS Helm (Route53 자동화) | Helm repo `kubernetes-sigs/external-dns` |
 | 20 | `20-monitoring-operator.yaml` | kube-prometheus-stack Helm | Helm repo `prometheus-community/kube-prometheus-stack` |
 | 21 | `21-grafana.yaml` | Grafana Helm (독립 UI) | Helm repo `grafana/grafana` |
+| 22 | `22-kiali.yaml` | Kiali Service Mesh Observability | Helm repo `kiali/kiali-server` |
+| 23 | `23-jaeger.yaml` | Jaeger Distributed Tracing | Helm repo `jaegertracing/jaeger` |
+| 24 | `24-elasticsearch.yaml` | Elasticsearch (EFK Log Store) | Helm repo `elastic/elasticsearch` |
+| 25 | `25-kibana.yaml` | Kibana (EFK Log UI) | Helm repo `elastic/kibana` |
+| 26 | `26-fluent-bit.yaml` | Fluent Bit (Log Forwarder) | Helm repo `fluent/fluent-bit` |
 | 27 | `27-postgresql.yaml` | Bitnami PostgreSQL (standalone) | Helm repo `bitnami/postgresql` |
 | 28 | `28-redis-operator.yaml` | Bitnami Redis Replication + Sentinel | Helm repo `bitnami/redis` |
+| 29 | `29-rabbitmq.yaml` | RabbitMQ (Celery Broker) | Helm repo `bitnami/rabbitmq` |
 | 40 | `40-apis-appset.yaml` | 도메인 API ApplicationSet (auth, my, scan, character, location, info, chat) | `workloads/domains/<service>/{env}` |
+| 45 | `45-workers-appset.yaml` | Celery Worker ApplicationSet (scan-worker, character-worker, celery-beat) | `workloads/domains/<worker>/{env}` |
 | 50 | `50-istio-routes.yaml` | Istio VirtualService 라우팅 규칙 | `workloads/routing/<service>/{env}` |
 
 - Istio Migration으로 인해 `Ingress` 대신 `Gateway/VirtualService`를 사용하며, Sync Wave가 60/70에서 40/50으로 조정되었습니다.
@@ -385,55 +470,59 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 
 ---
 
-## Release Summary (v1.0.5)
+## Release Summary (v1.0.7)
 
-- **Istio Service Mesh Migration**
-  - 기존 ALB Ingress Controller 기반 라우팅을 **Istio Ingress Gateway** + **VirtualService** 구조로 전면 전환했습니다.
-  - 이를 통해 L7 트래픽 제어(Canary 배포, Fault Injection 등) 기반을 마련하고, **Auth Offloading**을 통해 애플리케이션의 인증 부하를 게이트웨이로 위임했습니다.
+- **RabbitMQ 인프라 구축** ✅
+  - **RabbitMQ**를 AMQP 브로커로 도입하고, vhost `eco2`에 큐별 라우팅 구성
+  - Dead Letter Queue(DLQ) 및 Exchange 설정 완료
+  - NetworkPolicy를 통한 namespace간 통신 허용
 
-- **Security & Observability 강화**
-  - **mTLS**: 서비스 간 통신 암호화를 기본 적용하여 내부 보안을 강화했습니다.
-  - **Metrics Offloading**: 애플리케이션 레벨의 메트릭 수집을 Envoy Sidecar로 이관하여 비즈니스 로직 성능을 최적화했습니다.
-  - **RS256 JWT**: 인증 서명 알고리즘을 비대칭키(RS256)로 고도화하고 JWKS 엔드포인트를 제공합니다.
+- **비동기 API 개발 중** 🚧
+  - Scan API의 AI 파이프라인을 **Celery Chain**(Vision→Rule→Answer→Reward)으로 분리
+  - SSE(Server-Sent Events) 기반 실시간 진행 상황 스트리밍
+  - celery-beat 스케줄러를 통한 DLQ 재처리 구현 예정
 
-- **Infrastructure Stabilization**
-  - NetworkPolicy를 정교화하여 네임스페이스 간 격리를 유지하면서도 필수적인 DNS, DB, 외부 통신을 허용하도록 `Egress Whitelist` 정책을 완성했습니다.
-  - ArgoCD Sync Wave를 재설계하여 Istio 컴포넌트(Wave 4~6)와 애플리케이션(Wave 40), 라우팅(Wave 50) 간의 배포 순서를 보장했습니다.
+- **EFK 로깅 파이프라인** ✅
+  - **Fluent Bit**이 모든 Pod의 stdout/stderr 로그를 수집하여 **Elasticsearch**로 포워딩
+  - **Kibana** 대시보드에서 중앙 집중식 로그 검색 및 분석
+  - JSON 구조화 로그 포맷 적용
+
+- **분산 트레이싱** ✅
+  - **OpenTelemetry** 기반 계측으로 Istio Envoy Sidecar의 트레이스 수집
+  - **Jaeger**에서 서비스 간 호출 체인 시각화 및 지연 시간 분석
+  - **Kiali**로 Service Mesh 토폴로지 및 트래픽 흐름 모니터링
+
+- **Alerting** ✅
+  - **Alertmanager**를 통해 임계값 기반 알림(CPU, Memory, Pod 상태) 설정
+  - Slack/Email 웹훅 연동으로 운영 이슈 즉시 통보 체계 구축
 
 ---
 
 ## Article
 
-- [이코에코 GitOps 구축기 #1 클러스터 부트스트랩](https://rooftopsnow.tistory.com/8)
-- [이코에코 GitOps 구축기 #2 Ansible 의존성 줄이기](https://rooftopsnow.tistory.com/10)
-- [이코에코 GitOps 구축기 #3 네트워크 트러블슈팅](https://rooftopsnow.tistory.com/11)
-- [이코에코 GitOps 구축기 #4 Operator vs Helm-charts](https://rooftopsnow.tistory.com/12)
-- [이코에코 GitOps 구축기 #5 Sync-wave](https://rooftopsnow.tistory.com/13)
-- [이코에코 GitOps 구축기 #6 Namespace/RBAC/NeworkPolicy](https://rooftopsnow.tistory.com/14)
-- [이코에코(Eco²) 2025 새싹톤 본선 진출 후일담](https://rooftopsnow.tistory.com/15)
-- [이코에코(Eco²) 2025 새싹톤 우수상 후기](https://rooftopsnow.tistory.com/16)
-- [이코에코(Eco²) Scan API 성능 측정](https://rooftopsnow.tistory.com/17)
-- [이코에코(Eco²) Service Mesh #1 Istio Sidecar 도입 및 마이그레이션](https://rooftopsnow.tistory.com/19)
-- [이코에코(Eco²) Service Mesh #2 내부 통신을 위한 gRPC 마이그레이션](https://rooftopsnow.tistory.com/20)
-- [이코에코(Eco²) Auth Offloading: ext-authz 서버 개발기 (Go, gRPC)](https://rooftopsnow.tistory.com/21)
-- [이코에코(Eco²) Auth Offloading: 도메인 공통 모듈 제거](https://rooftopsnow.tistory.com/22)
-- [이코에코(Eco²) ext-authz: AuthN/AuthZ 검증 엔진 Stress Test](https://rooftopsnow.tistory.com/23)
-- [이코에코(Eco²) ext-authz 성능 튜닝: Redis PoolSize, HPA](https://rooftopsnow.tistory.com/24)
+📝 [이코에코(Eco²) 백엔드/인프라 개발 블로그](https://rooftopsnow.tistory.com/category/%EC%9D%B4%EC%BD%94%EC%97%90%EC%BD%94%28Eco%C2%B2%29)
 
 ---
 
 ## Status
 
+### v1.0.7 - Messaging
+- ✅ RabbitMQ 인프라 구축 완료 (vhost: eco2, DLX/DLQ 설정)
+- 🚧 Celery 비동기 API 개발 중 (scan-worker, character-worker)
+
+### v1.0.6 - Observability
+- ✅ EFK 로깅 파이프라인 (Fluent Bit → Elasticsearch → Kibana)
+- ✅ 분산 트레이싱 (Jaeger + OpenTelemetry + Kiali)
+- ✅ Alertmanager 알림 시스템 (Slack)
+
+### v1.0.5 - Service Mesh & Auth Offloading
+- ✅ Istio Service Mesh Migration 완료
+- ✅ gRPC 내부 통신 Migration 완료
+- ✅ Auth-Offloading 완료, 도메인별 독립성 확보
+- ✅ ext-authz 성능 튜닝 ([Grafana](https://snapshots.raintank.io/dashboard/snapshot/1qhkHr5rWubb29VtWCAXYB66bHMmN5Ad?orgId=0): RPS 1100, p99 200-300ms)
+
+### v1.0.0 - Initial Release
 - ✅ Terraform · Ansible bootstrap · ArgoCD Sync-wave
 - ✅ GitOps Sync-Wave 재정렬 (00~70) + upstream Helm/CRD 분리
-- ✅ Docker Hub 단일 이미지 파이프라인 + External Secrets 운영 안정화
-- ⚠️ RabbitMQ Operator/CR 장애로 Pending, MVP API 개발 이후 재도입 예정
+- ✅ Docker Hub 이미지 파이프라인 + External Secrets 운영
 - ✅ API 개발 완료, 프론트-백-AI 연동 완료
-- ✅ Istio Migration 완료
-- ✅ gRPC Migration 완료
-- ✅ Auth-Offloading 완료, 도메인별 독립성 확보 (코드레벨)
-- ✅ ext-authz 성능 튜닝
-     - [Grafana 대시보드(snapshot)](https://snapshots.raintank.io/dashboard/snapshot/1qhkHr5rWubb29VtWCAXYB66bHMmN5Ad?orgId=0)
-     - PoolSize: Idle=250, Max=500, HPA: 3-5, cpu(request): 100m, memory(request): 64Mi, cpu(limits): 500m, memory(limits): 256Mi
-     - 테스트 환경: 2500 users, 250 ramp-ups, 30m, wait_time 1-3s,locust
-     - RPS: 1100, pp99: 200-300ms, avg latency: 15-20ms, p99 redis_lookup: 250-350ms
