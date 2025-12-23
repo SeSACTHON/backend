@@ -136,8 +136,9 @@ class TestClassifyAsyncService:
 
         response = await service.classify_async(request, user_id)
 
+        # AsyncClassificationResponse는 error 필드 없음 - status와 message로 확인
         assert response.status == "failed"
-        assert "HTTPS_REQUIRED" in (response.error or "")
+        assert "HTTPS" in (response.message or "")
 
     @pytest.mark.asyncio
     async def test_returns_error_on_no_image(self, mock_settings):
@@ -155,8 +156,9 @@ class TestClassifyAsyncService:
 
         response = await service.classify_async(request, user_id)
 
+        # AsyncClassificationResponse는 error 필드 없음 - status와 message로 확인
         assert response.status == "failed"
-        assert response.error == "IMAGE_URL_REQUIRED"
+        assert "이미지 URL" in (response.message or "")
 
     @pytest.mark.asyncio
     async def test_chain_dispatch_failure(self, mock_settings, valid_image_url):
@@ -177,8 +179,9 @@ class TestClassifyAsyncService:
 
             response = await service.classify_async(request, user_id)
 
+            # AsyncClassificationResponse는 error 필드 없음 - status와 message로 확인
             assert response.status == "failed"
-            assert response.error == "TASK_DISPATCH_ERROR"
+            assert "실패" in (response.message or "")
 
 
 class TestCallbackUrlDeprecated:
@@ -216,21 +219,20 @@ class TestAsyncResponseFormat:
 
     def test_async_response_structure(self):
         """비동기 응답 구조 검증."""
-        from domains.scan.schemas.scan import ClassificationResponse
+        from domains.scan.schemas.scan import AsyncClassificationResponse
 
         task_id = str(uuid4())
-        response = ClassificationResponse(
+        response = AsyncClassificationResponse(
             task_id=task_id,
             status="processing",
             message="AI 분석이 진행 중입니다.",
         )
 
-        # 비동기 응답은 pipeline_result, reward가 None
+        # AsyncClassificationResponse는 task_id, status, message만 포함
         assert response.task_id == task_id
         assert response.status == "processing"
-        assert response.pipeline_result is None
-        assert response.reward is None
-        assert response.error is None
+        assert response.message is not None
+        # pipeline_result, reward, error 필드는 없음 (SSE로 수신)
 
     def test_completed_response_structure(self):
         """완료 응답 구조 검증 (SSE 최종 이벤트와 동일)."""
