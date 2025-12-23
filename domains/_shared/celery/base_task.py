@@ -30,7 +30,7 @@ class BaseTask(Task):
             extra={
                 "task_id": task_id,
                 "task_name": self.name,
-                "args": args,
+                "task_args": args,
                 "result_type": type(retval).__name__,
             },
         )
