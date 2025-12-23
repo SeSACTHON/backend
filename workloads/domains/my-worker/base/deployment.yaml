@@ -65,7 +65,7 @@ spec:
           valueFrom:
             secretKeyRef:
               name: my-secret
-              key: DATABASE_URL
+              key: MY_DATABASE_URL
         envFrom:
         - configMapRef:
             name: my-worker-config
