@@ -128,7 +128,7 @@ async def _completion_generator(
     # 마지막으로 received된 task 추적 (다음 task-sent 시 이전 task 완료 처리용)
     last_received_task: dict = {"task_id": None, "task_name": None}
 
-    def _send_sse_event(task_name: str, status: str, result: dict | None = None) -> None:
+    def _send_sse_event(task_name: str, status: str, result: dict | str | None = None) -> None:
         """SSE 이벤트 전송."""
         step_info = TASK_STEP_MAP.get(task_name, {})
         if not step_info:
@@ -147,17 +147,26 @@ async def _completion_generator(
 
         # reward 완료 시 최종 결과 포함
         if task_name == "scan.reward" and status == "completed" and result:
-            sse_data["result"] = {
-                "task_id": result.get("task_id"),
-                "status": "completed",
-                "message": "classification completed",
-                "pipeline_result": {
-                    "classification_result": result.get("classification_result"),
-                    "disposal_rules": result.get("disposal_rules"),
-                    "final_answer": result.get("final_answer"),
-                },
-                "reward": result.get("reward"),
-            }
+            # result가 문자열인 경우 JSON 파싱
+            if isinstance(result, str):
+                try:
+                    result = json.loads(result)
+                except json.JSONDecodeError:
+                    logger.warning("failed_to_parse_result", extra={"result": result[:100]})
+                    result = {}
+
+            if isinstance(result, dict):
+                sse_data["result"] = {
+                    "task_id": result.get("task_id"),
+                    "status": "completed",
+                    "message": "classification completed",
+                    "pipeline_result": {
+                        "classification_result": result.get("classification_result"),
+                        "disposal_rules": result.get("disposal_rules"),
+                        "final_answer": result.get("final_answer"),
+                    },
+                    "reward": result.get("reward"),
+                }
 
         loop.call_soon_threadsafe(event_queue.put_nowait, sse_data)
 
