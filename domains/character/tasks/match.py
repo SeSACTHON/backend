@@ -2,9 +2,10 @@
 Character Match Task
 
 캐릭터 매칭 전용 Celery Task (character.match 큐)
-- 로컬 캐시에서 캐릭터 목록 조회
+- 로컬 캐시에서만 캐릭터 목록 조회 (DB 조회 없음)
 - evaluator로 매칭
-- DB 저장 없이 결과만 반환
+- 소유권 체크 없음 (클라이언트가 판단)
+- 매칭 결과만 반환
 
 scan.reward에서 동기 호출하여 결과를 받습니다.
 """
@@ -37,7 +38,7 @@ def match_character_task(
     classification_result: dict[str, Any],
     disposal_rules_present: bool,
 ) -> dict[str, Any]:
-    """캐릭터 매칭 수행 (DB 저장 없음, 로컬 캐시 사용).
+    """캐릭터 매칭 수행 (캐시 전용, DB 조회 없음).
 
     Args:
         user_id: 사용자 ID
@@ -45,10 +46,11 @@ def match_character_task(
         disposal_rules_present: 배출 규칙 존재 여부
 
     Returns:
-        매칭 결과:
-        - received: 매칭 성공 여부
-        - already_owned: 이미 보유 여부
-        - character_id, name, dialog 등
+        매칭 성공 시:
+        - received: True (매칭됨, 소유 여부는 클라이언트가 판단)
+        - character_id, character_code: 저장 task용
+        - name, dialog, match_reason: 클라이언트 표시용
+        매칭 실패 시: None
     """
     log_ctx = {
         "user_id": user_id,
@@ -75,7 +77,7 @@ def match_character_task(
             "Character match completed",
             extra={
                 **log_ctx,
-                "received": result.get("received") if result else False,
+                "matched": result is not None,
                 "character_name": result.get("name") if result else None,
             },
         )
@@ -83,32 +85,22 @@ def match_character_task(
 
     except Exception:
         logger.exception("Character match failed", extra=log_ctx)
-        return {"received": False, "reason": "error"}
+        return None
 
 
 async def _match_character_async(
     user_id: str,
     classification_result: dict[str, Any],
     disposal_rules_present: bool,
-) -> dict[str, Any]:
-    """캐릭터 매칭 (로컬 캐시 우선, DB fallback).
+) -> dict[str, Any] | None:
+    """캐릭터 매칭 (캐시 전용, DB 조회 없음).
 
     Flow:
-        1. 로컬 캐시에서 캐릭터 목록 조회
-        2. 캐시 비어있으면 DB fallback
-        3. evaluator로 매칭
-        4. 소유권 체크 (DB)
-        5. 결과 반환
+        1. 로컬 캐시에서 캐릭터 목록 조회 (DB fallback 없음)
+        2. evaluator로 매칭
+        3. 결과 반환 (소유권 체크 없음 - 클라이언트가 판단)
     """
-    from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
-    from sqlalchemy.orm import sessionmaker
-
     from domains._shared.cache import get_character_cache
-    from domains.character.core.config import get_settings
-    from domains.character.repositories.character_repository import CharacterRepository
-    from domains.character.repositories.ownership_repository import (
-        CharacterOwnershipRepository,
-    )
     from domains.character.schemas.reward import (
         CharacterRewardRequest,
         CharacterRewardSource,
@@ -116,31 +108,22 @@ async def _match_character_async(
     )
     from domains.character.services.evaluators import get_evaluator
 
-    settings = get_settings()
-    engine = create_async_engine(settings.database_url, echo=False)
-    async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
-
     classification = classification_result.get("classification", {})
     situation_tags = classification_result.get("situation_tags", [])
 
-    # 1. 로컬 캐시에서 캐릭터 목록 조회
+    # 1. 로컬 캐시에서 캐릭터 목록 조회 (DB fallback 없음)
     cache = get_character_cache()
     characters = cache.list_all()
 
     if not characters:
-        # 2. 캐시가 비어있으면 DB fallback
-        logger.warning("Character cache empty, falling back to DB")
-        async with async_session() as session:
-            character_repo = CharacterRepository(session)
-            characters = await character_repo.list_all()
+        logger.warning("Character cache empty, cannot perform match")
+        return None
 
-    if not characters:
-        return {"received": False, "reason": "no_characters"}
-
-    # 3. Evaluator로 매칭
+    # 2. Evaluator로 매칭
     evaluator = get_evaluator(CharacterRewardSource.SCAN)
     if evaluator is None:
-        return {"received": False, "reason": "no_evaluator"}
+        logger.error("No evaluator found for SCAN source")
+        return None
 
     request = CharacterRewardRequest(
         source=CharacterRewardSource.SCAN,
@@ -159,26 +142,16 @@ async def _match_character_async(
     eval_result = evaluator.evaluate(request, characters)
 
     if not eval_result.should_evaluate or not eval_result.matches:
-        return {"received": False, "reason": "no_match"}
+        return None
 
     matched_character = eval_result.matches[0]
 
-    # 4. 소유권 체크 (DB)
-    async with async_session() as session:
-        ownership_repo = CharacterOwnershipRepository(session)
-        existing = await ownership_repo.get_by_user_and_character(
-            user_id=UUID(user_id), character_id=matched_character.id
-        )
-
-    # 5. 결과 반환 (DB 저장은 하지 않음)
+    # 3. 결과 반환 (소유권 체크 없음 - 클라이언트가 판단)
     return {
-        "received": not existing,
-        "already_owned": existing is not None,
+        "received": True,  # 매칭됨 (소유 여부는 클라이언트가 판단)
         "character_id": str(matched_character.id),
         "character_code": matched_character.code,
         "name": matched_character.name,
         "dialog": matched_character.dialog,
         "match_reason": eval_result.match_reason,
-        "character_type": matched_character.type_label,
-        "type": str(matched_character.type_label or "").strip(),
     }
