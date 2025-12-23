@@ -198,23 +198,35 @@ async def _completion_generator(
         }
 
         # reward 완료 시 최종 결과 포함
-        if task_name == "scan.reward" and status == "completed" and result:
+        if task_name == "scan.reward" and status == "completed":
             # Celery result 파싱 (Python repr 또는 JSON)
-            parsed_result = _parse_celery_result(result)
+            parsed_result = _parse_celery_result(result) if result else {}
 
-            if parsed_result:
-                sse_data["result"] = {
-                    "task_id": parsed_result.get("task_id"),
-                    "status": "completed",
-                    "message": "classification completed",
-                    "pipeline_result": {
-                        "classification_result": parsed_result.get("classification_result"),
-                        "disposal_rules": parsed_result.get("disposal_rules"),
-                        "final_answer": parsed_result.get("final_answer"),
-                    },
-                    "reward": parsed_result.get("reward"),
-                    "error": None,
-                }
+            # 파싱 결과 로깅
+            logger.info(
+                "reward_result_parsed",
+                extra={
+                    "task_id": task_id,
+                    "parsed_keys": list(parsed_result.keys()) if parsed_result else [],
+                    "has_classification": "classification_result" in parsed_result,
+                    "has_disposal": "disposal_rules" in parsed_result,
+                    "has_answer": "final_answer" in parsed_result,
+                },
+            )
+
+            # 결과가 없어도 기본 구조 반환
+            sse_data["result"] = {
+                "task_id": parsed_result.get("task_id") or task_id,
+                "status": "completed",
+                "message": "classification completed",
+                "pipeline_result": {
+                    "classification_result": parsed_result.get("classification_result"),
+                    "disposal_rules": parsed_result.get("disposal_rules"),
+                    "final_answer": parsed_result.get("final_answer"),
+                },
+                "reward": parsed_result.get("reward"),
+                "error": None,
+            }
 
         loop.call_soon_threadsafe(event_queue.put_nowait, sse_data)
 
@@ -291,8 +303,21 @@ async def _completion_generator(
         event_task_id = event.get("uuid", "")
         task_name = event.get("name", "") or task_name_map.get(event_task_id, "")
 
+        # 디버그 로깅: result 확인
+        raw_result = event.get("result")
+        logger.info(
+            "task_succeeded_result_debug",
+            extra={
+                "task_id": task_id,
+                "event_task_id": event_task_id,
+                "task_name": task_name,
+                "result_type": type(raw_result).__name__,
+                "result_preview": str(raw_result)[:200] if raw_result else None,
+            },
+        )
+
         if task_name:
-            _send_sse_event(task_name, "completed", result=event.get("result"))
+            _send_sse_event(task_name, "completed", result=raw_result)
 
     def on_task_failed(event: dict) -> None:
         """task-failed: task 실패."""
