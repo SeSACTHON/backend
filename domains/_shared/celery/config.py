@@ -132,9 +132,11 @@ class CelerySettings(BaseSettings):
                 "dlq.*": {"queue": "celery"},
             },
             # Queue configuration
-            "task_queues": None,  # Use default queue declaration
+            # RabbitMQ Topology Operator가 DLX 설정된 큐를 관리하므로
+            # Celery는 큐를 생성하지 않음
+            "task_create_missing_queues": False,
             "task_default_queue": "celery",
-            "task_default_exchange": "celery",
+            "task_default_exchange": "",  # Default exchange (direct routing)
             "task_default_routing_key": "celery",
             # Beat schedule (DLQ 재처리)
             "beat_schedule": {

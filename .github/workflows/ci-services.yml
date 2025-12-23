@@ -16,6 +16,7 @@ on:
       - "domains/my/**"
       - "domains/scan/**"
       - "domains/_shared/waste_pipeline/**"
+      - "domains/_shared/celery/**"
       - "workloads/domains/auth/**"
       - "workloads/domains/character/**"
       - "workloads/domains/chat/**"
@@ -38,6 +39,7 @@ on:
       - "domains/my/**"
       - "domains/scan/**"
       - "domains/_shared/waste_pipeline/**"
+      - "domains/_shared/celery/**"
       - "workloads/domains/auth/**"
       - "workloads/domains/character/**"
       - "workloads/domains/chat/**"
@@ -149,6 +151,7 @@ jobs:
             domains/my/**
             domains/scan/**
             domains/_shared/waste_pipeline/**
+            domains/_shared/celery/**
             workloads/domains/auth/**
             workloads/domains/character/**
             workloads/domains/chat/**
@@ -188,6 +191,7 @@ jobs:
           }
           shared_triggers = {
               "domains/_shared/waste_pipeline": ["chat", "scan"],
+              "domains/_shared/celery": ["scan", "character"],
           }
 
           def normalize(service: str) -> str:
