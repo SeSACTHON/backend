@@ -257,30 +257,62 @@ async def _event_generator(
     # Task가 이미 완료되었는지 확인 (이벤트를 놓친 경우 대비)
     from celery.result import AsyncResult
 
+    # Chain의 최종 결과 가져오기 헬퍼 함수
+    def _get_chain_final_result(first_task_id: str) -> tuple[AsyncResult, dict | None]:
+        """Chain을 따라가서 마지막 task의 결과를 가져옵니다.
+
+        Args:
+            first_task_id: Chain의 첫 번째 task ID
+
+        Returns:
+            (마지막 task의 AsyncResult, 최종 결과 dict)
+        """
+        current = AsyncResult(first_task_id, app=celery_app)
+
+        # children을 따라가서 마지막 task 찾기
+        visited = {first_task_id}
+        while current.children:
+            child = current.children[0]  # chain은 하나의 child만 가짐
+            if child.id in visited:
+                break  # 순환 방지
+            visited.add(child.id)
+            current = child
+
+        if current.ready():
+            return current, current.result if isinstance(current.result, dict) else None
+        return current, None
+
     async_result = AsyncResult(task_id, app=celery_app)
     if async_result.ready():
+        # Chain의 마지막 task 결과 가져오기
+        final_async_result, final_result = _get_chain_final_result(task_id)
+
         logger.info(
-            "Task already completed, returning result directly",
-            extra={"task_id": task_id, "state": async_result.state},
+            "Task already completed, returning final chain result",
+            extra={
+                "task_id": task_id,
+                "final_task_id": final_async_result.id,
+                "state": final_async_result.state,
+            },
         )
-        result = async_result.result
-        if isinstance(result, dict):
+
+        if final_result:
             event_counter += 1
             sse_data = {
                 "task_id": task_id,
                 "step": "reward",
-                "status": "completed" if async_result.successful() else "failed",
+                "status": "completed" if final_async_result.successful() else "failed",
                 "progress": 100,
                 "result": {
-                    "task_id": result.get("task_id"),
+                    "task_id": final_result.get("task_id"),
                     "status": "completed",
                     "message": "classification completed",
                     "pipeline_result": {
-                        "classification_result": result.get("classification_result"),
-                        "disposal_rules": result.get("disposal_rules"),
-                        "final_answer": result.get("final_answer"),
+                        "classification_result": final_result.get("classification_result"),
+                        "disposal_rules": final_result.get("disposal_rules"),
+                        "final_answer": final_result.get("final_answer"),
                     },
-                    "reward": result.get("reward"),
+                    "reward": final_result.get("reward"),
                     "error": None,
                 },
             }
@@ -323,35 +355,38 @@ async def _event_generator(
                 elapsed = asyncio.get_event_loop().time() - start_time
 
                 # 주기적으로 task 완료 여부 확인 (이벤트를 놓친 경우 대비)
-                async_result = AsyncResult(task_id, app=celery_app)
-                if async_result.ready():
+                # Chain의 마지막 task 결과 가져오기
+                final_async_result, final_result = _get_chain_final_result(task_id)
+                if final_async_result.ready() and final_result:
                     logger.info(
-                        "Task completed (detected via polling)",
-                        extra={"task_id": task_id, "state": async_result.state},
-                    )
-                    result = async_result.result
-                    if isinstance(result, dict):
-                        event_counter += 1
-                        sse_data = {
+                        "Chain completed (detected via polling)",
+                        extra={
                             "task_id": task_id,
-                            "step": "reward",
-                            "status": "completed" if async_result.successful() else "failed",
-                            "progress": 100,
-                            "result": {
-                                "task_id": result.get("task_id"),
-                                "status": "completed",
-                                "message": "classification completed",
-                                "pipeline_result": {
-                                    "classification_result": result.get("classification_result"),
-                                    "disposal_rules": result.get("disposal_rules"),
-                                    "final_answer": result.get("final_answer"),
-                                },
-                                "reward": result.get("reward"),
-                                "error": None,
+                            "final_task_id": final_async_result.id,
+                            "state": final_async_result.state,
+                        },
+                    )
+                    event_counter += 1
+                    sse_data = {
+                        "task_id": task_id,
+                        "step": "reward",
+                        "status": "completed" if final_async_result.successful() else "failed",
+                        "progress": 100,
+                        "result": {
+                            "task_id": final_result.get("task_id"),
+                            "status": "completed",
+                            "message": "classification completed",
+                            "pipeline_result": {
+                                "classification_result": final_result.get("classification_result"),
+                                "disposal_rules": final_result.get("disposal_rules"),
+                                "final_answer": final_result.get("final_answer"),
                             },
-                        }
-                        yield _format_sse_with_id(sse_data, event_counter)
-                        break
+                            "reward": final_result.get("reward"),
+                            "error": None,
+                        },
+                    }
+                    yield _format_sse_with_id(sse_data, event_counter)
+                    break
 
                 if elapsed > timeout:
                     logger.warning("SSE stream timeout", extra={"task_id": task_id})
