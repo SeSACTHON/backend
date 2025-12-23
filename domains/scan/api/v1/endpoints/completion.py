@@ -125,32 +125,11 @@ async def _completion_generator(
     chain_task_ids: set[str] = {task_id}
     task_name_map: dict[str, str] = {}
 
-    def _handle_event(event: dict, status: str, result: dict | None = None) -> None:
-        """Celery 이벤트 처리."""
-        event_task_id = event.get("uuid", "")
-        task_name = event.get("name", "")
-        root_id = event.get("root_id")
-        parent_id = event.get("parent_id")
+    # 마지막으로 received된 task 추적 (다음 task-sent 시 이전 task 완료 처리용)
+    last_received_task: dict = {"task_id": None, "task_name": None}
 
-        # root_id로 chain 매칭
-        is_chain_task = (
-            root_id == task_id
-            or event_task_id == task_id
-            or event_task_id in chain_task_ids
-            or parent_id in chain_task_ids
-        )
-
-        if not is_chain_task:
-            return
-
-        chain_task_ids.add(event_task_id)
-
-        # task name 매핑
-        if task_name:
-            task_name_map[event_task_id] = task_name
-        else:
-            task_name = task_name_map.get(event_task_id, "")
-
+    def _send_sse_event(task_name: str, status: str, result: dict | None = None) -> None:
+        """SSE 이벤트 전송."""
         step_info = TASK_STEP_MAP.get(task_name, {})
         if not step_info:
             return
@@ -185,14 +164,69 @@ async def _completion_generator(
         if task_name == "scan.reward" and status in ("completed", "failed"):
             loop.call_soon_threadsafe(event_queue.put_nowait, None)
 
-    def on_task_started(event: dict) -> None:
-        _handle_event(event, "started")
+    def _is_chain_task(event: dict) -> bool:
+        """이벤트가 현재 chain의 task인지 확인."""
+        event_task_id = event.get("uuid", "")
+        root_id = event.get("root_id")
+        parent_id = event.get("parent_id")
+
+        is_chain = (
+            root_id == task_id
+            or event_task_id == task_id
+            or event_task_id in chain_task_ids
+            or parent_id in chain_task_ids
+        )
+
+        if is_chain:
+            chain_task_ids.add(event_task_id)
+            if event.get("name"):
+                task_name_map[event_task_id] = event.get("name")
+
+        return is_chain
+
+    def on_task_received(event: dict) -> None:
+        """task-received: Worker가 task를 받음 → 'started' 상태."""
+        if not _is_chain_task(event):
+            return
+
+        event_task_id = event.get("uuid", "")
+        task_name = event.get("name", "") or task_name_map.get(event_task_id, "")
+
+        if task_name:
+            _send_sse_event(task_name, "started")
+            last_received_task["task_id"] = event_task_id
+            last_received_task["task_name"] = task_name
+
+    def on_task_sent(event: dict) -> None:
+        """task-sent: 다음 task 전송 → 이전 task 'completed' 상태."""
+        if not _is_chain_task(event):
+            return
+
+        # 다음 task가 sent되면 이전 task는 완료된 것
+        if last_received_task["task_name"]:
+            _send_sse_event(last_received_task["task_name"], "completed")
 
     def on_task_succeeded(event: dict) -> None:
-        _handle_event(event, "completed", result=event.get("result"))
+        """task-succeeded: task 성공 (result 포함)."""
+        if not _is_chain_task(event):
+            return
+
+        event_task_id = event.get("uuid", "")
+        task_name = event.get("name", "") or task_name_map.get(event_task_id, "")
+
+        if task_name:
+            _send_sse_event(task_name, "completed", result=event.get("result"))
 
     def on_task_failed(event: dict) -> None:
-        _handle_event(event, "failed")
+        """task-failed: task 실패."""
+        if not _is_chain_task(event):
+            return
+
+        event_task_id = event.get("uuid", "")
+        task_name = event.get("name", "") or task_name_map.get(event_task_id, "")
+
+        if task_name:
+            _send_sse_event(task_name, "failed")
 
     def run_event_receiver() -> None:
         """Celery Event Receiver (별도 스레드) - ReadyAwareReceiver 사용."""
@@ -255,7 +289,8 @@ async def _completion_generator(
                 recv = ReadyAwareReceiver(
                     connection,
                     handlers={
-                        "task-started": on_task_started,
+                        "task-sent": on_task_sent,
+                        "task-received": on_task_received,
                         "task-succeeded": on_task_succeeded,
                         "task-failed": on_task_failed,
                         "*": on_any_event,
