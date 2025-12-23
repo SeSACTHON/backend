@@ -4,8 +4,11 @@ kind: Kustomization
 resources:
 - ../base
 
-namespace: character
+namespace: my
 
 images:
 - name: docker.io/mng990/eco2
-  newTag: character-worker-dev-latest
+  newTag: my-worker-dev-latest
+
+commonLabels:
+  environment: dev
