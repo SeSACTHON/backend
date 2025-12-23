@@ -16,8 +16,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 default_exchange = Exchange("", type="direct")  # Default exchange
 dlx_exchange = Exchange("dlx", type="direct")  # Dead Letter Exchange
 
-# Queue 정의 (DLX 설정 포함 - Topology CR과 동기화)
-# x-queue-type: quorum은 Topology CR과 일치해야 함
+# Queue 정의 (DLX 설정 포함 - Topology CR과 완전 동기화)
+# 모든 인자가 Topology CR과 일치해야 함 (x-queue-type, x-delivery-limit 등)
 CELERY_QUEUES = (
     # Default queue
     Queue(
@@ -28,6 +28,8 @@ CELERY_QUEUES = (
             "x-queue-type": "quorum",
             "x-dead-letter-exchange": "dlx",
             "x-dead-letter-routing-key": "dlq.celery",
+            "x-message-ttl": 3600000,  # 1시간
+            "x-delivery-limit": 3,
         },
     ),
     # Scan pipeline queues
@@ -39,6 +41,8 @@ CELERY_QUEUES = (
             "x-queue-type": "quorum",
             "x-dead-letter-exchange": "dlx",
             "x-dead-letter-routing-key": "dlq.scan.vision",
+            "x-message-ttl": 3600000,  # 1시간
+            "x-delivery-limit": 3,
         },
     ),
     Queue(
@@ -49,6 +53,8 @@ CELERY_QUEUES = (
             "x-queue-type": "quorum",
             "x-dead-letter-exchange": "dlx",
             "x-dead-letter-routing-key": "dlq.scan.rule",
+            "x-message-ttl": 300000,  # 5분
+            "x-delivery-limit": 3,
         },
     ),
     Queue(
@@ -59,6 +65,8 @@ CELERY_QUEUES = (
             "x-queue-type": "quorum",
             "x-dead-letter-exchange": "dlx",
             "x-dead-letter-routing-key": "dlq.scan.answer",
+            "x-message-ttl": 3600000,  # 1시간
+            "x-delivery-limit": 3,
         },
     ),
     # Reward queues (도메인별 분리)
@@ -70,6 +78,8 @@ CELERY_QUEUES = (
             "x-queue-type": "quorum",
             "x-dead-letter-exchange": "dlx",
             "x-dead-letter-routing-key": "dlq.scan.reward",
+            "x-message-ttl": 3600000,  # 1시간
+            "x-delivery-limit": 3,
         },
     ),
     # Character match queue (빠른 응답용)
@@ -81,6 +91,8 @@ CELERY_QUEUES = (
             "x-queue-type": "quorum",
             "x-dead-letter-exchange": "dlx",
             "x-dead-letter-routing-key": "dlq.character.match",
+            "x-message-ttl": 30000,  # 30초 (빠른 응답)
+            "x-delivery-limit": 2,
         },
     ),
     # Character reward queue (fire & forget, 백그라운드)
@@ -92,6 +104,8 @@ CELERY_QUEUES = (
             "x-queue-type": "quorum",
             "x-dead-letter-exchange": "dlx",
             "x-dead-letter-routing-key": "dlq.character.reward",
+            "x-message-ttl": 86400000,  # 24시간
+            "x-delivery-limit": 5,
         },
     ),
     Queue(
@@ -102,6 +116,8 @@ CELERY_QUEUES = (
             "x-queue-type": "quorum",
             "x-dead-letter-exchange": "dlx",
             "x-dead-letter-routing-key": "dlq.my.reward",
+            "x-message-ttl": 86400000,  # 24시간
+            "x-delivery-limit": 5,
         },
     ),
 )
