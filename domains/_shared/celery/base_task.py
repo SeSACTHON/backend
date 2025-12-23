@@ -49,7 +49,7 @@ class BaseTask(Task):
             extra={
                 "task_id": task_id,
                 "task_name": self.name,
-                "args": args,
+                "task_args": args,
                 "error": str(exc),
                 "error_type": type(exc).__name__,
             },
