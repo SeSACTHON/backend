@@ -300,8 +300,8 @@ async def _save_ownership_async(
     from sqlalchemy.orm import sessionmaker
 
     from domains.character.core.config import get_settings
-    from domains.character.repositories.character import CharacterRepository
-    from domains.character.repositories.ownership import OwnershipRepository
+    from domains.character.repositories.character_repository import CharacterRepository
+    from domains.character.repositories.ownership_repository import OwnershipRepository
 
     settings = get_settings()
     engine = create_async_engine(settings.database_url, echo=False)
@@ -534,8 +534,8 @@ async def _match_character_async(
     from sqlalchemy.orm import sessionmaker
 
     from domains.character.core.config import get_settings
-    from domains.character.repositories.character import CharacterRepository
-    from domains.character.repositories.ownership import OwnershipRepository
+    from domains.character.repositories.character_repository import CharacterRepository
+    from domains.character.repositories.ownership_repository import OwnershipRepository
     from domains.character.schemas.reward import (
         CharacterRewardRequest,
         CharacterRewardSource,
