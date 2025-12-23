@@ -21,6 +21,58 @@ router = APIRouter(prefix="/scan", tags=["scan-completion"])
 
 logger = logging.getLogger(__name__)
 
+
+def _parse_celery_result(result: str | dict | None) -> dict:
+    """Celery task-succeeded 이벤트의 result를 파싱.
+
+    Celery는 result를 Python repr 형식(홑따옴표)으로 전달할 수 있어
+    json.loads가 실패할 수 있음. 이 경우 ast.literal_eval 사용.
+    """
+    import ast
+    import re
+
+    if result is None:
+        return {}
+
+    if isinstance(result, dict):
+        return result
+
+    if not isinstance(result, str):
+        return {}
+
+    # 1. 먼저 json.loads 시도 (이미 JSON 형식인 경우)
+    try:
+        return json.loads(result)
+    except json.JSONDecodeError:
+        pass
+
+    # 2. Python repr 형식 → JSON 형식 변환 시도
+    # 홑따옴표를 쌍따옴표로, None을 null로, True/False를 true/false로
+    try:
+        # Python literal → dict (가장 안전한 방법)
+        return ast.literal_eval(result)
+    except (ValueError, SyntaxError):
+        pass
+
+    # 3. 간단한 문자열 변환 시도 (fallback)
+    try:
+        converted = result
+        # None → null
+        converted = re.sub(r"\bNone\b", "null", converted)
+        # True → true, False → false
+        converted = re.sub(r"\bTrue\b", "true", converted)
+        converted = re.sub(r"\bFalse\b", "false", converted)
+        # 홑따옴표 → 쌍따옴표 (문자열 내부의 홑따옴표는 유지)
+        converted = converted.replace("'", '"')
+        return json.loads(converted)
+    except (json.JSONDecodeError, Exception):
+        logger.warning(
+            "failed_to_parse_celery_result",
+            extra={"result_preview": result[:200] if len(result) > 200 else result},
+        )
+        return {}
+
+
 # Task 이름 → 단계 매핑 (4단계 Chain)
 # prev_progress: started 상태일 때의 progress (이전 단계 완료 값)
 TASK_STEP_MAP = {
@@ -147,25 +199,21 @@ async def _completion_generator(
 
         # reward 완료 시 최종 결과 포함
         if task_name == "scan.reward" and status == "completed" and result:
-            # result가 문자열인 경우 JSON 파싱
-            if isinstance(result, str):
-                try:
-                    result = json.loads(result)
-                except json.JSONDecodeError:
-                    logger.warning("failed_to_parse_result", extra={"result": result[:100]})
-                    result = {}
+            # Celery result 파싱 (Python repr 또는 JSON)
+            parsed_result = _parse_celery_result(result)
 
-            if isinstance(result, dict):
+            if parsed_result:
                 sse_data["result"] = {
-                    "task_id": result.get("task_id"),
+                    "task_id": parsed_result.get("task_id"),
                     "status": "completed",
                     "message": "classification completed",
                     "pipeline_result": {
-                        "classification_result": result.get("classification_result"),
-                        "disposal_rules": result.get("disposal_rules"),
-                        "final_answer": result.get("final_answer"),
+                        "classification_result": parsed_result.get("classification_result"),
+                        "disposal_rules": parsed_result.get("disposal_rules"),
+                        "final_answer": parsed_result.get("final_answer"),
                     },
-                    "reward": result.get("reward"),
+                    "reward": parsed_result.get("reward"),
+                    "error": None,
                 }
 
         loop.call_soon_threadsafe(event_queue.put_nowait, sse_data)
