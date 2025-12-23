@@ -84,13 +84,17 @@ async def _save_ownership_async(
     character_id: str,
     source: str,
 ) -> dict[str, Any]:
-    """character.character_ownerships INSERT."""
-    from sqlalchemy.exc import IntegrityError
+    """character.character_ownerships UPSERT (INSERT ON CONFLICT DO NOTHING).
+
+    Single-query 멱등성 보장:
+    - 이미 존재하면 무시 (rowcount=0)
+    - 신규면 삽입 (rowcount=1)
+    - Race condition 없음 (atomic)
+    """
     from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
     from sqlalchemy.orm import sessionmaker
 
     from domains.character.core.config import get_settings
-    from domains.character.repositories.character_repository import CharacterRepository
     from domains.character.repositories.ownership_repository import CharacterOwnershipRepository
 
     settings = get_settings()
@@ -98,27 +102,16 @@ async def _save_ownership_async(
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with async_session() as session:
-        character_repo = CharacterRepository(session)
         ownership_repo = CharacterOwnershipRepository(session)
 
-        character = await character_repo.get_by_id(UUID(character_id))
-        if not character:
-            return {"saved": False, "reason": "character_not_found"}
-
-        existing = await ownership_repo.get_by_user_and_character(
-            user_id=UUID(user_id), character_id=UUID(character_id)
+        # Single-query UPSERT: INSERT ... ON CONFLICT DO NOTHING
+        inserted = await ownership_repo.insert_or_ignore(
+            user_id=UUID(user_id),
+            character_id=UUID(character_id),
+            source=source,
         )
-        if existing:
-            return {"saved": False, "reason": "already_owned"}
 
-        try:
-            await ownership_repo.insert_owned(
-                user_id=UUID(user_id),
-                character=character,
-                source=source,
-            )
-            await session.commit()
+        if inserted:
             return {"saved": True}
-        except IntegrityError:
-            await session.rollback()
-            return {"saved": False, "reason": "concurrent_insert"}
+        else:
+            return {"saved": False, "reason": "already_owned"}
