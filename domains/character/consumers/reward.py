@@ -301,7 +301,7 @@ async def _save_ownership_async(
 
     from domains.character.core.config import get_settings
     from domains.character.repositories.character_repository import CharacterRepository
-    from domains.character.repositories.ownership_repository import OwnershipRepository
+    from domains.character.repositories.ownership_repository import CharacterOwnershipRepository
 
     settings = get_settings()
     engine = create_async_engine(settings.database_url, echo=False)
@@ -309,7 +309,7 @@ async def _save_ownership_async(
 
     async with async_session() as session:
         character_repo = CharacterRepository(session)
-        ownership_repo = OwnershipRepository(session)
+        ownership_repo = CharacterOwnershipRepository(session)
 
         character = await character_repo.get_by_id(UUID(character_id))
         if not character:
@@ -535,7 +535,7 @@ async def _match_character_async(
 
     from domains.character.core.config import get_settings
     from domains.character.repositories.character_repository import CharacterRepository
-    from domains.character.repositories.ownership_repository import OwnershipRepository
+    from domains.character.repositories.ownership_repository import CharacterOwnershipRepository
     from domains.character.schemas.reward import (
         CharacterRewardRequest,
         CharacterRewardSource,
@@ -552,7 +552,7 @@ async def _match_character_async(
 
     async with async_session() as session:
         character_repo = CharacterRepository(session)
-        ownership_repo = OwnershipRepository(session)
+        ownership_repo = CharacterOwnershipRepository(session)
 
         evaluator = get_evaluator(CharacterRewardSource.SCAN)
         if evaluator is None:
