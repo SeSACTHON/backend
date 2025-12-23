@@ -93,10 +93,12 @@ def save_my_character_task(requests: list) -> dict[str, Any]:
 async def _save_my_character_batch_async(
     batch_data: list[dict[str, Any]],
 ) -> dict[str, Any]:
-    """my.user_characters BULK UPSERT.
+    """my.user_characters BULK INSERT.
 
     INSERT INTO ... VALUES (...), (...), ...
-    ON CONFLICT (user_id, character_id) DO UPDATE SET ...
+    ON CONFLICT (user_id, character_id) DO NOTHING
+
+    Idempotent: 이미 소유한 캐릭터는 무시 (성능 최적화).
     """
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -137,11 +139,7 @@ async def _save_my_character_batch_async(
                 (user_id, character_id, character_code, character_name,
                  character_type, character_dialog, source, created_at, updated_at)
             VALUES {", ".join(values)}
-            ON CONFLICT (user_id, character_id) DO UPDATE SET
-                character_name = EXCLUDED.character_name,
-                character_type = EXCLUDED.character_type,
-                character_dialog = EXCLUDED.character_dialog,
-                updated_at = NOW()
+            ON CONFLICT (user_id, character_id) DO NOTHING
         """
         )
 
@@ -150,5 +148,5 @@ async def _save_my_character_batch_async(
 
         return {
             "processed": len(batch_data),
-            "affected": result.rowcount,
+            "inserted": result.rowcount,
         }
