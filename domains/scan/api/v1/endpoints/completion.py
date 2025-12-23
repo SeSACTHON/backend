@@ -239,12 +239,26 @@ async def _completion_generator(
             logger.info("event_receiver_connecting", extra={"task_id": task_id})
             with celery_app.connection() as connection:
                 logger.info("event_receiver_connected", extra={"task_id": task_id})
+
+                def on_any_event(event: dict) -> None:
+                    """모든 이벤트 로깅 (디버깅용)."""
+                    logger.info(
+                        "celery_event_received",
+                        extra={
+                            "task_id": task_id,
+                            "event_type": event.get("type"),
+                            "event_uuid": event.get("uuid"),
+                            "event_name": event.get("name"),
+                        },
+                    )
+
                 recv = ReadyAwareReceiver(
                     connection,
                     handlers={
                         "task-started": on_task_started,
                         "task-succeeded": on_task_succeeded,
                         "task-failed": on_task_failed,
+                        "*": on_any_event,
                     },
                     ready_event=receiver_ready,
                 )
