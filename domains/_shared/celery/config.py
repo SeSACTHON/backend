@@ -7,8 +7,58 @@ Celery Configuration Module
 from functools import lru_cache
 from typing import Any
 
+from kombu import Exchange, Queue
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+# Exchange 정의
+default_exchange = Exchange("", type="direct")  # Default exchange
+dlx_exchange = Exchange("dlx", type="direct")  # Dead Letter Exchange
+
+# Queue 정의 (DLX 설정 포함)
+CELERY_QUEUES = (
+    # Default queue
+    Queue("celery", default_exchange, routing_key="celery"),
+    # Scan pipeline queues
+    Queue(
+        "scan.vision",
+        default_exchange,
+        routing_key="scan.vision",
+        queue_arguments={"x-dead-letter-exchange": "dlx"},
+    ),
+    Queue(
+        "scan.rule",
+        default_exchange,
+        routing_key="scan.rule",
+        queue_arguments={"x-dead-letter-exchange": "dlx"},
+    ),
+    Queue(
+        "scan.answer",
+        default_exchange,
+        routing_key="scan.answer",
+        queue_arguments={"x-dead-letter-exchange": "dlx"},
+    ),
+    # Reward/Character queues
+    Queue(
+        "reward.character",
+        default_exchange,
+        routing_key="reward.character",
+        queue_arguments={"x-dead-letter-exchange": "dlx"},
+    ),
+    Queue(
+        "reward.persist",
+        default_exchange,
+        routing_key="reward.persist",
+        queue_arguments={"x-dead-letter-exchange": "dlx"},
+    ),
+    Queue(
+        "my.sync",
+        default_exchange,
+        routing_key="my.sync",
+        queue_arguments={"x-dead-letter-exchange": "dlx"},
+    ),
+)
 
 
 class CelerySettings(BaseSettings):
@@ -131,10 +181,8 @@ class CelerySettings(BaseSettings):
                 # DLQ 재처리
                 "dlq.*": {"queue": "celery"},
             },
-            # Queue configuration
-            # RabbitMQ Topology Operator가 DLX 설정된 큐를 관리하므로
-            # Celery는 큐를 생성하지 않음
-            "task_create_missing_queues": False,
+            # Queue configuration (DLX 포함하여 명시적 정의)
+            "task_queues": CELERY_QUEUES,
             "task_default_queue": "celery",
             "task_default_exchange": "",  # Default exchange (direct routing)
             "task_default_routing_key": "celery",
