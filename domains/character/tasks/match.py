@@ -64,8 +64,25 @@ def match_character_task(
         cache = get_character_cache()
         characters = cache.get_all()
 
+        logger.info(
+            "Cache status",
+            extra={
+                **log_ctx,
+                "cache_initialized": cache.is_initialized,
+                "cache_count": cache.count(),
+                "characters_len": len(characters),
+            },
+        )
+
         if not characters:
-            logger.warning("Character cache empty, cannot perform match")
+            logger.warning(
+                "Character cache empty, cannot perform match",
+                extra={
+                    **log_ctx,
+                    "cache_id": id(cache),
+                    "cache_initialized": cache.is_initialized,
+                },
+            )
             return None
 
         # 2. 단순 라벨 매칭 (middle_category == match_label)

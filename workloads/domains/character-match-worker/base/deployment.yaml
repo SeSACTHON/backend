@@ -36,6 +36,8 @@ spec:
         - worker
         - --loglevel=info
         - -E  # Events 활성화
+        - -P
+        - threads  # 스레드 pool (MainProcess 캐시 공유)
         - -Q
         - character.match  # match 큐만 소비
         - -c
