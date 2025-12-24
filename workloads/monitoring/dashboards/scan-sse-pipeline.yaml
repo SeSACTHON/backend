@@ -102,16 +102,16 @@ data:
           }
         },
         {
-          "title": "Requests/min",
+          "title": "Requests/sec",
           "type": "stat",
           "gridPos": { "h": 4, "w": 4, "x": 16, "y": 1 },
           "targets": [
             {
-              "expr": "sum(rate(scan_sse_requests_total[5m])) * 60",
-              "legendFormat": "Total"
+              "expr": "sum(rate(scan_sse_requests_total[1m]))",
+              "legendFormat": "RPS"
             }
           ],
-          "fieldConfig": { "defaults": { "unit": "short", "decimals": 1 } }
+          "fieldConfig": { "defaults": { "unit": "reqps", "decimals": 2 } }
         },
         {
           "title": "Timeout Rate",
@@ -168,13 +168,13 @@ data:
           }
         },
         {
-          "title": "스테이지별 p95 소요 시간",
+          "title": "스테이지별 p99 소요 시간",
           "type": "timeseries",
           "gridPos": { "h": 8, "w": 12, "x": 12, "y": 6 },
           "targets": [
             {
-              "expr": "histogram_quantile(0.95, sum by (stage, le) (rate(scan_sse_stage_duration_seconds_bucket[5m])))",
-              "legendFormat": "{{stage}} p95"
+              "expr": "histogram_quantile(0.99, sum by (stage, le) (rate(scan_sse_stage_duration_seconds_bucket[1m])))",
+              "legendFormat": "{{stage}} p99"
             }
           ],
           "fieldConfig": {
@@ -247,13 +247,13 @@ data:
           "collapsed": false
         },
         {
-          "title": "Celery Task 처리 시간",
+          "title": "Celery Stage 평균 처리 시간",
           "type": "timeseries",
-          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 23 },
+          "gridPos": { "h": 8, "w": 8, "x": 0, "y": 23 },
           "targets": [
             {
-              "expr": "sum by (task_name) (rate(scan_celery_task_duration_seconds_sum[5m])) / sum by (task_name) (rate(scan_celery_task_duration_seconds_count[5m]))",
-              "legendFormat": "{{task_name}}"
+              "expr": "sum by (stage) (rate(scan_sse_stage_duration_seconds_sum[1m])) / sum by (stage) (rate(scan_sse_stage_duration_seconds_count[1m]))",
+              "legendFormat": "{{stage}} avg"
             }
           ],
           "fieldConfig": {
@@ -264,13 +264,34 @@ data:
           }
         },
         {
-          "title": "RabbitMQ 큐 메시지 수",
+          "title": "Celery Stage p99",
           "type": "timeseries",
-          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 23 },
+          "gridPos": { "h": 8, "w": 8, "x": 8, "y": 23 },
           "targets": [
             {
-              "expr": "rabbitmq_queue_messages{queue=~\"scan.*|character.*|my.*\"}",
-              "legendFormat": "{{queue}}"
+              "expr": "histogram_quantile(0.99, sum by (stage, le) (rate(scan_sse_stage_duration_seconds_bucket[1m])))",
+              "legendFormat": "{{stage}} p99"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": { "lineWidth": 2, "fillOpacity": 10 }
+            }
+          }
+        },
+        {
+          "title": "RabbitMQ 큐 메시지 수",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 8, "x": 16, "y": 23 },
+          "targets": [
+            {
+              "expr": "rabbitmq_queue_messages_ready{namespace=\"rabbitmq\", queue=~\"scan.*|character.*|my.*\"}",
+              "legendFormat": "{{queue}} (ready)"
+            },
+            {
+              "expr": "rabbitmq_queue_messages_unacked{namespace=\"rabbitmq\", queue=~\"scan.*|character.*|my.*\"}",
+              "legendFormat": "{{queue}} (unacked)"
             }
           ],
           "fieldConfig": {
@@ -287,18 +308,18 @@ data:
           "collapsed": false
         },
         {
-          "title": "SSE 요청 상태",
+          "title": "SSE 요청 상태 (req/s)",
           "type": "timeseries",
           "gridPos": { "h": 6, "w": 12, "x": 0, "y": 32 },
           "targets": [
             {
-              "expr": "sum by (status) (rate(scan_sse_requests_total[5m])) * 60",
+              "expr": "sum by (status) (rate(scan_sse_requests_total[1m]))",
               "legendFormat": "{{status}}"
             }
           ],
           "fieldConfig": {
             "defaults": {
-              "unit": "reqpm",
+              "unit": "reqps",
               "custom": { "lineWidth": 2, "fillOpacity": 20, "stacking": { "mode": "normal" } }
             },
             "overrides": [
