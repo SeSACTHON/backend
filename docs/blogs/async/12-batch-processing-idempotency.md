@@ -44,7 +44,27 @@ Fire&Forget으로 `save_ownership`, `save_my_character`를 발행하면 트래�
 
 ## 2. celery-batches 적용
 
-### 2.1 동작 방식
+### 2.1 아키텍처
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      character-worker                            │
+│                                                                  │
+│  ┌──────────────┐    ┌───────────────────┐    ┌──────────────┐  │
+│  │   RabbitMQ   │───▶│   Batches Buffer  │───▶│  PostgreSQL  │  │
+│  │   (Queue)    │    │   (In-Memory)     │    │   (Bulk)     │  │
+│  └──────────────┘    └───────────────────┘    └──────────────┘  │
+│         │                     │                      │          │
+│         │           ┌─────────┴─────────┐            │          │
+│         ▼           ▼                   ▼            ▼          │
+│    message 1   flush_every=50     flush_interval=5  BULK INSERT │
+│    message 2   (개수 도달)         (시간 경과)        50 rows     │
+│    ...                                                           │
+│    message 50                                                    │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### 2.2 동작 방식
 
 ```python
 from celery_batches import Batches
@@ -62,6 +82,22 @@ def batch_task(requests: list):
 **flush 트리거**:
 - `flush_every` 개 도달 → 즉시 처리
 - `flush_interval` 초 경과 → 버퍼에 있는 만큼 처리
+
+### 2.3 Flush 조건 다이어그램
+
+```
+시간 ──────────────────────────────────────────────────▶
+
+개수 기반 (flush_every=50)
+├─ msg1 ─ msg2 ─ ... ─ msg50 ─┤ FLUSH!
+                               ↓
+                          batch_task(requests=[msg1..msg50])
+
+시간 기반 (flush_interval=5초)
+├─ msg1 ─ msg2 ─ msg3 ────────────────┤ 5초 경과, FLUSH!
+                                       ↓
+                                  batch_task(requests=[msg1..msg3])
+```
 
 ---
 
@@ -133,58 +169,178 @@ async def _save_ownership_batch_async(batch_data: list[dict]) -> dict:
 
 ## 4. 멱등성 처리
 
-### 4.1 DO NOTHING vs DO UPDATE
+### 4.1 멱등성 정의
 
-| 전략 | SQL | 동작 |
-|------|-----|------|
-| **DO NOTHING** | `ON CONFLICT DO NOTHING` | 중복 시 무시 |
-| DO UPDATE | `ON CONFLICT DO UPDATE SET ...` | 중복 시 업데이트 |
+> **멱등성(Idempotency)**: 동일한 연산을 여러 번 수행해도 결과가 달라지지 않는 성질
 
-### 4.2 DO NOTHING 선택 근거
+분산 시스템에서 멱등성이 필요한 이유:
+- 네트워크 타임아웃으로 클라이언트가 재시도
+- Message Queue의 at-least-once 전달 보장
+- Celery 재시도 메커니즘
+- Worker 장애 후 재처리
 
-소유권은 한 번 부여되면 변경 없음. DO UPDATE는 불필요한 row lock + write 발생.
-
-```sql
-INSERT INTO user_characters (...)
-VALUES (...)
-ON CONFLICT (user_id, character_id) DO NOTHING;
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  멱등성 미보장 시 문제                                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  Client ──▶ scan-api ──▶ RabbitMQ ──▶ Worker ──▶ DB             │
+│     │                         │                                  │
+│     │   ┌─ 타임아웃 ─┐       │                                  │
+│     └───│  재시도    │───────┘                                  │
+│         └────────────┘                                          │
+│                                                                  │
+│  결과: 동일 데이터가 2번 INSERT → Duplicate Key Error 또는       │
+│        2개 행 생성 (잘못된 상태)                                  │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### 4.3 멱등성 검증
+### 4.2 PostgreSQL ON CONFLICT
+
+| 전략 | SQL | 동작 | 사용 케이스 |
+|------|-----|------|-------------|
+| **DO NOTHING** | `ON CONFLICT DO NOTHING` | 중복 시 무시 | 불변 데이터 |
+| DO UPDATE | `ON CONFLICT DO UPDATE SET ...` | 중복 시 업데이트 | 변경 가능 데이터 |
+
+### 4.3 DO NOTHING 선택 근거
+
+```
+character_ownerships:
+┌─────────────┬──────────────┬────────┬────────────┐
+│   user_id   │ character_id │ source │ created_at │
+├─────────────┼──────────────┼────────┼────────────┤
+│ user-123    │ char-petty   │ scan   │ 2024-12-24 │  ← 한 번 생성되면
+└─────────────┴──────────────┴────────┴────────────┘    변경될 이유 없음
+```
+
+소유권은 **불변 데이터**. DO UPDATE는 불필요한 연산:
+- Row Lock 획득 (불필요)
+- WAL 로그 write (불필요)
+- Index 업데이트 (불필요)
+
+```sql
+-- ✅ DO NOTHING: 중복 시 아무것도 하지 않음
+INSERT INTO character_ownerships (user_id, character_id, source, created_at)
+VALUES ($1, $2, $3, NOW())
+ON CONFLICT (user_id, character_id) DO NOTHING;
+
+-- ❌ DO UPDATE: 불필요한 write 발생
+INSERT INTO character_ownerships (...)
+VALUES (...)
+ON CONFLICT (user_id, character_id) 
+DO UPDATE SET updated_at = NOW();  -- 변경 없어도 write 발생
+```
+
+### 4.4 멱등성 검증
 
 ```
 시나리오: 같은 (user_id, character_id) 3회 발행
 
-Request 1: INSERT → 성공 (inserted: 1)
-Request 2: INSERT → 무시 (inserted: 0)  ← ON CONFLICT DO NOTHING
-Request 3: INSERT → 무시 (inserted: 0)
+┌─────────┬────────────────────────────────┬──────────────┐
+│  요청   │           동작                 │    결과      │
+├─────────┼────────────────────────────────┼──────────────┤
+│ Request 1 │ INSERT → 성공               │ inserted: 1  │
+│ Request 2 │ INSERT → ON CONFLICT 감지    │ inserted: 0  │
+│ Request 3 │ INSERT → ON CONFLICT 감지    │ inserted: 0  │
+└─────────┴────────────────────────────────┴──────────────┘
 
-최종 결과: 1개 행만 존재 ✅
+최종 DB 상태: 1개 행만 존재 ✅
 ```
 
-네트워크 이슈로 중복 발행되거나 Celery 재시도로 같은 메시지가 2번 처리되어도 안전.
+### 4.5 배치 내 중복 처리
+
+```
+동일 배치에 중복 데이터가 포함된 경우:
+
+batch_data = [
+    {user_id: "A", character_id: "X"},  ← 첫 번째
+    {user_id: "B", character_id: "Y"},
+    {user_id: "A", character_id: "X"},  ← 중복 (배치 내)
+]
+
+INSERT INTO character_ownerships VALUES
+    ('A', 'X', ...),
+    ('B', 'Y', ...),
+    ('A', 'X', ...)   ← Unique 제약 위반!
+ON CONFLICT DO NOTHING;
+
+결과:
+- 'A', 'X': 첫 번째만 INSERT
+- 'B', 'Y': INSERT
+- 'A', 'X' (두 번째): DO NOTHING으로 무시
+
+inserted: 2 (중복 제외)
+```
+
+PostgreSQL은 단일 INSERT 문 내에서도 `ON CONFLICT DO NOTHING`을 각 행에 개별 적용.
 
 ---
 
 ## 5. 배치 처리 흐름
 
-### 5.1 시간 기반 Flush (낮은 트래픽)
+### 5.1 전체 흐름 시각화
 
 ```
-0.0s  save_ownership 발행 #1
-0.1s  save_ownership 발행 #2
-0.2s  save_ownership 발행 #3
-...
-5.0s  flush_interval 도달 → 배치 처리
-      └── BULK INSERT 3개 행
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                            Batch Processing Flow                             │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  scan-api                RabbitMQ                 character-worker           │
+│     │                       │                          │                     │
+│     │  save_ownership #1    │                          │                     │
+│     │──────────────────────▶│ ┌───────────────────┐   │                     │
+│     │  save_ownership #2    │ │                   │   │                     │
+│     │──────────────────────▶│ │  character.reward │   │                     │
+│     │  save_ownership #3    │ │      Queue        │──▶│                     │
+│     │──────────────────────▶│ │                   │   │ ┌─────────────────┐ │
+│     │         ...           │ │  [#1, #2, #3...]  │   │ │ Batches Buffer  │ │
+│     │  save_ownership #50   │ │                   │   │ │ flush_every=50  │ │
+│     │──────────────────────▶│ └───────────────────┘   │ │ flush_interval=5│ │
+│     │                       │                          │ └────────┬────────┘ │
+│     │                       │                          │          │          │
+│     │                       │                          │          ▼          │
+│     │                       │                          │ ┌─────────────────┐ │
+│     │                       │                          │ │   PostgreSQL    │ │
+│     │                       │                          │ │  BULK INSERT    │ │
+│     │                       │                          │ │  50 rows        │ │
+│     │                       │                          │ └─────────────────┘ │
+│     │                       │                          │                     │
+└─────────────────────────────────────────────────────────────────────────────┘
 ```
 
-### 5.2 개수 기반 Flush (높은 트래픽)
+### 5.2 시간 기반 Flush (낮은 트래픽)
 
 ```
-0.0s ~ 0.4s: 50개 요청 빠르게 도착
-0.4s  flush_every=50 도달 → 배치 처리
-      └── BULK INSERT 50개 행
+시간축 ─────────────────────────────────────────────────────▶
+        │                                               │
+        0s                                              5s
+        │                                               │
+        ├─ msg1 ─ msg2 ─ msg3 ─────────────────────────┤
+        │                                               │
+        │  버퍼: [msg1, msg2, msg3]                     │
+        │                                          FLUSH!
+        │                                               │
+        │                                               ▼
+        │                                    batch_task([msg1, msg2, msg3])
+        │                                               │
+        │                                    BULK INSERT 3 rows
+```
+
+### 5.3 개수 기반 Flush (높은 트래픽)
+
+```
+시간축 ─────────────────────────────────────────────────────▶
+        │                          │
+        0s                        0.4s
+        │                          │
+        ├─ msg1..msg50 (빠르게 도착)│
+        │                          │
+        │  버퍼 크기: 50         FLUSH!
+        │                          │
+        │                          ▼
+        │               batch_task([msg1..msg50])
+        │                          │
+        │               BULK INSERT 50 rows
 ```
 
 ---
@@ -192,6 +348,25 @@ Request 3: INSERT → 무시 (inserted: 0)
 ## 6. 성능 비교
 
 ### 6.1 개별 vs 배치
+
+```
+개별 INSERT (50개 요청)
+┌─────────────────────────────────────────────────────────────┐
+│ req1 ──▶ connect ──▶ INSERT ──▶ commit ──▶ close  (~10ms)  │
+│ req2 ──▶ connect ──▶ INSERT ──▶ commit ──▶ close  (~10ms)  │
+│ ...                                                         │
+│ req50 ──▶ connect ──▶ INSERT ──▶ commit ──▶ close (~10ms)  │
+├─────────────────────────────────────────────────────────────┤
+│ 총 시간: ~500ms                                              │
+└─────────────────────────────────────────────────────────────┘
+
+Batch INSERT (50개 요청)
+┌─────────────────────────────────────────────────────────────┐
+│ req1..50 ──▶ connect ──▶ BULK INSERT 50 rows ──▶ commit    │
+│                                                              │
+│ 총 시간: ~10ms                                               │
+└─────────────────────────────────────────────────────────────┘
+```
 
 | 항목 | 개별 INSERT (50개) | Batch INSERT (50개) |
 |------|-------------------|---------------------|
@@ -203,10 +378,17 @@ Request 3: INSERT → 무시 (inserted: 0)
 ### 6.2 처리량 비교
 
 ```
-개별 INSERT:  1 요청 = ~10ms  →  ~100 req/s
-Batch INSERT: 50 요청 = ~10ms  →  ~5000 req/s
+개별 INSERT:                    Batch INSERT:
+    │                               │
+    ▼                               ▼
+┌───────┐                       ┌───────┐
+│ 10ms  │ × 50 = 500ms          │ 10ms  │ for 50 requests
+└───────┘                       └───────┘
+    │                               │
+    ▼                               ▼
+~100 req/s                      ~5000 req/s
 
-개선율: ~50x
+                개선율: ~50x
 ```
 
 ---
