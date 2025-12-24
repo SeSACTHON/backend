@@ -3,7 +3,7 @@ Character Match Task
 
 캐릭터 매칭 전용 Celery Task (character.match 큐)
 - 로컬 캐시에서만 캐릭터 목록 조회 (DB 조회 없음)
-- evaluator로 매칭
+- middle_category 기반 단순 라벨 매칭
 - 소유권 체크 없음 (클라이언트가 판단)
 - 매칭 결과만 반환
 
@@ -12,10 +12,8 @@ scan.reward에서 동기 호출하여 결과를 받습니다.
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from typing import Any
-from uuid import UUID
 
 from domains._shared.celery.base_task import BaseTask
 from domains.character.celery_app import celery_app
@@ -37,20 +35,23 @@ def match_character_task(
     user_id: str,
     classification_result: dict[str, Any],
     disposal_rules_present: bool,
-) -> dict[str, Any]:
-    """캐릭터 매칭 수행 (캐시 전용, DB 조회 없음).
+) -> dict[str, Any] | None:
+    """캐릭터 매칭 수행 (캐시 전용, 단순 라벨 매칭).
 
     Args:
         user_id: 사용자 ID
-        classification_result: 분류 결과 (classification, situation_tags 포함)
-        disposal_rules_present: 배출 규칙 존재 여부
+        classification_result: 분류 결과 (classification 포함)
+        disposal_rules_present: 배출 규칙 존재 여부 (unused, 호환성 유지)
 
     Returns:
         매칭 성공 시:
         - name, dialog, match_reason, type: 클라이언트 표시용
         - character_id, character_code: 저장 task 발행용 (내부)
+        - received: True (매칭됨)
         매칭 실패 시: None
     """
+    from domains._shared.cache import get_character_cache
+
     log_ctx = {
         "user_id": user_id,
         "celery_task_id": self.request.id,
@@ -59,25 +60,55 @@ def match_character_task(
     logger.info("Character match task started", extra=log_ctx)
 
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            result = loop.run_until_complete(
-                _match_character_async(
-                    user_id=user_id,
-                    classification_result=classification_result,
-                    disposal_rules_present=disposal_rules_present,
-                )
+        # 1. 로컬 캐시에서 캐릭터 목록 조회
+        cache = get_character_cache()
+        characters = cache.list_all()
+
+        if not characters:
+            logger.warning("Character cache empty, cannot perform match")
+            return None
+
+        # 2. 단순 라벨 매칭 (middle_category == match_label)
+        classification = classification_result.get("classification", {})
+        middle = (classification.get("middle_category") or "").strip()
+        minor = (classification.get("minor_category") or "").strip()
+
+        if not middle:
+            logger.info("No middle_category, skip matching", extra=log_ctx)
+            return None
+
+        # 첫 번째 매칭 캐릭터 반환
+        matched = next((c for c in characters if c.match_label == middle), None)
+
+        if not matched:
+            logger.info(
+                "No character matched",
+                extra={**log_ctx, "middle_category": middle},
             )
-        finally:
-            loop.close()
+            return None
+
+        # 3. match_reason 생성: "무색페트병>무색페트병(물병)" 형식
+        match_reason = f"{middle}>{minor}" if minor else middle
+
+        result = {
+            # 클라이언트 표시용
+            "name": matched.name,
+            "dialog": matched.dialog,
+            "match_reason": match_reason,
+            "type": matched.type_label,
+            # 저장 task 발행용 (내부)
+            "character_id": str(matched.id),
+            "character_code": matched.code,
+            "received": True,
+        }
 
         logger.info(
             "Character match completed",
             extra={
                 **log_ctx,
-                "matched": result is not None,
-                "character_name": result.get("name") if result else None,
+                "matched": True,
+                "character_name": matched.name,
+                "match_label": middle,
             },
         )
         return result
@@ -85,74 +116,3 @@ def match_character_task(
     except Exception:
         logger.exception("Character match failed", extra=log_ctx)
         return None
-
-
-async def _match_character_async(
-    user_id: str,
-    classification_result: dict[str, Any],
-    disposal_rules_present: bool,
-) -> dict[str, Any] | None:
-    """캐릭터 매칭 (캐시 전용, DB 조회 없음).
-
-    Flow:
-        1. 로컬 캐시에서 캐릭터 목록 조회 (DB fallback 없음)
-        2. evaluator로 매칭
-        3. 결과 반환 (소유권 체크 없음 - 클라이언트가 판단)
-    """
-    from domains._shared.cache import get_character_cache
-    from domains.character.schemas.reward import (
-        CharacterRewardRequest,
-        CharacterRewardSource,
-        ClassificationSummary,
-    )
-    from domains.character.services.evaluators import get_evaluator
-
-    classification = classification_result.get("classification", {})
-    situation_tags = classification_result.get("situation_tags", [])
-
-    # 1. 로컬 캐시에서 캐릭터 목록 조회 (DB fallback 없음)
-    cache = get_character_cache()
-    characters = cache.list_all()
-
-    if not characters:
-        logger.warning("Character cache empty, cannot perform match")
-        return None
-
-    # 2. Evaluator로 매칭
-    evaluator = get_evaluator(CharacterRewardSource.SCAN)
-    if evaluator is None:
-        logger.error("No evaluator found for SCAN source")
-        return None
-
-    request = CharacterRewardRequest(
-        source=CharacterRewardSource.SCAN,
-        user_id=UUID(user_id),
-        task_id="",
-        classification=ClassificationSummary(
-            major_category=classification.get("major_category", ""),
-            middle_category=classification.get("middle_category", ""),
-            minor_category=classification.get("minor_category"),
-        ),
-        situation_tags=situation_tags,
-        disposal_rules_present=disposal_rules_present,
-        insufficiencies_present=False,
-    )
-
-    eval_result = evaluator.evaluate(request, characters)
-
-    if not eval_result.should_evaluate or not eval_result.matches:
-        return None
-
-    matched_character = eval_result.matches[0]
-
-    # 3. 결과 반환 (소유권 체크 없음 - 클라이언트가 판단)
-    return {
-        # 클라이언트 표시용
-        "name": matched_character.name,
-        "dialog": matched_character.dialog,
-        "match_reason": eval_result.match_reason,
-        "type": matched_character.type_label,
-        # 저장 task 발행용 (내부)
-        "character_id": str(matched_character.id),
-        "character_code": matched_character.code,
-    }
