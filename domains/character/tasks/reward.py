@@ -92,12 +92,23 @@ def save_ownership_task(requests: list) -> dict[str, Any]:
         raise
 
 
+def _generate_ownership_id(user_id: str, character_id: str) -> UUID:
+    """Deterministic UUID 생성 (멱등성 보장).
+
+    동일한 (user_id, character_id) 쌍은 항상 동일한 id 생성.
+    """
+    from uuid import NAMESPACE_DNS, uuid5
+
+    return uuid5(NAMESPACE_DNS, f"ownership:{user_id}:{character_id}")
+
+
 async def _save_ownership_batch_async(
     batch_data: list[dict[str, Any]],
 ) -> dict[str, Any]:
     """character.character_ownerships BULK UPSERT.
 
     INSERT INTO ... VALUES (...), (...), ... ON CONFLICT DO NOTHING
+    Deterministic UUID로 멱등성 보장.
     """
     from sqlalchemy import text
     from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
@@ -119,11 +130,16 @@ async def _save_ownership_batch_async(
         values = []
         params = {}
         for i, data in enumerate(batch_data):
+            user_id = data["user_id"]
+            character_id = data["character_id"]
             values.append(
-                f"(:user_id_{i}, :character_id_{i}, :source_{i}, " f":status_{i}, NOW(), NOW())"
+                f"(:id_{i}, :user_id_{i}, :character_id_{i}, :source_{i}, "
+                f":status_{i}, NOW(), NOW())"
             )
-            params[f"user_id_{i}"] = UUID(data["user_id"])
-            params[f"character_id_{i}"] = UUID(data["character_id"])
+            # Deterministic UUID: 동일 입력 → 동일 id (멱등성)
+            params[f"id_{i}"] = _generate_ownership_id(user_id, character_id)
+            params[f"user_id_{i}"] = UUID(user_id)
+            params[f"character_id_{i}"] = UUID(character_id)
             params[f"source_{i}"] = data.get("source", "scan")
             params[f"status_{i}"] = "owned"
 
@@ -133,7 +149,7 @@ async def _save_ownership_batch_async(
         sql = text(
             f"""
             INSERT INTO character.character_ownerships
-                (user_id, character_id, source, status, acquired_at, updated_at)
+                (id, user_id, character_id, source, status, acquired_at, updated_at)
             VALUES {", ".join(values)}
             ON CONFLICT (user_id, character_id) DO NOTHING
         """
