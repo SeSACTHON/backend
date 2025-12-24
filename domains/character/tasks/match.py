@@ -62,7 +62,7 @@ def match_character_task(
     try:
         # 1. 로컬 캐시에서 캐릭터 목록 조회
         cache = get_character_cache()
-        characters = cache.list_all()
+        characters = cache.get_all()
 
         if not characters:
             logger.warning("Character cache empty, cannot perform match")
