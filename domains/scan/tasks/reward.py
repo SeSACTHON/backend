@@ -198,7 +198,12 @@ def _dispatch_character_match(
         )
 
         # 동기 대기 (타임아웃 설정)
-        result = async_result.get(timeout=MATCH_TIMEOUT)
+        # disable_sync_subtasks=False: task 내 동기 호출 허용
+        # (scan-worker와 character-match-worker는 별도 큐/워커이므로 데드락 위험 없음)
+        result = async_result.get(
+            timeout=MATCH_TIMEOUT,
+            disable_sync_subtasks=False,
+        )
 
         logger.info(
             "Character match completed",
