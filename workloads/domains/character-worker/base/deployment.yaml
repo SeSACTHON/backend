@@ -26,6 +26,9 @@ spec:
         version: v1
         tier: worker
         domain: character
+      annotations:
+        # Istio proxy가 준비될 때까지 main container 시작 대기
+        proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
     spec:
       containers:
       - name: character-worker

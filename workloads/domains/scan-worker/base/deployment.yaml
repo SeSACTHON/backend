@@ -25,6 +25,9 @@ spec:
         version: v1
         tier: worker
         domain: scan
+      annotations:
+        # Istio proxy가 준비될 때까지 main container 시작 대기
+        proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
     spec:
       containers:
       - name: scan-worker
