@@ -105,12 +105,18 @@ async def _save_my_character_batch_async(
     from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
     from sqlalchemy.orm import sessionmaker
 
+    from domains._shared.database.config import get_worker_db_pool_settings
+
     # my 도메인 DB URL (환경변수에서)
     my_db_url = os.getenv(
         "MY_DATABASE_URL",
         "postgresql+asyncpg://postgres:postgres@localhost:5432/my",
     )
-    engine = create_async_engine(my_db_url, echo=False)
+    pool_settings = get_worker_db_pool_settings()
+    engine = create_async_engine(
+        my_db_url,
+        **pool_settings.get_engine_kwargs(),
+    )
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with async_session() as session:

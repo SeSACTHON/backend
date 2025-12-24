@@ -94,21 +94,27 @@ def init_worker_resources(sender: Any, **kwargs: Any) -> None:
     """Worker 시작 시 리소스 초기화.
 
     1. OpenTelemetry Celery 트레이싱 설정
-    2. 공유 event loop 초기화 (AsyncOpenAI용)
+    2. 공유 event loop 초기화 (prefork pool에서만 필요)
     3. 캐시 Consumer 시작
     """
     from domains._shared.cache import start_cache_consumer
-    from domains._shared.celery.async_support import init_event_loop
 
     # 1. OpenTelemetry Celery 트레이싱 설정 (worker_ready 시점에 호출해야 로그 출력됨)
     _setup_celery_tracing()
 
-    # 2. Event loop 초기화 (비동기 호출용)
-    try:
-        init_event_loop()
-        logger.info("scan_worker_event_loop_initialized")
-    except Exception:
-        logger.exception("scan_worker_event_loop_init_failed")
+    # 2. Event loop 초기화 (prefork pool에서만 필요)
+    # gevent pool: 자동 greenlet 전환으로 불필요
+    pool_cls = os.getenv("CELERY_WORKER_POOL", "prefork")
+    if pool_cls == "prefork":
+        try:
+            from domains._shared.celery.async_support import init_event_loop
+
+            init_event_loop()
+            logger.info("scan_worker_event_loop_initialized (prefork pool)")
+        except Exception:
+            logger.exception("scan_worker_event_loop_init_failed")
+    else:
+        logger.info(f"scan_worker_using_{pool_cls}_pool (auto greenlet/coroutine switch)")
 
     # 3. 캐시 Consumer 시작
     logger.info("scan_worker_cache_consumer_starting")
@@ -127,7 +133,6 @@ def init_worker_resources(sender: Any, **kwargs: Any) -> None:
 def shutdown_worker_resources(sender: Any, **kwargs: Any) -> None:
     """Worker 종료 시 리소스 정리."""
     from domains._shared.cache import stop_cache_consumer
-    from domains._shared.celery.async_support import shutdown_event_loop
 
     # 1. 캐시 Consumer 정리
     try:
@@ -136,9 +141,13 @@ def shutdown_worker_resources(sender: Any, **kwargs: Any) -> None:
     except Exception:
         logger.exception("scan_worker_cache_shutdown_failed")
 
-    # 2. Event loop 정리
-    try:
-        shutdown_event_loop()
-        logger.info("scan_worker_event_loop_shutdown")
-    except Exception:
-        logger.exception("scan_worker_event_loop_shutdown_failed")
+    # 2. Event loop 정리 (prefork pool에서만 필요)
+    pool_cls = os.getenv("CELERY_WORKER_POOL", "prefork")
+    if pool_cls == "prefork":
+        try:
+            from domains._shared.celery.async_support import shutdown_event_loop
+
+            shutdown_event_loop()
+            logger.info("scan_worker_event_loop_shutdown")
+        except Exception:
+            logger.exception("scan_worker_event_loop_shutdown_failed")

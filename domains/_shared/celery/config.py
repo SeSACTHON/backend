@@ -172,7 +172,11 @@ class CelerySettings(BaseSettings):
     )
     worker_concurrency: int = Field(
         2,
-        description="Number of concurrent worker processes",
+        description="Number of concurrent worker processes (prefork) or coroutines (asyncio)",
+    )
+    worker_pool: str = Field(
+        "prefork",
+        description="Worker pool type: prefork, asyncio, eventlet, gevent",
     )
 
     # Retry settings
@@ -225,15 +229,20 @@ class CelerySettings(BaseSettings):
                 "scan.vision": {"queue": "scan.vision"},
                 "scan.rule": {"queue": "scan.rule"},
                 "scan.answer": {"queue": "scan.answer"},
-                "scan.reward": {"queue": "scan.reward"},  # 보상 dispatch (scan-worker)
+                "scan.reward": {"queue": "scan.reward"},
                 # Character match (동기 응답, 빠른 처리)
                 "character.match": {"queue": "character.match"},
                 # Character reward (fire & forget, 백그라운드)
                 "character.save_ownership": {"queue": "character.reward"},
                 # My reward (my-worker: my DB 저장)
                 "my.save_character": {"queue": "my.reward"},
-                # DLQ 재처리
-                "dlq.*": {"queue": "celery"},
+                # DLQ 재처리 → 각 도메인 worker가 처리
+                "dlq.reprocess_scan_vision": {"queue": "scan.vision"},
+                "dlq.reprocess_scan_rule": {"queue": "scan.rule"},
+                "dlq.reprocess_scan_answer": {"queue": "scan.answer"},
+                "dlq.reprocess_scan_reward": {"queue": "scan.reward"},
+                "dlq.reprocess_character_reward": {"queue": "character.reward"},
+                "dlq.reprocess_my_reward": {"queue": "my.reward"},
             },
             # Queue configuration (DLX 포함하여 명시적 정의)
             "task_queues": CELERY_QUEUES,

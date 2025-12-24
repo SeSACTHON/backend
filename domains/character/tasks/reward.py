@@ -103,10 +103,15 @@ async def _save_ownership_batch_async(
     from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
     from sqlalchemy.orm import sessionmaker
 
+    from domains._shared.database.config import get_worker_db_pool_settings
     from domains.character.core.config import get_settings
 
     settings = get_settings()
-    engine = create_async_engine(settings.database_url, echo=False)
+    pool_settings = get_worker_db_pool_settings()
+    engine = create_async_engine(
+        settings.database_url,
+        **pool_settings.get_engine_kwargs(),
+    )
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     async with async_session() as session:
