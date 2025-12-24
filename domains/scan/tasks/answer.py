@@ -3,6 +3,10 @@ Answer Generation Celery Task
 
 GPT를 사용한 최종 답변 생성 (Pipeline Step 3)
 Webhook 전송은 reward_task에서 수행
+
+Note:
+    gevent pool 사용 시 자동으로 I/O 블로킹이 greenlet으로 전환됨.
+    run_async()로 async 함수를 동기 컨텍스트에서 호출.
 """
 
 from __future__ import annotations
@@ -47,6 +51,9 @@ def answer_task(
 
     Returns:
         최종 파이프라인 결과 (reward_task로 전달)
+
+    Note:
+        gevent pool에서는 I/O 블로킹이 자동으로 greenlet 전환됨.
     """
     from domains._shared.celery.async_support import run_async
     from domains._shared.waste_pipeline.answer import generate_answer_async
@@ -62,7 +69,7 @@ def answer_task(
         "celery_task_id": self.request.id,
         "stage": "answer",
     }
-    logger.info("Answer task started (async)", extra=log_ctx)
+    logger.info("Answer task started", extra=log_ctx)
 
     started = perf_counter()
 
@@ -75,7 +82,7 @@ def answer_task(
         elapsed_ms = (perf_counter() - started) * 1000
     else:
         try:
-            # AsyncOpenAI 사용 (공유 event loop에서 실행)
+            # gevent pool: 자동 greenlet 전환으로 I/O 블로킹 최소화
             final_answer = run_async(generate_answer_async(classification_result, disposal_rules))
         except Exception as exc:
             elapsed_ms = (perf_counter() - started) * 1000

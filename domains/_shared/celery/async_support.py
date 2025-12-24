@@ -2,13 +2,13 @@
 Celery Async Support Module
 
 Worker에서 비동기 함수를 효율적으로 호출하기 위한 유틸리티.
-- Event loop 재사용 (Worker당 1개)
-- AsyncOpenAI connection pool 활용
+- Gevent pool: I/O 블로킹이 자동으로 greenlet 전환
+- Prefork pool: Event loop 재사용으로 오버헤드 최소화
 
 Usage:
     from domains._shared.celery.async_support import run_async, init_event_loop
 
-    # Worker 시작 시
+    # Worker 시작 시 (prefork pool에서만 필요)
     @worker_ready.connect
     def on_worker_ready(sender, **kwargs):
         init_event_loop()
@@ -37,6 +37,8 @@ _event_loop: asyncio.AbstractEventLoop | None = None
 def init_event_loop() -> None:
     """Worker 시작 시 event loop 초기화.
 
+    prefork pool에서만 필요.
+    gevent pool에서는 자동 greenlet 전환되므로 불필요.
     worker_ready signal에서 호출해야 합니다.
     """
     global _event_loop
@@ -81,14 +83,15 @@ def run_async(coro: Coroutine[None, None, T]) -> T:
 
     Celery task 내에서 비동기 함수를 호출할 때 사용합니다.
 
+    Pool별 동작:
+    - gevent: I/O 블로킹이 자동으로 greenlet 전환됨
+    - prefork: 공유 event loop에서 실행
+
     Args:
         coro: 실행할 코루틴
 
     Returns:
         코루틴 실행 결과
-
-    Raises:
-        RuntimeError: event loop가 초기화되지 않은 경우
 
     Example:
         result = run_async(analyze_images_async(prompt, image_url))
@@ -96,8 +99,8 @@ def run_async(coro: Coroutine[None, None, T]) -> T:
     global _event_loop
 
     if _event_loop is None:
-        # Fallback: loop가 없으면 새로 생성 (비효율적, 경고 출력)
-        logger.warning("Event loop not initialized, creating temporary loop")
+        # Fallback: loop가 없으면 새로 생성
+        # gevent pool에서는 정상 동작 (greenlet 전환)
         loop = asyncio.new_event_loop()
         try:
             return loop.run_until_complete(coro)

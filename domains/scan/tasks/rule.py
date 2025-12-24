@@ -2,6 +2,9 @@
 Rule-based Retrieval Celery Task
 
 RAG 기반 배출 규정 검색 (Pipeline Step 2)
+
+Note:
+    gevent pool 사용 시 파일 I/O도 greenlet으로 자동 전환됨.
 """
 
 from __future__ import annotations
@@ -48,6 +51,9 @@ def rule_task(
 
     Returns:
         prev_result에 disposal_rules와 metadata 추가
+
+    Note:
+        gevent pool에서는 파일 I/O가 greenlet으로 자동 전환됨.
     """
     from domains._shared.waste_pipeline.rag import get_disposal_rules
 

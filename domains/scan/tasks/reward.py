@@ -6,6 +6,9 @@ Celery Chain 기반 리워드 처리 (Pipeline Step 4)
 
 매칭은 character 도메인에서 처리하고, 결과를 받아 SSE로 반환합니다.
 DB 저장은 character/my 도메인의 task에서 비동기로 처리됩니다.
+
+Note:
+    gevent pool 사용 시 블로킹 I/O가 자동으로 greenlet으로 전환됨.
 """
 
 from __future__ import annotations
@@ -51,6 +54,9 @@ def scan_reward_task(
         2. character.match 호출 (동기 대기) → 매칭 결과
         3. 즉시 응답 (SSE로 클라이언트에게 전달)
         4. character.save_ownership, my.save_character 발행 (Fire & Forget)
+
+    Note:
+        gevent pool에서는 블로킹 get()이 greenlet으로 자동 전환됨.
     """
     task_id = prev_result.get("task_id")
     user_id = prev_result.get("user_id")
@@ -71,7 +77,7 @@ def scan_reward_task(
     # 1. 조건 확인
     reward = None
     if _should_attempt_reward(classification_result, disposal_rules, final_answer):
-        # 2. character.match 호출 (동기 대기)
+        # 2. character.match 호출 (동기 대기, gevent가 greenlet 전환)
         reward = _dispatch_character_match(
             user_id=user_id,
             classification_result=classification_result,
@@ -184,6 +190,7 @@ def _dispatch_character_match(
     """character.match task 호출 (동기 대기).
 
     character-worker에서 로컬 캐시를 사용해 매칭 수행.
+    gevent pool에서는 블로킹 get()이 자동으로 greenlet 전환됨.
     """
     try:
         # send_task로 character.match 호출 (import 없이 이름으로)
@@ -197,9 +204,7 @@ def _dispatch_character_match(
             queue="character.match",  # 빠른 응답용 전용 큐
         )
 
-        # 동기 대기 (타임아웃 설정)
-        # disable_sync_subtasks=False: task 내 동기 호출 허용
-        # (scan-worker와 character-match-worker는 별도 큐/워커이므로 데드락 위험 없음)
+        # 동기 대기 (gevent가 greenlet으로 전환)
         result = async_result.get(
             timeout=MATCH_TIMEOUT,
             disable_sync_subtasks=False,
