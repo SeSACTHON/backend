@@ -222,6 +222,7 @@ class CelerySettings(BaseSettings):
             # Celery Events 활성화 (SSE 실시간 진행상황 + 최종 결과)
             "task_send_sent_event": True,  # task-sent 이벤트 발행
             "worker_send_task_events": True,  # worker에서 task 이벤트 발행
+            "task_track_started": True,  # task-started 이벤트 발행 (worker가 task 시작 시)
             "result_extended": True,  # task-succeeded에 result 포함
             # Task routing (도메인별 큐 분리)
             "task_routes": {
