@@ -12,7 +12,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -38,8 +38,7 @@ class TestChainDataFlow:
         from domains.scan.tasks.vision import vision_task
 
         with patch(
-            "domains._shared.waste_pipeline.vision.analyze_images_async",
-            new_callable=AsyncMock,
+            "domains._shared.waste_pipeline.vision.analyze_images",
         ) as mock:
             mock.return_value = {
                 "classification": {
@@ -135,8 +134,7 @@ class TestChainDataFlow:
         }
 
         with patch(
-            "domains._shared.waste_pipeline.answer.generate_answer_async",
-            new_callable=AsyncMock,
+            "domains._shared.waste_pipeline.answer.generate_answer",
         ) as mock:
             mock.return_value = {
                 "user_answer": "페트병은 라벨을 제거하고 투명 페트병 수거함에 배출하세요.",
@@ -170,9 +168,9 @@ class TestFullChainAssembly:
     def user_id(self) -> str:
         return str(uuid4())
 
-    @patch("domains._shared.waste_pipeline.answer.generate_answer_async", new_callable=AsyncMock)
+    @patch("domains._shared.waste_pipeline.answer.generate_answer")
     @patch("domains._shared.waste_pipeline.rag.get_disposal_rules")
-    @patch("domains._shared.waste_pipeline.vision.analyze_images_async", new_callable=AsyncMock)
+    @patch("domains._shared.waste_pipeline.vision.analyze_images")
     def test_recyclable_with_reward(self, mock_vision, mock_rule, mock_answer, task_id, user_id):
         """시나리오 1: 재활용 폐기물 + 리워드 획득."""
         from domains.scan.tasks.reward import _should_attempt_reward
@@ -234,9 +232,9 @@ class TestFullChainAssembly:
         assert final_result["reward"]["received"] is True
         assert final_result["reward"]["name"] == "페트병이"
 
-    @patch("domains._shared.waste_pipeline.answer.generate_answer_async", new_callable=AsyncMock)
+    @patch("domains._shared.waste_pipeline.answer.generate_answer")
     @patch("domains._shared.waste_pipeline.rag.get_disposal_rules")
-    @patch("domains._shared.waste_pipeline.vision.analyze_images_async", new_callable=AsyncMock)
+    @patch("domains._shared.waste_pipeline.vision.analyze_images")
     def test_recyclable_with_insufficiencies(
         self, mock_vision, mock_rule, mock_answer, task_id, user_id
     ):
@@ -282,9 +280,9 @@ class TestFullChainAssembly:
         self._verify_classification_response(final_result)
         assert final_result["reward"] is None
 
-    @patch("domains._shared.waste_pipeline.answer.generate_answer_async", new_callable=AsyncMock)
+    @patch("domains._shared.waste_pipeline.answer.generate_answer")
     @patch("domains._shared.waste_pipeline.rag.get_disposal_rules")
-    @patch("domains._shared.waste_pipeline.vision.analyze_images_async", new_callable=AsyncMock)
+    @patch("domains._shared.waste_pipeline.vision.analyze_images")
     def test_non_recyclable(self, mock_vision, mock_rule, mock_answer, task_id, user_id):
         """시나리오 3: 일반 폐기물 (리워드 대상 아님)."""
         from domains.scan.tasks.reward import _should_attempt_reward
@@ -326,7 +324,7 @@ class TestFullChainAssembly:
         self._verify_classification_response(final_result)
         assert final_result["category"] == "일반쓰레기"
 
-    @patch("domains._shared.waste_pipeline.vision.analyze_images_async", new_callable=AsyncMock)
+    @patch("domains._shared.waste_pipeline.vision.analyze_images")
     def test_no_disposal_rules(self, mock_vision, task_id, user_id):
         """시나리오 4: 규정 없음."""
         from domains.scan.tasks.answer import answer_task
@@ -503,9 +501,9 @@ class TestSSEFinalEventFormat:
 class TestChainMetadataAccumulation:
     """Chain을 거치며 metadata가 누적되는지 검증."""
 
-    @patch("domains._shared.waste_pipeline.answer.generate_answer_async", new_callable=AsyncMock)
+    @patch("domains._shared.waste_pipeline.answer.generate_answer")
     @patch("domains._shared.waste_pipeline.rag.get_disposal_rules")
-    @patch("domains._shared.waste_pipeline.vision.analyze_images_async", new_callable=AsyncMock)
+    @patch("domains._shared.waste_pipeline.vision.analyze_images")
     def test_metadata_accumulates_through_chain(self, mock_vision, mock_rule, mock_answer):
         """각 단계의 duration이 metadata에 누적됨."""
         from domains.scan.tasks.answer import answer_task
@@ -558,7 +556,7 @@ class TestChainMetadataAccumulation:
 class TestEdgeCases:
     """엣지 케이스 테스트."""
 
-    @patch("domains._shared.waste_pipeline.vision.analyze_images_async", new_callable=AsyncMock)
+    @patch("domains._shared.waste_pipeline.vision.analyze_images")
     def test_empty_classification(self, mock_vision):
         """분류 결과가 비어있는 경우."""
         from domains.scan.tasks.rule import rule_task
@@ -586,9 +584,9 @@ class TestEdgeCases:
         assert r["classification_result"]["classification"]["major_category"] == ""
         assert r["disposal_rules"] is None
 
-    @patch("domains._shared.waste_pipeline.answer.generate_answer_async", new_callable=AsyncMock)
+    @patch("domains._shared.waste_pipeline.answer.generate_answer")
     @patch("domains._shared.waste_pipeline.rag.get_disposal_rules")
-    @patch("domains._shared.waste_pipeline.vision.analyze_images_async", new_callable=AsyncMock)
+    @patch("domains._shared.waste_pipeline.vision.analyze_images")
     def test_unicode_in_answer(self, mock_vision, mock_rule, mock_answer):
         """답변에 유니코드(한글, 이모지)가 포함된 경우."""
         from domains.scan.tasks.answer import answer_task
