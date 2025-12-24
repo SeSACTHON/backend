@@ -15,7 +15,7 @@
 | Python | 3.11.14 |
 | RabbitMQ Messaging Topology Operator | latest (rabbitmqoperator/messaging-topology-operator) |
 | RabbitMQ Cluster Operator | latest (rabbitmqoperator/cluster-operator) |
-| Kubernetes | v1.30+ |
+| Kubernetes | v1.28.15 |
 
 ## 문제 상황
 
