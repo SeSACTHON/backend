@@ -5,8 +5,8 @@ GPT를 사용한 최종 답변 생성 (Pipeline Step 3)
 Webhook 전송은 reward_task에서 수행
 
 Note:
-    gevent pool 사용 시 자동으로 I/O 블로킹이 greenlet으로 전환됨.
-    run_async()로 async 함수를 동기 컨텍스트에서 호출.
+    gevent pool: 동기 함수 호출 시 자동으로 I/O가 greenlet 전환됨.
+    asyncio 사용 시 event loop 충돌 발생하므로 동기 클라이언트 사용.
 """
 
 from __future__ import annotations
@@ -53,10 +53,11 @@ def answer_task(
         최종 파이프라인 결과 (reward_task로 전달)
 
     Note:
-        gevent pool에서는 I/O 블로킹이 자동으로 greenlet 전환됨.
+        gevent pool: 동기 호출이 자동으로 greenlet 전환됨.
+        asyncio 대신 동기 클라이언트 사용 (event loop 충돌 방지).
     """
-    from domains._shared.celery.async_support import run_async
-    from domains._shared.waste_pipeline.answer import generate_answer_async
+    # gevent pool: 동기 함수 사용 (asyncio event loop 충돌 방지)
+    from domains._shared.waste_pipeline.answer import generate_answer
 
     task_id = prev_result.get("task_id")
     user_id = prev_result.get("user_id")
@@ -82,8 +83,8 @@ def answer_task(
         elapsed_ms = (perf_counter() - started) * 1000
     else:
         try:
-            # gevent pool: 자동 greenlet 전환으로 I/O 블로킹 최소화
-            final_answer = run_async(generate_answer_async(classification_result, disposal_rules))
+            # gevent가 socket I/O를 자동으로 greenlet 전환
+            final_answer = generate_answer(classification_result, disposal_rules, save_result=False)
         except Exception as exc:
             elapsed_ms = (perf_counter() - started) * 1000
             logger.error(
