@@ -10,6 +10,16 @@ spec:
   policyTypes:
   - Egress
   egress:
+  # KEDA 내부 gRPC 통신 (metrics-apiserver ↔ operator)
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: keda
+    ports:
+    - protocol: TCP
+      port: 9666  # gRPC metrics service
+    - protocol: TCP
+      port: 8080  # metrics
   # RabbitMQ AMQP + Management API
   - to:
     - namespaceSelector:
