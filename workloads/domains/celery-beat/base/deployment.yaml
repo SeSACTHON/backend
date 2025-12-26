@@ -29,7 +29,7 @@ spec:
     spec:
       containers:
       - name: celery-beat
-        image: docker.io/mng990/eco2:scan-api-dev-latest
+        image: docker.io/mng990/eco2:scan-worker-dev-latest
         imagePullPolicy: Always
         command: [celery]
         args:

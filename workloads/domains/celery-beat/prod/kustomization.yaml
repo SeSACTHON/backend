@@ -6,6 +6,6 @@ resources:
 
 images:
 - name: docker.io/mng990/eco2
-  newTag: scan-api-prod-latest
+  newTag: scan-worker-prod-latest
 
 # Celery Beat는 항상 1개만 (스케줄러)
