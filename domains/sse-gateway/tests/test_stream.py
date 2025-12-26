@@ -29,11 +29,20 @@ class TestStreamEndpoint:
 
     def test_stream_valid_job_id(self, client):
         """유효한 job_id 형식 (길이 >= 10)."""
-        # Note: 실제 SSE 스트림은 TestClient로 완전히 테스트하기 어려움
-        # 여기서는 400이 아닌지만 확인 (SSE 연결 시도)
-        response = client.get("/api/v1/stream/valid-job-id-12345")
-        # SSE 엔드포인트이므로 200 또는 연결 관련 응답
-        assert response.status_code != 400
+        from core.broadcast_manager import SSEBroadcastManager
+
+        # SSEBroadcastManager를 mock
+        async def mock_subscribe(job_id):
+            yield {"stage": "done", "status": "success"}
+
+        mock_manager = AsyncMock()
+        mock_manager.subscribe = mock_subscribe
+
+        with patch.object(SSEBroadcastManager, "get_instance", return_value=mock_manager):
+            # SSE 엔드포인트 호출 - 200 응답과 text/event-stream 확인
+            response = client.get("/api/v1/stream/valid-job-id-12345")
+            assert response.status_code == 200
+            assert "text/event-stream" in response.headers.get("content-type", "")
 
 
 class TestEventGenerator:
