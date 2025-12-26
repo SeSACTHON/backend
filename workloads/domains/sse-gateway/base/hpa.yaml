@@ -1,8 +1,17 @@
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# SSE Gateway HPA
+# SSE Gateway HPA (연결 기반 스케일링)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 스케일링 기준: 활성 연결 수 (sse_gateway_connections_active)
+# 스케일링 기준: CPU/Memory 사용량 (Long-lived connections 특성)
 # 각 Pod당 최대 100 연결 권장
+#
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 리소스 계산 (k8s-sse-gateway: t3.small, 2 vCPU, 1.8GB)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# - 노드 Allocatable: 2000m CPU, 1854Mi Memory
+# - 시스템 Pods (DaemonSets): ~330m CPU, ~200Mi Memory
+# - 가용 리소스: ~1670m CPU, ~1650Mi Memory
+# - sse-gateway 1개: 200m CPU (100m + 100m istio), 384Mi Memory
+# - 최대 파드 수: min(1670/200, 1650/384) = min(8, 4.3) = 4개
 #
 # 참조: docs/blogs/async/31-sse-fanout-optimization.md
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -19,7 +28,7 @@ spec:
     kind: Deployment
     name: sse-gateway
   minReplicas: 1
-  maxReplicas: 5
+  maxReplicas: 4  # 5 → 4 (노드 리소스 용량 기반)
   metrics:
     # CPU 기반 (fallback)
   - type: Resource
