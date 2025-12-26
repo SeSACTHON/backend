@@ -48,6 +48,14 @@ class SubscriberQueue:
     created_at: float = field(default_factory=time.time)
     last_event_at: float = field(default_factory=time.time)
 
+    def __hash__(self) -> int:
+        """set에 추가할 수 있도록 hash 구현."""
+        return id(self)  # 인스턴스별 고유 ID 사용
+
+    def __eq__(self, other: object) -> bool:
+        """동일 인스턴스 비교."""
+        return self is other
+
     async def put_event(self, event: dict[str, Any]) -> bool:
         """이벤트 추가 (Drop 정책 적용).
 
