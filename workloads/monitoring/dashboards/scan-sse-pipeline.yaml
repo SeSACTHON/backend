@@ -495,7 +495,7 @@ data:
           "gridPos": { "h": 6, "w": 8, "x": 0, "y": 64 },
           "targets": [
             {
-              "expr": "redis_stream_length{redis_cluster=\"streams-redis\"}",
+              "expr": "redis_stream_length{job=\"rfr-streams-redis\"}",
               "legendFormat": "{{ stream }}"
             }
           ],
@@ -521,7 +521,7 @@ data:
           "gridPos": { "h": 6, "w": 4, "x": 8, "y": 64 },
           "targets": [
             {
-              "expr": "sum(redis_stream_groups{redis_cluster=\"streams-redis\"})",
+              "expr": "sum(redis_stream_groups{job=\"rfr-streams-redis\"})",
               "legendFormat": "Groups"
             }
           ],
@@ -538,7 +538,7 @@ data:
           "gridPos": { "h": 6, "w": 4, "x": 12, "y": 64 },
           "targets": [
             {
-              "expr": "sum(redis_stream_pending_entries{redis_cluster=\"streams-redis\"})",
+              "expr": "sum(redis_stream_pending_entries{job=\"rfr-streams-redis\"})",
               "legendFormat": "Pending"
             }
           ],
@@ -563,7 +563,7 @@ data:
           "gridPos": { "h": 6, "w": 8, "x": 16, "y": 64 },
           "targets": [
             {
-              "expr": "redis_memory_used_bytes{redis_cluster=\"streams-redis\"}",
+              "expr": "redis_memory_used_bytes{job=\"rfr-streams-redis\"}",
               "legendFormat": "{{ pod }}"
             }
           ],
@@ -581,7 +581,7 @@ data:
           "gridPos": { "h": 6, "w": 12, "x": 0, "y": 70 },
           "targets": [
             {
-              "expr": "rate(redis_commands_processed_total{redis_cluster=\"streams-redis\"}[1m])",
+              "expr": "rate(redis_commands_processed_total{job=\"rfr-streams-redis\"}[1m])",
               "legendFormat": "{{ pod }}"
             }
           ],
@@ -599,7 +599,7 @@ data:
           "gridPos": { "h": 6, "w": 12, "x": 12, "y": 70 },
           "targets": [
             {
-              "expr": "redis_connected_clients{redis_cluster=\"streams-redis\"}",
+              "expr": "redis_connected_clients{job=\"rfr-streams-redis\"}",
               "legendFormat": "{{ pod }}"
             }
           ],

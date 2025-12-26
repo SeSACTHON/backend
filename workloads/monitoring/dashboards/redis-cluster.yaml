@@ -29,13 +29,14 @@ data:
             "current": { "text": "Prometheus", "value": "prometheus" }
           },
           {
-            "name": "redis_cluster",
+            "name": "job",
             "type": "query",
             "datasource": { "type": "prometheus", "uid": "${datasource}" },
-            "query": "label_values(redis_up, redis_cluster)",
+            "query": "label_values(redis_up{job=~\"rfr-.*\"}, job)",
             "multi": true,
             "includeAll": true,
-            "current": { "text": "All", "value": "$__all" }
+            "current": { "text": "All", "value": "$__all" },
+            "regex": "/rfr-(.*)/"
           }
         ]
       },
@@ -53,7 +54,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "sum(redis_up{redis_cluster=~\"$redis_cluster\"})",
+              "expr": "sum(redis_up{job=~\"rfr-$job\"})",
               "legendFormat": "Up"
             }
           ],
@@ -78,7 +79,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "sum(redis_memory_used_bytes{redis_cluster=~\"$redis_cluster\"})",
+              "expr": "sum(redis_memory_used_bytes{job=~\"rfr-$job\"})",
               "legendFormat": "Used"
             }
           ],
@@ -91,7 +92,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "sum(redis_connected_clients{redis_cluster=~\"$redis_cluster\"})",
+              "expr": "sum(redis_connected_clients{job=~\"rfr-$job\"})",
               "legendFormat": "Clients"
             }
           ],
@@ -104,7 +105,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "sum(rate(redis_commands_processed_total{redis_cluster=~\"$redis_cluster\"}[1m]))",
+              "expr": "sum(rate(redis_commands_processed_total{job=~\"rfr-$job\"}[1m]))",
               "legendFormat": "Commands"
             }
           ],
@@ -117,7 +118,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "sum(redis_keyspace_hits_total{redis_cluster=~\"$redis_cluster\"}) / (sum(redis_keyspace_hits_total{redis_cluster=~\"$redis_cluster\"}) + sum(redis_keyspace_misses_total{redis_cluster=~\"$redis_cluster\"})) * 100",
+              "expr": "sum(redis_keyspace_hits_total{job=~\"rfr-$job\"}) / (sum(redis_keyspace_hits_total{job=~\"rfr-$job\"}) + sum(redis_keyspace_misses_total{job=~\"rfr-$job\"})) * 100",
               "legendFormat": "Hit %"
             }
           ],
@@ -144,7 +145,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "sum(increase(redis_evicted_keys_total{redis_cluster=~\"$redis_cluster\"}[1h]))",
+              "expr": "sum(increase(redis_evicted_keys_total{job=~\"rfr-$job\"}[1h]))",
               "legendFormat": "Evicted (1h)"
             }
           ],
@@ -175,7 +176,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "redis_memory_used_bytes{redis_cluster=\"auth-redis\"}",
+              "expr": "redis_memory_used_bytes{job=\"rfr-auth-redis\"}",
               "legendFormat": "{{ pod }}"
             }
           ],
@@ -194,7 +195,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "redis_memory_used_bytes{redis_cluster=\"streams-redis\"}",
+              "expr": "redis_memory_used_bytes{job=\"rfr-streams-redis\"}",
               "legendFormat": "{{ pod }}"
             }
           ],
@@ -213,7 +214,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "redis_memory_used_bytes{redis_cluster=\"cache-redis\"}",
+              "expr": "redis_memory_used_bytes{job=\"rfr-cache-redis\"}",
               "legendFormat": "{{ pod }}"
             }
           ],
@@ -238,7 +239,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "redis_connected_clients{redis_cluster=\"auth-redis\"}",
+              "expr": "redis_connected_clients{job=\"rfr-auth-redis\"}",
               "legendFormat": "{{ pod }}"
             }
           ],
@@ -256,7 +257,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "redis_connected_clients{redis_cluster=\"streams-redis\"}",
+              "expr": "redis_connected_clients{job=\"rfr-streams-redis\"}",
               "legendFormat": "{{ pod }}"
             }
           ],
@@ -274,7 +275,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "redis_connected_clients{redis_cluster=\"cache-redis\"}",
+              "expr": "redis_connected_clients{job=\"rfr-cache-redis\"}",
               "legendFormat": "{{ pod }}"
             }
           ],
@@ -298,15 +299,15 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "sum(rate(redis_commands_processed_total{redis_cluster=\"auth-redis\"}[1m]))",
+              "expr": "sum(rate(redis_commands_processed_total{job=\"rfr-auth-redis\"}[1m]))",
               "legendFormat": "auth-redis"
             },
             {
-              "expr": "sum(rate(redis_commands_processed_total{redis_cluster=\"streams-redis\"}[1m]))",
+              "expr": "sum(rate(redis_commands_processed_total{job=\"rfr-streams-redis\"}[1m]))",
               "legendFormat": "streams-redis"
             },
             {
-              "expr": "sum(rate(redis_commands_processed_total{redis_cluster=\"cache-redis\"}[1m]))",
+              "expr": "sum(rate(redis_commands_processed_total{job=\"rfr-cache-redis\"}[1m]))",
               "legendFormat": "cache-redis"
             }
           ],
@@ -324,8 +325,8 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "redis_slowlog_last_id{redis_cluster=~\"$redis_cluster\"}",
-              "legendFormat": "{{ redis_cluster }} slowlog"
+              "expr": "redis_slowlog_last_id{job=~\"rfr-$job\"}",
+              "legendFormat": "{{ job }} slowlog"
             }
           ],
           "fieldConfig": {
@@ -348,7 +349,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "redis_db_keys{redis_cluster=\"auth-redis\"}",
+              "expr": "redis_db_keys{job=\"rfr-auth-redis\"}",
               "legendFormat": "db{{ db }}"
             }
           ],
@@ -366,7 +367,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "redis_db_keys{redis_cluster=\"streams-redis\"}",
+              "expr": "redis_db_keys{job=\"rfr-streams-redis\"}",
               "legendFormat": "db{{ db }}"
             }
           ],
@@ -384,7 +385,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "redis_db_keys{redis_cluster=\"cache-redis\"}",
+              "expr": "redis_db_keys{job=\"rfr-cache-redis\"}",
               "legendFormat": "db{{ db }}"
             }
           ],
@@ -408,7 +409,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "sum(redis_connected_slaves{redis_cluster=~\"$redis_cluster\"})",
+              "expr": "sum(redis_connected_slaves{job=~\"rfr-$job\"})",
               "legendFormat": "Slaves"
             }
           ],
@@ -433,8 +434,8 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "redis_master_repl_offset{redis_cluster=~\"$redis_cluster\"} - on(redis_cluster) group_left redis_slave_repl_offset{redis_cluster=~\"$redis_cluster\"}",
-              "legendFormat": "{{ redis_cluster }} lag"
+              "expr": "redis_master_repl_offset{job=~\"rfr-$job\"} - on(job) group_left redis_slave_repl_offset{job=~\"rfr-$job\"}",
+              "legendFormat": "{{ job }} lag"
             }
           ],
           "fieldConfig": {
@@ -451,8 +452,8 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "redis_master_link_up{redis_cluster=~\"$redis_cluster\"}",
-              "legendFormat": "{{ redis_cluster }}"
+              "expr": "redis_master_link_up{job=~\"rfr-$job\"}",
+              "legendFormat": "{{ job }}"
             }
           ],
           "fieldConfig": {
@@ -471,7 +472,7 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "sum(redis_blocked_clients{redis_cluster=~\"$redis_cluster\"})",
+              "expr": "sum(redis_blocked_clients{job=~\"rfr-$job\"})",
               "legendFormat": "Blocked"
             }
           ],
@@ -502,8 +503,8 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "rate(redis_net_input_bytes_total{redis_cluster=~\"$redis_cluster\"}[1m])",
-              "legendFormat": "{{ redis_cluster }}"
+              "expr": "rate(redis_net_input_bytes_total{job=~\"rfr-$job\"}[1m])",
+              "legendFormat": "{{ job }}"
             }
           ],
           "fieldConfig": {
@@ -520,8 +521,8 @@ data:
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
           "targets": [
             {
-              "expr": "rate(redis_net_output_bytes_total{redis_cluster=~\"$redis_cluster\"}[1m])",
-              "legendFormat": "{{ redis_cluster }}"
+              "expr": "rate(redis_net_output_bytes_total{job=~\"rfr-$job\"}[1m])",
+              "legendFormat": "{{ job }}"
             }
           ],
           "fieldConfig": {

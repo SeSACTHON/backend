@@ -16,17 +16,17 @@ spec:
   # 스케일링 범위
   minReplicaCount: 1
   maxReplicaCount: 10
-  # 쿨다운 기간 (빠른 스케일다운)
-  cooldownPeriod: 30
-  # 폴링 간격 (빠른 감지)
-  pollingInterval: 10
+  # 쿨다운 기간 (스케일업 후 최소 대기 시간)
+  cooldownPeriod: 120  # 30s → 120s (스케일링 진동 방지)
+  # 폴링 간격
+  pollingInterval: 15
   # 고급 설정
   advanced:
     restoreToOriginalReplicaCount: false
     horizontalPodAutoscalerConfig:
       behavior:
         scaleDown:
-          stabilizationWindowSeconds: 120
+          stabilizationWindowSeconds: 300  # 120s → 300s (5분 안정화)
           policies:
           - type: Percent
             value: 50
