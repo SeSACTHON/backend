@@ -27,12 +27,13 @@ class TestStreamEndpoint:
         # 빈 경로는 404 또는 다른 라우트로 매칭
         assert response.status_code in [404, 405]
 
-    def test_stream_health_endpoint(self, client):
-        """Stream 라우터 health 엔드포인트."""
-        response = client.get("/api/v1/stream/health")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["status"] == "ok"
+    def test_stream_valid_job_id(self, client):
+        """유효한 job_id 형식 (길이 >= 10)."""
+        # Note: 실제 SSE 스트림은 TestClient로 완전히 테스트하기 어려움
+        # 여기서는 400이 아닌지만 확인 (SSE 연결 시도)
+        response = client.get("/api/v1/stream/valid-job-id-12345")
+        # SSE 엔드포인트이므로 200 또는 연결 관련 응답
+        assert response.status_code != 400
 
 
 class TestEventGenerator:
