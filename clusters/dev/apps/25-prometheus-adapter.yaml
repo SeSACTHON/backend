@@ -1,0 +1,87 @@
+# Prometheus Adapter for Custom Metrics HPA
+# HPA가 Prometheus 메트릭 (scan_sse_connections_active 등)을 사용할 수 있게 함
+# sync-wave: 25 (kube-prom-stack 20 이후)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-prometheus-adapter
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '25'
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: dev
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: prometheus-adapter
+    targetRevision: 4.10.0
+    helm:
+      releaseName: prometheus-adapter
+      valuesObject:
+        prometheus:
+          url: http://kube-prometheus-stack-prometheus.prometheus.svc
+          port: 9090
+        # 커스텀 메트릭 규칙
+        rules:
+          default: false
+          custom:
+          # scan-api SSE 연결 수
+          - seriesQuery: scan_sse_connections_active{namespace!="",pod!=""}
+            resources:
+              overrides:
+                namespace:
+                  resource: namespace
+                pod:
+                  resource: pod
+            name:
+              matches: ^(.*)$
+              as: ${1}
+            metricsQuery: sum(<<.Series>>{<<.LabelMatchers>>}) by (<<.GroupBy>>)
+          # ext-authz 요청 수 (RPS)
+          - seriesQuery: ext_authz_requests_total{namespace!="",pod!=""}
+            resources:
+              overrides:
+                namespace:
+                  resource: namespace
+                pod:
+                  resource: pod
+            name:
+              matches: ^(.*)_total$
+              as: ${1}_per_second
+            metricsQuery: sum(rate(<<.Series>>{<<.LabelMatchers>>}[2m])) by (<<.GroupBy>>)
+          # RabbitMQ 큐 메시지 수 (KEDA 대체용)
+          - seriesQuery: rabbitmq_queue_messages{namespace!="",queue!=""}
+            resources:
+              overrides:
+                namespace:
+                  resource: namespace
+            name:
+              matches: ^(.*)$
+              as: ${1}
+            metricsQuery: sum(<<.Series>>{<<.LabelMatchers>>}) by (<<.GroupBy>>)
+        # 노드 선택 (monitoring 노드)
+        tolerations:
+        - key: domain
+          operator: Equal
+          value: observability
+          effect: NoSchedule
+        nodeSelector:
+          infra-type: monitoring
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: prometheus
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=false
+    - ServerSideApply=true

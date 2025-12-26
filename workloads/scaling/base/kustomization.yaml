@@ -1,0 +1,20 @@
+# KEDA ScaledObject 및 Prometheus Adapter HPA (Base)
+# 이 파일들은 KEDA/Prometheus Adapter 설치 후 적용됩니다.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+metadata:
+  name: scaling-base
+
+resources:
+# KEDA ScaledObject (scan-worker용)
+# 주의: 기존 scan-worker-hpa를 먼저 삭제해야 함
+- scan-worker-scaledobject.yaml
+
+# Prometheus Adapter HPA (scan-api용)
+# 주의: 기존 scan-api-hpa를 먼저 삭제해야 함
+- scan-api-hpa.yaml
+
+labels:
+- pairs:
+    app.kubernetes.io/managed-by: kustomize
+    app.kubernetes.io/part-of: eco2-scaling

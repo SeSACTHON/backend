@@ -1,0 +1,34 @@
+# KEDA ScaledObject 및 Prometheus Adapter HPA (Prod)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+metadata:
+  name: scaling-prod
+
+resources:
+- ../base
+
+# Prod 환경: 높은 스케일링 한계
+patches:
+# scan-worker: 최대 10개
+- target:
+    kind: ScaledObject
+    name: scan-worker-scaledobject
+  patch: |-
+    - op: replace
+      path: /spec/maxReplicaCount
+      value: 10
+    - op: replace
+      path: /spec/minReplicaCount
+      value: 2
+
+# scan-api: 최대 5개
+- target:
+    kind: HorizontalPodAutoscaler
+    name: scan-api-hpa
+  patch: |-
+    - op: replace
+      path: /spec/maxReplicas
+      value: 5
+    - op: replace
+      path: /spec/minReplicas
+      value: 2
