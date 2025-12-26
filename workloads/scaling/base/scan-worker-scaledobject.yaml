@@ -13,12 +13,16 @@ spec:
     name: scan-worker
     kind: Deployment
   # 스케일링 범위
-  minReplicaCount: 1
-  maxReplicaCount: 10
-  # 쿨다운 기간 (스케일업 후 최소 대기 시간)
-  cooldownPeriod: 120  # 30s → 120s (스케일링 진동 방지)
+  minReplicaCount: 2  # 1 → 2 (기본 Worker 수 증가, 메트릭 실패 시에도 유지)
+  maxReplicaCount: 5
+  # 쿨다운 기간 (스케일다운 전 최소 대기 시간)
+  cooldownPeriod: 300  # 120s → 300s (5분, stabilizationWindow와 일치)
   # 폴링 간격
-  pollingInterval: 15
+  pollingInterval: 30  # 15s → 30s (메트릭 수집 안정화)
+  # Fallback: 메트릭 실패 시 기본 replicas 유지
+  fallback:
+    failureThreshold: 3  # 3번 실패 후 fallback 발동
+    replicas: 2  # fallback 시 유지할 replicas
   # 고급 설정
   advanced:
     restoreToOriginalReplicaCount: false
