@@ -1,21 +1,14 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
-
 resources:
 - ../base
-
 images:
 - name: docker.io/mng990/eco2
-  newTag: scan-worker-prod-latest
-
-# Prod 환경: replicas 증가
+  newTag: scan-worker-1.0.7-114705
 patches:
 - target:
     group: apps
     version: v1
     kind: Deployment
     name: scan-worker
-  patch: |-
-    - op: replace
-      path: /spec/replicas
-      value: 3
+  patch: "- op: replace\n  path: /spec/replicas\n  value: 3"
