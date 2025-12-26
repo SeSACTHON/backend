@@ -60,6 +60,10 @@ async def get_async_redis_client() -> "aioredis.Redis":  # type: ignore[type-arg
     FastAPI asyncio event loop에서 사용됩니다.
     redis.asyncio를 사용하여 non-blocking I/O를 수행합니다.
 
+    Note:
+        socket_timeout은 XREAD block 타임아웃보다 충분히 커야 합니다.
+        AI 답변 생성에 6~10초 소요되므로 60초로 설정.
+
     Returns:
         비동기 Redis 클라이언트 (싱글톤)
 
@@ -76,7 +80,7 @@ async def get_async_redis_client() -> "aioredis.Redis":  # type: ignore[type-arg
         _async_redis_client = aioredis.from_url(
             _REDIS_STREAMS_URL,
             decode_responses=False,  # 바이트 유지 (Streams 호환)
-            socket_timeout=5.0,
+            socket_timeout=60.0,  # XREAD block(5s) + AI 처리(10s) 여유
             socket_connect_timeout=5.0,
         )
 
