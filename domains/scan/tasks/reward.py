@@ -222,7 +222,13 @@ def _dispatch_character_match(
 
     character-worker에서 로컬 캐시를 사용해 매칭 수행.
     gevent pool에서는 블로킹 get()이 자동으로 greenlet 전환됨.
+
+    Fallback:
+        - 타임아웃 시 None 반환 (SSE 완료 보장)
+        - 에러 발생 시 None 반환 (전체 파이프라인 실패 방지)
     """
+    from celery.exceptions import TimeoutError as CeleryTimeoutError
+
     try:
         # send_task로 character.match 호출 (import 없이 이름으로)
         async_result = celery_app.send_task(
@@ -251,8 +257,28 @@ def _dispatch_character_match(
         )
         return result
 
-    except Exception:
-        logger.exception("Character match failed", extra=log_ctx)
+    except CeleryTimeoutError:
+        # Fallback: 타임아웃 시 None 반환 (전체 파이프라인 실패 방지)
+        logger.warning(
+            "Character match timeout - returning fallback",
+            extra={
+                **log_ctx,
+                "timeout_seconds": MATCH_TIMEOUT,
+                "fallback": "None (no reward)",
+            },
+        )
+        return None
+
+    except Exception as exc:
+        # Fallback: 에러 시 None 반환 (전체 파이프라인 실패 방지)
+        logger.warning(
+            "Character match failed - returning fallback",
+            extra={
+                **log_ctx,
+                "error": str(exc),
+                "fallback": "None (no reward)",
+            },
+        )
         return None
 
 

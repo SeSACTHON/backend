@@ -16,10 +16,10 @@ spec:
   # 스케일링 범위
   minReplicaCount: 1
   maxReplicaCount: 10
-  # 쿨다운 기간
-  cooldownPeriod: 60
-  # 폴링 간격
-  pollingInterval: 15
+  # 쿨다운 기간 (빠른 스케일다운)
+  cooldownPeriod: 30
+  # 폴링 간격 (빠른 감지)
+  pollingInterval: 10
   # 고급 설정
   advanced:
     restoreToOriginalReplicaCount: false
