@@ -30,6 +30,8 @@ logger = logging.getLogger(__name__)
     max_retries=2,
     soft_time_limit=60,
     time_limit=90,
+    # Exponential backoff: 1s, 2s (max_retries=2)
+    default_retry_delay=1,
 )
 def answer_task(
     self: BaseTask,
@@ -104,7 +106,9 @@ def answer_task(
                 "failed",
                 result={"error": str(exc)},
             )
-            raise self.retry(exc=exc)
+            # Exponential backoff: 1s, 2s, 4s...
+            countdown = 2**self.request.retries
+            raise self.retry(exc=exc, countdown=countdown)
 
         elapsed_ms = (perf_counter() - started) * 1000
 

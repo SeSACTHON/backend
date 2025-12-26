@@ -87,10 +87,14 @@ spec:
       operator: Equal
       value: data
       effect: NoSchedule
-    # Metrics Exporter
+    # Metrics Exporter (Streams 메트릭 포함)
     exporter:
       enabled: true
       image: oliver006/redis_exporter:v1.62.0
+      args:
+      - --include-system-metrics
+      # Streams 메트릭 수집: scan:events:* 패턴
+      - --check-streams=scan:events:*
       resources:
         requests:
           cpu: 25m
