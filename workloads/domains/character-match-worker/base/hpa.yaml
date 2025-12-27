@@ -5,6 +5,10 @@
 #
 # ⚠️ Cache 공유: fanout exchange로 모든 Pod가 동일한 cache 이벤트 수신
 #    새 Pod 생성 시 자동으로 cache 동기화됨
+#
+# 2025-12-27: min:2→1, max:4→2로 조정 (노드 리소스 오버커밋 해소)
+# - k8s-worker-storage CPU Requests 91%, Limits 985% 오버커밋 상태
+# - my-worker Pending 원인 (FailedScheduling: Insufficient cpu)
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
@@ -18,8 +22,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: character-match-worker
-  minReplicas: 2  # 최소 2개 (가용성)
-  maxReplicas: 4  # 노드 공유 고려
+  minReplicas: 1  # 노드 리소스 고려 (2→1)
+  maxReplicas: 2  # 노드 공유 고려 (4→2)
   metrics:
   # CPU 기반 스케일링 (주 지표)
   - type: Resource
