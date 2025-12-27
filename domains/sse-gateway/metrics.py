@@ -286,3 +286,54 @@ SSE_EVENT_REPLAY_TOTAL = Counter(
     "Total events replayed from history",
     registry=REGISTRY,
 )
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 8. 요청/응답 메트릭 (대시보드 호환용)
+# ─────────────────────────────────────────────────────────────────────────────
+
+SSE_REQUESTS_TOTAL = Counter(
+    "sse_gateway_requests_total",
+    "Total SSE requests",
+    labelnames=["status"],  # success, timeout, failed
+    registry=REGISTRY,
+)
+
+SSE_TTFB = Histogram(
+    "sse_gateway_ttfb_seconds",
+    "Time to first byte (connection open to first event)",
+    registry=REGISTRY,
+    buckets=exponential_buckets_range(0.001, 10.0, 15),
+)
+
+SSE_STREAM_DURATION = Histogram(
+    "sse_gateway_stream_duration_seconds",
+    "Total stream duration (connection open to close)",
+    registry=REGISTRY,
+    buckets=exponential_buckets_range(1.0, 300.0, 15),
+)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9. Pub/Sub 구독 메트릭
+# ─────────────────────────────────────────────────────────────────────────────
+
+SSE_PUBSUB_CONNECTED = Gauge(
+    "sse_gateway_pubsub_connected",
+    "Redis Pub/Sub connection status (1=connected, 0=disconnected)",
+    registry=REGISTRY,
+)
+
+SSE_PUBSUB_MESSAGES_RECEIVED = Counter(
+    "sse_gateway_pubsub_messages_received_total",
+    "Total messages received from Pub/Sub",
+    labelnames=["stage"],
+    registry=REGISTRY,
+)
+
+SSE_PUBSUB_SUBSCRIBE_LATENCY = Histogram(
+    "sse_gateway_pubsub_subscribe_latency_seconds",
+    "Time to subscribe to a job channel",
+    registry=REGISTRY,
+    buckets=exponential_buckets_range(0.001, 1.0, 10),
+)

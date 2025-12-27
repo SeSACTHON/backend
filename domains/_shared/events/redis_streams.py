@@ -1,17 +1,11 @@
-"""Redis Streams 기반 이벤트 발행/구독 모듈.
+"""Redis Streams 기반 이벤트 발행 모듈.
 
-Celery Events 대신 Redis Streams를 사용하여
-SSE:RabbitMQ 연결 폭발 문제를 해결합니다.
+Event Router + Pub/Sub 아키텍처:
+- Worker는 Redis Streams에 이벤트 발행 (멱등성 보장)
+- Event Router가 Streams를 소비하여 Pub/Sub로 발행
+- SSE-Gateway는 Pub/Sub를 구독하여 클라이언트에게 전달
 
-B안 샤딩 아키텍처:
-- 스트림을 N개로 샤딩: scan:events:0 ~ scan:events:N-1
-- shard = hash(job_id) % N
-- Worker는 sharded stream에 publish
-- SSE Gateway는 자기 shard만 XREAD
-
-참고:
-- [Redis Streams 문서](https://redis.io/docs/latest/develop/data-types/streams/)
-- [antirez: Streams Design](http://antirez.com/news/114)
+참조: docs/blogs/async/34-sse-HA-architecture.md
 """
 
 from __future__ import annotations
@@ -20,11 +14,10 @@ import json
 import logging
 import os
 import time
-from typing import TYPE_CHECKING, Any, AsyncGenerator
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import redis
-    import redis.asyncio as aioredis
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +27,10 @@ logger = logging.getLogger(__name__)
 
 STREAM_PREFIX = "scan:events"
 STATE_KEY_PREFIX = "scan:state:"  # State KV 스냅샷 (SSE 재연결용)
-STREAM_MAXLEN = 100  # shard당 최근 100개 이벤트만 유지
-STREAM_TTL = 3600  # 1시간 후 만료
-STATE_TTL = 3600  # State 스냅샷 TTL 1시간
+PUBLISHED_KEY_PREFIX = "published:"  # 멱등성 마킹
+STREAM_MAXLEN = 10000  # Stream당 최대 메시지 수
+PUBLISHED_TTL = 7200  # 발행 마킹 TTL (2시간)
+STATE_TTL = 3600  # State 스냅샷 TTL (1시간)
 
 # Stage 순서 (단조증가 seq)
 STAGE_ORDER = {
@@ -50,6 +44,44 @@ STAGE_ORDER = {
 
 # 샤딩 설정 (환경 변수로 오버라이드 가능)
 DEFAULT_SHARD_COUNT = int(os.environ.get("SSE_SHARD_COUNT", "4"))
+
+# ─────────────────────────────────────────────────────────────────
+# 멱등성 Lua Script
+# ─────────────────────────────────────────────────────────────────
+
+# Worker → Streams 멱등성 XADD
+# 동일한 job_id + stage + seq 조합은 한 번만 발행
+IDEMPOTENT_XADD_SCRIPT = """
+local publish_key = KEYS[1]  -- published:{job_id}:{stage}:{seq}
+local stream_key = KEYS[2]   -- scan:events:{shard}
+local state_key = KEYS[3]    -- scan:state:{job_id}
+
+-- 이미 발행했는지 체크
+if redis.call('EXISTS', publish_key) == 1 then
+    local existing_msg_id = redis.call('GET', publish_key)
+    return {0, existing_msg_id}  -- 이미 발행됨
+end
+
+-- XADD 실행 (MAXLEN ~ 로 효율적 trim)
+local msg_id = redis.call('XADD', stream_key, 'MAXLEN', '~', ARGV[1],
+    '*',
+    'job_id', ARGV[2],
+    'stage', ARGV[3],
+    'status', ARGV[4],
+    'seq', ARGV[5],
+    'ts', ARGV[6],
+    'progress', ARGV[7],
+    'result', ARGV[8]
+)
+
+-- 발행 마킹 (TTL: 2시간)
+redis.call('SETEX', publish_key, ARGV[9], msg_id)
+
+-- State 스냅샷 저장 (TTL: 1시간)
+redis.call('SETEX', state_key, ARGV[10], ARGV[11])
+
+return {1, msg_id}  -- 새로 발행됨
+"""
 
 
 def get_shard_for_job(job_id: str, shard_count: int | None = None) -> int:
@@ -75,7 +107,7 @@ def get_shard_for_job(job_id: str, shard_count: int | None = None) -> int:
 
 
 def get_stream_key(job_id: str, shard_count: int | None = None) -> str:
-    """Sharded Stream key 생성 (B안).
+    """Sharded Stream key 생성.
 
     Args:
         job_id: Chain의 root task ID
@@ -101,15 +133,15 @@ def publish_stage_event(
     result: dict | None = None,
     progress: int | None = None,
 ) -> str:
-    """Worker가 호출: stage 이벤트를 Sharded Redis Streams에 발행 (B안).
+    """Worker가 호출: stage 이벤트를 Redis Streams에 발행 (멱등성 보장).
 
-    각 Celery Task의 시작/완료 시점에 호출하여
-    SSE 클라이언트에게 진행 상황을 전달합니다.
+    Lua Script를 사용하여 원자적으로:
+    1. 이미 발행했는지 체크 (published:{job_id}:{stage}:{seq})
+    2. 미발행이면 XADD 실행
+    3. 발행 마킹 저장
+    4. State 스냅샷 저장
 
-    B안 샤딩:
-    - shard = hash(job_id) % shard_count
-    - scan:events:{shard}에 발행
-    - 이벤트에 job_id 포함 (라우팅용)
+    Celery Task 재시도 시에도 중복 발행 없음.
 
     Args:
         redis_client: 동기 Redis 클라이언트 (Celery Worker용)
@@ -135,196 +167,75 @@ def publish_stage_event(
     base_seq = STAGE_ORDER.get(stage, 99) * 10
     seq = base_seq + (1 if status == "completed" else 0)
 
-    # B안: job_id를 이벤트에 포함 (SSE Gateway에서 라우팅에 사용)
-    event: dict[str, str] = {
-        "job_id": job_id,  # 라우팅 키
+    # 멱등성 키
+    publish_key = f"{PUBLISHED_KEY_PREFIX}{job_id}:{stage}:{seq}"
+
+    # 이벤트 데이터
+    ts = str(time.time())
+    progress_str = str(progress) if progress is not None else ""
+    result_str = json.dumps(result, ensure_ascii=False) if result else ""
+
+    # State 스냅샷 데이터
+    state_data = {
+        "job_id": job_id,
         "stage": stage,
         "status": status,
-        "seq": str(seq),  # 단조증가 시퀀스 (중복/역전 방지)
-        "ts": str(time.time()),
+        "seq": seq,
+        "ts": ts,
     }
-
     if progress is not None:
-        event["progress"] = str(progress)
-
+        state_data["progress"] = progress
     if result:
-        event["result"] = json.dumps(result, ensure_ascii=False)
+        state_data["result"] = result
+    state_json = json.dumps(state_data, ensure_ascii=False)
 
-    # XADD + MAXLEN (오래된 이벤트 자동 삭제)
-    # approximate=True (~ 접두사)로 효율적 trim
-    msg_id = redis_client.xadd(
-        stream_key,
-        event,
-        maxlen=STREAM_MAXLEN,
+    # Lua Script 실행
+    script = redis_client.register_script(IDEMPOTENT_XADD_SCRIPT)
+    result_tuple = script(
+        keys=[publish_key, stream_key, state_key],
+        args=[
+            str(STREAM_MAXLEN),  # ARGV[1]: maxlen
+            job_id,  # ARGV[2]: job_id
+            stage,  # ARGV[3]: stage
+            status,  # ARGV[4]: status
+            str(seq),  # ARGV[5]: seq
+            ts,  # ARGV[6]: ts
+            progress_str,  # ARGV[7]: progress
+            result_str,  # ARGV[8]: result
+            str(PUBLISHED_TTL),  # ARGV[9]: published TTL
+            str(STATE_TTL),  # ARGV[10]: state TTL
+            state_json,  # ARGV[11]: state data
+        ],
     )
 
-    # Stream에 TTL 설정 (매번 갱신, 마지막 이벤트 기준)
-    redis_client.expire(stream_key, STREAM_TTL)
-
-    # State KV 스냅샷 저장 (SSE 늦은 연결/재연결 대응)
-    # 항상 최신 상태를 유지하여 SSE가 현재 상태로 수렴 가능
-    redis_client.setex(state_key, STATE_TTL, json.dumps(event, ensure_ascii=False))
+    is_new, msg_id = result_tuple
+    if isinstance(msg_id, bytes):
+        msg_id = msg_id.decode()
 
     shard = get_shard_for_job(job_id)
-    logger.debug(
-        "stage_event_published",
-        extra={
-            "job_id": job_id,
-            "shard": shard,
-            "stream_key": stream_key,
-            "state_key": state_key,
-            "stage": stage,
-            "status": status,
-            "seq": seq,
-            "msg_id": msg_id,
-        },
-    )
+    if is_new:
+        logger.debug(
+            "stage_event_published",
+            extra={
+                "job_id": job_id,
+                "shard": shard,
+                "stream_key": stream_key,
+                "stage": stage,
+                "status": status,
+                "seq": seq,
+                "msg_id": msg_id,
+            },
+        )
+    else:
+        logger.debug(
+            "stage_event_duplicate_skipped",
+            extra={
+                "job_id": job_id,
+                "shard": shard,
+                "stage": stage,
+                "seq": seq,
+                "existing_msg_id": msg_id,
+            },
+        )
 
     return msg_id
-
-
-# ─────────────────────────────────────────────────────────────────
-# API용: 비동기 이벤트 구독 (SSE 엔드포인트에서 호출)
-# ─────────────────────────────────────────────────────────────────
-
-
-async def subscribe_events(
-    redis_client: "aioredis.Redis",  # type: ignore[type-arg]
-    job_id: str,
-    timeout_ms: int = 5000,
-    max_wait_seconds: int = 300,
-) -> AsyncGenerator[dict[str, Any], None]:
-    """SSE 엔드포인트가 호출: Redis Streams 이벤트 구독.
-
-    Redis Streams의 XREAD 블로킹 읽기를 사용하여
-    Worker가 발행하는 stage 이벤트를 실시간으로 수신합니다.
-
-    Args:
-        redis_client: 비동기 Redis 클라이언트 (redis.asyncio)
-        job_id: Chain의 root task ID
-        timeout_ms: XREAD 블로킹 타임아웃 (밀리초, 기본 5초)
-        max_wait_seconds: 최대 대기 시간 (초, 기본 5분)
-
-    Yields:
-        이벤트 딕셔너리:
-        - {"type": "keepalive"}: 타임아웃 시 keepalive
-        - {"stage": "vision", "status": "started", ...}: stage 이벤트
-        - {"stage": "done", "result": {...}}: 완료 이벤트
-
-    Raises:
-        TimeoutError: max_wait_seconds 초과 시
-
-    Example:
-        >>> async for event in subscribe_events(redis, job_id):
-        ...     if event.get("type") == "keepalive":
-        ...         yield ": keepalive\\n\\n"
-        ...     else:
-        ...         yield format_sse(event)
-    """
-    stream_key = get_stream_key(job_id)
-    last_id = "0"  # 처음부터 읽기 (리플레이 지원)
-    start_time = time.time()
-
-    logger.info(
-        "subscribe_events_started",
-        extra={"job_id": job_id, "stream_key": stream_key},
-    )
-
-    while True:
-        # 최대 대기 시간 체크
-        elapsed = time.time() - start_time
-        if elapsed > max_wait_seconds:
-            logger.warning(
-                "subscribe_events_timeout",
-                extra={"job_id": job_id, "elapsed_seconds": elapsed},
-            )
-            yield {"type": "error", "error": "timeout", "message": "Maximum wait time exceeded"}
-            return
-
-        # XREAD: 새 이벤트 대기 (blocking)
-        try:
-            events = await redis_client.xread(
-                {stream_key: last_id},
-                block=timeout_ms,
-                count=10,
-            )
-        except Exception as e:
-            error_msg = str(e)
-            logger.error(
-                "subscribe_events_xread_error",
-                extra={"job_id": job_id, "error": error_msg},
-            )
-
-            # 연결 오류 시 재연결 시도 (1회)
-            if "closed" in error_msg.lower() or "connection" in error_msg.lower():
-                from domains._shared.events.redis_client import reset_async_redis_client
-
-                try:
-                    redis_client = await reset_async_redis_client()
-                    logger.info(
-                        "subscribe_events_reconnected",
-                        extra={"job_id": job_id},
-                    )
-                    continue  # 재시도
-                except Exception as reconnect_error:
-                    logger.error(
-                        "subscribe_events_reconnect_failed",
-                        extra={"job_id": job_id, "error": str(reconnect_error)},
-                    )
-
-            yield {"type": "error", "error": "redis_error", "message": error_msg}
-            return
-
-        if not events:
-            # 타임아웃 → keepalive 이벤트
-            yield {"type": "keepalive"}
-            continue
-
-        for stream_name, messages in events:
-            for msg_id, data in messages:
-                # msg_id를 bytes에서 str로 변환 (필요시)
-                if isinstance(msg_id, bytes):
-                    last_id = msg_id.decode()
-                else:
-                    last_id = msg_id
-
-                # 바이트 → 문자열 디코딩
-                event: dict[str, Any] = {}
-                for k, v in data.items():
-                    key = k.decode() if isinstance(k, bytes) else k
-                    value = v.decode() if isinstance(v, bytes) else v
-                    event[key] = value
-
-                # result JSON 파싱
-                if "result" in event and isinstance(event["result"], str):
-                    try:
-                        event["result"] = json.loads(event["result"])
-                    except json.JSONDecodeError:
-                        pass
-
-                # progress 정수 변환
-                if "progress" in event:
-                    try:
-                        event["progress"] = int(event["progress"])
-                    except (ValueError, TypeError):
-                        pass
-
-                logger.debug(
-                    "subscribe_events_received",
-                    extra={
-                        "job_id": job_id,
-                        "msg_id": last_id,
-                        "stage": event.get("stage"),
-                        "status": event.get("status"),
-                    },
-                )
-
-                yield event
-
-                # done 이벤트면 종료
-                if event.get("stage") == "done":
-                    logger.info(
-                        "subscribe_events_completed",
-                        extra={"job_id": job_id, "total_time": time.time() - start_time},
-                    )
-                    return

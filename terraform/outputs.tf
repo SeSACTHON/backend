@@ -319,6 +319,42 @@ output "sse_gateway_private_ip" {
   value       = module.sse_gateway.private_ip
 }
 
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Phase 6: HA Event Architecture Outputs
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+# Event Router (Phase 6)
+output "event_router_instance_id" {
+  description = "Event Router Instance ID"
+  value       = module.event_router.instance_id
+}
+
+output "event_router_public_ip" {
+  description = "Event Router Public IP"
+  value       = module.event_router.public_ip
+}
+
+output "event_router_private_ip" {
+  description = "Event Router Private IP"
+  value       = module.event_router.private_ip
+}
+
+# Redis Pub/Sub (Phase 6)
+output "redis_pubsub_instance_id" {
+  description = "Redis Pub/Sub Instance ID"
+  value       = module.redis_pubsub.instance_id
+}
+
+output "redis_pubsub_public_ip" {
+  description = "Redis Pub/Sub Public IP"
+  value       = module.redis_pubsub.public_ip
+}
+
+output "redis_pubsub_private_ip" {
+  description = "Redis Pub/Sub Private IP"
+  value       = module.redis_pubsub.private_ip
+}
+
 # output "rabbitmq_private_ip" {
 #   description = "RabbitMQ 노드 Private IP"
 #   value       = module.rabbitmq.private_ip
@@ -329,7 +365,7 @@ output "sse_gateway_private_ip" {
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 output "ansible_inventory" {
-  description = "Ansible Inventory 내용 (17-Node Architecture)"
+  description = "Ansible Inventory 내용 (20-Node Architecture)"
   value = templatefile("${path.module}/templates/hosts.tpl", {
     master_public_ip           = aws_eip.master.public_ip
     master_private_ip          = module.master.private_ip
@@ -369,6 +405,10 @@ output "ansible_inventory" {
     ingress_gateway_private_ip = module.ingress_gateway.private_ip
     sse_gateway_public_ip      = module.sse_gateway.public_ip
     sse_gateway_private_ip     = module.sse_gateway.private_ip
+    event_router_public_ip     = module.event_router.public_ip
+    event_router_private_ip    = module.event_router.private_ip
+    redis_pubsub_public_ip     = module.redis_pubsub.public_ip
+    redis_pubsub_private_ip    = module.redis_pubsub.private_ip
   })
 }
 
@@ -377,7 +417,7 @@ output "ansible_inventory" {
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 output "ssh_commands" {
-  description = "SSH 접속 명령어 (17-Node Architecture)"
+  description = "SSH 접속 명령어 (20-Node Architecture)"
   value = {
     master         = "ssh -i ~/.ssh/sesacthon.pem ubuntu@${aws_eip.master.public_ip}"
     api_auth       = "ssh -i ~/.ssh/sesacthon.pem ubuntu@${module.api_auth.public_ip}"
@@ -397,6 +437,8 @@ output "ssh_commands" {
     monitoring     = "ssh -i ~/.ssh/sesacthon.pem ubuntu@${module.monitoring.public_ip}"
     logging        = "ssh -i ~/.ssh/sesacthon.pem ubuntu@${module.logging.public_ip}"
     sse_gateway    = "ssh -i ~/.ssh/sesacthon.pem ubuntu@${module.sse_gateway.public_ip}"
+    event_router   = "ssh -i ~/.ssh/sesacthon.pem ubuntu@${module.event_router.public_ip}"
+    redis_pubsub   = "ssh -i ~/.ssh/sesacthon.pem ubuntu@${module.redis_pubsub.public_ip}"
   }
 }
 
@@ -405,11 +447,11 @@ output "ssh_commands" {
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 output "cluster_info" {
-  description = "클러스터 정보 요약 (17-Node Architecture)"
+  description = "클러스터 정보 요약 (20-Node Architecture)"
   value = {
     vpc_id    = module.vpc.vpc_id
     master_ip = aws_eip.master.public_ip
-    phase     = "Phase 1-4 Complete - 17-Node Full Production Architecture"
+    phase     = "Phase 1-6 Complete - 20-Node HA Architecture"
     api_ips = [
       module.api_auth.public_ip,
       module.api_my.public_ip,
@@ -428,19 +470,21 @@ output "cluster_info" {
       module.redis_auth.public_ip,
       module.redis_streams.public_ip,
       module.redis_cache.public_ip,
+      module.redis_pubsub.public_ip,
       module.rabbitmq.public_ip,
       module.monitoring.public_ip,
       module.logging.public_ip
     ]
     gateway_ips = [
       module.ingress_gateway.public_ip,
-      module.sse_gateway.public_ip
+      module.sse_gateway.public_ip,
+      module.event_router.public_ip
     ]
-    # 18-Node Architecture (Redis 3-node cluster + SSE Gateway)
-    total_nodes        = 18  # Master + 7 APIs + 2 Workers + 7 Infra + 2 Gateway
-    total_vcpu         = 40  # +2 (sse-gateway t3.small)
-    total_memory_gb    = 56  # +2 (sse-gateway t3.small)
-    estimated_cost_usd = 350 # +15 (t3.small)
+    # 20-Node Architecture (Phase 6: HA Event)
+    total_nodes        = 20  # Master + 7 APIs + 2 Workers + 8 Infra + 3 Gateway
+    total_vcpu         = 44  # +4 (event-router t3.small + redis-pubsub t3.small)
+    total_memory_gb    = 60  # +4 (2GB + 2GB)
+    estimated_cost_usd = 380 # +30 (t3.small × 2)
   }
 }
 
@@ -449,7 +493,7 @@ output "cluster_info" {
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 output "node_roles" {
-  description = "노드별 역할 (18-Node Architecture)"
+  description = "노드별 역할 (20-Node Architecture)"
   value = {
     master          = "Control Plane (t3.xlarge, 16GB) - Phase 0"
     api_auth        = "Authentication API (t3.small, 2GB) - Phase 1"
@@ -465,11 +509,13 @@ output "node_roles" {
     redis_auth      = "Redis Auth - Blacklist + OAuth (t3.medium, 4GB) - Phase 1"
     redis_streams   = "Redis Streams - SSE Events (t3.small, 2GB) - Phase 1"
     redis_cache     = "Redis Cache - Celery + Domain (t3.small, 2GB) - Phase 1"
+    redis_pubsub    = "Redis Pub/Sub - Realtime Broadcast (t3.small, 2GB) - Phase 6"
     rabbitmq        = "RabbitMQ Message Queue (t3.medium, 4GB) - Phase 4"
     monitoring      = "Prometheus + Grafana (t3.large, 8GB) - Phase 4"
     logging         = "ELK Stack - Elasticsearch + Logstash + Kibana (t3.large, 8GB) - Phase 4"
     ingress_gateway = "Istio Ingress Gateway (t3.medium, 4GB) - Phase 5"
-    sse_gateway     = "SSE Central Consumer + Fan-out (t3.small, 2GB) - Phase 5"
+    sse_gateway     = "SSE Pub/Sub Subscriber + Client Fan-out (t3.small, 2GB) - Phase 5"
+    event_router    = "Event Router - Streams→Pub/Sub Bridge (t3.small, 2GB) - Phase 6"
   }
 }
 

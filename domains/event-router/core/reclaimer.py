@@ -11,10 +11,18 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import redis.asyncio as aioredis
+
+from metrics import (
+    EVENT_ROUTER_RECLAIM_LATENCY,
+    EVENT_ROUTER_RECLAIM_MESSAGES,
+    EVENT_ROUTER_RECLAIM_RUNS,
+    EVENT_ROUTER_RECLAIMER_STATUS,
+)
 
 from .processor import EventProcessor
 
@@ -64,17 +72,22 @@ class PendingReclaimer:
             },
         )
 
+        EVENT_ROUTER_RECLAIMER_STATUS.set(1)
+
         while not self._shutdown:
             try:
                 await self._reclaim_pending()
+                EVENT_ROUTER_RECLAIM_RUNS.labels(result="success").inc()
                 await asyncio.sleep(self._interval)
             except asyncio.CancelledError:
                 logger.info("reclaimer_cancelled")
                 break
             except Exception as e:
+                EVENT_ROUTER_RECLAIM_RUNS.labels(result="error").inc()
                 logger.error("reclaimer_error", extra={"error": str(e)})
                 await asyncio.sleep(self._interval)
 
+        EVENT_ROUTER_RECLAIMER_STATUS.set(0)
         logger.info("reclaimer_stopped")
 
     async def _reclaim_pending(self) -> None:
@@ -83,9 +96,11 @@ class PendingReclaimer:
 
         for shard in range(self._shard_count):
             stream_key = f"{self._stream_prefix}:{shard}"
+            shard_str = str(shard)
 
             try:
                 # XAUTOCLAIM: 오래된 Pending 메시지 재할당
+                start_time = time.perf_counter()
                 result = await self._redis.xautoclaim(
                     stream_key,
                     self._consumer_group,
@@ -94,6 +109,8 @@ class PendingReclaimer:
                     start_id="0-0",
                     count=self._count,
                 )
+                reclaim_latency = time.perf_counter() - start_time
+                EVENT_ROUTER_RECLAIM_LATENCY.labels(shard=shard_str).observe(reclaim_latency)
 
                 # result: (next_start_id, [(msg_id, data), ...], deleted_ids)
                 if len(result) >= 2:
@@ -101,6 +118,7 @@ class PendingReclaimer:
                     if messages:
                         reclaimed_count = await self._process_reclaimed(stream_key, messages)
                         total_reclaimed += reclaimed_count
+                        EVENT_ROUTER_RECLAIM_MESSAGES.labels(shard=shard_str).inc(reclaimed_count)
 
             except Exception as e:
                 if "NOGROUP" in str(e):

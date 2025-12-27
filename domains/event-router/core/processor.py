@@ -14,10 +14,23 @@ from __future__ import annotations
 
 import json
 import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import redis.asyncio as aioredis
+
+from metrics import (
+    EVENT_ROUTER_EVENTS_PROCESSED,
+    EVENT_ROUTER_EVENTS_SKIPPED,
+    EVENT_ROUTER_PROCESS_ERRORS,
+    EVENT_ROUTER_PROCESS_LATENCY,
+    EVENT_ROUTER_PUBLISHED_MARKERS,
+    EVENT_ROUTER_PUBSUB_PUBLISH_ERRORS,
+    EVENT_ROUTER_PUBSUB_PUBLISH_LATENCY,
+    EVENT_ROUTER_PUBSUB_PUBLISHED,
+    EVENT_ROUTER_STATE_UPDATES,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -119,6 +132,7 @@ class EventProcessor:
         job_id = event.get("job_id")
         if not job_id:
             logger.warning("process_event_missing_job_id", extra={"event": event})
+            EVENT_ROUTER_EVENTS_SKIPPED.labels(reason="missing_job_id").inc()
             return False
 
         seq = event.get("seq", 0)
@@ -126,6 +140,8 @@ class EventProcessor:
             seq = int(seq)
         except (ValueError, TypeError):
             seq = 0
+
+        stage = event.get("stage", "unknown")
 
         # Redis 키
         state_key = f"{self._state_key_prefix}:{job_id}"
@@ -136,25 +152,41 @@ class EventProcessor:
         event_data = json.dumps(event, ensure_ascii=False)
 
         # Step 1: State 갱신 (Streams Redis - Lua Script)
-        result = await self._script(
-            keys=[state_key, publish_key],
-            args=[event_data, seq, self._state_ttl, self._published_ttl],
-        )
+        start_time = time.perf_counter()
+        try:
+            result = await self._script(
+                keys=[state_key, publish_key],
+                args=[event_data, seq, self._state_ttl, self._published_ttl],
+            )
+        except Exception:
+            EVENT_ROUTER_PROCESS_ERRORS.labels(error_type="lua_script").inc()
+            raise
+        finally:
+            process_latency = time.perf_counter() - start_time
+            EVENT_ROUTER_PROCESS_LATENCY.labels(stage=stage).observe(process_latency)
 
         if result == 1:
+            # State가 갱신됨
+            EVENT_ROUTER_STATE_UPDATES.labels(stage=stage).inc()
+            EVENT_ROUTER_PUBLISHED_MARKERS.inc()
+
             # Step 2: Pub/Sub 발행 (별도 Redis)
+            publish_start = time.perf_counter()
             try:
                 await self._pubsub_redis.publish(channel, event_data)
+                EVENT_ROUTER_PUBSUB_PUBLISHED.labels(stage=stage).inc()
+                EVENT_ROUTER_PUBSUB_PUBLISH_LATENCY.observe(time.perf_counter() - publish_start)
                 logger.debug(
                     "event_processed",
                     extra={
                         "job_id": job_id,
-                        "stage": event.get("stage"),
+                        "stage": stage,
                         "seq": seq,
                         "channel": channel,
                     },
                 )
             except Exception as e:
+                EVENT_ROUTER_PUBSUB_PUBLISH_ERRORS.inc()
                 # Pub/Sub 실패해도 State는 이미 갱신됨
                 # SSE 클라이언트는 State polling으로 복구 가능
                 logger.warning(
@@ -166,13 +198,16 @@ class EventProcessor:
                         "error": str(e),
                     },
                 )
+
+            EVENT_ROUTER_EVENTS_PROCESSED.labels(stage=stage).inc()
             return True
         else:
+            EVENT_ROUTER_EVENTS_SKIPPED.labels(reason="duplicate_or_out_of_order").inc()
             logger.debug(
                 "event_skipped",
                 extra={
                     "job_id": job_id,
-                    "stage": event.get("stage"),
+                    "stage": stage,
                     "seq": seq,
                     "reason": "duplicate_or_out_of_order",
                 },

@@ -11,10 +11,20 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import time
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     import redis.asyncio as aioredis
+
+from metrics import (
+    EVENT_ROUTER_ACTIVE_SHARDS,
+    EVENT_ROUTER_CONSUMER_STATUS,
+    EVENT_ROUTER_XACK_TOTAL,
+    EVENT_ROUTER_XREADGROUP_BATCH_SIZE,
+    EVENT_ROUTER_XREADGROUP_LATENCY,
+    EVENT_ROUTER_XREADGROUP_TOTAL,
+)
 
 from .processor import EventProcessor
 
@@ -98,9 +108,13 @@ class StreamConsumer:
             },
         )
 
+        EVENT_ROUTER_CONSUMER_STATUS.set(1)
+        EVENT_ROUTER_ACTIVE_SHARDS.set(self._shard_count)
+
         while not self._shutdown:
             try:
                 # XREADGROUP: 모든 shard에서 읽기
+                start_time = time.perf_counter()
                 events = await self._redis.xreadgroup(
                     groupname=self._consumer_group,
                     consumername=self._consumer_name,
@@ -108,13 +122,20 @@ class StreamConsumer:
                     count=self._count,
                     block=self._block_ms,
                 )
+                xread_latency = time.perf_counter() - start_time
+                EVENT_ROUTER_XREADGROUP_LATENCY.observe(xread_latency)
 
                 if not events:
+                    EVENT_ROUTER_XREADGROUP_TOTAL.labels(result="empty").inc()
                     continue
+
+                EVENT_ROUTER_XREADGROUP_TOTAL.labels(result="success").inc()
 
                 for stream_name, messages in events:
                     if isinstance(stream_name, bytes):
                         stream_name = stream_name.decode()
+
+                    EVENT_ROUTER_XREADGROUP_BATCH_SIZE.observe(len(messages))
 
                     for msg_id, data in messages:
                         if isinstance(msg_id, bytes):
@@ -145,7 +166,9 @@ class StreamConsumer:
                                 self._consumer_group,
                                 msg_id,
                             )
+                            EVENT_ROUTER_XACK_TOTAL.labels(result="success").inc()
                         except Exception as e:
+                            EVENT_ROUTER_XACK_TOTAL.labels(result="error").inc()
                             logger.error(
                                 "xack_error",
                                 extra={
@@ -159,9 +182,11 @@ class StreamConsumer:
                 logger.info("consumer_cancelled")
                 break
             except Exception as e:
+                EVENT_ROUTER_XREADGROUP_TOTAL.labels(result="error").inc()
                 logger.error("consumer_error", extra={"error": str(e)})
                 await asyncio.sleep(1)
 
+        EVENT_ROUTER_CONSUMER_STATUS.set(0)
         logger.info("consumer_stopped")
 
     def _parse_event(self, data: dict[bytes | str, bytes | str]) -> dict[str, Any]:

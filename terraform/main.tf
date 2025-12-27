@@ -86,6 +86,8 @@ locals {
     "k8s-logging"         = "--node-labels=role=infrastructure,domain=observability,infra-type=logging,workload=logging,tier=observability,phase=4 --register-with-taints=domain=observability:NoSchedule"
     "k8s-ingress-gateway" = "--node-labels=role=ingress-gateway,domain=gateway,infra-type=istio,workload=gateway,tier=network,phase=5 --register-with-taints=role=ingress-gateway:NoSchedule"
     "k8s-sse-gateway"     = "--node-labels=role=sse-gateway,domain=sse,service=sse-gateway,workload=sse,tier=integration,phase=5 --register-with-taints=domain=sse:NoSchedule"
+    "k8s-event-router"    = "--node-labels=role=event-router,domain=event-router,service=event-router,workload=event-router,tier=integration,phase=5 --register-with-taints=domain=event-router:NoSchedule"
+    "k8s-redis-pubsub"    = "--node-labels=role=infrastructure,domain=data,infra-type=redis-pubsub,redis-cluster=pubsub,workload=cache,tier=data,phase=1 --register-with-taints=domain=data:NoSchedule"
   }
 }
 
@@ -687,6 +689,69 @@ module "sse_gateway" {
     Workload = "sse-gateway"
     Domain   = "sse"
     Phase    = "5"
+  }
+}
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Phase 6: HA Event Architecture (2025-12 SSE HA 고도화)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# docs/blogs/async/35-sse-ha-implementation-roadmap.md 참조
+# - Event Router: Redis Streams → Pub/Sub Fan-out
+# - Redis Pub/Sub: 실시간 이벤트 브로드캐스트
+
+# Event Router Node (Streams Consumer + Pub/Sub Publisher)
+module "event_router" {
+  source = "./modules/ec2"
+
+  instance_name        = "k8s-event-router"
+  instance_type        = "t3.small" # 2GB (XREADGROUP, Low CPU)
+  ami_id               = data.aws_ami.ubuntu.id
+  subnet_id            = module.vpc.public_subnet_ids[2]
+  security_group_ids   = [module.security_groups.cluster_sg_id]
+  key_name             = aws_key_pair.k8s.key_name
+  iam_instance_profile = aws_iam_instance_profile.k8s.name
+
+  root_volume_size = 20
+  root_volume_type = "gp3"
+
+  user_data = templatefile("${path.module}/user-data/common.sh", {
+    hostname           = "k8s-event-router"
+    kubelet_extra_args = local.kubelet_profiles["k8s-event-router"]
+  })
+
+  tags = {
+    Role     = "worker"
+    Workload = "event-router"
+    Domain   = "event-router"
+    Phase    = "6"
+  }
+}
+
+# Redis Pub/Sub Node (Real-time Event Broadcast)
+module "redis_pubsub" {
+  source = "./modules/ec2"
+
+  instance_name        = "k8s-redis-pubsub"
+  instance_type        = "t3.small" # 2GB (Pub/Sub only, Low memory)
+  ami_id               = data.aws_ami.ubuntu.id
+  subnet_id            = module.vpc.public_subnet_ids[0]
+  security_group_ids   = [module.security_groups.cluster_sg_id]
+  key_name             = aws_key_pair.k8s.key_name
+  iam_instance_profile = aws_iam_instance_profile.k8s.name
+
+  root_volume_size = 10 # 최소 (emptyDir only, no persistence)
+  root_volume_type = "gp3"
+
+  user_data = templatefile("${path.module}/user-data/common.sh", {
+    hostname           = "k8s-redis-pubsub"
+    kubelet_extra_args = local.kubelet_profiles["k8s-redis-pubsub"]
+  })
+
+  tags = {
+    Role         = "worker"
+    Workload     = "cache"
+    RedisCluster = "pubsub"
+    Phase        = "6"
   }
 }
 
