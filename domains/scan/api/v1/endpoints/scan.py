@@ -9,6 +9,7 @@ v2 아키텍처:
 """
 
 import logging
+import time
 from uuid import uuid4
 
 from celery import chain
@@ -21,6 +22,13 @@ from domains._shared.events import (
     publish_stage_event,
 )
 from domains.scan.api.dependencies import CurrentUser, ScanServiceDep
+from domains.scan.metrics import (
+    SCAN_ACTIVE_JOBS,
+    SCAN_API_REQUEST_LATENCY,
+    SCAN_API_REQUESTS_TOTAL,
+    SCAN_RESULT_TOTAL,
+    SCAN_SUBMIT_TOTAL,
+)
 from domains.scan.schemas.scan import (
     ClassificationRequest,
     ClassificationResponse,
@@ -66,74 +74,90 @@ async def submit_scan(
     """
     import json
 
-    image_url = str(payload.image_url) if payload.image_url else None
-    if not image_url:
-        raise HTTPException(status_code=400, detail="image_url is required")
+    start_time = time.perf_counter()
 
-    # Idempotency Key 캐시 키 (None이면 저장 안 함)
-    idempotency_cache_key = f"scan:idempotency:{x_idempotency_key}" if x_idempotency_key else None
+    try:
+        image_url = str(payload.image_url) if payload.image_url else None
+        if not image_url:
+            SCAN_SUBMIT_TOTAL.labels(status="error").inc()
+            SCAN_API_REQUESTS_TOTAL.labels(endpoint="submit", status="error").inc()
+            raise HTTPException(status_code=400, detail="image_url is required")
 
-    # Idempotency Key 체크 (중복 제출 방지) - Cache Redis 사용
-    if idempotency_cache_key:
-        cache_client = await get_async_cache_client()
-        existing = await cache_client.get(idempotency_cache_key)
-        if existing:
-            logger.info(
-                "scan_idempotent_hit",
-                extra={"idempotency_key": x_idempotency_key},
-            )
-            return ScanSubmitResponse(**json.loads(existing))
-
-    job_id = str(uuid4())
-    user_id = str(user.user_id)
-    user_input = payload.user_input or "이 폐기물을 어떻게 분리배출해야 하나요?"
-
-    # Redis Streams에 queued 이벤트 발행 (+ State KV 스냅샷)
-    sync_redis_client = get_sync_redis_client()
-    publish_stage_event(
-        redis_client=sync_redis_client,
-        job_id=job_id,
-        stage="queued",
-        status="started",
-        progress=0,
-    )
-
-    # Celery Chain 비동기 발행
-    pipeline = chain(
-        vision_task.s(job_id, user_id, image_url, user_input),
-        rule_task.s(),
-        answer_task.s(),
-        scan_reward_task.s(),
-    )
-    pipeline.apply_async(task_id=job_id)
-
-    logger.info(
-        "scan_submitted",
-        extra={
-            "job_id": job_id,
-            "user_id": user_id,
-            "image_url": image_url,
-            "idempotency_key": x_idempotency_key,
-        },
-    )
-
-    response = ScanSubmitResponse(
-        job_id=job_id,
-        stream_url=f"/api/v1/stream?job_id={job_id}",
-        result_url=f"/api/v1/scan/result/{job_id}",
-        status="queued",
-    )
-
-    # Idempotency Key 저장 - Cache Redis 사용
-    if idempotency_cache_key:
-        cache_client = await get_async_cache_client()
-        await cache_client.setex(
-            idempotency_cache_key,
-            IDEMPOTENCY_TTL,
-            json.dumps(response.model_dump()),
+        # Idempotency Key 캐시 키 (None이면 저장 안 함)
+        idempotency_cache_key = (
+            f"scan:idempotency:{x_idempotency_key}" if x_idempotency_key else None
         )
 
-    return response
+        # Idempotency Key 체크 (중복 제출 방지) - Cache Redis 사용
+        if idempotency_cache_key:
+            cache_client = await get_async_cache_client()
+            existing = await cache_client.get(idempotency_cache_key)
+            if existing:
+                logger.info(
+                    "scan_idempotent_hit",
+                    extra={"idempotency_key": x_idempotency_key},
+                )
+                SCAN_SUBMIT_TOTAL.labels(status="idempotent_hit").inc()
+                SCAN_API_REQUESTS_TOTAL.labels(endpoint="submit", status="success").inc()
+                return ScanSubmitResponse(**json.loads(existing))
+
+        job_id = str(uuid4())
+        user_id = str(user.user_id)
+        user_input = payload.user_input or "이 폐기물을 어떻게 분리배출해야 하나요?"
+
+        # Redis Streams에 queued 이벤트 발행 (+ State KV 스냅샷)
+        sync_redis_client = get_sync_redis_client()
+        publish_stage_event(
+            redis_client=sync_redis_client,
+            job_id=job_id,
+            stage="queued",
+            status="started",
+            progress=0,
+        )
+
+        # Celery Chain 비동기 발행
+        pipeline = chain(
+            vision_task.s(job_id, user_id, image_url, user_input),
+            rule_task.s(),
+            answer_task.s(),
+            scan_reward_task.s(),
+        )
+        pipeline.apply_async(task_id=job_id)
+
+        logger.info(
+            "scan_submitted",
+            extra={
+                "job_id": job_id,
+                "user_id": user_id,
+                "image_url": image_url,
+                "idempotency_key": x_idempotency_key,
+            },
+        )
+
+        response = ScanSubmitResponse(
+            job_id=job_id,
+            stream_url=f"/api/v1/stream?job_id={job_id}",
+            result_url=f"/api/v1/scan/result/{job_id}",
+            status="queued",
+        )
+
+        # Idempotency Key 저장 - Cache Redis 사용
+        if idempotency_cache_key:
+            cache_client = await get_async_cache_client()
+            await cache_client.setex(
+                idempotency_cache_key,
+                IDEMPOTENCY_TTL,
+                json.dumps(response.model_dump()),
+            )
+
+        SCAN_SUBMIT_TOTAL.labels(status="success").inc()
+        SCAN_API_REQUESTS_TOTAL.labels(endpoint="submit", status="success").inc()
+        SCAN_ACTIVE_JOBS.inc()
+
+        return response
+
+    finally:
+        SCAN_API_REQUEST_LATENCY.labels(endpoint="submit").observe(time.perf_counter() - start_time)
 
 
 @router.post(
@@ -179,29 +203,43 @@ async def get_result(
         202: 아직 처리 중 (ScanProcessingResponse + Retry-After: 2초)
         404: job_id에 해당하는 작업 없음
     """
-    result = await service.get_result(job_id)
-    if result is None:
-        # State KV에서 현재 상태 확인
-        state = await service.get_state(job_id)
-        if state is not None:
-            # 작업이 존재하지만 결과가 아직 없음 → 202 Accepted
-            processing_response = ScanProcessingResponse(
-                status="processing",
-                message="결과 준비 중입니다.",
-                current_stage=state.get("stage"),
-                progress=int(state["progress"]) if state.get("progress") else None,
+    start_time = time.perf_counter()
+
+    try:
+        result = await service.get_result(job_id)
+        if result is None:
+            # State KV에서 현재 상태 확인
+            state = await service.get_state(job_id)
+            if state is not None:
+                # 작업이 존재하지만 결과가 아직 없음 → 202 Accepted
+                processing_response = ScanProcessingResponse(
+                    status="processing",
+                    message="결과 준비 중입니다.",
+                    current_stage=state.get("stage"),
+                    progress=int(state["progress"]) if state.get("progress") else None,
+                )
+                SCAN_RESULT_TOTAL.labels(status="processing").inc()
+                SCAN_API_REQUESTS_TOTAL.labels(endpoint="result", status="success").inc()
+                return JSONResponse(
+                    status_code=202,
+                    content=processing_response.model_dump(),
+                    headers={"Retry-After": "2"},
+                )
+            # 작업 자체가 없음 → 404
+            SCAN_RESULT_TOTAL.labels(status="not_found").inc()
+            SCAN_API_REQUESTS_TOTAL.labels(endpoint="result", status="error").inc()
+            raise HTTPException(
+                status_code=404,
+                detail=f"Result not found for job_id: {job_id}",
             )
-            return JSONResponse(
-                status_code=202,
-                content=processing_response.model_dump(),
-                headers={"Retry-After": "2"},
-            )
-        # 작업 자체가 없음 → 404
-        raise HTTPException(
-            status_code=404,
-            detail=f"Result not found for job_id: {job_id}",
-        )
-    return result
+
+        SCAN_RESULT_TOTAL.labels(status="success").inc()
+        SCAN_API_REQUESTS_TOTAL.labels(endpoint="result", status="success").inc()
+        SCAN_ACTIVE_JOBS.dec()  # 결과 조회 성공 시 active job 감소
+        return result
+
+    finally:
+        SCAN_API_REQUEST_LATENCY.labels(endpoint="result").observe(time.perf_counter() - start_time)
 
 
 @router.get(

@@ -53,16 +53,31 @@ data:
           }
         },
         {
-          "title": "Events Processed/sec",
+          "title": "Scan API RPM",
+          "description": "POST /scan 요청 수 (분당)",
           "type": "stat",
           "gridPos": { "h": 4, "w": 4, "x": 4, "y": 1 },
           "targets": [
             {
-              "expr": "sum(rate(event_router_events_processed_total[1m]))",
-              "legendFormat": "Processed"
+              "expr": "sum(rate(scan_submit_total{status=\"success\"}[1m])) * 60",
+              "legendFormat": "RPM"
             }
           ],
-          "fieldConfig": { "defaults": { "unit": "ops", "decimals": 2 } }
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "decimals": 1,
+              "color": { "mode": "thresholds" },
+              "thresholds": {
+                "mode": "absolute",
+                "steps": [
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 100 },
+                  { "color": "red", "value": 500 }
+                ]
+              }
+            }
+          }
         },
         {
           "title": "TTFB (p50)",
@@ -139,9 +154,98 @@ data:
           }
         },
         {
-          "title": "⚡ Event Router",
+          "title": "📥 Scan API",
           "type": "row",
           "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 },
+          "collapsed": false
+        },
+        {
+          "title": "Scan Submit RPM",
+          "description": "POST /scan 분당 요청 수 (시계열)",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 8, "x": 0, "y": 6 },
+          "targets": [
+            {
+              "expr": "sum(rate(scan_submit_total{status=\"success\"}[1m])) * 60",
+              "legendFormat": "Success RPM"
+            },
+            {
+              "expr": "sum(rate(scan_submit_total{status=\"idempotent_hit\"}[1m])) * 60",
+              "legendFormat": "Idempotent Hit RPM"
+            },
+            {
+              "expr": "sum(rate(scan_submit_total{status=\"error\"}[1m])) * 60",
+              "legendFormat": "Error RPM"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "lineWidth": 2, "fillOpacity": 20 }
+            },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "Success RPM" }, "properties": [{ "id": "color", "value": { "fixedColor": "#73bf69" } }] },
+              { "matcher": { "id": "byName", "options": "Idempotent Hit RPM" }, "properties": [{ "id": "color", "value": { "fixedColor": "#6ed0e0" } }] },
+              { "matcher": { "id": "byName", "options": "Error RPM" }, "properties": [{ "id": "color", "value": { "fixedColor": "#f2495c" } }] }
+            ]
+          }
+        },
+        {
+          "title": "Scan Result RPM",
+          "description": "GET /scan/result 분당 요청 수",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 8, "x": 8, "y": 6 },
+          "targets": [
+            {
+              "expr": "sum(rate(scan_result_total{status=\"success\"}[1m])) * 60",
+              "legendFormat": "Success (200)"
+            },
+            {
+              "expr": "sum(rate(scan_result_total{status=\"processing\"}[1m])) * 60",
+              "legendFormat": "Processing (202)"
+            },
+            {
+              "expr": "sum(rate(scan_result_total{status=\"not_found\"}[1m])) * 60",
+              "legendFormat": "Not Found (404)"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "short",
+              "custom": { "lineWidth": 2, "fillOpacity": 20 }
+            },
+            "overrides": [
+              { "matcher": { "id": "byName", "options": "Success (200)" }, "properties": [{ "id": "color", "value": { "fixedColor": "#73bf69" } }] },
+              { "matcher": { "id": "byName", "options": "Processing (202)" }, "properties": [{ "id": "color", "value": { "fixedColor": "#ff9830" } }] },
+              { "matcher": { "id": "byName", "options": "Not Found (404)" }, "properties": [{ "id": "color", "value": { "fixedColor": "#f2495c" } }] }
+            ]
+          }
+        },
+        {
+          "title": "API Latency (p50/p99)",
+          "type": "timeseries",
+          "gridPos": { "h": 6, "w": 8, "x": 16, "y": 6 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, sum by (endpoint, le) (rate(scan_api_request_latency_seconds_bucket[5m])))",
+              "legendFormat": "{{endpoint}} p50"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum by (endpoint, le) (rate(scan_api_request_latency_seconds_bucket[5m])))",
+              "legendFormat": "{{endpoint}} p99"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": {
+              "unit": "s",
+              "custom": { "lineWidth": 2, "fillOpacity": 10 }
+            }
+          }
+        },
+        {
+          "title": "⚡ Event Router",
+          "type": "row",
+          "gridPos": { "h": 1, "w": 24, "x": 0, "y": 12 },
           "collapsed": false
         },
         {

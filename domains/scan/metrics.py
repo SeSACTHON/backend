@@ -86,6 +86,49 @@ def register_metrics(app: FastAPI) -> None:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Scan API 요청 메트릭 (RPM 추적)
+# ─────────────────────────────────────────────────────────────────────────────
+
+SCAN_API_REQUESTS_TOTAL = Counter(
+    "scan_api_requests_total",
+    "Total Scan API requests",
+    labelnames=[
+        "endpoint",
+        "status",
+    ],  # endpoint: submit, result, categories / status: success, error
+    registry=REGISTRY,
+)
+
+SCAN_API_REQUEST_LATENCY = Histogram(
+    "scan_api_request_latency_seconds",
+    "Scan API request latency",
+    labelnames=["endpoint"],  # submit, result, categories
+    registry=REGISTRY,
+    buckets=exponential_buckets_range(0.001, 5.0, 12),
+)
+
+SCAN_SUBMIT_TOTAL = Counter(
+    "scan_submit_total",
+    "Total scan submit requests (POST /scan)",
+    labelnames=["status"],  # success, error, idempotent_hit
+    registry=REGISTRY,
+)
+
+SCAN_RESULT_TOTAL = Counter(
+    "scan_result_total",
+    "Total scan result requests (GET /scan/result)",
+    labelnames=["status"],  # success, processing, not_found
+    registry=REGISTRY,
+)
+
+SCAN_ACTIVE_JOBS = Gauge(
+    "scan_active_jobs",
+    "Number of active scan jobs (submitted but not completed)",
+    registry=REGISTRY,
+)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SSE Completion 엔드포인트 메트릭
 # ─────────────────────────────────────────────────────────────────────────────
 
