@@ -43,7 +43,7 @@ spec:
       - name: dockerhub-secret
       containers:
       - name: event-router
-        image: mng990/eco2:event-router-dev-latest
+        image: docker.io/mng990/eco2:event-router-dev-latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8000

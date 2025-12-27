@@ -7,27 +7,25 @@ on:
       - develop
       - refactor/gitops-sync-wave
     paths:
-      # FastAPI 서비스만 (ext-authz는 Go이므로 ci-ext-authz.yml에서 처리)
+      # FastAPI API 서비스만 
+      # (ext-authz는 Go → ci-ext-authz.yml)
+      # (sse-gateway, event-router는 → ci-sse-components.yml)
       - "domains/auth/**"
       - "domains/character/**"
       - "domains/chat/**"
-      - "domains/event-router/**"
       - "domains/image/**"
       - "domains/location/**"
       - "domains/my/**"
       - "domains/scan/**"
-      - "domains/sse-gateway/**"
       - "domains/_shared/**"
       - "domains/_base/**"
       - "workloads/domains/auth/**"
       - "workloads/domains/character/**"
       - "workloads/domains/chat/**"
-      - "workloads/domains/event-router/**"
       - "workloads/domains/image/**"
       - "workloads/domains/location/**"
       - "workloads/domains/my/**"
       - "workloads/domains/scan/**"
-      - "workloads/domains/sse-gateway/**"
       - "workloads/domains/character-worker/**"
       - "workloads/domains/scan-worker/**"
       - "workloads/domains/my-worker/**"
@@ -37,27 +35,25 @@ on:
       - develop
       - refactor/gitops-sync-wave
     paths:
-      # FastAPI 서비스만 (ext-authz는 Go이므로 ci-ext-authz.yml에서 처리)
+      # FastAPI API 서비스만
+      # (ext-authz는 Go → ci-ext-authz.yml)
+      # (sse-gateway, event-router는 → ci-sse-components.yml)
       - "domains/auth/**"
       - "domains/character/**"
       - "domains/chat/**"
-      - "domains/event-router/**"
       - "domains/image/**"
       - "domains/location/**"
       - "domains/my/**"
       - "domains/scan/**"
-      - "domains/sse-gateway/**"
       - "domains/_shared/**"
       - "domains/_base/**"
       - "workloads/domains/auth/**"
       - "workloads/domains/character/**"
       - "workloads/domains/chat/**"
-      - "workloads/domains/event-router/**"
       - "workloads/domains/image/**"
       - "workloads/domains/location/**"
       - "workloads/domains/my/**"
       - "workloads/domains/scan/**"
-      - "workloads/domains/sse-gateway/**"
       - "workloads/domains/character-worker/**"
       - "workloads/domains/scan-worker/**"
       - "workloads/domains/my-worker/**"
@@ -160,25 +156,20 @@ jobs:
             domains/auth/**
             domains/character/**
             domains/chat/**
-            domains/event-router/**
             domains/image/**
             domains/location/**
             domains/my/**
             domains/scan/**
-            domains/sse-gateway/**
             domains/_base/**
             domains/_shared/waste_pipeline/**
             domains/_shared/celery/**
-            domains/_shared/events/**
             workloads/domains/auth/**
             workloads/domains/character/**
             workloads/domains/chat/**
-            workloads/domains/event-router/**
             workloads/domains/image/**
             workloads/domains/location/**
             workloads/domains/my/**
             workloads/domains/scan/**
-            workloads/domains/sse-gateway/**
 
       - name: Prepare service matrix
         id: prepare
@@ -194,18 +185,17 @@ jobs:
           event_name = os.environ.get("EVENT_NAME", "")
           force_all = os.environ.get("FORCE_ALL", "false").lower() == "true"
           
-          # FastAPI 서비스 목록 (명시적 나열)
-          # ext-authz는 Go 프로젝트이므로 별도 CI(ci-ext-authz.yml)에서 처리
+          # FastAPI API 서비스 목록 (명시적 나열)
+          # ext-authz는 Go 프로젝트 → ci-ext-authz.yml
+          # sse-gateway, event-router는 SSE 컴포넌트 → ci-sse-components.yml
           FASTAPI_SERVICES = [
               "auth",
               "character",
               "chat",
-              "event-router",
               "image",
               "location",
               "my",
               "scan",
-              "sse-gateway",
           ]
           
           alias_map = {
@@ -214,8 +204,8 @@ jobs:
           shared_triggers = {
               "domains/_shared/waste_pipeline": ["chat", "scan"],
               "domains/_shared/celery": ["scan", "character", "my"],
-              "domains/_shared/events": ["scan"],  # Redis Streams SSE
-              # Base 이미지 변경 시 모든 서비스 재빌드 (의존성 업데이트)
+              # domains/_shared/events는 SSE 컴포넌트 전용 → ci-sse-components.yml
+              # Base 이미지 변경 시 모든 API 서비스 재빌드 (의존성 업데이트)
               "domains/_base": ["auth", "character", "chat", "image", "location", "my", "scan"],
           }
 

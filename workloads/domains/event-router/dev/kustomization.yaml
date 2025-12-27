@@ -3,7 +3,7 @@ kind: Kustomization
 resources:
 - ../base
 images:
-- name: mng990/eco2
+- name: docker.io/mng990/eco2
   newTag: event-router-dev-latest
 - name: docker.io/mng990/eco2
   newTag: event-router-api-dev-latest
