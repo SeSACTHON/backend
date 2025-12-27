@@ -66,6 +66,17 @@ spec:
           value: INFO
         - name: ENVIRONMENT
           value: development
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        # OTEL 설정
+        # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        - name: OTEL_ENABLED
+          value: 'true'
+        - name: OTEL_SAMPLE_RATE
+          value: '0.1'
+        - name: OTEL_SERVICE_NAME
+          value: event-router
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: jaeger-collector-clusterip.istio-system.svc.cluster.local:4317
         resources:
           requests:
             cpu: 100m

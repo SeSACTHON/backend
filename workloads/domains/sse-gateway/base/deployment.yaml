@@ -74,7 +74,7 @@ spec:
         - name: OTEL_SERVICE_NAME
           value: sse-gateway
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
-          value: http://jaeger-collector.istio-system.svc.cluster.local:4317
+          value: jaeger-collector-clusterip.istio-system.svc.cluster.local:4317
         resources:
           requests:
             cpu: 100m
