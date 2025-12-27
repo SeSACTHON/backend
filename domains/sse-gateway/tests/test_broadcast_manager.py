@@ -215,14 +215,14 @@ class TestSSEBroadcastManager:
         from core.broadcast_manager import SSEBroadcastManager
 
         manager = SSEBroadcastManager()
-        mock_cache = AsyncMock()
-        mock_cache.get = AsyncMock(return_value=None)
-        manager._cache_client = mock_cache
+        mock_streams = AsyncMock()
+        mock_streams.get = AsyncMock(return_value=None)
+        manager._streams_client = mock_streams  # State KV는 Streams Redis에 저장됨
 
         result = await manager._get_state_snapshot("test-job")
 
         assert result is None
-        mock_cache.get.assert_called_once()
+        mock_streams.get.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_get_state_snapshot_cache_hit(self):
@@ -230,10 +230,10 @@ class TestSSEBroadcastManager:
         from core.broadcast_manager import SSEBroadcastManager
 
         manager = SSEBroadcastManager()
-        mock_cache = AsyncMock()
+        mock_streams = AsyncMock()
         snapshot_data = {"stage": "vision", "status": "success"}
-        mock_cache.get = AsyncMock(return_value=json.dumps(snapshot_data))
-        manager._cache_client = mock_cache
+        mock_streams.get = AsyncMock(return_value=json.dumps(snapshot_data))
+        manager._streams_client = mock_streams  # State KV는 Streams Redis에 저장됨
 
         result = await manager._get_state_snapshot("test-job")
 
@@ -245,9 +245,9 @@ class TestSSEBroadcastManager:
         from core.broadcast_manager import SSEBroadcastManager
 
         manager = SSEBroadcastManager()
-        mock_cache = AsyncMock()
-        mock_cache.get = AsyncMock(side_effect=Exception("Redis error"))
-        manager._cache_client = mock_cache
+        mock_streams = AsyncMock()
+        mock_streams.get = AsyncMock(side_effect=Exception("Redis error"))
+        manager._streams_client = mock_streams  # State KV는 Streams Redis에 저장됨
 
         result = await manager._get_state_snapshot("test-job")
 
