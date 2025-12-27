@@ -146,14 +146,15 @@ def scan_reward_task(
         result=result,
     )
 
-    # done 이벤트용 결과 구성
+    # done 이벤트용 결과 구성 (ClassificationResponse 스키마에 맞춤)
     done_result = {
         "task_id": task_id,
         "status": "completed",
-        "result_url": f"/api/v1/scan/result/{task_id}",
-        "classification_result": result.get("classification_result"),
-        "disposal_rules": result.get("disposal_rules"),
-        "final_answer": result.get("final_answer"),
+        "pipeline_result": {
+            "classification_result": result.get("classification_result"),
+            "disposal_rules": result.get("disposal_rules"),
+            "final_answer": result.get("final_answer"),
+        },
         "reward": result.get("reward"),
     }
 
