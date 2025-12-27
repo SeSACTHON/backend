@@ -349,16 +349,20 @@ class SSEBroadcastManager:
             )
 
     async def _get_state_snapshot(self, job_id: str) -> dict[str, Any] | None:
-        """KV에서 현재 상태 스냅샷 조회.
+        """State KV에서 현재 상태 스냅샷 조회.
 
-        재접속 시 마지막 상태를 즉시 반환할 수 있음.
+        재접속/늦은 연결 시 마지막 상태를 즉시 반환할 수 있음.
+
+        Note:
+            State KV는 Streams Redis에 저장됨 (publish_stage_event에서 저장)
+            따라서 _streams_client를 사용해야 함
         """
-        if not self._cache_client:
+        if not self._streams_client:
             return None
 
         try:
             key = f"{STATE_KEY_PREFIX}{job_id}"
-            data = await self._cache_client.get(key)
+            data = await self._streams_client.get(key)
             if data:
                 return json.loads(data)
         except Exception as e:

@@ -146,7 +146,7 @@ def scan_reward_task(
         result=result,
     )
 
-    # Redis Streams: done 이벤트 발행 (파이프라인 완료)
+    # done 이벤트용 결과 구성
     done_result = {
         "task_id": task_id,
         "status": "completed",
@@ -156,6 +156,12 @@ def scan_reward_task(
         "final_answer": result.get("final_answer"),
         "reward": result.get("reward"),
     }
+
+    # ⚠️ 순서 중요: Cache 저장 → done 이벤트 (Race Condition #2 방지)
+    # done 이벤트를 받고 /result 호출 시 404 방지
+    _cache_result(task_id, done_result)
+
+    # Redis Streams: done 이벤트 발행 (결과 커밋 완료 신호)
     publish_stage_event(
         redis_client,
         task_id,
@@ -163,9 +169,6 @@ def scan_reward_task(
         "completed",
         result=done_result,
     )
-
-    # Cache-Redis에 결과 저장 (GET /scan/result/{job_id} 조회용)
-    _cache_result(task_id, done_result)
 
     # [Legacy] 커스텀 이벤트 발행 (Celery Events 방식, 마이그레이션 후 제거 예정)
     try:

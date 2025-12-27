@@ -33,8 +33,20 @@ logger = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────
 
 STREAM_PREFIX = "scan:events"
+STATE_KEY_PREFIX = "scan:state:"  # State KV 스냅샷 (SSE 재연결용)
 STREAM_MAXLEN = 100  # shard당 최근 100개 이벤트만 유지
 STREAM_TTL = 3600  # 1시간 후 만료
+STATE_TTL = 3600  # State 스냅샷 TTL 1시간
+
+# Stage 순서 (단조증가 seq)
+STAGE_ORDER = {
+    "queued": 0,
+    "vision": 1,
+    "rule": 2,
+    "answer": 3,
+    "reward": 4,
+    "done": 5,
+}
 
 # 샤딩 설정 (환경 변수로 오버라이드 가능)
 DEFAULT_SHARD_COUNT = int(os.environ.get("SSE_SHARD_COUNT", "4"))
@@ -110,12 +122,18 @@ def publish_stage_event(
         >>> publish_stage_event(redis, job_id, "vision", "completed", progress=25)
     """
     stream_key = get_stream_key(job_id)
+    state_key = f"{STATE_KEY_PREFIX}{job_id}"
+
+    # 단조증가 seq 계산 (stage 기준 + status 보정)
+    base_seq = STAGE_ORDER.get(stage, 99) * 10
+    seq = base_seq + (1 if status == "completed" else 0)
 
     # B안: job_id를 이벤트에 포함 (SSE Gateway에서 라우팅에 사용)
     event: dict[str, str] = {
         "job_id": job_id,  # 라우팅 키
         "stage": stage,
         "status": status,
+        "seq": str(seq),  # 단조증가 시퀀스 (중복/역전 방지)
         "ts": str(time.time()),
     }
 
@@ -136,6 +154,10 @@ def publish_stage_event(
     # Stream에 TTL 설정 (매번 갱신, 마지막 이벤트 기준)
     redis_client.expire(stream_key, STREAM_TTL)
 
+    # State KV 스냅샷 저장 (SSE 늦은 연결/재연결 대응)
+    # 항상 최신 상태를 유지하여 SSE가 현재 상태로 수렴 가능
+    redis_client.setex(state_key, STATE_TTL, json.dumps(event, ensure_ascii=False))
+
     shard = get_shard_for_job(job_id)
     logger.debug(
         "stage_event_published",
@@ -143,8 +165,10 @@ def publish_stage_event(
             "job_id": job_id,
             "shard": shard,
             "stream_key": stream_key,
+            "state_key": state_key,
             "stage": stage,
             "status": status,
+            "seq": seq,
             "msg_id": msg_id,
         },
     )

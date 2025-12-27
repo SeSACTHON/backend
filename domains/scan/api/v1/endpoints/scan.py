@@ -12,9 +12,14 @@ import logging
 from uuid import uuid4
 
 from celery import chain
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
+from fastapi.responses import JSONResponse
 
-from domains._shared.events import get_sync_redis_client, publish_stage_event
+from domains._shared.events import (
+    get_async_redis_client,
+    get_sync_redis_client,
+    publish_stage_event,
+)
 from domains.scan.api.dependencies import CurrentUser, ScanServiceDep
 from domains.scan.schemas.scan import (
     ClassificationRequest,
@@ -31,6 +36,9 @@ router = APIRouter(prefix="/scan", tags=["scan"])
 logger = logging.getLogger(__name__)
 
 
+IDEMPOTENCY_TTL = 3600  # Idempotency key TTL 1시간
+
+
 @router.post(
     "",
     response_model=ScanSubmitResponse,
@@ -39,6 +47,7 @@ logger = logging.getLogger(__name__)
 async def submit_scan(
     payload: ClassificationRequest,
     user: CurrentUser,
+    x_idempotency_key: str | None = Header(None, alias="X-Idempotency-Key"),
 ) -> ScanSubmitResponse:
     """이미지 분류 작업을 비동기로 제출합니다.
 
@@ -47,6 +56,10 @@ async def submit_scan(
     2. stream_url로 SSE 연결 → 실시간 진행상황 수신
     3. 완료 후 result_url로 최종 결과 조회
 
+    Idempotency:
+        X-Idempotency-Key 헤더를 포함하면 동일한 키로 재시도 시
+        새 작업을 생성하지 않고 기존 응답을 반환합니다.
+
     Returns:
         ScanSubmitResponse: job_id, stream_url, result_url
     """
@@ -54,14 +67,28 @@ async def submit_scan(
     if not image_url:
         raise HTTPException(status_code=400, detail="image_url is required")
 
+    # Idempotency Key 체크 (중복 제출 방지)
+    if x_idempotency_key:
+        redis_client = await get_async_redis_client()
+        idempotency_cache_key = f"scan:idempotency:{x_idempotency_key}"
+        existing = await redis_client.get(idempotency_cache_key)
+        if existing:
+            logger.info(
+                "scan_idempotent_hit",
+                extra={"idempotency_key": x_idempotency_key},
+            )
+            import json
+
+            return ScanSubmitResponse(**json.loads(existing))
+
     job_id = str(uuid4())
     user_id = str(user.user_id)
     user_input = payload.user_input or "이 폐기물을 어떻게 분리배출해야 하나요?"
 
-    # Redis Streams에 queued 이벤트 발행
-    redis_client = get_sync_redis_client()
+    # Redis Streams에 queued 이벤트 발행 (+ State KV 스냅샷)
+    sync_redis_client = get_sync_redis_client()
     publish_stage_event(
-        redis_client=redis_client,
+        redis_client=sync_redis_client,
         job_id=job_id,
         stage="queued",
         status="started",
@@ -83,15 +110,29 @@ async def submit_scan(
             "job_id": job_id,
             "user_id": user_id,
             "image_url": image_url,
+            "idempotency_key": x_idempotency_key,
         },
     )
 
-    return ScanSubmitResponse(
+    response = ScanSubmitResponse(
         job_id=job_id,
         stream_url=f"/api/v1/stream?job_id={job_id}",
         result_url=f"/api/v1/scan/result/{job_id}",
         status="queued",
     )
+
+    # Idempotency Key 저장
+    if x_idempotency_key:
+        import json
+
+        redis_client = await get_async_redis_client()
+        await redis_client.setex(
+            idempotency_cache_key,
+            IDEMPOTENCY_TTL,
+            json.dumps(response.model_dump()),
+        )
+
+    return response
 
 
 @router.post(
@@ -118,6 +159,11 @@ async def classify(
     "/result/{job_id}",
     response_model=ClassificationResponse,
     summary="Get scan result by job_id",
+    responses={
+        200: {"description": "결과 반환"},
+        202: {"description": "처리 중 - Retry-After 헤더 확인"},
+        404: {"description": "작업을 찾을 수 없음"},
+    },
 )
 async def get_result(
     job_id: str,
@@ -126,10 +172,29 @@ async def get_result(
     """작업 ID로 분류 결과를 조회합니다.
 
     Redis Cache에서 결과를 조회합니다.
-    결과가 없으면 404를 반환합니다.
+
+    Returns:
+        200: 결과 반환
+        202: 아직 처리 중 (Retry-After: 2초 후 재시도)
+        404: job_id에 해당하는 작업 없음
     """
     result = await service.get_result(job_id)
     if result is None:
+        # State KV에서 현재 상태 확인
+        state = await service.get_state(job_id)
+        if state is not None:
+            # 작업이 존재하지만 결과가 아직 없음 → 202 Accepted
+            return JSONResponse(
+                status_code=202,
+                content={
+                    "status": "processing",
+                    "message": "결과 준비 중입니다.",
+                    "current_stage": state.get("stage"),
+                    "progress": state.get("progress"),
+                },
+                headers={"Retry-After": "2"},
+            )
+        # 작업 자체가 없음 → 404
         raise HTTPException(
             status_code=404,
             detail=f"Result not found for job_id: {job_id}",

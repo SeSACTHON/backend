@@ -419,6 +419,32 @@ class ScanService:
 
         return None
 
+    async def get_state(self, job_id: str) -> dict | None:
+        """State KV에서 현재 작업 상태 조회.
+
+        SSE 늦은 연결/재연결 시 현재 상태를 확인하기 위해 사용.
+
+        Args:
+            job_id: 작업 ID (Celery task ID)
+
+        Returns:
+            State dict if found (stage, status, progress, seq), None otherwise
+        """
+        redis_client = await get_async_redis_client()
+        state_key = f"scan:state:{job_id}"
+
+        try:
+            cached = await redis_client.get(state_key)
+            if cached:
+                return json.loads(cached)
+        except Exception as e:
+            logger.warning(
+                "scan_state_cache_error",
+                extra={"job_id": job_id, "error": str(e)},
+            )
+
+        return None
+
     # Alias for backward compatibility with tests
     async def classify(
         self, payload: ClassificationRequest, user_id: UUID
