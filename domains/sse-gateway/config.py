@@ -93,6 +93,8 @@ def get_settings() -> Settings:
 def get_shard_for_job(job_id: str, shard_count: int | None = None) -> int:
     """job_id에 대한 shard 계산.
 
+    일관된 해시를 위해 hashlib.md5 사용 (Python hash()는 세션마다 다름).
+
     Args:
         job_id: Celery task ID (UUID)
         shard_count: 전체 shard 수 (None이면 설정값 사용)
@@ -100,9 +102,14 @@ def get_shard_for_job(job_id: str, shard_count: int | None = None) -> int:
     Returns:
         shard ID (0-based)
     """
+    import hashlib
+
     if shard_count is None:
         shard_count = get_settings().sse_shard_count
-    return hash(job_id) % shard_count
+    # MD5 해시의 첫 8바이트를 정수로 변환
+    hash_bytes = hashlib.md5(job_id.encode()).digest()[:8]
+    hash_int = int.from_bytes(hash_bytes, byteorder="big")
+    return hash_int % shard_count
 
 
 def get_sharded_stream_key(job_id: str, shard_count: int | None = None) -> str:
