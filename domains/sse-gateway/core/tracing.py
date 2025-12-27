@@ -7,7 +7,7 @@ SSE Gateway 특화 분산 트레이싱:
 - State 복구 추적
 
 Architecture:
-  SSE Gateway (OTel SDK) → OTLP/gRPC (4317) → Jaeger Collector → Elasticsearch
+  SSE Gateway (OTel SDK) → OTLP/HTTP (4318) → Jaeger Collector → Elasticsearch
 """
 
 import logging
@@ -22,8 +22,9 @@ logger = logging.getLogger(__name__)
 # Environment variables
 OTEL_EXPORTER_ENDPOINT = os.getenv(
     "OTEL_EXPORTER_OTLP_ENDPOINT",
-    "jaeger-collector.istio-system.svc.cluster.local:4317",
+    "http://jaeger-collector-clusterip.istio-system.svc.cluster.local:4318",
 )
+OTEL_EXPORTER_PROTOCOL = os.getenv("OTEL_EXPORTER_OTLP_PROTOCOL", "http/protobuf")
 OTEL_SAMPLING_RATE = float(os.getenv("OTEL_SAMPLING_RATE", "0.1"))
 OTEL_ENABLED = os.getenv("OTEL_ENABLED", "true").lower() == "true"
 
@@ -52,7 +53,7 @@ def configure_tracing() -> bool:
 
     try:
         from opentelemetry import trace
-        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
             OTLPSpanExporter,
         )
         from opentelemetry.sdk.resources import Resource
@@ -83,10 +84,10 @@ def configure_tracing() -> bool:
             sampler=sampler,
         )
 
-        # OTLP gRPC Exporter (Jaeger Collector)
+        # OTLP HTTP Exporter (Jaeger Collector - 4318)
+        # HTTP/protobuf는 gRPC보다 Istio mTLS와 호환성이 좋음
         exporter = OTLPSpanExporter(
-            endpoint=OTEL_EXPORTER_ENDPOINT,
-            insecure=True,
+            endpoint=f"{OTEL_EXPORTER_ENDPOINT}/v1/traces",
         )
 
         # BatchSpanProcessor (async, low overhead)

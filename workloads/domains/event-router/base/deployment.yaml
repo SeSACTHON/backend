@@ -76,7 +76,9 @@ spec:
         - name: OTEL_SERVICE_NAME
           value: event-router
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
-          value: jaeger-collector-clusterip.istio-system.svc.cluster.local:4317
+          value: http://jaeger-collector-clusterip.istio-system.svc.cluster.local:4318
+        - name: OTEL_EXPORTER_OTLP_PROTOCOL
+          value: http/protobuf
         resources:
           requests:
             cpu: 100m
