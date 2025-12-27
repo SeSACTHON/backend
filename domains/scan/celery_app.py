@@ -37,7 +37,7 @@ celery_app.autodiscover_tasks(
 
 
 def _setup_celery_tracing() -> None:
-    """Celery 태스크 분산 추적 설정."""
+    """Celery 태스크 분산 추적 설정 (Celery + Redis instrumentation)."""
     otel_enabled = os.getenv("OTEL_ENABLED", "true").lower() == "true"
     if not otel_enabled:
         logger.info("Celery tracing disabled (OTEL_ENABLED=false)")
@@ -45,10 +45,11 @@ def _setup_celery_tracing() -> None:
 
     try:
         from opentelemetry import trace
-        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
             OTLPSpanExporter,
         )
         from opentelemetry.instrumentation.celery import CeleryInstrumentor
+        from opentelemetry.instrumentation.redis import RedisInstrumentor
         from opentelemetry.sdk.resources import Resource
         from opentelemetry.sdk.trace import TracerProvider
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
@@ -59,27 +60,32 @@ def _setup_celery_tracing() -> None:
                 "service.name": "scan-worker",
                 "service.version": os.getenv("SERVICE_VERSION", "1.0.0"),
                 "deployment.environment": os.getenv("ENVIRONMENT", "dev"),
+                # Worker 특화 속성
+                "messaging.system": "redis",
+                "messaging.destination.kind": "stream",
             }
         )
 
         provider = TracerProvider(resource=resource)
         endpoint = os.getenv(
             "OTEL_EXPORTER_OTLP_ENDPOINT",
-            "jaeger-collector.istio-system.svc.cluster.local:4317",
+            "http://jaeger-collector-clusterip.istio-system.svc.cluster.local:4318",
         )
-        exporter = OTLPSpanExporter(endpoint=endpoint, insecure=True)
+        # HTTP/protobuf exporter (Istio 호환성 향상)
+        exporter = OTLPSpanExporter(endpoint=f"{endpoint}/v1/traces")
         provider.add_span_processor(BatchSpanProcessor(exporter))
         trace.set_tracer_provider(provider)
 
         # Celery Instrumentation
         CeleryInstrumentor().instrument()
-        logger.info(
-            "Celery tracing enabled",
-            extra={"endpoint": endpoint, "service": "scan-worker"},
-        )
+        logger.info("Celery tracing enabled", extra={"endpoint": endpoint})
+
+        # Redis Instrumentation (Streams XADD, Cache 등 추적)
+        RedisInstrumentor().instrument()
+        logger.info("Redis tracing enabled (Streams/Cache)")
 
     except ImportError as e:
-        logger.warning(f"Celery tracing not available: {e}")
+        logger.warning(f"Celery/Redis tracing not available: {e}")
     except Exception as e:
         logger.error(f"Failed to setup Celery tracing: {e}")
 

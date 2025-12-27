@@ -18,6 +18,7 @@ from domains.scan.core.tracing import (
     configure_tracing,
     instrument_fastapi,
     instrument_httpx,
+    instrument_redis,
     shutdown_tracing,
 )
 from domains.scan.metrics import register_metrics
@@ -35,6 +36,7 @@ configure_tracing(
 
 # 글로벌 instrumentation
 instrument_httpx()
+instrument_redis(None)  # Redis Streams/Cache 추적
 
 
 @asynccontextmanager
