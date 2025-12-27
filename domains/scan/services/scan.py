@@ -25,7 +25,7 @@ from domains.scan.schemas.scan import (
     ClassificationResponse,
     ScanCategory,
 )
-from domains._shared.events import get_async_redis_client
+from domains._shared.events import get_async_cache_client, get_async_redis_client
 from domains._shared.schemas.waste import WasteClassificationResult
 from domains._shared.waste_pipeline import PipelineError, process_waste_classification
 from domains._shared.waste_pipeline.utils import ITEM_CLASS_PATH, load_yaml
@@ -397,19 +397,25 @@ class ScanService:
     async def get_result(self, job_id: str) -> ClassificationResponse | None:
         """Redis Cache에서 작업 결과 조회.
 
+        Note:
+            Result는 Cache Redis에 저장됨 (reward.py의 _cache_result)
+            State는 Streams Redis에 저장됨 (publish_stage_event)
+
         Args:
             job_id: 작업 ID (Celery task ID)
 
         Returns:
             ClassificationResponse if found, None otherwise
         """
-        redis_client = await get_async_redis_client()
+        cache_client = await get_async_cache_client()
         cache_key = f"scan:result:{job_id}"
 
         try:
-            cached = await redis_client.get(cache_key)
+            cached = await cache_client.get(cache_key)
             if cached:
-                data = json.loads(cached)
+                data = (
+                    json.loads(cached) if isinstance(cached, str) else json.loads(cached.decode())
+                )
                 return ClassificationResponse(**data)
         except Exception as e:
             logger.warning(

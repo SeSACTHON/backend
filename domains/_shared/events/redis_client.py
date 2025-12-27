@@ -27,11 +27,17 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# 환경변수에서 Redis Streams URL 가져오기
-# 로컬 개발: localhost, K8s: rfr-streams-redis.redis.svc.cluster.local
+# 환경변수에서 Redis URL 가져오기
+# Streams Redis: 이벤트 발행/구독, State KV
 _REDIS_STREAMS_URL = os.getenv(
     "REDIS_STREAMS_URL",
     "redis://localhost:6379/0",  # 로컬 개발용 (Streams 전용 Redis)
+)
+
+# Cache Redis: 결과 캐싱 (scan:result:{job_id})
+_REDIS_CACHE_URL = os.getenv(
+    "REDIS_CACHE_URL",
+    "redis://localhost:6379/1",  # 로컬 개발용 (Cache 전용 Redis)
 )
 
 
@@ -143,3 +149,51 @@ async def reset_async_redis_client() -> "aioredis.Redis":  # type: ignore[type-a
 
     logger.warning("async_redis_client_reset")
     return await get_async_redis_client()
+
+
+# ─────────────────────────────────────────────────────────────────
+# Cache Redis (결과 캐싱용)
+# ─────────────────────────────────────────────────────────────────
+
+_async_cache_client: "aioredis.Redis | None" = None  # type: ignore[type-arg]
+
+
+async def get_async_cache_client() -> "aioredis.Redis":  # type: ignore[type-arg]
+    """비동기 Cache Redis 클라이언트.
+
+    Result 캐시 조회용 (scan:result:{job_id}).
+    Streams Redis와 분리되어 있음.
+
+    Returns:
+        비동기 Cache Redis 클라이언트 (싱글톤)
+    """
+    global _async_cache_client
+
+    if _async_cache_client is None:
+        import redis.asyncio as aioredis
+
+        _async_cache_client = aioredis.from_url(
+            _REDIS_CACHE_URL,
+            decode_responses=True,  # 문자열 디코딩 (JSON 처리 편의)
+            socket_timeout=5.0,
+            socket_connect_timeout=5.0,
+            retry_on_timeout=True,
+            health_check_interval=30,
+            max_connections=20,
+        )
+        logger.info(
+            "async_cache_client_initialized",
+            extra={"url": _REDIS_CACHE_URL, "max_connections": 20},
+        )
+
+    return _async_cache_client
+
+
+async def close_async_cache_client() -> None:
+    """비동기 Cache Redis 클라이언트 종료."""
+    global _async_cache_client
+
+    if _async_cache_client is not None:
+        await _async_cache_client.close()
+        logger.info("async_cache_client_closed")
+        _async_cache_client = None
