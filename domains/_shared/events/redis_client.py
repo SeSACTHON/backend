@@ -37,7 +37,7 @@ _REDIS_STREAMS_URL = os.getenv(
 # Cache Redis: 결과 캐싱 (scan:result:{job_id})
 _REDIS_CACHE_URL = os.getenv(
     "REDIS_CACHE_URL",
-    "redis://localhost:6379/1",  # 로컬 개발용 (Cache 전용 Redis)
+    "redis://localhost:6379/1",  # 로컬 개발용 기본값
 )
 
 
