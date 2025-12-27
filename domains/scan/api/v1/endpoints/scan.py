@@ -159,6 +159,7 @@ async def classify(
 @router.get(
     "/result/{job_id}",
     summary="Get scan result by job_id",
+    response_model=None,  # Union[Response, Pydantic]은 response_model 자동 생성 불가
     responses={
         200: {"model": ClassificationResponse, "description": "결과 반환"},
         202: {"model": ScanProcessingResponse, "description": "처리 중 - Retry-After 헤더 확인"},
