@@ -233,7 +233,28 @@ class SSEBroadcastManager:
         """
         subscriber = SubscriberQueue(job_id=job_id)
 
-        # 1. State에서 현재 상태 복구
+        # 1. 구독자 등록 (먼저!)
+        self._subscribers[job_id].add(subscriber)
+
+        # 2. Pub/Sub 구독 시작 + 완료 대기 (핵심: 먼저 구독해야 이벤트 누락 방지)
+        subscribed_event: asyncio.Event | None = None
+        if job_id not in self._pubsub_tasks or self._pubsub_tasks[job_id].done():
+            subscribed_event = asyncio.Event()
+            self._pubsub_tasks[job_id] = asyncio.create_task(
+                self._pubsub_listener(job_id, subscribed_event)
+            )
+
+        # 구독 완료 대기 (최대 1초)
+        if subscribed_event:
+            try:
+                await asyncio.wait_for(subscribed_event.wait(), timeout=1.0)
+            except asyncio.TimeoutError:
+                logger.warning(
+                    "pubsub_subscribe_timeout",
+                    extra={"job_id": job_id},
+                )
+
+        # 3. State에서 현재 상태 복구 (구독 후 조회 = 누락 방지)
         state = await self._get_state_snapshot(job_id)
         if state:
             state_seq = state.get("seq", -1)
@@ -251,13 +272,6 @@ class SSEBroadcastManager:
                     extra={"job_id": job_id},
                 )
                 return
-
-        # 2. 구독자 등록
-        self._subscribers[job_id].add(subscriber)
-
-        # 3. Pub/Sub 구독 시작 (첫 구독자인 경우)
-        if job_id not in self._pubsub_tasks or self._pubsub_tasks[job_id].done():
-            self._pubsub_tasks[job_id] = asyncio.create_task(self._pubsub_listener(job_id))
 
         logger.info(
             "broadcast_subscribe_started",
@@ -354,13 +368,21 @@ class SSEBroadcastManager:
                 },
             )
 
-    async def _pubsub_listener(self, job_id: str) -> None:
+    async def _pubsub_listener(
+        self, job_id: str, subscribed_event: asyncio.Event | None = None
+    ) -> None:
         """job_id별 Pub/Sub 리스너.
 
         Redis Pub/Sub 채널을 구독하고 이벤트를 해당 job_id의
         모든 SubscriberQueue에 분배.
+
+        Args:
+            job_id: 구독할 job ID
+            subscribed_event: 구독 완료 시그널 (옵션)
         """
         if not self._pubsub_client:
+            if subscribed_event:
+                subscribed_event.set()
             return
 
         channel = f"{PUBSUB_CHANNEL_PREFIX}{job_id}"
@@ -368,6 +390,11 @@ class SSEBroadcastManager:
 
         try:
             await pubsub.subscribe(channel)
+
+            # 구독 완료 시그널
+            if subscribed_event:
+                subscribed_event.set()
+
             logger.debug(
                 "pubsub_subscribed",
                 extra={"job_id": job_id, "channel": channel},
