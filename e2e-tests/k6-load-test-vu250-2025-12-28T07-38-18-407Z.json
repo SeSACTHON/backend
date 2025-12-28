@@ -1,0 +1,62 @@
+{
+  "meta": {
+    "timestamp": "2025-12-28T07:38:18.407Z",
+    "test_duration_sec": 210.1,
+    "target_vus": 250,
+    "duration_config": "2m",
+    "base_url": "https://api.dev.growbin.app"
+  },
+  "scan_api": {
+    "total": 949,
+    "success": 947,
+    "failed": 2,
+    "success_rate": 0.9978925184404637,
+    "throughput_rps": 4.52,
+    "latency_ms": {
+      "avg": 55.89251844046365,
+      "med": 38,
+      "p90": 73,
+      "p95": 86,
+      "max": 1106
+    }
+  },
+  "completion": {
+    "total": 714,
+    "rate": 0.8331388564760793,
+    "throughput_jps": 3.4,
+    "time_ms": {
+      "min": 7593,
+      "avg": 43200.994152046784,
+      "med": 40473,
+      "p90": 75961,
+      "p95": 76430.6,
+      "max": 77656
+    }
+  },
+  "e2e_latency_ms": {
+    "avg": 43258.21871345029,
+    "med": 40513,
+    "p90": 76004.6,
+    "p95": 76495.6
+  },
+  "rewards": {
+    "total": 713,
+    "rate": 0.8339181286549707
+  },
+  "stages": {
+    "vision": 714,
+    "rule": 714,
+    "answer": 714,
+    "reward": 713,
+    "done": 714
+  },
+  "polling": {
+    "total": 17118,
+    "latency_ms": {
+      "avg": 35.68804766912022,
+      "med": 26,
+      "p95": 47
+    }
+  },
+  "thresholds": {}
+}
