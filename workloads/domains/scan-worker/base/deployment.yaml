@@ -1,7 +1,7 @@
 # Scan Worker Celery Deployment
 # 비동기 AI 파이프라인 처리 (vision, rule, answer, reward)
 # Gevent Pool 사용으로 동시 I/O 처리
-# Rebuild: 2024-12-28 - FD 고갈 방지: greenlet 50, ulimit 65536
+# Rebuild: 2024-12-28 - FD 고갈 방지: ulimit 65536, 타임아웃 30초, 연결풀링
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -50,7 +50,7 @@ spec:
             -E \
             -P gevent \
             -Q scan.vision,scan.rule,scan.answer,scan.reward \
-            -c 50 \
+            -c 100 \
             --prefetch-multiplier=1
         env:
         # Celery Broker (RabbitMQ)
