@@ -40,6 +40,11 @@ logger = logging.getLogger(__name__)
 
 # State 조건부 갱신 + 발행 마킹 (원자적)
 # Pub/Sub는 별도 Redis로 분리했으므로 여기서는 State만 처리
+#
+# 수평 확장 지원:
+# - 여러 Pod이 같은 job_id의 이벤트를 동시에 처리할 수 있음
+# - 순서가 뒤집혀도 모든 이벤트는 Pub/Sub에 발행됨
+# - State는 가장 큰 seq로만 갱신 (최신 상태 유지)
 UPDATE_STATE_SCRIPT = """
 local state_key = KEYS[1]      -- scan:state:{job_id}
 local publish_key = KEYS[2]    -- router:published:{job_id}:{seq}
@@ -49,30 +54,33 @@ local new_seq = tonumber(ARGV[2])
 local state_ttl = tonumber(ARGV[3])
 local published_ttl = tonumber(ARGV[4])
 
--- 이미 처리했는지 체크
+-- 멱등성: 이미 처리했으면 스킵
 if redis.call('EXISTS', publish_key) == 1 then
     return 0  -- 이미 처리됨
 end
 
--- State 조건부 갱신 (seq 비교)
+-- State 조건부 갱신 (더 큰 seq만)
+local should_update_state = true
 local current = redis.call('GET', state_key)
 if current then
     local cur_data = cjson.decode(current)
     local cur_seq = tonumber(cur_data.seq) or 0
     if new_seq <= cur_seq then
-        -- seq가 낮거나 같아도 처리 마킹 (중복 처리 방지)
-        redis.call('SETEX', publish_key, published_ttl, '1')
-        return 0  -- 역순/중복 이벤트
+        should_update_state = false  -- State 갱신 안함 (더 최신 State 유지)
     end
 end
 
--- State 갱신 (내구성 Redis에 저장)
-redis.call('SETEX', state_key, state_ttl, event_data)
+-- State 갱신 (더 큰 seq만 갱신하여 최신 상태 유지)
+if should_update_state then
+    redis.call('SETEX', state_key, state_ttl, event_data)
+end
 
--- 처리 마킹
+-- 처리 마킹 (항상)
 redis.call('SETEX', publish_key, published_ttl, '1')
 
-return 1  -- State 갱신됨 → Pub/Sub 발행 필요
+-- 항상 1 반환 → Pub/Sub 발행
+-- (순서와 상관없이 모든 이벤트가 클라이언트에게 전달됨)
+return 1
 """
 
 
