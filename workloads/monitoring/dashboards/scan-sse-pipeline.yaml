@@ -92,26 +92,24 @@ data:
           "fieldConfig": { "defaults": { "unit": "s", "decimals": 2 } }
         },
         {
-          "title": "Success Rate",
-          "type": "gauge",
+          "title": "Active Jobs",
+          "type": "stat",
           "gridPos": { "h": 4, "w": 4, "x": 12, "y": 1 },
           "targets": [
             {
-              "expr": "sum(rate(sse_gateway_requests_total{status=\"success\"}[5m])) / sum(rate(sse_gateway_requests_total[5m])) * 100",
-              "legendFormat": "Success %"
+              "expr": "sum(sse_gateway_active_jobs)",
+              "legendFormat": "Jobs"
             }
           ],
           "fieldConfig": {
             "defaults": {
-              "unit": "percent",
-              "min": 0,
-              "max": 100,
+              "unit": "short",
               "thresholds": {
                 "mode": "absolute",
                 "steps": [
-                  { "color": "red", "value": null },
-                  { "color": "yellow", "value": 90 },
-                  { "color": "green", "value": 98 }
+                  { "color": "green", "value": null },
+                  { "color": "yellow", "value": 20 },
+                  { "color": "red", "value": 50 }
                 ]
               }
             }
@@ -135,7 +133,7 @@ data:
           "gridPos": { "h": 4, "w": 4, "x": 20, "y": 1 },
           "targets": [
             {
-              "expr": "sum(redis_stream_pending_entries{job=\"rfr-streams-redis\"})",
+              "expr": "sum(redis_stream_group_messages_pending{job=\"rfr-streams-redis\"})",
               "legendFormat": "Pending"
             }
           ],
@@ -337,13 +335,17 @@ data:
           }
         },
         {
-          "title": "Events Skipped (Idempotency)",
+          "title": "Published Markers (Idempotency)",
           "type": "timeseries",
           "gridPos": { "h": 6, "w": 8, "x": 16, "y": 21 },
           "targets": [
             {
-              "expr": "sum by (reason) (rate(event_router_events_skipped_total[1m]))",
-              "legendFormat": "{{reason}}"
+              "expr": "sum(rate(event_router_published_markers_total[1m]))",
+              "legendFormat": "Markers/sec"
+            },
+            {
+              "expr": "sum(rate(event_router_state_updates_total[1m]))",
+              "legendFormat": "State Updates/sec"
             }
           ],
           "fieldConfig": {
@@ -381,40 +383,44 @@ data:
           }
         },
         {
-          "title": "Events Distributed",
+          "title": "Events per Connection",
           "type": "timeseries",
           "gridPos": { "h": 6, "w": 8, "x": 8, "y": 28 },
           "targets": [
             {
-              "expr": "sum by (status) (rate(sse_gateway_events_distributed_total[1m]))",
-              "legendFormat": "{{status}}"
+              "expr": "histogram_quantile(0.50, sum(rate(sse_gateway_events_per_connection_bucket[5m])) by (le))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(sse_gateway_events_per_connection_bucket[5m])) by (le))",
+              "legendFormat": "p95"
             }
           ],
           "fieldConfig": {
             "defaults": {
-              "unit": "ops",
+              "unit": "short",
               "custom": { "lineWidth": 2, "fillOpacity": 20 }
-            },
-            "overrides": [
-              { "matcher": { "id": "byName", "options": "success" }, "properties": [{ "id": "color", "value": { "fixedColor": "#73bf69" } }] },
-              { "matcher": { "id": "byName", "options": "dropped" }, "properties": [{ "id": "color", "value": { "fixedColor": "#f2495c" } }] }
-            ]
+            }
           }
         },
         {
-          "title": "Connection Close Reasons",
+          "title": "Connection Duration (p50/p95)",
           "type": "timeseries",
           "gridPos": { "h": 6, "w": 8, "x": 16, "y": 28 },
           "targets": [
             {
-              "expr": "sum by (reason) (rate(sse_gateway_connections_closed_total[1m]))",
-              "legendFormat": "{{reason}}"
+              "expr": "histogram_quantile(0.50, sum(rate(sse_gateway_connection_duration_seconds_bucket[5m])) by (le))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(sse_gateway_connection_duration_seconds_bucket[5m])) by (le))",
+              "legendFormat": "p95"
             }
           ],
           "fieldConfig": {
             "defaults": {
-              "unit": "ops",
-              "custom": { "lineWidth": 2, "fillOpacity": 20 }
+              "unit": "s",
+              "custom": { "lineWidth": 2, "fillOpacity": 10 }
             }
           }
         },
@@ -465,17 +471,21 @@ data:
           }
         },
         {
-          "title": "Queue Backlog",
+          "title": "Queue & State Snapshots",
           "type": "timeseries",
           "gridPos": { "h": 6, "w": 8, "x": 16, "y": 34 },
           "targets": [
             {
-              "expr": "sse_gateway_queue_size_total",
+              "expr": "sum(sse_gateway_queue_size_total)",
               "legendFormat": "Queue Size"
             },
             {
-              "expr": "sum(rate(sse_gateway_queue_dropped_total[1m]))",
-              "legendFormat": "Dropped/sec"
+              "expr": "sum(rate(sse_gateway_state_snapshot_hits_total[1m]))",
+              "legendFormat": "State Hits/sec"
+            },
+            {
+              "expr": "sum(rate(sse_gateway_state_snapshot_misses_total[1m]))",
+              "legendFormat": "State Misses/sec"
             }
           ],
           "fieldConfig": {
@@ -636,7 +646,7 @@ data:
           "gridPos": { "h": 6, "w": 4, "x": 12, "y": 59 },
           "targets": [
             {
-              "expr": "sum(redis_stream_pending_entries{job=\"rfr-streams-redis\"})",
+              "expr": "sum(redis_stream_group_messages_pending{job=\"rfr-streams-redis\"})",
               "legendFormat": "Pending"
             }
           ],
@@ -797,19 +807,22 @@ data:
           }
         },
         {
-          "title": "Messages Reclaimed",
-          "type": "timeseries",
+          "title": "Reclaimer Status",
+          "type": "stat",
           "gridPos": { "h": 6, "w": 8, "x": 8, "y": 79 },
           "targets": [
             {
-              "expr": "sum by (shard) (rate(event_router_reclaim_messages_total[5m]))",
-              "legendFormat": "shard-{{shard}}"
+              "expr": "event_router_reclaimer_status",
+              "legendFormat": "Reclaimer"
             }
           ],
           "fieldConfig": {
             "defaults": {
-              "unit": "ops",
-              "custom": { "lineWidth": 2, "fillOpacity": 20 }
+              "unit": "short",
+              "mappings": [
+                { "type": "value", "options": { "0": { "text": "Stopped", "color": "red" } } },
+                { "type": "value", "options": { "1": { "text": "Running", "color": "green" } } }
+              ]
             }
           }
         },
