@@ -8,6 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+import httpx
 import yaml
 from dotenv import load_dotenv
 from openai import AsyncOpenAI, OpenAI
@@ -30,19 +31,71 @@ ANSWER_GENERATION_PROMPT_PATH = PROMPTS_DIR / "answer_generation_prompt.txt"
 _openai_client: OpenAI | None = None
 _async_openai_client: AsyncOpenAI | None = None
 
+# ==========================================
+# OpenAI API 설정 (FD 고갈 방지)
+# ==========================================
+# 타임아웃: 30초 대기 후 강제 종료 (Greenlet Stuck 방지)
+OPENAI_TIMEOUT = httpx.Timeout(
+    connect=5.0,  # 연결 타임아웃: 5초
+    read=30.0,  # 읽기 타임아웃: 30초 (OpenAI 응답 대기)
+    write=10.0,  # 쓰기 타임아웃: 10초
+    pool=5.0,  # 연결 풀 대기 타임아웃: 5초
+)
+
+# 연결 풀링: 동시 연결 수 제한 (FD 고갈 방지)
+OPENAI_LIMITS = httpx.Limits(
+    max_connections=50,  # 최대 동시 연결 수
+    max_keepalive_connections=20,  # Keep-Alive 연결 수
+    keepalive_expiry=30.0,  # Keep-Alive 만료 시간
+)
+
 
 def _build_client() -> OpenAI:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.")
-    return OpenAI(api_key=api_key)
+
+    # httpx 클라이언트로 타임아웃 + 연결 풀링 설정
+    http_client = httpx.Client(
+        timeout=OPENAI_TIMEOUT,
+        limits=OPENAI_LIMITS,
+    )
+
+    logger.info(
+        "OpenAI client initialized (timeout=%s, max_connections=%d)",
+        OPENAI_TIMEOUT.read,
+        OPENAI_LIMITS.max_connections,
+    )
+
+    return OpenAI(
+        api_key=api_key,
+        http_client=http_client,
+        max_retries=2,  # 재시도 2회 (기본 2)
+    )
 
 
 def _build_async_client() -> AsyncOpenAI:
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
         raise RuntimeError("OPENAI_API_KEY 환경 변수가 설정되지 않았습니다.")
-    return AsyncOpenAI(api_key=api_key)
+
+    # httpx 비동기 클라이언트로 타임아웃 + 연결 풀링 설정
+    http_client = httpx.AsyncClient(
+        timeout=OPENAI_TIMEOUT,
+        limits=OPENAI_LIMITS,
+    )
+
+    logger.info(
+        "AsyncOpenAI client initialized (timeout=%s, max_connections=%d)",
+        OPENAI_TIMEOUT.read,
+        OPENAI_LIMITS.max_connections,
+    )
+
+    return AsyncOpenAI(
+        api_key=api_key,
+        http_client=http_client,
+        max_retries=2,
+    )
 
 
 def get_openai_client() -> OpenAI:

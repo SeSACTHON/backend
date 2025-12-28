@@ -1,7 +1,7 @@
 # Scan Worker Celery Deployment
 # 비동기 AI 파이프라인 처리 (vision, rule, answer, reward)
-# Gevent Pool 사용으로 100+ 동시 I/O 처리
-# Rebuild: 2024-12-24 - base image gevent + celery 5.4.0
+# Gevent Pool 사용으로 동시 I/O 처리
+# Rebuild: 2024-12-28 - FD 고갈 방지: greenlet 50, ulimit 65536
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -29,23 +29,29 @@ spec:
         # Istio proxy가 준비될 때까지 main container 시작 대기
         proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
     spec:
+      # Init container: ulimit 확인 (디버깅용)
+      initContainers:
+      - name: init-ulimit
+        image: busybox:1.36
+        command: [sh, -c, ulimit -n || echo "ulimit check skipped"]
+        securityContext:
+          runAsUser: 0
       containers:
       - name: scan-worker
         image: docker.io/mng990/eco2:scan-worker-dev-latest
         imagePullPolicy: Always
-        command: [celery]
+        # ulimit 설정 후 celery 실행 (FD 고갈 방지)
+        command: [/bin/sh, -c]
         args:
-        - -A
-        - domains.scan.celery_app
-        - worker
-        - --loglevel=info
-        - -E  # Events 활성화 (SSE 스트리밍용)
-        - -P
-        - gevent  # Gevent pool (높은 동시성 I/O)
-        - -Q
-        - scan.vision,scan.rule,scan.answer,scan.reward
-        - -c
-        - '100'  # 동시 greenlet 수 (OpenAI API 병렬 호출)
+        - |
+          ulimit -n 65536 2>/dev/null || echo "ulimit setting skipped (not privileged)"
+          exec celery -A domains.scan.celery_app worker \
+            --loglevel=info \
+            -E \
+            -P gevent \
+            -Q scan.vision,scan.rule,scan.answer,scan.reward \
+            -c 50 \
+            --prefetch-multiplier=1
         env:
         # Celery Broker (RabbitMQ)
         - name: CELERY_BROKER_URL
@@ -67,6 +73,9 @@ spec:
         # Gevent Pool 설정
         - name: CELERY_WORKER_POOL
           value: gevent
+        # Prefetch 제한 (Fair dispatch: 긴 작업에 적합)
+        - name: CELERY_WORKER_PREFETCH_MULTIPLIER
+          value: '1'
         # OpenTelemetry
         - name: OTEL_SERVICE_NAME
           value: scan-worker

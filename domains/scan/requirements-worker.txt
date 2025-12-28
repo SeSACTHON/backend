@@ -6,6 +6,9 @@
 # OpenAI API (Vision, Answer tasks)
 openai>=1.51.0
 
+# httpx (OpenAI 클라이언트 타임아웃 + 연결 풀링)
+httpx>=0.26.0
+
 # OpenTelemetry instrumentation for OpenAI
 opentelemetry-instrumentation-openai-v2>=2.0b0
 
