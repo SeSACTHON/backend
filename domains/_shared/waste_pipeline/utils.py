@@ -42,11 +42,11 @@ OPENAI_TIMEOUT = httpx.Timeout(
     pool=5.0,  # 연결 풀 대기 타임아웃: 5초
 )
 
-# 연결 풀링: 동시 연결 수 제한 (FD 고갈 방지)
+# 연결 풀링: httpx 기본값 유지 + Keep-Alive 설정
 OPENAI_LIMITS = httpx.Limits(
-    max_connections=50,  # 최대 동시 연결 수
-    max_keepalive_connections=20,  # Keep-Alive 연결 수
-    keepalive_expiry=30.0,  # Keep-Alive 만료 시간
+    max_connections=100,  # 최대 동시 연결 수 (기본값)
+    max_keepalive_connections=20,  # Keep-Alive 연결 수 (기본값)
+    keepalive_expiry=30.0,  # Keep-Alive 만료 시간 (연결 재사용)
 )
 
 
