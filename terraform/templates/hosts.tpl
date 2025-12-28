@@ -13,7 +13,7 @@ ansible_python_interpreter=/usr/bin/python3
 k8s-master ansible_host=${master_public_ip} private_ip=${master_private_ip} instance_type=t3.large
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# API Nodes (Phase 1&2: 5 nodes)
+# API Nodes (Phase 1&2: 7 nodes)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 [api_nodes]
@@ -41,9 +41,11 @@ k8s-worker-ai ansible_host=${worker_ai_public_ip} private_ip=${worker_ai_private
 [postgresql]
 k8s-postgresql ansible_host=${postgresql_public_ip} private_ip=${postgresql_private_ip} workload=database instance_type=t3.medium phase=1
 
-# Redis (Phase 1)
+# Redis (Phase 1) - 3-Node Cluster
 [redis]
-k8s-redis ansible_host=${redis_public_ip} private_ip=${redis_private_ip} workload=cache instance_type=t3.small phase=1
+k8s-redis-auth ansible_host=${redis_auth_public_ip} private_ip=${redis_auth_private_ip} workload=cache redis_cluster=auth instance_type=t3.medium phase=1
+k8s-redis-streams ansible_host=${redis_streams_public_ip} private_ip=${redis_streams_private_ip} workload=cache redis_cluster=streams instance_type=t3.small phase=1
+k8s-redis-cache ansible_host=${redis_cache_public_ip} private_ip=${redis_cache_private_ip} workload=cache redis_cluster=cache instance_type=t3.small phase=1
 
 # RabbitMQ (Phase 4: 2025-11-08 활성화)
 [rabbitmq]
@@ -61,6 +63,18 @@ k8s-logging ansible_host=${logging_public_ip} private_ip=${logging_private_ip} w
 [ingress_gateway]
 k8s-ingress-gateway ansible_host=${ingress_gateway_public_ip} private_ip=${ingress_gateway_private_ip} workload=gateway instance_type=t3.medium phase=5
 
+# SSE Gateway (Phase 5: Pub/Sub Subscriber + Client Fan-out)
+[sse_gateway]
+k8s-sse-gateway ansible_host=${sse_gateway_public_ip} private_ip=${sse_gateway_private_ip} workload=sse instance_type=t3.small phase=5
+
+# Event Router (Phase 6: Streams→Pub/Sub Bridge)
+[event_router]
+k8s-event-router ansible_host=${event_router_public_ip} private_ip=${event_router_private_ip} workload=event-router instance_type=t3.small phase=6
+
+# Redis Pub/Sub (Phase 6: Realtime Broadcast)
+[redis_pubsub]
+k8s-redis-pubsub ansible_host=${redis_pubsub_public_ip} private_ip=${redis_pubsub_private_ip} workload=cache redis_cluster=pubsub instance_type=t3.small phase=6
+
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Group Definitions
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -71,7 +85,10 @@ api_nodes
 workers
 postgresql
 redis
+redis_pubsub
 rabbitmq
 monitoring
 logging
 ingress_gateway
+sse_gateway
+event_router

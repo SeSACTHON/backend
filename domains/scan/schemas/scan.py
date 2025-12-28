@@ -10,9 +10,8 @@ from domains.character.schemas.reward import CharacterRewardResponse
 class ClassificationRequest(BaseModel):
     """폐기물 분류 요청.
 
-    비동기 처리:
-        POST /scan/classify/async 사용 시 task_id가 즉시 반환되며,
-        GET /scan/{task_id}/progress (SSE)로 진행상황 및 최종 결과를 수신합니다.
+    동기 처리: POST /scan/classify
+    스트리밍: POST /scan/classify/completion (SSE)
     """
 
     image_url: Optional[HttpUrl] = Field(
@@ -23,20 +22,45 @@ class ClassificationRequest(BaseModel):
         default=None,
         description="사용자 질문/설명 (없으면 기본 안내 문구 사용)",
     )
-    callback_url: Optional[HttpUrl] = Field(
-        default=None,
-        description="[DEPRECATED] 무시됨. SSE(/scan/{task_id}/progress)로 결과 수신.",
-        json_schema_extra={"deprecated": True},
-    )
 
 
 class ClassificationResponse(BaseModel):
+    """분류 응답 (동기 처리 결과)."""
+
     task_id: str
     status: str
     message: Optional[str] = None
     pipeline_result: Optional[WasteClassificationResult] = None
     reward: Optional[CharacterRewardResponse] = None
     error: Optional[str] = None
+
+
+class ScanSubmitResponse(BaseModel):
+    """비동기 스캔 제출 응답.
+
+    클라이언트 흐름:
+    1. POST /api/v1/scan → 이 응답 수신
+    2. GET {stream_url} → SSE 스트리밍 구독
+    3. GET {result_url} → 최종 결과 조회
+    """
+
+    job_id: str = Field(description="작업 ID (UUID)")
+    stream_url: str = Field(description="SSE 스트리밍 URL")
+    result_url: str = Field(description="결과 조회 URL")
+    status: str = Field(default="queued", description="현재 상태")
+
+
+class ScanProcessingResponse(BaseModel):
+    """처리 중 응답 (202 Accepted).
+
+    결과가 아직 준비되지 않았을 때 반환됩니다.
+    클라이언트는 Retry-After 헤더를 확인하고 재시도해야 합니다.
+    """
+
+    status: str = Field(default="processing", description="처리 상태")
+    message: str = Field(default="결과 준비 중입니다.", description="상태 메시지")
+    current_stage: Optional[str] = Field(None, description="현재 처리 단계")
+    progress: Optional[int] = Field(None, description="진행률 (0-100)")
 
 
 class ScanTask(BaseModel):

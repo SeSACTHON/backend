@@ -1,0 +1,24 @@
+# ext-authz Prometheus ServiceMonitor
+# Prometheus Operator가 ext-authz gRPC 서버 메트릭을 수집
+# 메트릭: ext_authz_requests_total, ext_authz_request_duration_seconds, redis_* 등
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: ext-authz
+  namespace: auth
+  labels:
+    app: ext-authz
+    tier: api
+    release: prometheus  # Prometheus Operator selector
+spec:
+  selector:
+    matchLabels:
+      app: ext-authz
+  namespaceSelector:
+    matchNames:
+    - auth
+  endpoints:
+  - port: metrics  # 9090 포트
+    interval: 15s
+    scrapeTimeout: 10s
+    path: /metrics

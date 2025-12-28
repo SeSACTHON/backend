@@ -6,7 +6,8 @@
 
 
 - **GPT Vision + Rule-based-retrieval** 기반 AI 어시스턴트로, 폐기물 이미지 분류·분리배출 안내·챗봇 기능을 제공합니다.
-- Self-managed Kubernetes 16-Nodes 클러스터에서 **Istio Service Mesh**(mTLS, Auth Offloading)와 **ArgoCD GitOps**로 운영합니다.
+- Self-managed Kubernetes 18-Nodes 클러스터에서 **Istio Service Mesh**(mTLS, Auth Offloading)와 **ArgoCD GitOps**로 운영합니다.
+- **Redis Streams + Pub/Sub + State KV** 기반 Event Bus Layer로 실시간 SSE 이벤트를 처리하고, **KEDA**로 이벤트 드리븐 오토스케일링을 수행합니다.
 - **RabbitMQ + Celery** 비동기 Task Queue로 AI 파이프라인을 처리하고, **EFK + Jaeger**로 로깅·트레이싱을 수집합니다.
 - 7개 도메인 마이크로서비스(auth, my, scan, chat, character, location, image)를 모노레포로 관리합니다.
 - 정상 배포 중: [https://frontend.dev.growbin.app](https://frontend.dev.growbin.app)
@@ -63,8 +64,15 @@ flowchart TB
 
             subgraph Data["Data Infrastructure"]
                 Redis[("Redis<br/>(cache/blacklist)")]
+                RedisStreams[("Redis Streams<br/>(event log)")]
+                RedisPubSub[("Redis Pub/Sub<br/>(fan-out)")]
                 PostgreSQL[("PostgreSQL<br/>(database)")]
-                RabbitMQ[("RabbitMQ<br/>(message broker)")]
+                RabbitMQ[("RabbitMQ<br/>(task queue)")]
+            end
+
+            subgraph EventBus["Event Bus Layer"]
+                EventRouter["Event Router<br/>(Consumer Group)"]
+                SSEGateway["SSE Gateway<br/>(Pub/Sub → Client)"]
             end
 
             subgraph Workers["Celery Workers"]
@@ -132,6 +140,14 @@ flowchart TB
     CharWorker --> PostgreSQL
     CeleryBeat -.->|Schedule| RabbitMQ
 
+    %% Event Bus Layer
+    ScanWorker -->|XADD| RedisStreams
+    RedisStreams -->|XREADGROUP| EventRouter
+    EventRouter -->|PUBLISH| RedisPubSub
+    EventRouter -->|SETEX| Redis
+    RedisPubSub -->|SUBSCRIBE| SSEGateway
+    SSEGateway -->|SSE| IG
+
     %% Observability
     Prometheus -.->|Scrape| Services
     Prometheus -.->|Scrape| ExtAuthz
@@ -156,18 +172,20 @@ flowchart TB
 ```yaml
 Edge Layer        : Route 53, AWS ALB, Istio Ingress Gateway
 Service Layer     : auth, my, scan, character, location, chat (w/ Envoy Sidecar)
-Messaging Layer   : RabbitMQ ✅, Celery Workers 🚧 (scan-worker, character-worker, celery-beat)
+Integration Layer : Redis Streams + Pub/Sub + State KV, Event Router, SSE Gateway
+                  : RabbitMQ, Celery Workers (scan-worker, character-worker, celery-beat)
 Persistence Layer : PostgreSQL, Redis
-Platform Layer    : ArgoCD, Istiod, Controllers, Prometheus, Grafana, Kiali, Jaeger, EFK Stack
+Platform Layer    : ArgoCD, Istiod, KEDA, Prometheus, Grafana, Kiali, Jaeger, EFK Stack
 ```
 
-본 서비스는 5-Layer Architecture로 구성되었습니다.
+본 서비스는 6-Layer Architecture로 구성되었습니다.
 
 - **Edge Layer**: AWS ALB가 SSL Termination을 처리하고, 트래픽을 `Istio Ingress Gateway`로 전달합니다. Gateway는 `VirtualService` 규칙에 따라 North-South 트래픽을 라우팅합니다.
 - **Service Layer**: 모든 마이크로서비스는 **Istio Service Mesh** 내에서 동작하며, `Envoy Sidecar`를 통해 mTLS 통신, 트래픽 제어, 메트릭 수집을 수행합니다.
-- **Messaging Layer**: **RabbitMQ** 인프라 구축 완료. **Celery Worker**를 통한 비동기 태스크 처리 개발 중입니다. Scan API의 AI 파이프라인(Vision→Rule→Answer→Reward)은 Chain으로 구성됩니다.
+- **Event Bus Layer**: **Redis Streams**(내구성) + **Pub/Sub**(실시간) + **State KV**(복구) 3-tier 이벤트 아키텍처로 SSE 파이프라인을 처리합니다. **Event Router**가 Consumer Group(`XREADGROUP`)으로 Streams를 소비하고 Pub/Sub로 Fan-out하며, **SSE Gateway**가 클라이언트에 실시간 이벤트를 전달합니다.
+- **Messaging Layer**: **RabbitMQ + Celery** 비동기 Task Queue로 AI 파이프라인(Vision→Rule→Answer→Reward)을 처리합니다. **KEDA**가 RabbitMQ 큐 길이 기반으로 Worker를 자동 스케일링합니다.
 - **Persistence Layer**: 서비스는 영속성을 위해 PostgreSQL, Redis를 사용합니다. Helm Chart로 관리되는 독립적인 데이터 인프라입니다.
-- **Platform Layer**: `Istiod`가 Service Mesh를 제어하고, `ArgoCD`가 GitOps 동기화를 담당합니다. Observability 스택(`Prometheus/Grafana/Kiali`, `Jaeger`, `EFK Stack`)이 메트릭·트레이싱·로깅을 통합 관리합니다.
+- **Platform Layer**: `Istiod`가 Service Mesh를 제어하고, `ArgoCD`가 GitOps 동기화를 담당합니다. `KEDA`가 이벤트 드리븐 오토스케일링을 수행하고, Observability 스택(`Prometheus/Grafana/Kiali`, `Jaeger`, `EFK Stack`)이 메트릭·트레이싱·로깅을 통합 관리합니다.
 
 각 계층은 서로 독립적으로 기능하도록 설계되었으며, Platform Layer가 전 계층을 횡단하며 제어 및 관측합니다.
 프로덕션 환경을 전제로 한 Self-manged Kubernetes 기반 클러스터로 컨테이너화된 어플리케이션의 오케스트레이션을 지원합니다.
@@ -189,15 +207,21 @@ Platform Layer    : ArgoCD, Istiod, Controllers, Prometheus, Grafana, Kiali, Jae
 | location | 지도/수거함 검색 | `docker.io/mng990/eco2:location-{env}-latest` |
 | images | 이미지 업로드 | `docker.io/mng990/eco2:image-{env}-latest` |
 
-### Celery Workers 🚧
+### Celery Workers ✅
 
-> **Status**: 개발 중
+| Worker | 설명 | Queue | Scaling |
+|--------|------|-------|---------|
+| scan-worker | AI 파이프라인 처리 (Vision→Rule→Answer) | `scan.vision`, `scan.rule`, `scan.answer` | KEDA (RabbitMQ) |
+| character-worker | 보상 판정 및 DB 저장 | `reward.character`, `reward.persist`, `my.sync` | KEDA (RabbitMQ) |
+| character-match-worker | 캐릭터 매칭 처리 | `character.match` | KEDA (RabbitMQ) |
+| celery-beat | DLQ 재처리 스케줄링 | - | 단일 인스턴스 |
 
-| Worker | 설명 | Queue | Status |
-|--------|------|-------|--------|
-| scan-worker | AI 파이프라인 처리 (Vision→Rule→Answer) | `scan.vision`, `scan.rule`, `scan.answer` | 🚧 |
-| character-worker | 보상 판정 및 DB 저장 | `reward.character`, `reward.persist`, `my.sync` | 🚧 |
-| celery-beat | DLQ 재처리 스케줄링 | - | 🚧 |
+### Event Bus Components ✅
+
+| Component | 설명 | Scaling |
+|-----------|------|---------|
+| event-router | Redis Streams → Pub/Sub Fan-out, State KV 관리 | KEDA (Streams Pending) |
+| sse-gateway | Pub/Sub 구독 → SSE 클라이언트 전달 | KEDA (연결 수) |
 
 각 도메인은 공통 FastAPI 템플릿·Dockerfile·테스트를 공유하고, Kustomize overlay에서 이미지 태그와 ConfigMap/Secret만 분기합니다.
 
@@ -217,57 +241,146 @@ Platform Layer    : ArgoCD, Istiod, Controllers, Prometheus, Grafana, Kiali, Jae
 
 ---
 
-## Async Task Pipeline (Celery) 🚧
+## Event Bus Layer (SSE Pipeline) ✅
 
-> **Status**: RabbitMQ 인프라 구축 완료, Celery Worker 개발 중
+> **Status**: Redis Streams + Pub/Sub + State KV 기반 Event Bus 아키텍처 완료
 
 ```mermaid
 sequenceDiagram
     participant Client
     participant ScanAPI as Scan API
     participant RabbitMQ
+    participant ScanWorker as Scan Worker
+    participant RedisStreams as Redis Streams
+    participant EventRouter as Event Router
+    participant RedisPubSub as Redis Pub/Sub
+    participant StateKV as State KV
+    participant SSEGateway as SSE Gateway
+
+    Client->>ScanAPI: POST /api/v1/scan
+    ScanAPI->>RabbitMQ: Dispatch Chain (job_id)
+    ScanAPI-->>Client: 202 Accepted {job_id}
+
+    Client->>SSEGateway: GET /api/v1/stream?job_id (SSE)
+    SSEGateway->>RedisPubSub: SUBSCRIBE sse:events:{job_id}
+    SSEGateway->>StateKV: GET scan:state:{job_id}
+
+    RabbitMQ->>ScanWorker: scan.vision queue
+    ScanWorker->>ScanWorker: GPT Vision 분석
+    ScanWorker->>RedisStreams: XADD scan:events:{shard}
+
+    RedisStreams->>EventRouter: XREADGROUP (Consumer Group)
+    EventRouter->>StateKV: SETEX scan:state:{job_id}
+    EventRouter->>RedisPubSub: PUBLISH sse:events:{job_id}
+    RedisPubSub-->>SSEGateway: Event: vision
+    SSEGateway-->>Client: SSE: stage=vision
+
+    Note over ScanWorker,EventRouter: rule → answer → reward 동일 플로우
+
+    ScanWorker->>RedisStreams: XADD (stage=done)
+    EventRouter->>RedisPubSub: PUBLISH (done)
+    SSEGateway-->>Client: SSE: stage=done (result)
+```
+
+### Event Bus 아키텍처
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           Event Bus Layer                                   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌─────────────┐    XADD    ┌──────────────┐   XREADGROUP  ┌─────────────┐ │
+│  │ Scan Worker │ ─────────▶ │ Redis Streams│ ─────────────▶│ Event Router│ │
+│  └─────────────┘            │ (내구성)      │               │ (Consumer   │ │
+│                             │ scan:events:* │               │  Group)     │ │
+│                             └──────────────┘               └──────┬──────┘ │
+│                                                                   │        │
+│                         ┌─────────────────────────────────────────┤        │
+│                         │                                         │        │
+│                         ▼ SETEX                                   ▼ PUBLISH│
+│                  ┌──────────────┐                          ┌──────────────┐│
+│                  │ State KV     │                          │ Redis Pub/Sub││
+│                  │ (복구/조회)   │                          │ (실시간)      ││
+│                  │ scan:state:* │                          │ sse:events:* ││
+│                  └──────────────┘                          └──────┬───────┘│
+│                         ▲                                         │        │
+│                         │ GET (재접속 시)                  SUBSCRIBE│        │
+│                         │                                         ▼        │
+│                  ┌──────────────────────────────────────────────────────┐  │
+│                  │                    SSE Gateway                       │  │
+│                  │  • Pub/Sub 구독 → 실시간 이벤트 전달                  │  │
+│                  │  • State KV → 재접속 시 상태 복구                    │  │
+│                  │  • Streams Catch-up → 누락 이벤트 보완               │  │
+│                  └───────────────────────────┬──────────────────────────┘  │
+│                                              │ SSE                         │
+│                                              ▼                             │
+│                                       ┌──────────────┐                     │
+│                                       │    Client    │                     │
+│                                       └──────────────┘                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+| 컴포넌트 | 역할 | 스케일링 |
+|----------|------|---------|
+| **Event Router** | Streams → Pub/Sub Fan-out, State 갱신, 멱등성 보장 | KEDA (Pending 메시지) |
+| **SSE Gateway** | Pub/Sub → Client, State 복구, Streams Catch-up | KEDA (연결 수) |
+| **Redis Streams** | 이벤트 로그 (내구성), Consumer Group 지원 | 샤딩 (4 shards) |
+| **Redis Pub/Sub** | 실시간 Fan-out (fire-and-forget) | 전용 인스턴스 |
+| **State KV** | 최신 상태 스냅샷, 재접속 복구 | Streams Redis 공유 |
+
+---
+
+## Async Task Pipeline (Celery) ✅
+
+> **Status**: RabbitMQ + Celery + KEDA 이벤트 드리븐 오토스케일링 완료
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant ScanAPI as Scan API
+    participant RabbitMQ
+    participant KEDA
     participant VisionWorker as Vision Worker
     participant RuleWorker as Rule Worker
     participant AnswerWorker as Answer Worker
     participant RewardWorker as Reward Worker
+    participant RedisStreams as Redis Streams
     participant PostgreSQL
 
-    Client->>ScanAPI: POST /classify/async
-    ScanAPI->>RabbitMQ: Dispatch Chain (task_id)
-    ScanAPI-->>Client: 202 Accepted {task_id}
+    Client->>ScanAPI: POST /api/v1/scan
+    ScanAPI->>RabbitMQ: Dispatch Chain (job_id)
+    ScanAPI-->>Client: 202 Accepted {job_id}
 
-    Client->>ScanAPI: GET /progress/{task_id} (SSE)
+    KEDA->>RabbitMQ: 큐 길이 모니터링
+    KEDA->>VisionWorker: Scale Up (메시지 증가 시)
 
     RabbitMQ->>VisionWorker: scan.vision queue
     VisionWorker->>VisionWorker: GPT Vision 분석
-    VisionWorker-->>ScanAPI: Event: vision_complete
-    ScanAPI-->>Client: SSE: stage=vision
-
+    VisionWorker->>RedisStreams: XADD stage=vision
     VisionWorker->>RabbitMQ: Chain → scan.rule
+
     RabbitMQ->>RuleWorker: scan.rule queue
     RuleWorker->>RuleWorker: RAG 규정 검색
-    RuleWorker-->>ScanAPI: Event: rule_complete
-    ScanAPI-->>Client: SSE: stage=rule
+    RuleWorker->>RedisStreams: XADD stage=rule
 
     RuleWorker->>RabbitMQ: Chain → scan.answer
     RabbitMQ->>AnswerWorker: scan.answer queue
     AnswerWorker->>AnswerWorker: GPT 답변 생성
-    AnswerWorker-->>ScanAPI: Event: answer_complete
-    ScanAPI-->>Client: SSE: stage=answer
+    AnswerWorker->>RedisStreams: XADD stage=answer
 
     AnswerWorker->>RabbitMQ: Chain → reward.character
     RabbitMQ->>RewardWorker: reward.character queue
-    RewardWorker->>PostgreSQL: 보상 저장
-    RewardWorker-->>ScanAPI: Event: complete
-    ScanAPI-->>Client: SSE: stage=complete (result)
+    RewardWorker->>PostgreSQL (Batch): 보상 저장
+    RewardWorker->>RedisStreams: XADD stage=done
 ```
 
-| 컴포넌트 | 역할 | Queue |
-|----------|------|-------|
-| **scan-worker** | Vision 분석, RAG 검색, 답변 생성 | `scan.vision`, `scan.rule`, `scan.answer` |
-| **character-worker** | 보상 판정, DB 저장, my 도메인 동기화 | `reward.character`, `reward.persist`, `my.sync` |
-| **celery-beat** | DLQ 재처리 스케줄링 (5분 주기) | - |
-| **RabbitMQ** | AMQP 메시지 브로커 | vhost: `eco2` |
+| 컴포넌트 | 역할 | Queue | 스케일링 |
+|----------|------|-------|---------|
+| **scan-worker** | Vision 분석, RAG 검색, 답변 생성 | `scan.vision`, `scan.rule`, `scan.answer` | KEDA (큐 길이) |
+| **character-worker** | 보상 판정, DB 저장, my 도메인 동기화 | `reward.character`, `reward.persist`, `my.sync` | KEDA (큐 길이) |
+| **character-match-worker** | 캐릭터 매칭 처리 | `character.match` | KEDA (큐 길이) |
+| **celery-beat** | DLQ 재처리 스케줄링 (5분 주기) | - | 단일 인스턴스 |
+| **RabbitMQ** | AMQP 메시지 브로커 | vhost: `eco2` | Quorum Queue |
 
 ---
 
@@ -343,7 +456,7 @@ flowchart LR
 ## Bootstrap Overview
 
 ```yaml
-Cluster   : kubeadm Self-Managed (16 Nodes)
+Cluster   : kubeadm Self-Managed (18 Nodes)
 GitOps    :
   Layer0 - Terraform (AWS 인프라)
   Layer1 - Ansible (kubeadm, CNI)
@@ -352,9 +465,10 @@ GitOps    :
 Architecture :
   Edge Layer        - Route 53, AWS ALB, Istio Ingress Gateway
   Service Layer     - auth, my, scan, character, location, chat
-  Messaging Layer   - RabbitMQ (✅), Celery Workers (🚧 개발 중)
-  Persistence Layer - PostgreSQL, Redis
-  Platform Layer    - ArgoCD, Istiod, Observability (Prometheus, Grafana, EFK, Jaeger)
+  Integration Layer - Redis Streams + Pub/Sub + State KV, Event Router, SSE Gateway
+                    - RabbitMQ, Celery Workers, KEDA (Event-driven Autoscaling)
+  Persistence Layer - PostgreSQL, Redis (Cache/Streams/Pub-Sub 분리)
+  Platform Layer    - ArgoCD, Istiod, KEDA, Observability (Prometheus, Grafana, EFK, Jaeger)
 Network   : Calico CNI + Istio Service Mesh (mTLS)
 ```
 1. Terraform으로 AWS 인프라를 구축합니다.
@@ -428,36 +542,6 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 
 ---
 
-### Namespace + Label Layout
-
-![B13B764A-E597-4691-93F4-56F5C9FC0AB1](https://github.com/user-attachments/assets/1dc545ab-93db-4990-8a48-4df4dfb7adf0)
-
-- “포지션(part-of) → 계층(tier) → 역할(role)” 순으로 라벨을 붙인 뒤 네임스페이스로 매핑합니다.
-- Taint/Tolerance를 활용해 라벨과 매칭되는 노드로 파드의 배치가 제한되며, 계층별 network policy 격리가 적용됩니다.
-- 이코에코(Eco²)에서 네임스페이스와 라벨은 컨트롤 포인트를 맡으며, 도메인/역할/책임/계층 추상화를 통해 개발 및 운영 복잡도를 낮춥니다.
-
-### 상세 설명
-1. **app.kubernetes.io/part-of**
-   - `ecoeco-backend`: 업무 도메인(API)와 그에 붙은 데이터/관측 리소스.
-   - `ecoeco-platform`: 플랫폼 자체를 관리하는 인프라/오퍼레이터 네임스페이스.
-
-2. **tier**
-   - 백엔드 전용 네임스페이스는 대부분 `business-logic`.
-   - 데이터 계층(`data`)과 관측(`observability`)도 같은 제품군(`ecoeco-backend`) 안에 포함.
-   - 플랫폼 계층은 `infrastructure`.
-
-3. **role**
-   - 비즈니스 로직 네임스페이스는 공통적으로 `role: api`.
-   - 데이터 계층 내에서도 `database`, `cache`, `messaging`처럼 분리.
-   - 관측 계층은 `metrics`, `dashboards`.
-   - 플랫폼 계층은 `platform-core` 혹은 `operators`.
-
-4. **domain / data-type**
-   - `domain` 라벨로 실제 서비스(예: `auth`, `location`)를 식별.
-   - 데이터 계층은 `data-type`으로 DB 종류까지 표기(`postgres`, `redis`).
-
----
-
 ### Troubleshooting
 
 | 이슈 | 증상 & 해결 |
@@ -472,29 +556,37 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 
 ## Release Summary (v1.0.7)
 
-- **RabbitMQ 인프라 구축** ✅
-  - **RabbitMQ**를 AMQP 브로커로 도입하고, vhost `eco2`에 큐별 라우팅 구성
-  - Dead Letter Queue(DLQ) 및 Exchange 설정 완료
-  - NetworkPolicy를 통한 namespace간 통신 허용
+- **Event Bus Layer 도입** ✅
+  - **Redis Streams**(내구성) + **Pub/Sub**(실시간) + **State KV**(복구) 3-tier 이벤트 아키텍처 구현
+  - **Event Router**: Consumer Group(`XREADGROUP`)으로 Streams 소비, Pub/Sub Fan-out, 멱등성 보장
+  - **SSE Gateway**: Pub/Sub 구독 기반 실시간 전달, State 복구, Streams Catch-up
+  - 50 VU 테스트 완료율: 35% → **99.7%** (이전 Celery Events 대비 2.8배 향상)
 
-- **비동기 API 개발 중** 🚧
+- **KEDA 이벤트 드리븐 오토스케일링** ✅
+  - **scan-worker**: RabbitMQ 큐 길이 기반 자동 스케일링 (1-3 replicas)
+  - **event-router**: Redis Streams pending 메시지 기반 스케일링
+  - **character-match-worker**: RabbitMQ character.match 큐 기반 스케일링
+  - Prometheus Adapter 연동으로 커스텀 메트릭 기반 HPA 구현
+
+- **비동기 AI 파이프라인** ✅
   - Scan API의 AI 파이프라인을 **Celery Chain**(Vision→Rule→Answer→Reward)으로 분리
   - SSE(Server-Sent Events) 기반 실시간 진행 상황 스트리밍
-  - celery-beat 스케줄러를 통한 DLQ 재처리 구현 예정
+  - 단일 요청 소요시간: Vision 6.9초 + Answer 4.8초 ≈ **12초**
+
+- **Observability 강화** ✅
+  - **Event Router/SSE Gateway Metrics**: Prometheus 메트릭 수집 및 Grafana 대시보드
+  - **scan-sse-pipeline 대시보드**: Scan API, Event Bus, Redis Streams 통합 모니터링
+  - **OpenTelemetry 확장**: Event Router, SSE Gateway, Redis, OpenAI API 트레이싱
+
+- **인프라 확장** ✅
+  - **18-Node 클러스터**: Event Router, Redis Pub/Sub 전용 노드 추가
+  - **Redis 인스턴스 분리**: Streams(내구성) / Pub/Sub(실시간) / Cache(LRU)
+  - **부하 테스트 검증**: 50/250/300 VU 테스트 완료
 
 - **EFK 로깅 파이프라인** ✅
   - **Fluent Bit**이 모든 Pod의 stdout/stderr 로그를 수집하여 **Elasticsearch**로 포워딩
   - **Kibana** 대시보드에서 중앙 집중식 로그 검색 및 분석
   - JSON 구조화 로그 포맷 적용
-
-- **분산 트레이싱** ✅
-  - **OpenTelemetry** 기반 계측으로 Istio Envoy Sidecar의 트레이스 수집
-  - **Jaeger**에서 서비스 간 호출 체인 시각화 및 지연 시간 분석
-  - **Kiali**로 Service Mesh 토폴로지 및 트래픽 흐름 모니터링
-
-- **Alerting** ✅
-  - **Alertmanager**를 통해 임계값 기반 알림(CPU, Memory, Pod 상태) 설정
-  - Slack/Email 웹훅 연동으로 운영 이슈 즉시 통보 체계 구축
 
 ---
 
@@ -506,9 +598,12 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 
 ## Status
 
-### v1.0.7 - Messaging
-- ✅ RabbitMQ 인프라 구축 완료 (vhost: eco2, DLX/DLQ 설정)
-- 🚧 Celery 비동기 API 개발 중 (scan-worker, character-worker)
+### v1.0.7 - Event Bus & KEDA
+- ✅ Redis Streams + Pub/Sub + State KV 기반 Event Bus Layer 완료
+- ✅ Event Router, SSE Gateway 컴포넌트 개발 완료
+- ✅ KEDA 이벤트 드리븐 오토스케일링 적용 (scan-worker, event-router, character-match-worker)
+- ✅ Celery 비동기 AI 파이프라인 완료 (Vision→Rule→Answer→Reward)
+- ✅ 50/250/300 VU 부하 테스트 완료 (99.7% 완료율 @ 50 VU)
 
 ### v1.0.6 - Observability
 - ✅ EFK 로깅 파이프라인 (Fluent Bit → Elasticsearch → Kibana)

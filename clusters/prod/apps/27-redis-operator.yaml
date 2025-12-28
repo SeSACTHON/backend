@@ -1,0 +1,74 @@
+# ============================================================================
+# Spotahome Redis Operator (Production)
+# ============================================================================
+# GitHub: https://github.com/spotahome/redis-operator
+# Helm Repo: https://spotahome.github.io/redis-operator
+# CRD: RedisFailover (databases.spotahome.com/v1)
+# Sync Wave 27: PostgreSQL(24) -> Redis Cluster CR(28)
+# NOTE: CRD is installed separately via workloads/crds due to Helm template bug
+# ============================================================================
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prod-redis-operator
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '27'
+  labels:
+    env: prod
+    tier: platform
+    component: redis-operator
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: prod
+  source:
+    repoURL: https://spotahome.github.io/redis-operator
+    chart: redis-operator
+    targetRevision: 3.3.0
+    helm:
+      skipCrds: true
+      values: |
+        replicas: 1
+        image:
+          repository: quay.io/spotahome/redis-operator
+          tag: v1.2.4
+          pullPolicy: IfNotPresent
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 300m
+            memory: 512Mi
+        nodeSelector:
+          role: control-plane
+        tolerations:
+          - key: role
+            operator: Equal
+            value: control-plane
+            effect: NoSchedule
+          - key: node-role.kubernetes.io/control-plane
+            operator: Exists
+            effect: NoSchedule
+        serviceAccount:
+          create: true
+        monitoring:
+          enabled: true
+          serviceMonitor: true
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: redis-operator
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

@@ -1,0 +1,73 @@
+# KEDA (Kubernetes Event-driven Autoscaling)
+# RabbitMQ 큐 길이, Redis Streams 등 이벤트 기반 오토스케일링
+# sync-wave: 35 (rabbitmq 32 이후, apis 40 이전)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: dev-keda
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '35'
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: dev
+  source:
+    repoURL: https://kedacore.github.io/charts
+    chart: keda
+    targetRevision: 2.16.0
+    helm:
+      releaseName: keda
+      valuesObject:
+        # KEDA Operator 설정
+        operator:
+          replicaCount: 1
+        # Metrics Server 설정
+        metricsServer:
+          replicaCount: 1
+        # Admission Webhooks
+        webhooks:
+          enabled: true
+          replicaCount: 1
+        # 노드 선택 (monitoring 노드)
+        tolerations:
+        - key: domain
+          operator: Equal
+          value: observability
+          effect: NoSchedule
+        nodeSelector:
+          infra-type: monitoring
+        # 리소스 제한
+        resources:
+          operator:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          metricServer:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 200m
+              memory: 256Mi
+        # Prometheus 메트릭 노출
+        prometheus:
+          operator:
+            enabled: true
+            port: 8080
+          metricServer:
+            enabled: true
+            port: 8080
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: keda
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
+    - ServerSideApply=true

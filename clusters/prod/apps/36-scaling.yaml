@@ -1,0 +1,26 @@
+# KEDA ScaledObject 및 Prometheus Adapter HPA
+# sync-wave: 36 (keda 35 이후)
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: prod-scaling
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: '36'
+  finalizers:
+  - resources-finalizer.argocd.argoproj.io
+spec:
+  project: prod
+  source:
+    repoURL: https://github.com/eco2-team/backend.git
+    targetRevision: main
+    path: workloads/scaling/prod
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: scan
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=false

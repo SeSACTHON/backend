@@ -17,12 +17,18 @@ spec:
       - name: celery-beat
         namespace: scan
         phase: '2'
+      - name: character-match-worker
+        namespace: character
+        phase: '3'
       - name: character-worker
         namespace: character
         phase: '3'
+      - name: my-worker
+        namespace: my
+        phase: '3'
   template:
     metadata:
-      name: dev-worker-{{name}}
+      name: dev-{{name}}
       namespace: argocd
       labels:
         tier: worker
@@ -43,3 +49,9 @@ spec:
           selfHeal: true
         syncOptions:
         - CreateNamespace=false  # API에서 이미 생성
+      # KEDA/HPA가 관리하는 replicas 필드 무시
+      ignoreDifferences:
+      - group: apps
+        kind: Deployment
+        jsonPointers:
+        - /spec/replicas

@@ -1,0 +1,76 @@
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# SSE Gateway VirtualService
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Event Router + Pub/Sub 아키텍처:
+# - 어느 Pod에 연결되든 Redis Pub/Sub를 통해 동일 이벤트 수신
+# - LEAST_REQUEST 로드밸런싱으로 연결 분산
+# - SSE 장기 연결에 적합
+#
+# 참조: docs/blogs/async/34-sse-HA-architecture.md
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: sse-gateway
+  namespace: sse-consumer
+  labels:
+    app: sse-gateway
+spec:
+  hosts:
+  - sse-gateway.sse-consumer.svc.cluster.local
+  - sse-gateway
+  http:
+  - name: sse-stream
+    match:
+    - uri:
+        prefix: /api/v1/stream
+    route:
+    - destination:
+        host: sse-gateway.sse-consumer.svc.cluster.local
+        port:
+          number: 8000
+    # timeout: SSE는 long-lived connection
+    timeout: 86400s    # 24시간
+    retries:
+      attempts: 0    # SSE는 재시도 불가
+  - name: default
+    route:
+    - destination:
+        host: sse-gateway.sse-consumer.svc.cluster.local
+        port:
+          number: 8000
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# DestinationRule: LEAST_REQUEST 로드밸런싱
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# SSE 장기 연결에 적합한 로드밸런싱:
+# - 가장 적은 활성 연결을 가진 Pod로 라우팅
+# - 연결 수 기반 자동 분산
+# - HTTP/1.1 강제 (SSE 호환)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: sse-gateway
+  namespace: sse-consumer
+  labels:
+    app: sse-gateway
+spec:
+  host: sse-gateway.sse-consumer.svc.cluster.local
+  trafficPolicy:
+    connectionPool:
+      http:
+        h2UpgradePolicy: DO_NOT_UPGRADE
+        http1MaxPendingRequests: 1000
+        http2MaxRequests: 1000
+      tcp:
+        maxConnections: 1000
+        connectTimeout: 30s
+        tcpKeepalive:
+          time: 300s
+          interval: 75s
+          probes: 9
+    # LEAST_REQUEST: 가장 적은 연결을 가진 Pod로 라우팅
+    loadBalancer:
+      simple: LEAST_REQUEST

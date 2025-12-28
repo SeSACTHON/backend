@@ -7,6 +7,70 @@ Eco² Backend 프로젝트의 모든 주목할 만한 변경사항을 기록합�
 
 ---
 
+## [1.0.7] - 2025-12-28
+
+### Added
+- **Redis Streams 기반 SSE 아키텍처 전면 개편**
+  - **Event Bus Layer 도입**: Redis Streams(내구성) + Pub/Sub(실시간) + State KV(복구) 3-tier 이벤트 아키텍처 구현
+  - **Event Router 컴포넌트**: Consumer Group(`XREADGROUP`) 기반 Streams 소비, Pub/Sub Fan-out, State KV 갱신을 담당하는 독립 서비스 신규 개발
+  - **SSE Gateway 컴포넌트**: Pub/Sub 구독 기반 실시간 이벤트 전달, State KV 재접속 복구, Streams Catch-up 메커니즘 구현
+  - **Redis Pub/Sub 전용 노드**: 실시간 이벤트 Fan-out 전용 Redis 인스턴스(`k8s-redis-pubsub`) 프로비저닝
+  - **Event Router 전용 노드**: Event Bus Layer 전용 노드(`k8s-event-router`) 프로비저닝
+
+- **KEDA 이벤트 드리븐 오토스케일링**
+  - **scan-worker ScaledObject**: RabbitMQ 큐 길이 기반 스케일링 (vision, answer, rule 큐 모니터링)
+  - **event-router ScaledObject**: Redis Streams pending 메시지 기반 스케일링 (Prometheus 연동)
+  - **character-match-worker ScaledObject**: RabbitMQ character.match 큐 기반 스케일링
+
+- **Observability 강화**
+  - **Event Router Metrics**: 이벤트 처리량, Pub/Sub 발행, State 갱신, Reclaimer 상태 Prometheus 메트릭
+  - **SSE Gateway Metrics**: 활성 연결 수, 연결 duration, 이벤트 분배, Pub/Sub 수신 메트릭
+  - **scan-sse-pipeline 대시보드**: Grafana 통합 대시보드 (Scan API, Event Router, SSE Gateway, Redis Streams)
+  - **ServiceMonitor 추가**: `event-router`, `sse-gateway` Prometheus 메트릭 수집
+
+- **분산 트레이싱 확장**
+  - **OpenTelemetry 계측**: Event Router, SSE Gateway에 OTLP/HTTP 트레이싱 적용
+  - **Redis 자동 계측**: scan-api, scan-worker에 Redis 작업 트레이싱 추가
+  - **OpenAI API 계측**: scan-worker에 OpenAI 호출 트레이싱 추가
+
+- **부하 테스트 및 성능 검증**
+  - **k6 테스트 스크립트**: `k6-sse-load-test.js` 50/250/300 VU 부하 테스트
+  - **50 VU 완료율**: 35% → 86.3% (KEDA) → **99.7%** (Event Bus)
+  - **300 VU 부하 테스트**: 1,365 요청, 67.3% 완료율, 3.1 req/s 처리량
+
+### Changed
+- **Worker State 갱신 권한 이전**: scan-worker가 직접 State KV를 갱신하던 로직을 제거, Event Router가 단일 권위로 State 관리
+- **SSE Gateway 아키텍처**: StatefulSet + Consistent Hash 기반 → Deployment + Pub/Sub 기반으로 전환
+- **CI 파이프라인 분리**: `ci-sse-components.yml` 신규 생성, event-router/sse-gateway 전용 빌드 파이프라인
+- **Redis 인스턴스 분리**: Streams(내구성) / Pub/Sub(실시간) / Cache(LRU) 용도별 분리 운영
+- **scan-worker KEDA maxReplicas**: 5 → 3 (노드 리소스 제약 반영)
+
+### Fixed
+- **SSE 이벤트 누락 문제 해결**: Pub/Sub 구독 타이밍과 State KV 조회 간 Race Condition 수정
+- **Event Router 멱등성**: Lua Script 기반 중복 이벤트 필터링 및 순서 보장
+- **SSE Gateway Streams Catch-up**: 재접속 시 누락 이벤트 Redis Streams에서 복구
+- **KEDA ScaledObject 트리거**: Prometheus 쿼리 메트릭명 수정 (`redis_stream_group_messages_pending`)
+- **ServiceMonitor namespace 설정**: `prometheus` 네임스페이스에서 메트릭 수집하도록 변경
+
+### Infrastructure
+- **신규 노드 프로비저닝**
+  - `k8s-event-router` (t3.small): Event Bus Layer 전용
+  - `k8s-redis-pubsub` (t3.medium): Redis Pub/Sub 전용
+- **Redis Operator 확장**: `pubsub-redis` RedisFailover CR 추가 (3 masters, 3 sentinels)
+- **NetworkPolicy 확장**: KEDA → Prometheus egress 허용
+
+### Performance
+| VU | 아키텍처 | 완료율 | 처리량 | 비고 |
+|----|----------|--------|--------|------|
+| 50 | Celery Events | 실패 | - | 503 에러 폭증 |
+| 50 | Redis Streams | 35% | - | 초기 마이그레이션 |
+| 50 | KEDA 스케일링 | 86.3% | - | Worker 자동 확장 |
+| 50 | Event Bus | **99.7%** | 3.3 req/s | 현재 아키텍처 |
+| 250 | Event Bus | 83.3% | 3.4 req/s | 3 Worker 제한 |
+| 300 | Event Bus | 67.3% | 3.1 req/s | Worker 병목 |
+
+---
+
 ## [1.0.6] - 2025-12-11
 
 ### Added
@@ -486,6 +550,6 @@ Eco² Backend 프로젝트의 모든 주목할 만한 변경사항을 기록합�
 
 ---
 
-**문서 버전**: 1.0.6
-**최종 업데이트**: 2025-12-13
+**문서 버전**: 1.0.7
+**최종 업데이트**: 2025-12-28
 **관리자**: Backend Platform Team
