@@ -7,7 +7,7 @@
 
 - **GPT Vision + Rule-based-retrieval** 기반 AI 어시스턴트로, 폐기물 이미지 분류·분리배출 안내·챗봇 기능을 제공합니다.
 - Self-managed Kubernetes 21-Nodes 클러스터에서 **Istio Service Mesh**(mTLS, Auth Offloading)와 **ArgoCD GitOps**로 운영합니다.
-- **Redis Streams + Pub/Sub + State KV** 기반 Event Bus Layer로 실시간 SSE 이벤트를 처리하고, **KEDA**로 이벤트 드리븐 오토스케일링을 수행합니다.
+- **Redis Streams + Pub/Sub + State KV** 기반 Integration Layer로 실시간 SSE 이벤트를 처리하고, **KEDA**로 이벤트 드리븐 오토스케일링을 수행합니다.
 - **RabbitMQ + Celery** 비동기 Task Queue로 AI 파이프라인을 처리하고, **EFK + Jaeger**로 로깅·트레이싱을 수집합니다.
 - 7개 도메인 마이크로서비스(auth, my, scan, chat, character, location, image)를 모노레포로 관리합니다.
 - 정상 배포 중: [https://frontend.dev.growbin.app](https://frontend.dev.growbin.app)
@@ -70,7 +70,7 @@ flowchart TB
                 RabbitMQ[("RabbitMQ<br/>(task queue)")]
             end
 
-            subgraph EventBus["Event Bus Layer"]
+            subgraph EventBus["Integration Layer"]
                 EventRouter["Event Router<br/>(Consumer Group)"]
                 SSEGateway["SSE Gateway<br/>(Pub/Sub → Client)"]
             end
@@ -140,7 +140,7 @@ flowchart TB
     CharWorker --> PostgreSQL
     CeleryBeat -.->|Schedule| RabbitMQ
 
-    %% Event Bus Layer
+    %% Integration Layer
     ScanWorker -->|XADD| RedisStreams
     RedisStreams -->|XREADGROUP| EventRouter
     EventRouter -->|PUBLISH| RedisPubSub
@@ -182,8 +182,7 @@ Platform Layer    : ArgoCD, Istiod, KEDA, Prometheus, Grafana, Kiali, Jaeger, EF
 
 - **Edge Layer**: AWS ALB가 SSL Termination을 처리하고, 트래픽을 `Istio Ingress Gateway`로 전달합니다. Gateway는 `VirtualService` 규칙에 따라 North-South 트래픽을 라우팅합니다.
 - **Service Layer**: 모든 마이크로서비스는 **Istio Service Mesh** 내에서 동작하며, `Envoy Sidecar`를 통해 mTLS 통신, 트래픽 제어, 메트릭 수집을 수행합니다.
-- **Event Bus Layer**: **Redis Streams**(내구성) + **Pub/Sub**(실시간) + **State KV**(복구) 3-tier 이벤트 아키텍처로 SSE 파이프라인을 처리합니다. **Event Router**가 Consumer Group(`XREADGROUP`)으로 Streams를 소비하고 Pub/Sub로 Fan-out하며, **SSE Gateway**가 클라이언트에 실시간 이벤트를 전달합니다.
-- **Messaging Layer**: **RabbitMQ + Celery** 비동기 Task Queue로 AI 파이프라인(Vision→Rule→Answer→Reward)을 처리합니다. **KEDA**가 RabbitMQ 큐 길이 기반으로 Worker를 자동 스케일링합니다.
+- **Integration Layer**: **Redis Streams**(내구성) + **Pub/Sub**(실시간) + **State KV**(복구) 3-tier 이벤트 아키텍처로 SSE 파이프라인을 처리합니다. **RabbitMQ + Celery** 비동기 Task Queue로 AI 파이프라인(Vision→Rule→Answer→Reward)을 처리하고, **KEDA**가 이벤트 드리븐 오토스케일링을 수행합니다.
 - **Persistence Layer**: 서비스는 영속성을 위해 PostgreSQL, Redis를 사용합니다. Helm Chart로 관리되는 독립적인 데이터 인프라입니다.
 - **Platform Layer**: `Istiod`가 Service Mesh를 제어하고, `ArgoCD`가 GitOps 동기화를 담당합니다. `KEDA`가 이벤트 드리븐 오토스케일링을 수행하고, Observability 스택(`Prometheus/Grafana/Kiali`, `Jaeger`, `EFK Stack`)이 메트릭·트레이싱·로깅을 통합 관리합니다.
 
@@ -241,7 +240,7 @@ Platform Layer    : ArgoCD, Istiod, KEDA, Prometheus, Grafana, Kiali, Jaeger, EF
 
 ---
 
-## Event Bus Layer (SSE Pipeline) ✅
+## Integration Layer (SSE Pipeline) ✅
 
 > **Status**: Redis Streams + Pub/Sub + State KV 기반 Event Bus 아키텍처 완료
 
@@ -286,7 +285,7 @@ sequenceDiagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                           Event Bus Layer                                   │
+│                           Integration Layer                                 │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                             │
 │  ┌─────────────┐    XADD    ┌──────────────┐   XREADGROUP  ┌─────────────┐ │
@@ -556,7 +555,7 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 
 ## Release Summary (v1.0.7)
 
-- **Event Bus Layer 도입** ✅
+- **Integration Layer 도입** ✅
   - **Redis Streams**(내구성) + **Pub/Sub**(실시간) + **State KV**(복구) 3-tier 이벤트 아키텍처 구현
   - **Event Router**: Consumer Group(`XREADGROUP`)으로 Streams 소비, Pub/Sub Fan-out, 멱등성 보장
   - **SSE Gateway**: Pub/Sub 구독 기반 실시간 전달, State 복구, Streams Catch-up
@@ -599,7 +598,7 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 ## Status
 
 ### v1.0.7 - Event Bus & KEDA
-- ✅ Redis Streams + Pub/Sub + State KV 기반 Event Bus Layer 완료
+- ✅ Redis Streams + Pub/Sub + State KV 기반 Integration Layer 완료
 - ✅ Event Router, SSE Gateway 컴포넌트 개발 완료
 - ✅ KEDA 이벤트 드리븐 오토스케일링 적용 (scan-worker, event-router, character-match-worker)
 - ✅ Celery 비동기 AI 파이프라인 완료 (Vision→Rule→Answer→Reward)
