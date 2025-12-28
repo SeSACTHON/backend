@@ -74,4 +74,4 @@ class TestSettings:
         from config import Settings
 
         settings = Settings()
-        assert settings.state_timeout_seconds == 30
+        assert settings.state_timeout_seconds == 5
