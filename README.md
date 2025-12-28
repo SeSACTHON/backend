@@ -173,7 +173,7 @@ flowchart TB
 Edge Layer        : Route 53, AWS ALB, Istio Ingress Gateway
 Service Layer     : auth, my, scan, character, location, chat (w/ Envoy Sidecar)
 Integration Layer : Redis Streams + Pub/Sub + State KV, Event Router, SSE Gateway
-                  : RabbitMQ, Celery Workers (scan-worker, character-worker, celery-beat)
+                  : RabbitMQ, Celery Workers (scan, character-match, character, my, beat)
 Persistence Layer : PostgreSQL, Redis
 Platform Layer    : ArgoCD, Istiod, KEDA, Prometheus, Grafana, Kiali, Jaeger, EFK Stack
 ```
@@ -210,12 +210,13 @@ Platform Layer    : ArgoCD, Istiod, KEDA, Prometheus, Grafana, Kiali, Jaeger, EF
 
 | Worker | 설명 | Queue | Scaling |
 |--------|------|-------|---------|
-| scan-worker | AI 파이프라인 처리 (Vision→Rule→Answer) | `scan.vision`, `scan.rule`, `scan.answer` | KEDA (RabbitMQ) |
-| character-worker | 보상 판정 및 DB 저장 | `reward.character`, `reward.persist`, `my.sync` | KEDA (RabbitMQ) |
+| scan-worker | AI 파이프라인 처리 (Vision→Rule→Answer→Reward) | `scan.vision`, `scan.rule`, `scan.answer`, `scan.reward` | KEDA (RabbitMQ) |
 | character-match-worker | 캐릭터 매칭 처리 | `character.match` | KEDA (RabbitMQ) |
+| character-worker | 캐릭터 소유권 저장 (batch) | `character.reward` | KEDA (RabbitMQ) |
+| my-worker | 마이페이지 캐릭터 동기화 (batch) | `my.reward` | KEDA (RabbitMQ) |
 | celery-beat | DLQ 재처리 스케줄링 | - | 단일 인스턴스 |
 
-### Event Bus Components ✅
+### Event Relay Components ✅
 
 | Component | 설명 | Scaling |
 |-----------|------|---------|
@@ -242,7 +243,7 @@ Platform Layer    : ArgoCD, Istiod, KEDA, Prometheus, Grafana, Kiali, Jaeger, EF
 
 ## Integration Layer (SSE Pipeline) ✅
 
-> **Status**: Redis Streams + Pub/Sub + State KV 기반 Event Bus 아키텍처 완료
+> **Status**: Redis Streams + Pub/Sub + State KV 기반 Event Relay 아키텍처 완료
 
 ```mermaid
 sequenceDiagram
@@ -281,7 +282,7 @@ sequenceDiagram
     SSEGateway-->>Client: SSE: stage=done (result)
 ```
 
-### Event Bus 아키텍처
+### Event Relay 아키텍처
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
@@ -375,9 +376,10 @@ sequenceDiagram
 
 | 컴포넌트 | 역할 | Queue | 스케일링 |
 |----------|------|-------|---------|
-| **scan-worker** | Vision 분석, RAG 검색, 답변 생성 | `scan.vision`, `scan.rule`, `scan.answer` | KEDA (큐 길이) |
-| **character-worker** | 보상 판정, DB 저장, my 도메인 동기화 | `reward.character`, `reward.persist`, `my.sync` | KEDA (큐 길이) |
+| **scan-worker** | Vision 분석, RAG 검색, 답변 생성, 보상 판정 | `scan.vision`, `scan.rule`, `scan.answer`, `scan.reward` | KEDA (큐 길이) |
 | **character-match-worker** | 캐릭터 매칭 처리 | `character.match` | KEDA (큐 길이) |
+| **character-worker** | 캐릭터 소유권 저장 (batch) | `character.reward` | KEDA (큐 길이) |
+| **my-worker** | 마이페이지 캐릭터 동기화 (batch) | `my.reward` | KEDA (큐 길이) |
 | **celery-beat** | DLQ 재처리 스케줄링 (5분 주기) | - | 단일 인스턴스 |
 | **RabbitMQ** | AMQP 메시지 브로커 | vhost: `eco2` | Quorum Queue |
 
@@ -389,7 +391,7 @@ sequenceDiagram
 flowchart LR
     subgraph Pods["Kubernetes Pods"]
         API["API Pods<br/>(auth, scan, chat...)"]
-        Workers["Celery Workers<br/>(scan-worker, character-worker)"]
+        Workers["Celery Workers<br/>(scan, character-match, character, my)"]
         Infra["Infra Pods<br/>(istio, argocd...)"]
     end
 
@@ -533,11 +535,23 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 | 28 | `28-redis-operator.yaml` | Bitnami Redis Replication + Sentinel | Helm repo `bitnami/redis` |
 | 29 | `29-rabbitmq.yaml` | RabbitMQ (Celery Broker) | Helm repo `bitnami/rabbitmq` |
 | 40 | `40-apis-appset.yaml` | 도메인 API ApplicationSet (auth, my, scan, character, location, info, chat) | `workloads/domains/<service>/{env}` |
-| 45 | `45-workers-appset.yaml` | Celery Worker ApplicationSet (scan-worker, character-worker, celery-beat) | `workloads/domains/<worker>/{env}` |
+| 45 | `45-workers-appset.yaml` | Celery Worker ApplicationSet (scan, character-match, character, my, beat) | `workloads/domains/<worker>/{env}` |
 | 50 | `50-istio-routes.yaml` | Istio VirtualService 라우팅 규칙 | `workloads/routing/<service>/{env}` |
 
 - Istio Migration으로 인해 `Ingress` 대신 `Gateway/VirtualService`를 사용하며, Sync Wave가 60/70에서 40/50으로 조정되었습니다.
 - 모든 API는 공통 base(kustomize) 템플릿을 상속하고, 환경별 patch에서 이미지 태그·환경 변수·노드 셀렉터만 조정합니다.
+
+---
+
+### Troubleshooting
+
+| 이슈 | 증상 & 해결 |
+|------|------------|
+| **Istio Webhook Sync Error** | ArgoCD Sync 시 `istiod-default-validator`가 `OutOfSync` 및 `Deleting` 상태 반복 → `ignoreDifferences`에 `failurePolicy` 추가하여 Istio의 런타임 패치 무시 설정 |
+| **NetworkPolicy Egress 차단** | `allow-istiod` 정책 적용 후 `my`, `chat` 등 서비스가 DB/DNS 접속 실패 (`ConnectionRefused`, `i/o timeout`) → `allow-dns`, `allow-database-access` 정책을 모든 애플리케이션 네임스페이스로 확장 |
+| **Auth OAuth 콜백 리다이렉트 실패** | OAuth 성공 후에도 API JSON 응답에서 멈추고 `.growbin.app` 외 서브도메인으로 쿠키가 전달되지 않음 → `X-Frontend-Origin` 헤더 기반 리다이렉트 분기 |
+| **OAuth Provider HTTPS egress 차단** | Auth/Scan/Chat 파드가 외부 OAuth 엔드포인트 연결 실패 → `allow-external-https` 정책으로 TCP 443 egress 허용 |
+| **ArgoCD Deployment CrashLoopBackOff** | Ansible의 Deployment 직접 패치 방식 충돌 → ConfigMap 기반 `server.insecure` 설정으로 전환 |
 
 ---
 
@@ -562,7 +576,7 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 
 - **Observability 강화** ✅
   - **Event Router/SSE Gateway Metrics**: Prometheus 메트릭 수집 및 Grafana 대시보드
-  - **scan-sse-pipeline 대시보드**: Scan API, Event Bus, Redis Streams 통합 모니터링
+  - **scan-sse-pipeline 대시보드**: Scan API, Event Relay, Redis Streams 통합 모니터링
   - **OpenTelemetry 확장**: Event Router, SSE Gateway, Redis, OpenAI API 트레이싱
 
 - **인프라 확장** ✅
@@ -585,7 +599,7 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 
 ## Status
 
-### v1.0.7 - Event Bus & KEDA
+### v1.0.7 - Event Relay & KEDA
 - ✅ Redis Streams + Pub/Sub + State KV 기반 Integration Layer 완료
 - ✅ Event Router, SSE Gateway 컴포넌트 개발 완료
 - ✅ KEDA 이벤트 드리븐 오토스케일링 적용 (scan-worker, event-router, character-match-worker)
