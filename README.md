@@ -172,8 +172,8 @@ flowchart TB
 ```yaml
 Edge Layer        : Route 53, AWS ALB, Istio Ingress Gateway
 Service Layer     : auth, my, scan, character, location, chat (w/ Envoy Sidecar)
-Event Bus Layer   : Redis Streams + Pub/Sub + State KV, Event Router, SSE Gateway
-Messaging Layer   : RabbitMQ, Celery Workers (scan-worker, character-worker, celery-beat)
+Integration Layer : Redis Streams + Pub/Sub + State KV, Event Router, SSE Gateway
+                  : RabbitMQ, Celery Workers (scan-worker, character-worker, celery-beat)
 Persistence Layer : PostgreSQL, Redis
 Platform Layer    : ArgoCD, Istiod, KEDA, Prometheus, Grafana, Kiali, Jaeger, EFK Stack
 ```
@@ -465,8 +465,8 @@ GitOps    :
 Architecture :
   Edge Layer        - Route 53, AWS ALB, Istio Ingress Gateway
   Service Layer     - auth, my, scan, character, location, chat
-  Event Bus Layer   - Redis Streams + Pub/Sub + State KV, Event Router, SSE Gateway
-  Messaging Layer   - RabbitMQ, Celery Workers, KEDA (Event-driven Autoscaling)
+  Integration Layer - Redis Streams + Pub/Sub + State KV, Event Router, SSE Gateway
+                    - RabbitMQ, Celery Workers, KEDA (Event-driven Autoscaling)
   Persistence Layer - PostgreSQL, Redis (Cache/Streams/Pub-Sub 분리)
   Platform Layer    - ArgoCD, Istiod, KEDA, Observability (Prometheus, Grafana, EFK, Jaeger)
 Network   : Calico CNI + Istio Service Mesh (mTLS)
@@ -539,36 +539,6 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 
 - Istio Migration으로 인해 `Ingress` 대신 `Gateway/VirtualService`를 사용하며, Sync Wave가 60/70에서 40/50으로 조정되었습니다.
 - 모든 API는 공통 base(kustomize) 템플릿을 상속하고, 환경별 patch에서 이미지 태그·환경 변수·노드 셀렉터만 조정합니다.
-
----
-
-### Namespace + Label Layout
-
-![B13B764A-E597-4691-93F4-56F5C9FC0AB1](https://github.com/user-attachments/assets/1dc545ab-93db-4990-8a48-4df4dfb7adf0)
-
-- “포지션(part-of) → 계층(tier) → 역할(role)” 순으로 라벨을 붙인 뒤 네임스페이스로 매핑합니다.
-- Taint/Tolerance를 활용해 라벨과 매칭되는 노드로 파드의 배치가 제한되며, 계층별 network policy 격리가 적용됩니다.
-- 이코에코(Eco²)에서 네임스페이스와 라벨은 컨트롤 포인트를 맡으며, 도메인/역할/책임/계층 추상화를 통해 개발 및 운영 복잡도를 낮춥니다.
-
-### 상세 설명
-1. **app.kubernetes.io/part-of**
-   - `ecoeco-backend`: 업무 도메인(API)와 그에 붙은 데이터/관측 리소스.
-   - `ecoeco-platform`: 플랫폼 자체를 관리하는 인프라/오퍼레이터 네임스페이스.
-
-2. **tier**
-   - 백엔드 전용 네임스페이스는 대부분 `business-logic`.
-   - 데이터 계층(`data`)과 관측(`observability`)도 같은 제품군(`ecoeco-backend`) 안에 포함.
-   - 플랫폼 계층은 `infrastructure`.
-
-3. **role**
-   - 비즈니스 로직 네임스페이스는 공통적으로 `role: api`.
-   - 데이터 계층 내에서도 `database`, `cache`, `messaging`처럼 분리.
-   - 관측 계층은 `metrics`, `dashboards`.
-   - 플랫폼 계층은 `platform-core` 혹은 `operators`.
-
-4. **domain / data-type**
-   - `domain` 라벨로 실제 서비스(예: `auth`, `location`)를 식별.
-   - 데이터 계층은 `data-type`으로 DB 종류까지 표기(`postgres`, `redis`).
 
 ---
 
