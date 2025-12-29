@@ -62,7 +62,7 @@ export const options = {
 // ─────────────────────────────────────────────────────────────────────────────
 // Test Endpoint (lightweight authenticated endpoint - no DB)
 // ─────────────────────────────────────────────────────────────────────────────
-const TEST_ENDPOINT = `${BASE_URL}/api/v1/my/ping`;
+const TEST_ENDPOINT = `${BASE_URL}/api/v1/user/ping`;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Main Test
