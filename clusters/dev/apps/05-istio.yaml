@@ -65,7 +65,7 @@ spec:
             envoyExtAuthzGrpc:
               service: ext-authz.auth.svc.cluster.local
               port: '50051'
-              timeout: 0.25s
+              timeout: 2s  # 고부하 상황 대응 (기존 0.25s)
               failOpen: false
               includeHeadersInCheck:
               - authorization

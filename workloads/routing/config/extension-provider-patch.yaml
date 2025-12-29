@@ -10,7 +10,7 @@ spec:
       envoyExtAuthzGrpc:
         service: auth-api.auth.svc.cluster.local
         port: '9001'
-        timeout: 0.25s
+        timeout: 2s  # 2500 VU 부하 테스트를 위해 증가 (기존 0.25s)
         failOpen: false
         includeHeadersInCheck:
         - authorization
