@@ -568,13 +568,10 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
 
 - **비동기 AI 파이프라인** ✅
   - Scan API의 AI 파이프라인을 **Celery Chain**(Vision→Rule→Answer→Reward)으로 분리
+  - **GPT 5.1 Vision** (이미지 분류) + **GPT 5.1-mini** (답변 생성) 조합
+  - **gevent pool** (100 greenlets) + **httpx connection pooling** 적용
   - SSE(Server-Sent Events) 기반 실시간 진행 상황 스트리밍
   - 단일 요청 소요시간: Vision 6.9초 + Answer 4.8초 ≈ **12초**
-
-- **Observability 강화** ✅
-  - **Event Router/SSE Gateway Metrics**: Prometheus 메트릭 수집 및 Grafana 대시보드
-  - **scan-sse-pipeline 대시보드**: Scan API, Event Relay, Redis Streams 통합 모니터링
-  - **OpenTelemetry 확장**: Event Router, SSE Gateway, Redis, OpenAI API 트레이싱
 
 - **부하 테스트 및 스케일링 검증** ✅
   - **21-Node 클러스터**: Event Router, Redis Pub/Sub 전용 노드 추가
@@ -582,11 +579,6 @@ Eco² 클러스터는 ArgoCD App-of-Apps 패턴을 중심으로 운영되며, �
   - **부하 테스트 검증**: 50/200/250/300/400/500 VU 테스트 완료
     - 단일 노드(k8s-worker-ai, 2 cores) 기준 **250 VU SLA**, **500 VU 한계점** 도출
     - KEDA 자동 스케일링 검증: scan-worker 1→3 pods, scan-api 1→3 pods
-
-- **EFK 로깅 파이프라인** ✅
-  - **Fluent Bit**이 모든 Pod의 stdout/stderr 로그를 수집하여 **Elasticsearch**로 포워딩
-  - **Kibana** 대시보드에서 중앙 집중식 로그 검색 및 분석
-  - JSON 구조화 로그 포맷 적용
 
 ---
 
