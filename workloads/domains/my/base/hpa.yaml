@@ -13,7 +13,7 @@ spec:
     kind: Deployment
     name: my-api
   minReplicas: 1
-  maxReplicas: 4  # k8s-api-my 노드 자원 한계로 제한
+  maxReplicas: 3
   metrics:
   - type: Resource
     resource:
