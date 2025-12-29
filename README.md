@@ -164,6 +164,93 @@ flowchart LR
 > **Status**: RabbitMQ + Celery + KEDA 이벤트 드리븐 오토스케일링 완료
 
 ```mermaid
+flowchart LR
+    subgraph Client["👤 Client"]
+        CL["Browser/App"]
+    end
+
+    subgraph API["🌐 Scan API"]
+        SA["POST /api/v1/scan<br/>Dispatch Chain"]
+    end
+
+    subgraph MQ["📬 RabbitMQ"]
+        VQ[("scan.vision")]
+        RQ[("scan.rule")]
+        AQ[("scan.answer")]
+        WQ[("scan.reward")]
+    end
+
+    subgraph Workers["🔧 Celery Workers (gevent)"]
+        VW["Vision Worker<br/>GPT Vision 분석"]
+        RW["Rule Worker<br/>RAG 규정 검색"]
+        AW["Answer Worker<br/>GPT 답변 생성"]
+        WW["Reward Worker<br/>보상 판정"]
+    end
+
+    subgraph External["🤖 OpenAI API"]
+        OAI["GPT-4o Vision<br/>GPT-4o-mini"]
+    end
+
+    subgraph Streams["📊 Redis Streams"]
+        RS[("scan:events:*<br/>(Event Relay로 전달)")]
+    end
+
+    subgraph DB["💾 PostgreSQL"]
+        PG[("결과 저장")]
+    end
+
+    subgraph Scale["⚡ KEDA"]
+        KD["큐 길이 기반<br/>오토스케일링"]
+    end
+
+    CL -->|POST| SA
+    SA -->|Dispatch| VQ
+    SA -.->|202 Accepted| CL
+
+    VQ --> VW
+    VW -->|API Call| OAI
+    VW -->|XADD| RS
+    VW -->|Chain| RQ
+
+    RQ --> RW
+    RW -->|XADD| RS
+    RW -->|Chain| AQ
+
+    AQ --> AW
+    AW -->|API Call| OAI
+    AW -->|XADD| RS
+    AW -->|Chain| WQ
+
+    WQ --> WW
+    WW -->|Batch Insert| PG
+    WW -->|XADD stage=done| RS
+
+    KD -.->|Monitor| MQ
+    KD -.->|Scale| Workers
+
+    classDef client fill:#e1bee7,stroke:#7b1fa2,stroke-width:2px,color:#000
+    classDef api fill:#b2dfdb,stroke:#00796b,stroke-width:2px,color:#000
+    classDef mq fill:#bbdefb,stroke:#1976d2,stroke-width:2px,color:#000
+    classDef worker fill:#fff9c4,stroke:#f9a825,stroke-width:2px,color:#000
+    classDef external fill:#ffcc80,stroke:#e65100,stroke-width:2px,color:#000
+    classDef streams fill:#ffccbc,stroke:#e64a19,stroke-width:2px,color:#000
+    classDef db fill:#c8e6c9,stroke:#388e3c,stroke-width:2px,color:#000
+    classDef scale fill:#b3e5fc,stroke:#0288d1,stroke-width:2px,color:#000
+
+    class CL client
+    class SA api
+    class VQ,RQ,AQ,WQ mq
+    class VW,RW,AW,WW worker
+    class OAI external
+    class RS streams
+    class PG db
+    class KD scale
+```
+
+<details>
+<summary>📋 Sequence Diagram (상세 흐름)</summary>
+
+```mermaid
 sequenceDiagram
     participant Client
     participant ScanAPI as Scan API
@@ -202,6 +289,8 @@ sequenceDiagram
     RewardWorker->>PostgreSQL (Batch): 보상 저장
     RewardWorker->>RedisStreams: XADD stage=done
 ```
+
+</details>
 
 | 컴포넌트 | 역할 | Queue | 스케일링 |
 |----------|------|-------|---------|
