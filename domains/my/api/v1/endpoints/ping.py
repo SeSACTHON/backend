@@ -4,7 +4,7 @@ This endpoint requires authentication but performs no database operations,
 making it ideal for measuring pure ext-authz overhead.
 
 Usage:
-    curl -H "Authorization: Bearer <token>" https://api.dev.growbin.app/api/v1/my/ping
+    curl -H "Authorization: Bearer <token>" https://api.dev.growbin.app/api/v1/user/ping
 """
 
 from fastapi import APIRouter, Depends
