@@ -1,6 +1,25 @@
 ---
-# Allow egress to RabbitMQ from worker namespaces
+# Allow egress to RabbitMQ from worker namespaces and auth
 # Celery workers need to connect to RabbitMQ broker
+# auth-api/ext-authz need RabbitMQ for blacklist event pub/sub
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-rabbitmq-egress
+  namespace: auth
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: rabbitmq
+    ports:
+    - protocol: TCP
+      port: 5672
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
