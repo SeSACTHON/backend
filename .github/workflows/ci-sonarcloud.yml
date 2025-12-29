@@ -9,13 +9,14 @@
 name: SonarCloud Analysis
 
 on:
-  workflow_dispatch:  # 수동 트리거
-  push:
-    branches: [develop, main]
-    paths:
-      - 'domains/**/*.py'
-      - 'sonar-project.properties'
-  # PR 분석은 무료 플랜에서 미지원 - main 머지 후 분석
+  workflow_dispatch:  # 수동 트리거만 허용
+  # push 트리거 비활성화 - SonarCloud 프로젝트 설정 필요
+  # 설정 완료 후 아래 주석 해제:
+  # push:
+  #   branches: [develop, main]
+  #   paths:
+  #     - 'domains/**/*.py'
+  #     - 'sonar-project.properties'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
