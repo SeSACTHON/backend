@@ -6,7 +6,7 @@ api_router = APIRouter()
 api_router.include_router(character.router)
 api_router.include_router(metrics.router)
 api_router.include_router(rewards.router)
-api_router.include_router(ping.router)
+api_router.include_router(ping.router, prefix="/character")
 
 health_router = APIRouter()
 health_router.include_router(health.router)
