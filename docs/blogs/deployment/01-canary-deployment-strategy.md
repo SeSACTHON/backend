@@ -643,7 +643,7 @@ kubectl scale deployment auth-api-canary --replicas=0 -n auth
 
 ## 7. CI/CD 자동화: PR 라벨 기반 Canary 빌드
 
-Canary 이미지 빌드를 **수동 트리거**가 아닌 **PR 라벨 기반 자동화**로 구현했다.
+Canary 이미지 빌드를 **수동 트리거**가 아닌 **PR 라벨 기반 CI 분기**를 마련했다.
 
 ### 7.1 선택지 비교
 
