@@ -28,8 +28,11 @@ spec:
         # 설정
         config:
           logLevel: info
-          # ArgoCD API 사용 (Token 필요)
-          # applicationsAPIKind: argocd (기본값)
+          # ArgoCD API 사용 (Kubernetes API 대신 ArgoCD API로 Application 읽기/수정)
+          applicationsAPIKind: argocd
+          # plaintext 연결 (internal service)
+          argocd.insecure: 'true'
+          argocd.plaintext: 'true'
           registries:
           - name: DockerHub
             prefix: docker.io
