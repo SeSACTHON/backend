@@ -1,0 +1,531 @@
+name: CI Canary Build
+
+# PR에 'canary' 라벨이 붙으면 canary 이미지 빌드
+on:
+  pull_request:
+    types: [labeled, synchronize]
+    branches:
+      - develop
+      - main
+
+permissions:
+  contents: write
+  packages: write
+  pull-requests: read
+
+concurrency:
+  group: ci-canary-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # ============================================================================
+  # Canary 라벨 체크
+  # ============================================================================
+  check-canary-label:
+    name: 🏷️ Check Canary Label
+    runs-on: ubuntu-latest
+    outputs:
+      is_canary: ${{ steps.check.outputs.is_canary }}
+    steps:
+      - name: Check for canary label
+        id: check
+        env:
+          PR_LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          if echo "$PR_LABELS" | jq -e 'contains(["canary"])' > /dev/null; then
+            echo "is_canary=true" >> "$GITHUB_OUTPUT"
+            echo "✅ Canary label detected - will build canary images"
+          else
+            echo "is_canary=false" >> "$GITHUB_OUTPUT"
+            echo "ℹ️ No canary label - skipping canary build"
+          fi
+
+  # ============================================================================
+  # 변경된 서비스 감지
+  # ============================================================================
+  detect-changes:
+    name: 🔍 Detect Changes
+    runs-on: ubuntu-latest
+    needs: check-canary-label
+    if: needs.check-canary-label.outputs.is_canary == 'true'
+    outputs:
+      api_services: ${{ steps.prepare.outputs.api_services }}
+      has_api_changes: ${{ steps.prepare.outputs.has_api_changes }}
+      worker_services: ${{ steps.prepare.outputs.worker_services }}
+      has_worker_changes: ${{ steps.prepare.outputs.has_worker_changes }}
+      has_ext_authz: ${{ steps.prepare.outputs.has_ext_authz }}
+      has_auth_relay: ${{ steps.prepare.outputs.has_auth_relay }}
+      has_sse_gateway: ${{ steps.prepare.outputs.has_sse_gateway }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Changed files
+        id: changes
+        uses: tj-actions/changed-files@v45
+        with:
+          files: |
+            domains/**
+            workloads/domains/**
+
+      - name: Prepare service matrix
+        id: prepare
+        run: |
+          python3 <<'PYEOF'
+          import json
+          import os
+
+          files = os.environ.get("CHANGED_FILES", "").split()
+          any_changed = os.environ.get("ANY_CHANGED", "false").lower() == "true"
+          
+          # FastAPI API 서비스
+          API_SERVICES = ["auth", "character", "chat", "image", "location", "my", "scan"]
+          
+          # Worker 서비스
+          WORKER_SERVICES = ["character-worker", "scan-worker", "my-worker"]
+          
+          # 특수 서비스
+          SPECIAL_SERVICES = ["ext-authz", "auth-relay", "sse-gateway"]
+          
+          api_services = []
+          worker_services = []
+          has_ext_authz = False
+          has_auth_relay = False
+          has_sse_gateway = False
+          
+          if any_changed:
+              for path in files:
+                  parts = path.split("/")
+                  
+                  # domains/<service>/ 경로 감지
+                  if len(parts) >= 2 and parts[0] == "domains":
+                      svc = parts[1]
+                      
+                      if svc in API_SERVICES and svc not in api_services:
+                          api_services.append(svc)
+                      elif svc == "ext-authz":
+                          has_ext_authz = True
+                      elif svc == "auth" and "workers/blacklist_relay" in path:
+                          has_auth_relay = True
+                      elif svc == "sse-gateway":
+                          has_sse_gateway = True
+                      elif svc == "character" and "worker" in path:
+                          if "character-worker" not in worker_services:
+                              worker_services.append("character-worker")
+                      elif svc == "scan" and "worker" in path:
+                          if "scan-worker" not in worker_services:
+                              worker_services.append("scan-worker")
+                      elif svc == "my" and "worker" in path:
+                          if "my-worker" not in worker_services:
+                              worker_services.append("my-worker")
+                  
+                  # workloads/domains/<service>/ 경로 감지
+                  elif len(parts) >= 3 and parts[0] == "workloads" and parts[1] == "domains":
+                      svc = parts[2]
+                      if svc in API_SERVICES and svc not in api_services:
+                          api_services.append(svc)
+          
+          with open(os.environ["GITHUB_OUTPUT"], "a") as out:
+              out.write(f"api_services={json.dumps(api_services)}\n")
+              out.write(f"has_api_changes={'true' if api_services else 'false'}\n")
+              out.write(f"worker_services={json.dumps(worker_services)}\n")
+              out.write(f"has_worker_changes={'true' if worker_services else 'false'}\n")
+              out.write(f"has_ext_authz={'true' if has_ext_authz else 'false'}\n")
+              out.write(f"has_auth_relay={'true' if has_auth_relay else 'false'}\n")
+              out.write(f"has_sse_gateway={'true' if has_sse_gateway else 'false'}\n")
+          PYEOF
+        env:
+          CHANGED_FILES: ${{ steps.changes.outputs.all_changed_files }}
+          ANY_CHANGED: ${{ steps.changes.outputs.any_changed }}
+
+  # ============================================================================
+  # API Canary 이미지 빌드
+  # ============================================================================
+  api-canary-build:
+    name: 📦 Build API Canary - ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs:
+      - check-canary-label
+      - detect-changes
+    if: >
+      needs.check-canary-label.outputs.is_canary == 'true' &&
+      needs.detect-changes.outputs.has_api_changes == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.api_services) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Prepare canary tags
+        id: meta
+        run: |
+          SERVICE="${{ matrix.service }}"
+          IMAGE_REPO="docker.io/mng990/eco2"
+          SHORT_SHA=$(git rev-parse --short=6 HEAD)
+          
+          # canary 태그 생성
+          CANARY_TAG="${SERVICE}-api-dev-canary"
+          CANARY_SHA_TAG="${SERVICE}-api-dev-canary-${SHORT_SHA}"
+          
+          {
+            echo "tags<<TAGS"
+            echo "${IMAGE_REPO}:${CANARY_TAG}"
+            echo "${IMAGE_REPO}:${CANARY_SHA_TAG}"
+            echo "TAGS"
+          } >> "$GITHUB_OUTPUT"
+          echo "canary_tag=${CANARY_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push canary image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: domains/${{ matrix.service }}/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Summary
+        run: |
+          cat <<EOF >> "$GITHUB_STEP_SUMMARY"
+          ## 🐤 Canary Image Built: ${{ matrix.service }}
+          
+          | Tag | Value |
+          |-----|-------|
+          | Canary | \`${{ steps.meta.outputs.canary_tag }}\` |
+          | Full | \`${{ steps.meta.outputs.tags }}\` |
+          
+          ### 테스트 방법
+          \`\`\`bash
+          curl -H "X-Canary: true" https://api.growbin.app/api/v1/${{ matrix.service }}/health
+          \`\`\`
+          EOF
+
+  # ============================================================================
+  # Worker Canary 이미지 빌드
+  # ============================================================================
+  worker-canary-build:
+    name: 📦 Build Worker Canary - ${{ matrix.service }}
+    runs-on: ubuntu-latest
+    needs:
+      - check-canary-label
+      - detect-changes
+    if: >
+      needs.check-canary-label.outputs.is_canary == 'true' &&
+      needs.detect-changes.outputs.has_worker_changes == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        service: ${{ fromJson(needs.detect-changes.outputs.worker_services) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Prepare canary tags
+        id: meta
+        run: |
+          SERVICE="${{ matrix.service }}"
+          IMAGE_REPO="docker.io/mng990/eco2"
+          SHORT_SHA=$(git rev-parse --short=6 HEAD)
+          
+          CANARY_TAG="${SERVICE}-dev-canary"
+          CANARY_SHA_TAG="${SERVICE}-dev-canary-${SHORT_SHA}"
+          
+          {
+            echo "tags<<TAGS"
+            echo "${IMAGE_REPO}:${CANARY_TAG}"
+            echo "${IMAGE_REPO}:${CANARY_SHA_TAG}"
+            echo "TAGS"
+          } >> "$GITHUB_OUTPUT"
+          echo "canary_tag=${CANARY_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Determine Dockerfile path
+        id: dockerfile
+        run: |
+          SERVICE="${{ matrix.service }}"
+          case "$SERVICE" in
+            character-worker)
+              echo "path=domains/character/Dockerfile.worker" >> "$GITHUB_OUTPUT"
+              ;;
+            scan-worker)
+              echo "path=domains/scan/Dockerfile.worker" >> "$GITHUB_OUTPUT"
+              ;;
+            my-worker)
+              echo "path=domains/my/Dockerfile.worker" >> "$GITHUB_OUTPUT"
+              ;;
+            *)
+              echo "path=domains/${SERVICE}/Dockerfile" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
+      - name: Build and push canary image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ steps.dockerfile.outputs.path }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================================
+  # ext-authz Canary 이미지 빌드
+  # ============================================================================
+  ext-authz-canary-build:
+    name: 📦 Build ext-authz Canary
+    runs-on: ubuntu-latest
+    needs:
+      - check-canary-label
+      - detect-changes
+    if: >
+      needs.check-canary-label.outputs.is_canary == 'true' &&
+      needs.detect-changes.outputs.has_ext_authz == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Prepare canary tags
+        id: meta
+        run: |
+          IMAGE_REPO="docker.io/mng990/eco2"
+          SHORT_SHA=$(git rev-parse --short=6 HEAD)
+          
+          CANARY_TAG="ext-authz-dev-canary"
+          CANARY_SHA_TAG="ext-authz-dev-canary-${SHORT_SHA}"
+          
+          {
+            echo "tags<<TAGS"
+            echo "${IMAGE_REPO}:${CANARY_TAG}"
+            echo "${IMAGE_REPO}:${CANARY_SHA_TAG}"
+            echo "TAGS"
+          } >> "$GITHUB_OUTPUT"
+          echo "canary_tag=${CANARY_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push canary image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./domains/ext-authz
+          file: domains/ext-authz/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================================
+  # auth-relay Canary 이미지 빌드
+  # ============================================================================
+  auth-relay-canary-build:
+    name: 📦 Build auth-relay Canary
+    runs-on: ubuntu-latest
+    needs:
+      - check-canary-label
+      - detect-changes
+    if: >
+      needs.check-canary-label.outputs.is_canary == 'true' &&
+      needs.detect-changes.outputs.has_auth_relay == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Prepare canary tags
+        id: meta
+        run: |
+          IMAGE_REPO="docker.io/mng990/eco2"
+          SHORT_SHA=$(git rev-parse --short=6 HEAD)
+          
+          CANARY_TAG="auth-relay-dev-canary"
+          CANARY_SHA_TAG="auth-relay-dev-canary-${SHORT_SHA}"
+          
+          {
+            echo "tags<<TAGS"
+            echo "${IMAGE_REPO}:${CANARY_TAG}"
+            echo "${IMAGE_REPO}:${CANARY_SHA_TAG}"
+            echo "TAGS"
+          } >> "$GITHUB_OUTPUT"
+          echo "canary_tag=${CANARY_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push canary image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: domains/auth/Dockerfile.worker
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================================
+  # sse-gateway Canary 이미지 빌드
+  # ============================================================================
+  sse-gateway-canary-build:
+    name: 📦 Build sse-gateway Canary
+    runs-on: ubuntu-latest
+    needs:
+      - check-canary-label
+      - detect-changes
+    if: >
+      needs.check-canary-label.outputs.is_canary == 'true' &&
+      needs.detect-changes.outputs.has_sse_gateway == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Prepare canary tags
+        id: meta
+        run: |
+          IMAGE_REPO="docker.io/mng990/eco2"
+          SHORT_SHA=$(git rev-parse --short=6 HEAD)
+          
+          CANARY_TAG="sse-gateway-dev-canary"
+          CANARY_SHA_TAG="sse-gateway-dev-canary-${SHORT_SHA}"
+          
+          {
+            echo "tags<<TAGS"
+            echo "${IMAGE_REPO}:${CANARY_TAG}"
+            echo "${IMAGE_REPO}:${CANARY_SHA_TAG}"
+            echo "TAGS"
+          } >> "$GITHUB_OUTPUT"
+          echo "canary_tag=${CANARY_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push canary image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: domains/sse-gateway/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ============================================================================
+  # Canary 빌드 완료 알림
+  # ============================================================================
+  canary-summary:
+    name: 📋 Canary Build Summary
+    runs-on: ubuntu-latest
+    needs:
+      - check-canary-label
+      - detect-changes
+      - api-canary-build
+      - worker-canary-build
+      - ext-authz-canary-build
+      - auth-relay-canary-build
+      - sse-gateway-canary-build
+    if: always() && needs.check-canary-label.outputs.is_canary == 'true'
+    steps:
+      - name: Generate summary
+        env:
+          API_SERVICES: ${{ needs.detect-changes.outputs.api_services }}
+          WORKER_SERVICES: ${{ needs.detect-changes.outputs.worker_services }}
+          HAS_EXT_AUTHZ: ${{ needs.detect-changes.outputs.has_ext_authz }}
+          HAS_AUTH_RELAY: ${{ needs.detect-changes.outputs.has_auth_relay }}
+          HAS_SSE_GATEWAY: ${{ needs.detect-changes.outputs.has_sse_gateway }}
+        run: |
+          cat <<EOF >> "$GITHUB_STEP_SUMMARY"
+          # 🐤 Canary Build Summary
+          
+          ## 빌드된 서비스
+          
+          | 카테고리 | 서비스 | 태그 |
+          |---------|--------|------|
+          EOF
+          
+          # API Services
+          if [ -n "$API_SERVICES" ] && [ "$API_SERVICES" != "[]" ]; then
+            for svc in $(echo "$API_SERVICES" | jq -r '.[]'); do
+              echo "| API | $svc | \`${svc}-api-dev-canary\` |" >> "$GITHUB_STEP_SUMMARY"
+            done
+          fi
+          
+          # Worker Services
+          if [ -n "$WORKER_SERVICES" ] && [ "$WORKER_SERVICES" != "[]" ]; then
+            for svc in $(echo "$WORKER_SERVICES" | jq -r '.[]'); do
+              echo "| Worker | $svc | \`${svc}-dev-canary\` |" >> "$GITHUB_STEP_SUMMARY"
+            done
+          fi
+          
+          # Special Services
+          if [ "$HAS_EXT_AUTHZ" = "true" ]; then
+            echo "| Special | ext-authz | \`ext-authz-dev-canary\` |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ "$HAS_AUTH_RELAY" = "true" ]; then
+            echo "| Special | auth-relay | \`auth-relay-dev-canary\` |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [ "$HAS_SSE_GATEWAY" = "true" ]; then
+            echo "| Special | sse-gateway | \`sse-gateway-dev-canary\` |" >> "$GITHUB_STEP_SUMMARY"
+          fi
+          
+          cat <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          
+          ## 테스트 방법
+          
+          ```bash
+          # Canary 버전으로 요청
+          curl -H "X-Canary: true" https://api.growbin.app/api/v1/auth/health
+          
+          # Stable 버전으로 요청 (기본)
+          curl https://api.growbin.app/api/v1/auth/health
+          ```
+          
+          ## 다음 단계
+          
+          1. ✅ Canary 이미지 빌드 완료
+          2. ⏳ ArgoCD가 자동으로 canary deployment 업데이트
+          3. 🧪 `X-Canary: true` 헤더로 테스트
+          4. 🚀 PR 머지 시 stable 이미지로 배포
+          EOF
+
