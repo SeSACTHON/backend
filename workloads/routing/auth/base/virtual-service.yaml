@@ -9,6 +9,15 @@ spec:
   gateways:
   - istio-system/eco2-gateway
   http:
+  # ext-authz 순수 성능 테스트용 (백엔드 호출 없음)
+  - match:
+    - uri:
+        exact: /api/v1/authz/ping
+    directResponse:
+      status: 200
+      body:
+        string: '{"pong":true,"source":"istio-direct"}'
+  # 기존 auth API 라우팅
   - match:
     - uri:
         prefix: /api/v1/auth
