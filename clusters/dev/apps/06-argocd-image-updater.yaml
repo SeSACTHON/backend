@@ -48,6 +48,7 @@ spec:
         extraArgs:
         - --argocd-plaintext
         - --argocd-insecure
+        - --interval=10m   # Docker Hub rate limit 회피 (기본 2분 → 10분)
 
         # RBAC - ClusterRole로 전체 namespace의 Application 수정 권한 부여
         rbac:
