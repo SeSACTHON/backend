@@ -1,15 +1,17 @@
 apiVersion: networking.istio.io/v1beta1
 kind: DestinationRule
 metadata:
-  name: ext-authz
-  namespace: auth
+  name: character-api
+  namespace: character
+  labels:
+    app: character-api
+    domain: character
 spec:
-  host: ext-authz.auth.svc.cluster.local
+  host: character-api.character.svc.cluster.local
   trafficPolicy:
     loadBalancer:
       simple: ROUND_ROBIN
     connectionPool:
       http:
-        h2UpgradePolicy: UPGRADE
         http2MaxRequests: 3000
         maxRequestsPerConnection: 100
