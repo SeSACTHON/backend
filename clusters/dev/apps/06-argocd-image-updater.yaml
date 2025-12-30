@@ -28,13 +28,18 @@ spec:
         # 설정
         config:
           logLevel: info
+          # Kubernetes API 직접 사용 (ArgoCD Token 불필요)
+          applicationsAPIKind: kubernetes
           registries:
           - name: DockerHub
             prefix: docker.io
             api_url: https://registry-1.docker.io
             # Public repository는 인증 없이 digest 확인 가능
-            # Private repo 필요 시 dockerconfigjson 타입 Secret 사용
             default: true
+
+        # RBAC - ClusterRole로 전체 namespace의 Application 수정 권한 부여
+        rbac:
+          enabled: true
 
         # 리소스 제한
         resources:
