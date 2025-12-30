@@ -2,7 +2,6 @@
 
 import time
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
 import pytest
 
 from apps.auth.application.queries.validate_token import ValidateTokenQueryService
@@ -10,7 +9,7 @@ from apps.auth.domain.enums.token_type import TokenType
 from apps.auth.domain.value_objects.token_payload import TokenPayload
 from apps.auth.domain.value_objects.user_id import UserId
 from apps.auth.domain.entities.user import User
-from apps.auth.domain.exceptions.auth import TokenRevokedError, TokenExpiredError
+from apps.auth.domain.exceptions.auth import TokenRevokedError
 from apps.auth.domain.exceptions.user import UserNotFoundError
 
 

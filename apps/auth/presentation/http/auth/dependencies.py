@@ -16,9 +16,7 @@ from apps.auth.application.queries.validate_token import (
 )
 
 if TYPE_CHECKING:
-    from apps.auth.application.common.ports.token_service import TokenService
-    from apps.auth.application.common.ports.token_blacklist import TokenBlacklist
-    from apps.auth.application.common.ports.user_query_gateway import UserQueryGateway
+    pass
 
 
 async def get_current_user(

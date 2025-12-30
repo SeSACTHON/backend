@@ -5,7 +5,7 @@ ORM과 분리된 순수 도메인 엔티티입니다.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 

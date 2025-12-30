@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-import pytest
 
 from apps.auth.domain.entities.user import User
 from apps.auth.domain.entities.user_social_account import UserSocialAccount

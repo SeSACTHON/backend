@@ -14,11 +14,7 @@ from unittest.mock import AsyncMock, MagicMock, create_autospec
 import pytest
 
 if TYPE_CHECKING:
-    from apps.auth.application.common.ports.user_command_gateway import UserCommandGateway
-    from apps.auth.application.common.ports.user_query_gateway import UserQueryGateway
-    from apps.auth.application.common.ports.token_service import TokenService
-    from apps.auth.application.common.ports.state_store import StateStore
-    from apps.auth.application.common.ports.token_blacklist import TokenBlacklist
+    pass
 
 
 # ============================================================

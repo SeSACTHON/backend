@@ -10,7 +10,6 @@ from uuid import uuid4
 
 from apps.auth.domain.entities.user import User
 from apps.auth.domain.entities.user_social_account import UserSocialAccount
-from apps.auth.domain.value_objects.user_id import UserId
 from apps.auth.domain.ports.user_id_generator import UserIdGenerator
 
 

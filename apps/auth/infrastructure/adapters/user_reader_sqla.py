@@ -11,7 +11,6 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from apps.auth.domain.entities.user import User
-from apps.auth.domain.entities.user_social_account import UserSocialAccount
 from apps.auth.domain.value_objects.user_id import UserId
 from apps.auth.infrastructure.persistence_postgres.mappings.user import users_table
 from apps.auth.infrastructure.persistence_postgres.mappings.user_social_account import (

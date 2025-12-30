@@ -5,7 +5,6 @@ FastAPI Depends를 사용한 의존성 주입 설정입니다.
 
 from __future__ import annotations
 
-from functools import lru_cache
 from typing import TYPE_CHECKING, AsyncGenerator
 
 from fastapi import Depends

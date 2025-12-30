@@ -34,7 +34,6 @@ def start_user_mapper() -> None:
         도메인 엔티티가 SQLAlchemy에 의존하지 않도록 합니다.
     """
     from apps.auth.domain.entities.user import User
-    from apps.auth.domain.value_objects.user_id import UserId
 
     # 이미 매핑된 경우 스킵
     if hasattr(User, "__mapper__"):
