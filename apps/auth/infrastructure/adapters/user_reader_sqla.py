@@ -1,0 +1,70 @@
+"""SQLAlchemy User Reader.
+
+UserQueryGateway의 구현체입니다.
+"""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
+
+from apps.auth.domain.entities.user import User
+from apps.auth.domain.value_objects.user_id import UserId
+from apps.auth.infrastructure.persistence_postgres.mappings.user import users_table
+from apps.auth.infrastructure.persistence_postgres.mappings.user_social_account import (
+    user_social_accounts_table,
+)
+
+if TYPE_CHECKING:
+    from sqlalchemy.ext.asyncio import AsyncSession
+
+
+class SqlaUserReader:
+    """SQLAlchemy 기반 User 읽기 Gateway.
+
+    UserQueryGateway 구현체.
+    """
+
+    def __init__(self, session: "AsyncSession") -> None:
+        self._session = session
+
+    async def get_by_id(self, user_id: UserId) -> User | None:
+        """ID로 사용자 조회."""
+        stmt = (
+            select(User)
+            .where(users_table.c.id == user_id.value)
+            .options(selectinload(User.social_accounts))
+        )
+        result = await self._session.execute(stmt)
+        user = result.scalar_one_or_none()
+
+        if user:
+            # UserId Value Object로 변환
+            user.id_ = UserId(value=user._id)
+
+        return user
+
+    async def get_by_provider(self, provider: str, provider_user_id: str) -> User | None:
+        """OAuth 프로바이더 정보로 사용자 조회."""
+        # 소셜 계정으로 조인하여 조회
+        stmt = (
+            select(User)
+            .join(
+                user_social_accounts_table,
+                users_table.c.id == user_social_accounts_table.c.user_id,
+            )
+            .where(
+                user_social_accounts_table.c.provider == provider,
+                user_social_accounts_table.c.provider_user_id == provider_user_id,
+            )
+            .options(selectinload(User.social_accounts))
+        )
+        result = await self._session.execute(stmt)
+        user = result.scalar_one_or_none()
+
+        if user:
+            user.id_ = UserId(value=user._id)
+
+        return user

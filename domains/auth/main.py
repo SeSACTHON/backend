@@ -5,20 +5,20 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
-from domains.auth.api.v1.routers import api_router, health_probe_router
-from domains.auth.core.constants import (
+from domains.auth.presentation.http.routers import api_router, health_probe_router
+from domains.auth.setup.constants import (
     DEFAULT_ENVIRONMENT,
     ENV_KEY_ENVIRONMENT,
     SERVICE_NAME,
     SERVICE_VERSION,
 )
-from domains.auth.core.exceptions import (
+from domains.auth.presentation.http.errors.handlers import (
     general_exception_handler,
     http_exception_handler,
     validation_exception_handler,
 )
-from domains.auth.core.logging import configure_logging
-from domains.auth.core.tracing import (
+from domains.auth.setup.logging import configure_logging
+from domains.auth.setup.tracing import (
     configure_tracing,
     instrument_fastapi,
     instrument_httpx,
@@ -26,7 +26,7 @@ from domains.auth.core.tracing import (
     shutdown_tracing,
 )
 from domains.auth.metrics import register_metrics
-from domains.auth.services.key_manager import KeyManager
+from domains.auth.application.services.key_manager import KeyManager
 
 import os
 

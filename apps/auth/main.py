@@ -1,0 +1,90 @@
+"""Auth API Application Entry Point.
+
+Clean Architecture 기반 Auth 서비스입니다.
+"""
+
+import logging
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from apps.auth.setup.config import get_settings
+from apps.auth.setup.logging import setup_logging
+from apps.auth.presentation.http.controllers import root_router
+from apps.auth.presentation.http.errors import register_exception_handlers
+
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """애플리케이션 생명주기 관리."""
+    # Startup
+    logger.info("Starting Auth API (Clean Architecture)")
+
+    # ORM 매퍼 시작
+    from apps.auth.infrastructure.persistence_postgres.mappings import start_all_mappers
+
+    try:
+        start_all_mappers()
+        logger.info("ORM mappers initialized")
+    except Exception as e:
+        logger.warning(f"ORM mappers already initialized or error: {e}")
+
+    yield
+
+    # Shutdown
+    logger.info("Shutting down Auth API")
+
+
+def create_app() -> FastAPI:
+    """FastAPI 애플리케이션 팩토리."""
+    settings = get_settings()
+
+    # 로깅 설정
+    setup_logging("DEBUG" if settings.debug else "INFO")
+
+    app = FastAPI(
+        title="Auth API",
+        description="OAuth 인증 서비스 (Clean Architecture)",
+        version="2.0.0",
+        lifespan=lifespan,
+    )
+
+    # CORS 설정
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],  # 프로덕션에서는 제한
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    # 예외 핸들러 등록
+    register_exception_handlers(app)
+
+    # 라우터 등록
+    app.include_router(root_router)
+
+    # Health check (루트)
+    @app.get("/health")
+    async def root_health():
+        return {"status": "healthy", "service": "auth-api", "version": "2.0.0"}
+
+    return app
+
+
+# 애플리케이션 인스턴스
+app = create_app()
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run(
+        "apps.auth.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+    )
