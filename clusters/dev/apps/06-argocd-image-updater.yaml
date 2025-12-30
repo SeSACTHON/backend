@@ -38,8 +38,8 @@ spec:
           - name: DockerHub
             prefix: docker.io
             api_url: https://registry-1.docker.io
-            # DockerHub rate limit 회피를 위한 인증 (username/password secret)
-            credentials: secret:argocd/dockerhub-credentials#username#password
+            # DockerHub rate limit 회피를 위한 인증
+            credentials: env:DOCKER_USERNAME:DOCKER_PASSWORD
             default: true
 
         # 추가 CLI 인자
@@ -47,6 +47,19 @@ spec:
         - --dry-run=false
         - --argocd-plaintext
         - --argocd-insecure
+
+        # DockerHub 인증 환경변수
+        extraEnv:
+        - name: DOCKER_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: dockerhub-credentials
+              key: username
+        - name: DOCKER_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: dockerhub-credentials
+              key: password
 
         # RBAC - ClusterRole로 전체 namespace의 Application 수정 권한 부여
         rbac:
