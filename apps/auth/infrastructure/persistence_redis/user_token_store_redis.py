@@ -49,11 +49,13 @@ class RedisUserTokenStore:
         await self._redis.expire(user_key, ttl)
 
         # 토큰 메타데이터 저장
-        meta = json.dumps({
-            "device_id": device_id,
-            "user_agent": user_agent,
-            "issued_at": issued_at,
-        })
+        meta = json.dumps(
+            {
+                "device_id": device_id,
+                "user_agent": user_agent,
+                "issued_at": issued_at,
+            }
+        )
         await self._redis.setex(meta_key, ttl, meta)
 
     async def contains(self, user_id: UUID, jti: str) -> bool:

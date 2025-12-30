@@ -68,9 +68,7 @@ class ValidateTokenQueryService:
             raise TokenRevokedError(payload.jti)
 
         # 3. 사용자 조회
-        user = await self._user_query_gateway.get_by_id(
-            UserId(value=payload.user_id.value)
-        )
+        user = await self._user_query_gateway.get_by_id(UserId(value=payload.user_id.value))
         if not user:
             raise UserNotFoundError(str(payload.user_id.value))
 

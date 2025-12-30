@@ -91,9 +91,7 @@ def build_frontend_success_url(frontend_url: str) -> str:
 
 
 def build_frontend_redirect_url(
-    request: Request,
-    fallback_url: str,
-    frontend_origin: str | None
+    request: Request, fallback_url: str, frontend_origin: str | None
 ) -> str:
     """프론트엔드 리다이렉트 URL 생성.
 
@@ -139,9 +137,7 @@ def build_frontend_redirect_url(
 
 
 def build_frontend_redirect_response(
-    request: Request,
-    fallback_url: str,
-    frontend_origin: str | None
+    request: Request, fallback_url: str, frontend_origin: str | None
 ) -> RedirectResponse:
     """프론트엔드 리다이렉트 Response 생성.
 

@@ -95,9 +95,7 @@ class Settings(BaseSettings):
     )
     otel_exporter_endpoint: Optional[str] = Field(
         default=None,
-        validation_alias=AliasChoices(
-            "OTEL_EXPORTER_OTLP_ENDPOINT", "AUTH_OTEL_EXPORTER_ENDPOINT"
-        ),
+        validation_alias=AliasChoices("OTEL_EXPORTER_OTLP_ENDPOINT", "AUTH_OTEL_EXPORTER_ENDPOINT"),
     )
 
     model_config = SettingsConfigDict(

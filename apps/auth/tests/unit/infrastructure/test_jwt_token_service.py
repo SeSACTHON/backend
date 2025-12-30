@@ -161,9 +161,7 @@ class TestJwtTokenService:
         assert payload.iat is not None
         assert payload.provider is not None
 
-    def test_different_users_get_different_tokens(
-        self, token_service: JwtTokenService
-    ) -> None:
+    def test_different_users_get_different_tokens(self, token_service: JwtTokenService) -> None:
         """다른 사용자는 다른 토큰을 받는지 테스트."""
         # Arrange
         user_id_1 = uuid4()

@@ -64,9 +64,7 @@ class LogoutInteractor:
                 payload = self._token_service.decode(request.refresh_token)
                 self._token_service.ensure_type(payload, TokenType.REFRESH)
                 await self._token_blacklist.add(payload, reason="logout")
-                await self._user_token_store.remove(
-                    payload.user_id.value, payload.jti
-                )
+                await self._user_token_store.remove(payload.user_id.value, payload.jti)
             except Exception:
                 # 토큰이 유효하지 않아도 무시
                 pass

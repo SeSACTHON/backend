@@ -28,13 +28,15 @@ class RedisStateStore:
     async def save(self, state: str, data: OAuthState, ttl_seconds: int = 600) -> None:
         """상태 저장."""
         key = f"{STATE_KEY_PREFIX}{state}"
-        value = json.dumps({
-            "provider": data.provider,
-            "redirect_uri": data.redirect_uri,
-            "code_verifier": data.code_verifier,
-            "device_id": data.device_id,
-            "frontend_origin": data.frontend_origin,
-        })
+        value = json.dumps(
+            {
+                "provider": data.provider,
+                "redirect_uri": data.redirect_uri,
+                "code_verifier": data.code_verifier,
+                "device_id": data.device_id,
+                "frontend_origin": data.frontend_origin,
+            }
+        )
         await self._redis.setex(key, ttl_seconds, value)
 
     async def consume(self, state: str) -> OAuthState | None:

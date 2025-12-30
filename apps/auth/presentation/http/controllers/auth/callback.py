@@ -103,9 +103,8 @@ async def callback(
     except Exception as e:
         # OAuth 실패 시 프론트엔드 로그인 페이지로 리다이렉트
         logger.error(
-            f"{provider.capitalize()} OAuth callback failed: "
-            f"{type(e).__name__}: {str(e)}",
-            exc_info=True
+            f"{provider.capitalize()} OAuth callback failed: " f"{type(e).__name__}: {str(e)}",
+            exc_info=True,
         )
         return build_frontend_redirect_response(
             request,

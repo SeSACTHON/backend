@@ -83,13 +83,15 @@ class TestRedisStateStore:
         """기존 상태 조회 및 삭제 테스트."""
         # Arrange
         state = "test-state-67890"
-        stored_data = json.dumps({
-            "provider": "kakao",
-            "redirect_uri": "http://localhost/callback",
-            "code_verifier": "verifier-456",
-            "device_id": None,
-            "frontend_origin": None,
-        })
+        stored_data = json.dumps(
+            {
+                "provider": "kakao",
+                "redirect_uri": "http://localhost/callback",
+                "code_verifier": "verifier-456",
+                "device_id": None,
+                "frontend_origin": None,
+            }
+        )
         mock_redis.get.return_value = stored_data
 
         # Act
@@ -319,11 +321,13 @@ class TestRedisUserTokenStore:
         """메타데이터 조회 테스트 - 존재하는 경우."""
         # Arrange
         jti = "test-jti"
-        mock_redis.get.return_value = json.dumps({
-            "device_id": "device-123",
-            "user_agent": "TestAgent/1.0",
-            "issued_at": 1234567890,
-        })
+        mock_redis.get.return_value = json.dumps(
+            {
+                "device_id": "device-123",
+                "user_agent": "TestAgent/1.0",
+                "issued_at": 1234567890,
+            }
+        )
 
         # Act
         result = await store.get_metadata(jti)

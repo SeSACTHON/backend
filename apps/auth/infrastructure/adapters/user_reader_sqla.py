@@ -47,9 +47,7 @@ class SqlaUserReader:
 
         return user
 
-    async def get_by_provider(
-        self, provider: str, provider_user_id: str
-    ) -> User | None:
+    async def get_by_provider(self, provider: str, provider_user_id: str) -> User | None:
         """OAuth 프로바이더 정보로 사용자 조회."""
         # 소셜 계정으로 조인하여 조회
         stmt = (
