@@ -641,14 +641,141 @@ kubectl scale deployment auth-api-canary --replicas=0 -n auth
 
 ---
 
+## 7. CI/CD 자동화: PR 라벨 기반 Canary 빌드
+
+Canary 이미지 빌드를 **수동 트리거**가 아닌 **PR 라벨 기반 자동화**로 구현했다.
+
+### 7.1 선택지 비교
+
+Canary 이미지를 언제 빌드할지 결정하는 세 가지 방식을 검토했다:
+
+| 방식 | 동작 | 장점 | 단점 |
+|------|------|------|------|
+| **workflow_dispatch** | 수동으로 Actions에서 빌드 트리거 | 명시적 제어 | 매번 수동 실행 필요 |
+| **브랜치 기반** | `canary/*` 브랜치 push 시 자동 빌드 | 브랜치명으로 직관적 | 브랜치 관리 복잡 |
+| **PR 라벨 기반** | PR에 `canary` 라벨 붙이면 자동 빌드 | PR 워크플로우와 통합 | 라벨 관리 필요 |
+
+### 7.2 PR 라벨 방식 선택 이유
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                   PR 라벨 기반 워크플로우                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  1. feature/auth-refactor 브랜치에서 작업                        │
+│                    ↓                                             │
+│  2. develop으로 PR 생성                                          │
+│                    ↓                                             │
+│  3. PR에 'canary' 라벨 추가 ← 자동으로 canary 이미지 빌드        │
+│                    ↓                                             │
+│  4. {service}-dev-canary 태그 이미지 DockerHub 푸시              │
+│                    ↓                                             │
+│  5. ArgoCD가 Canary Deployment 업데이트                          │
+│                    ↓                                             │
+│  6. X-Canary 헤더로 테스트                                       │
+│                    ↓                                             │
+│  7. PR 머지 → {service}-dev-latest 이미지 빌드 (stable)          │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**장점:**
+1. **PR 리뷰 워크플로우와 자연스럽게 통합** - 코드 리뷰 중 canary 테스트 가능
+2. **변경 추적 용이** - PR에서 canary 빌드 이력 확인 가능
+3. **라벨 토글로 간편 제어** - 라벨 추가/제거로 canary 활성화/비활성화
+4. **자동 변경 감지** - PR에서 변경된 서비스만 canary 빌드
+
+### 7.3 CI 워크플로우 구현
+
+`.github/workflows/ci-canary.yml`:
+
+```yaml
+name: CI Canary Build
+
+on:
+  pull_request:
+    types: [labeled, synchronize]  # 라벨 추가 또는 코드 업데이트 시
+    branches: [develop, main]
+
+jobs:
+  check-canary-label:
+    name: 🏷️ Check Canary Label
+    runs-on: ubuntu-latest
+    outputs:
+      is_canary: ${{ steps.check.outputs.is_canary }}
+    steps:
+      - name: Check for canary label
+        id: check
+        run: |
+          # PR 라벨 목록에서 'canary' 확인
+          if echo '${{ toJSON(github.event.pull_request.labels.*.name) }}' \
+             | jq -e 'contains(["canary"])' > /dev/null; then
+            echo "is_canary=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "is_canary=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # canary 라벨이 있을 때만 빌드
+  api-canary-build:
+    needs: check-canary-label
+    if: needs.check-canary-label.outputs.is_canary == 'true'
+    # ... 빌드 로직
+```
+
+### 7.4 이미지 태그 전략
+
+| 빌드 트리거 | 이미지 태그 | 용도 |
+|------------|------------|------|
+| `develop` push | `{service}-dev-latest` | Stable 버전 |
+| `main` push | `{service}-prod-latest` | 프로덕션 |
+| PR + `canary` 라벨 | `{service}-dev-canary` | Canary 테스트 |
+
+### 7.5 사용 방법
+
+1. **Feature 브랜치에서 작업**
+   ```bash
+   git checkout -b feature/auth-refactor
+   # ... 코드 작업 ...
+   git push origin feature/auth-refactor
+   ```
+
+2. **PR 생성** (develop 대상)
+
+3. **Canary 테스트가 필요하면 `canary` 라벨 추가**
+   - GitHub UI에서 Labels → `canary` 선택
+   - 자동으로 CI가 canary 이미지 빌드
+
+4. **테스트**
+   ```bash
+   curl -H "X-Canary: true" https://api.growbin.app/api/v1/auth/health
+   ```
+
+5. **테스트 완료 후 PR 머지**
+   - Stable 이미지 자동 빌드 및 배포
+
+### 7.6 향후 개선 계획
+
+1. **Argo Rollouts 통합**: 가중치 기반 자동 확대
+2. **메트릭 기반 자동 롤백**: 에러율 임계치 초과 시 자동 롤백
+3. **Slack 알림**: Canary 배포 상태 실시간 알림
+
+---
+
 ## 관련 커밋
 
 - `4efee1e2` - feat(canary): add header-based canary deployment for auth service
 - `d3a67f61` - feat(canary): add header-based canary deployment for all workloads
+- `xxxxxxxx` - feat(ci): add PR label-based canary build workflow
+
+## 관련 PR
+
+- [#XX: Canary 배포 전략 구현](https://github.com/mango-bnb/SeSACTHON/pull/XX) - 기본 Canary 인프라 구성
+- [#XX: PR 라벨 기반 Canary CI](https://github.com/mango-bnb/SeSACTHON/pull/XX) - CI 자동화
 
 ## 참고 자료
 
 - [Istio Traffic Management](https://istio.io/latest/docs/concepts/traffic-management/)
 - [Canary Deployments using Istio](https://istio.io/latest/blog/2017/0.1-canary/)
 - [Kubernetes Deployment Strategies](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/)
+- [GitHub Actions: Workflow Triggers](https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows)
 - [Argo Rollouts](https://argoproj.github.io/argo-rollouts/) (향후 자동화 고려)
