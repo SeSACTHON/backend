@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
       - name: ext-authz
-        image: docker.io/mng990/eco2:ext-authz-canary
+        image: docker.io/mng990/eco2:ext-authz-dev-latest  # TODO: canary 태그로 변경 필요
         imagePullPolicy: Always
         ports:
         - containerPort: 50051
