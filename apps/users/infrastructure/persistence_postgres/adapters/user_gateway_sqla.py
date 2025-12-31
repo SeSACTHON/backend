@@ -22,16 +22,12 @@ class SqlaUserQueryGateway:
 
     async def get_by_auth_user_id(self, auth_user_id: UUID) -> User | None:
         """auth_user_id로 사용자를 조회합니다."""
-        result = await self._session.execute(
-            select(User).where(User.auth_user_id == auth_user_id)
-        )
+        result = await self._session.execute(select(User).where(User.auth_user_id == auth_user_id))
         return result.scalar_one_or_none()
 
     async def get_by_id(self, user_id: int) -> User | None:
         """사용자 ID로 조회합니다."""
-        result = await self._session.execute(
-            select(User).where(User.id == user_id)
-        )
+        result = await self._session.execute(select(User).where(User.id == user_id))
         return result.scalar_one_or_none()
 
 
@@ -55,9 +51,7 @@ class SqlaUserCommandGateway:
 
     async def delete(self, user_id: int) -> None:
         """사용자를 삭제합니다."""
-        result = await self._session.execute(
-            select(User).where(User.id == user_id)
-        )
+        result = await self._session.execute(select(User).where(User.id == user_id))
         user = result.scalar_one_or_none()
         if user:
             await self._session.delete(user)

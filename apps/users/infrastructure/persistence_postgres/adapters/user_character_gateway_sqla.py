@@ -40,8 +40,6 @@ class SqlaUserCharacterQueryGateway:
     async def count_by_user_id(self, user_id: UUID) -> int:
         """사용자의 캐릭터 수를 조회합니다."""
         result = await self._session.execute(
-            select(func.count())
-            .select_from(UserCharacter)
-            .where(UserCharacter.user_id == user_id)
+            select(func.count()).select_from(UserCharacter).where(UserCharacter.user_id == user_id)
         )
         return result.scalar() or 0

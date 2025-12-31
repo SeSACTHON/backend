@@ -25,7 +25,13 @@ user_characters_table = Table(
     Column("source", String(120), nullable=True),
     Column("status", String(20), nullable=False, default="owned"),
     Column("acquired_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
-    Column("updated_at", DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()),
+    Column(
+        "updated_at",
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    ),
 )
 
 

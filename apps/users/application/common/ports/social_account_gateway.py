@@ -29,8 +29,6 @@ class SocialAccountQueryGateway(Protocol):
         """사용자의 소셜 계정 목록을 조회합니다."""
         ...
 
-    async def get_by_provider(
-        self, user_id: UUID, provider: str
-    ) -> SocialAccountInfo | None:
+    async def get_by_provider(self, user_id: UUID, provider: str) -> SocialAccountInfo | None:
         """특정 프로바이더의 소셜 계정을 조회합니다."""
         ...

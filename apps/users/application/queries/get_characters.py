@@ -73,9 +73,7 @@ class CheckCharacterOwnershipQuery:
             extra={"user_id": str(user_id), "character_code": character_code},
         )
 
-        character = await self._character_gateway.get_by_character_code(
-            user_id, character_code
-        )
+        character = await self._character_gateway.get_by_character_code(user_id, character_code)
 
         if character is None:
             return CharacterOwnership(

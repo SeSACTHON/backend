@@ -59,9 +59,7 @@ class SqlaSocialAccountQueryGateway:
             for row in rows
         ]
 
-    async def get_by_provider(
-        self, user_id: UUID, provider: str
-    ) -> SocialAccountInfo | None:
+    async def get_by_provider(self, user_id: UUID, provider: str) -> SocialAccountInfo | None:
         """특정 프로바이더의 소셜 계정을 조회합니다."""
         result = await self._session.execute(
             select(auth_social_accounts_table).where(

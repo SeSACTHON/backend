@@ -45,9 +45,7 @@ class UpdateProfileInteractor:
         self._user_service = user_service
         self._profile_builder = profile_builder
 
-    async def execute(
-        self, auth_user_id: UUID, update: UserUpdate, provider: str
-    ) -> UserProfile:
+    async def execute(self, auth_user_id: UUID, update: UserUpdate, provider: str) -> UserProfile:
         """사용자 프로필을 업데이트합니다.
 
         Args:
