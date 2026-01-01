@@ -83,9 +83,7 @@ class RabbitMQBlacklistEventPublisher:
             "type": "add",
             "jti": payload.jti,
             "user_id": str(payload.user_id.value),
-            "expires_at": datetime.fromtimestamp(
-                payload.exp, tz=timezone.utc
-            ).isoformat(),
+            "expires_at": datetime.fromtimestamp(payload.exp, tz=timezone.utc).isoformat(),
             "reason": reason,
             "timestamp": datetime.now(timezone.utc).isoformat(),
         }
