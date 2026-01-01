@@ -89,13 +89,12 @@ jobs:
           WORKER_SERVICES = ["character-worker", "scan-worker", "my-worker"]
           
           # 특수 서비스
-          # auth-relay: 코드 분리 작업 중 (apps/auth_relay/로 이동 예정)
-          SPECIAL_SERVICES = ["ext-authz", "sse-gateway"]
+          SPECIAL_SERVICES = ["ext-authz", "auth-relay", "sse-gateway"]
           
           api_services = []
           worker_services = []
           has_ext_authz = False
-          has_auth_relay = False  # 항상 False (코드 분리 작업 중)
+          has_auth_relay = False
           has_auth_worker = False
           has_sse_gateway = False
           
@@ -109,9 +108,9 @@ jobs:
                       
                       if svc in API_SERVICES and svc not in api_services:
                           api_services.append(svc)
-                      # apps/auth_relay/ 경로 감지 (예정)
-                      # if svc == "auth_relay":
-                      #     has_auth_relay = True
+                      # apps/auth_relay/ 경로 감지
+                      if svc == "auth_relay":
+                          has_auth_relay = True
                       # apps/auth_worker/ 경로 감지
                       if svc == "auth_worker":
                           has_auth_worker = True
@@ -124,9 +123,6 @@ jobs:
                           api_services.append(svc)
                       elif svc == "ext-authz":
                           has_ext_authz = True
-                      # auth-relay: 코드 분리 작업 중
-                      # elif svc == "auth" and "workers/blacklist_relay" in path:
-                      #     has_auth_relay = True
                       elif svc == "sse-gateway":
                           has_sse_gateway = True
                       elif svc == "character" and "worker" in path:
@@ -377,11 +373,9 @@ jobs:
 
   # ============================================================================
   # auth-relay Canary 이미지 빌드
-  # NOTE: 코드 분리 작업 중 (apps/auth_relay/로 이동 예정)
-  #       has_auth_relay가 항상 false이므로 이 job은 실행되지 않음
   # ============================================================================
   auth-relay-canary-build:
-    name: 📦 Build auth-relay Canary (DISABLED)
+    name: 📦 Build auth-relay Canary
     runs-on: ubuntu-latest
     needs:
       - check-canary-label
@@ -423,12 +417,8 @@ jobs:
       - name: Determine Dockerfile path
         id: dockerfile
         run: |
-          # Clean Architecture 리팩토링된 버전 우선
-          if [ -f "apps/auth/Dockerfile.relay" ]; then
-            echo "path=apps/auth/Dockerfile.relay" >> "$GITHUB_OUTPUT"
-          else
-            echo "path=domains/auth/Dockerfile.worker" >> "$GITHUB_OUTPUT"
-          fi
+          # Clean Architecture (apps/auth_relay/)
+          echo "path=apps/auth_relay/Dockerfile" >> "$GITHUB_OUTPUT"
 
       - name: Build and push canary image
         uses: docker/build-push-action@v5
@@ -558,7 +548,7 @@ jobs:
       - api-canary-build
       - worker-canary-build
       - ext-authz-canary-build
-      # - auth-relay-canary-build  # 코드 분리 작업 중
+      - auth-relay-canary-build
       - auth-worker-canary-build
       - sse-gateway-canary-build
     if: always() && needs.check-canary-label.outputs.is_canary == 'true'

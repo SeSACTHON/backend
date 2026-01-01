@@ -1,0 +1,116 @@
+name: CI Auth Relay
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - "apps/auth_relay/**"
+      - "workloads/domains/auth-relay/**"
+  pull_request:
+    branches:
+      - main
+      - develop
+    paths:
+      - "apps/auth_relay/**"
+      - "workloads/domains/auth-relay/**"
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: "Force build and push"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: ci-auth-relay-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: 🧪 Lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          pip install ruff black
+
+      - name: Run Ruff
+        run: ruff check apps/auth_relay
+
+      - name: Run Black
+        run: black --check apps/auth_relay
+
+  build:
+    name: 🏗️ Build & Push
+    runs-on: ubuntu-latest
+    needs: lint
+    if: github.event_name == 'push' || github.event.inputs.force_build == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: docker.io
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Prepare tags
+        id: meta
+        run: |
+          IMAGE_REPO="docker.io/mng990/eco2"
+          SHORT_SHA=$(git rev-parse --short=6 HEAD)
+          VERSION="${{ github.ref_name }}"
+          
+          if [ "${{ github.ref_name }}" = "main" ]; then
+            TAG="auth-relay-${VERSION}-${SHORT_SHA}"
+            echo "tags=${IMAGE_REPO}:${TAG},${IMAGE_REPO}:auth-relay-prod-latest,${IMAGE_REPO}:auth-relay-latest" >> "$GITHUB_OUTPUT"
+          else
+            TAG="auth-relay-dev-${SHORT_SHA}"
+            echo "tags=${IMAGE_REPO}:${TAG},${IMAGE_REPO}:auth-relay-dev-latest" >> "$GITHUB_OUTPUT"
+            echo "manifest_tag=auth-relay-dev-latest" >> "$GITHUB_OUTPUT"
+          fi
+          echo "tag_name=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: apps/auth_relay/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Update Kustomization
+        if: github.event_name == 'push' && github.ref_name != 'main'
+        env:
+          TAG_NAME: ${{ steps.meta.outputs.tag_name }}
+        run: |
+          KUSTOMIZE_FILE="workloads/domains/auth-relay/dev/kustomization.yaml"
+          
+          sed -i "s|newTag:.*|newTag: ${TAG_NAME}|" "$KUSTOMIZE_FILE"
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add "$KUSTOMIZE_FILE"
+          git commit -m "chore(auth-relay): bump image tag to ${TAG_NAME} [skip ci]" || echo "No changes"
+          git push
+
