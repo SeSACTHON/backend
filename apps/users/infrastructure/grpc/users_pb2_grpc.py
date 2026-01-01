@@ -19,20 +19,23 @@ class UsersServiceStub(object):
             channel: A grpc.Channel.
         """
         self.GetOrCreateFromOAuth = channel.unary_unary(
-                '/users.UsersService/GetOrCreateFromOAuth',
-                request_serializer=users__pb2.GetOrCreateFromOAuthRequest.SerializeToString,
-                response_deserializer=users__pb2.GetOrCreateFromOAuthResponse.FromString,
-                _registered_method=True)
+            "/users.UsersService/GetOrCreateFromOAuth",
+            request_serializer=users__pb2.GetOrCreateFromOAuthRequest.SerializeToString,
+            response_deserializer=users__pb2.GetOrCreateFromOAuthResponse.FromString,
+            _registered_method=True,
+        )
         self.GetUser = channel.unary_unary(
-                '/users.UsersService/GetUser',
-                request_serializer=users__pb2.GetUserRequest.SerializeToString,
-                response_deserializer=users__pb2.GetUserResponse.FromString,
-                _registered_method=True)
+            "/users.UsersService/GetUser",
+            request_serializer=users__pb2.GetUserRequest.SerializeToString,
+            response_deserializer=users__pb2.GetUserResponse.FromString,
+            _registered_method=True,
+        )
         self.UpdateLoginTime = channel.unary_unary(
-                '/users.UsersService/UpdateLoginTime',
-                request_serializer=users__pb2.UpdateLoginTimeRequest.SerializeToString,
-                response_deserializer=users__pb2.UpdateLoginTimeResponse.FromString,
-                _registered_method=True)
+            "/users.UsersService/UpdateLoginTime",
+            request_serializer=users__pb2.UpdateLoginTimeRequest.SerializeToString,
+            response_deserializer=users__pb2.UpdateLoginTimeResponse.FromString,
+            _registered_method=True,
+        )
 
 
 class UsersServiceServicer(object):
@@ -43,52 +46,50 @@ class UsersServiceServicer(object):
     """
 
     def GetOrCreateFromOAuth(self, request, context):
-        """OAuth 로그인 시 사용자 조회 또는 생성
-        """
+        """OAuth 로그인 시 사용자 조회 또는 생성"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def GetUser(self, request, context):
-        """사용자 조회 (ID로)
-        """
+        """사용자 조회 (ID로)"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
     def UpdateLoginTime(self, request, context):
-        """로그인 시간 업데이트
-        """
+        """로그인 시간 업데이트"""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
-        context.set_details('Method not implemented!')
-        raise NotImplementedError('Method not implemented!')
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
 
 
 def add_UsersServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
-            'GetOrCreateFromOAuth': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetOrCreateFromOAuth,
-                    request_deserializer=users__pb2.GetOrCreateFromOAuthRequest.FromString,
-                    response_serializer=users__pb2.GetOrCreateFromOAuthResponse.SerializeToString,
-            ),
-            'GetUser': grpc.unary_unary_rpc_method_handler(
-                    servicer.GetUser,
-                    request_deserializer=users__pb2.GetUserRequest.FromString,
-                    response_serializer=users__pb2.GetUserResponse.SerializeToString,
-            ),
-            'UpdateLoginTime': grpc.unary_unary_rpc_method_handler(
-                    servicer.UpdateLoginTime,
-                    request_deserializer=users__pb2.UpdateLoginTimeRequest.FromString,
-                    response_serializer=users__pb2.UpdateLoginTimeResponse.SerializeToString,
-            ),
+        "GetOrCreateFromOAuth": grpc.unary_unary_rpc_method_handler(
+            servicer.GetOrCreateFromOAuth,
+            request_deserializer=users__pb2.GetOrCreateFromOAuthRequest.FromString,
+            response_serializer=users__pb2.GetOrCreateFromOAuthResponse.SerializeToString,
+        ),
+        "GetUser": grpc.unary_unary_rpc_method_handler(
+            servicer.GetUser,
+            request_deserializer=users__pb2.GetUserRequest.FromString,
+            response_serializer=users__pb2.GetUserResponse.SerializeToString,
+        ),
+        "UpdateLoginTime": grpc.unary_unary_rpc_method_handler(
+            servicer.UpdateLoginTime,
+            request_deserializer=users__pb2.UpdateLoginTimeRequest.FromString,
+            response_serializer=users__pb2.UpdateLoginTimeResponse.SerializeToString,
+        ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
-            'users.UsersService', rpc_method_handlers)
+        "users.UsersService", rpc_method_handlers
+    )
     server.add_generic_rpc_handlers((generic_handler,))
-    server.add_registered_method_handlers('users.UsersService', rpc_method_handlers)
+    server.add_registered_method_handlers("users.UsersService", rpc_method_handlers)
 
 
- # This class is part of an EXPERIMENTAL API.
+# This class is part of an EXPERIMENTAL API.
 class UsersService(object):
     """============================================================================
     Users Service - auth ↔ users 도메인 간 통신
@@ -97,20 +98,22 @@ class UsersService(object):
     """
 
     @staticmethod
-    def GetOrCreateFromOAuth(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def GetOrCreateFromOAuth(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/users.UsersService/GetOrCreateFromOAuth',
+            "/users.UsersService/GetOrCreateFromOAuth",
             users__pb2.GetOrCreateFromOAuthRequest.SerializeToString,
             users__pb2.GetOrCreateFromOAuthResponse.FromString,
             options,
@@ -121,23 +124,26 @@ class UsersService(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )
 
     @staticmethod
-    def GetUser(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def GetUser(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/users.UsersService/GetUser',
+            "/users.UsersService/GetUser",
             users__pb2.GetUserRequest.SerializeToString,
             users__pb2.GetUserResponse.FromString,
             options,
@@ -148,23 +154,26 @@ class UsersService(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )
 
     @staticmethod
-    def UpdateLoginTime(request,
-            target,
-            options=(),
-            channel_credentials=None,
-            call_credentials=None,
-            insecure=False,
-            compression=None,
-            wait_for_ready=None,
-            timeout=None,
-            metadata=None):
+    def UpdateLoginTime(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
         return grpc.experimental.unary_unary(
             request,
             target,
-            '/users.UsersService/UpdateLoginTime',
+            "/users.UsersService/UpdateLoginTime",
             users__pb2.UpdateLoginTimeRequest.SerializeToString,
             users__pb2.UpdateLoginTimeResponse.FromString,
             options,
@@ -175,4 +184,5 @@ class UsersService(object):
             wait_for_ready,
             timeout,
             metadata,
-            _registered_method=True)
+            _registered_method=True,
+        )

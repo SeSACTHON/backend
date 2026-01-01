@@ -81,9 +81,7 @@ class UsersServicer(users_pb2_grpc.UsersServiceServicer):
                     email=request.email if request.HasField("email") else None,
                     nickname=request.nickname if request.HasField("nickname") else None,
                     profile_image_url=(
-                        request.profile_image_url
-                        if request.HasField("profile_image_url")
-                        else None
+                        request.profile_image_url if request.HasField("profile_image_url") else None
                     ),
                 )
 
@@ -208,9 +206,7 @@ class UsersServicer(users_pb2_grpc.UsersServiceServicer):
 
         return user, social_account
 
-    async def _get_user_by_id(
-        self, session: "AsyncSession", user_id: UUID
-    ) -> AuthUserModel | None:
+    async def _get_user_by_id(self, session: "AsyncSession", user_id: UUID) -> AuthUserModel | None:
         """ID로 사용자 조회."""
         from sqlalchemy import select
 
