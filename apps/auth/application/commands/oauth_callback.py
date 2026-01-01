@@ -150,7 +150,6 @@ class OAuthCallbackInteractor:
         )
 
         # 6. 로그인 감사 기록
-        from datetime import datetime
 
         login_audit = LoginAudit(
             id=uuid4(),

@@ -5,7 +5,6 @@
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Protocol
 
 from apps.auth.domain.value_objects.token_payload import TokenPayload
