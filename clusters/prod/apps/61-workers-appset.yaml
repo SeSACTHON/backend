@@ -12,9 +12,13 @@ spec:
   - list:
       elements:
       # Phase 1: Auth 관련
-      - name: auth-relay
+      - name: auth-worker
         namespace: auth
         phase: '1'
+      # auth-relay: 코드 분리 작업 중 (apps/auth_relay/로 이동 예정)
+      # - name: auth-relay
+      #   namespace: auth
+      #   phase: '1'
       # Phase 2: Scan 관련
       - name: scan-worker
         namespace: scan
