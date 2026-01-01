@@ -6,6 +6,7 @@ OAuth 콜백 처리 Use Case입니다.
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timezone
 from uuid import uuid4
 
 from apps.auth.domain.entities.login_audit import LoginAudit
@@ -149,7 +150,6 @@ class OAuthCallbackInteractor:
         )
 
         # 6. 로그인 감사 기록
-        from datetime import datetime
 
         login_audit = LoginAudit(
             id=uuid4(),
@@ -158,7 +158,7 @@ class OAuthCallbackInteractor:
             jti=token_pair.access_jti,
             login_ip=request.ip_address,
             user_agent=request.user_agent,
-            issued_at=datetime.utcnow(),
+            issued_at=datetime.now(timezone.utc),
         )
         self._login_audit_gateway.add(login_audit)
 
