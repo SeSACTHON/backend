@@ -35,6 +35,17 @@ class Settings(BaseSettings):
         description="Bypass auth validation for local development",
     )
 
+    # gRPC Server
+    grpc_server_port: int = Field(
+        50051,
+        validation_alias=AliasChoices("GRPC_SERVER_PORT", "USERS_GRPC_PORT"),
+        description="gRPC server port",
+    )
+    grpc_max_workers: int = Field(
+        10,
+        description="Maximum gRPC worker threads",
+    )
+
     model_config = SettingsConfigDict(
         env_prefix="USERS_",
         case_sensitive=False,

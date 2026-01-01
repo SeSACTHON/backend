@@ -183,6 +183,20 @@ def get_user_service(
     return UserService(user_id_generator)
 
 
+def get_user_management_service(settings: Settings = Depends(get_settings)):
+    """UserManagementService 제공자 (gRPC 클라이언트).
+
+    users 도메인과 gRPC 통신을 위한 어댑터입니다.
+    """
+    from apps.auth.infrastructure.grpc.users_client import UsersGrpcClient
+    from apps.auth.infrastructure.grpc.user_management_adapter import (
+        UserManagementGrpcAdapter,
+    )
+
+    client = UsersGrpcClient(settings)
+    return UserManagementGrpcAdapter(client)
+
+
 # ============================================================
 # Use Case Dependencies
 # ============================================================
@@ -202,10 +216,7 @@ async def get_oauth_authorize_interactor(
 
 
 async def get_oauth_callback_interactor(
-    user_service=Depends(get_user_service),
-    user_command_gateway=Depends(get_user_command_gateway),
-    user_query_gateway=Depends(get_user_query_gateway),
-    social_account_gateway=Depends(get_social_account_gateway),
+    user_management=Depends(get_user_management_service),
     login_audit_gateway=Depends(get_login_audit_gateway),
     token_service=Depends(get_token_service),
     state_store=Depends(get_state_store),
@@ -214,14 +225,16 @@ async def get_oauth_callback_interactor(
     flusher=Depends(get_flusher),
     transaction_manager=Depends(get_transaction_manager),
 ):
-    """OAuthCallbackInteractor 제공자."""
+    """OAuthCallbackInteractor 제공자.
+
+    Phase 1: gRPC를 통해 users 도메인과 통신합니다.
+    - UserManagementService (gRPC 어댑터)를 사용
+    - 기존 UserService, UserCommandGateway 등은 deprecated
+    """
     from apps.auth.application.commands import OAuthCallbackInteractor
 
     return OAuthCallbackInteractor(
-        user_service=user_service,
-        user_command_gateway=user_command_gateway,
-        user_query_gateway=user_query_gateway,
-        social_account_gateway=social_account_gateway,
+        user_management=user_management,
         login_audit_gateway=login_audit_gateway,
         token_service=token_service,
         state_store=state_store,
