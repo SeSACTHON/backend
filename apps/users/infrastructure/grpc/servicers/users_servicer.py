@@ -3,8 +3,8 @@
 OAuth 콜백에서 auth 도메인이 호출하는 사용자 관련 gRPC 서비스입니다.
 
 통합 스키마 사용:
-    - users.users
-    - users.user_social_accounts
+    - users.accounts
+    - users.social_accounts
 
 참고: https://rooftopsnow.tistory.com/127
 """
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 class UsersServicer(users_pb2_grpc.UsersServiceServicer):
     """Users gRPC Service 구현.
 
-    users.users, users.user_social_accounts 테이블에 접근합니다.
+    users.accounts, users.social_accounts 테이블에 접근합니다.
     """
 
     def __init__(self, session_factory) -> None:
@@ -172,25 +172,25 @@ class UsersServicer(users_pb2_grpc.UsersServiceServicer):
         """Provider 정보로 사용자 조회."""
         from sqlalchemy import select
 
-        from apps.users.infrastructure.persistence_postgres.mappings.user import users_table
+        from apps.users.infrastructure.persistence_postgres.mappings.user import accounts_table
         from apps.users.infrastructure.persistence_postgres.mappings.user_social_account import (
-            user_social_accounts_table,
+            social_accounts_table,
         )
 
         # 소셜 계정으로 사용자 조회
         stmt = (
             select(
-                users_table,
-                user_social_accounts_table,
+                accounts_table,
+                social_accounts_table,
             )
-            .select_from(users_table)
+            .select_from(accounts_table)
             .join(
-                user_social_accounts_table,
-                users_table.c.id == user_social_accounts_table.c.user_id,
+                social_accounts_table,
+                accounts_table.c.id == social_accounts_table.c.user_id,
             )
             .where(
-                user_social_accounts_table.c.provider == provider,
-                user_social_accounts_table.c.provider_user_id == provider_user_id,
+                social_accounts_table.c.provider == provider,
+                social_accounts_table.c.provider_user_id == provider_user_id,
             )
         )
 
@@ -214,14 +214,14 @@ class UsersServicer(users_pb2_grpc.UsersServiceServicer):
         )
 
         social_account = UserSocialAccount(
-            id=row[user_social_accounts_table.c.id],
-            user_id=row[user_social_accounts_table.c.user_id],
-            provider=row[user_social_accounts_table.c.provider],
-            provider_user_id=row[user_social_accounts_table.c.provider_user_id],
-            email=row[user_social_accounts_table.c.email],
-            last_login_at=row[user_social_accounts_table.c.last_login_at],
-            created_at=row[user_social_accounts_table.c.created_at],
-            updated_at=row[user_social_accounts_table.c.updated_at],
+            id=row[social_accounts_table.c.id],
+            user_id=row[social_accounts_table.c.user_id],
+            provider=row[social_accounts_table.c.provider],
+            provider_user_id=row[social_accounts_table.c.provider_user_id],
+            email=row[social_accounts_table.c.email],
+            last_login_at=row[social_accounts_table.c.last_login_at],
+            created_at=row[social_accounts_table.c.created_at],
+            updated_at=row[social_accounts_table.c.updated_at],
         )
 
         return user, social_account
@@ -230,9 +230,9 @@ class UsersServicer(users_pb2_grpc.UsersServiceServicer):
         """ID로 사용자 조회."""
         from sqlalchemy import select
 
-        from apps.users.infrastructure.persistence_postgres.mappings.user import users_table
+        from apps.users.infrastructure.persistence_postgres.mappings.user import accounts_table
 
-        stmt = select(users_table).where(users_table.c.id == user_id)
+        stmt = select(accounts_table).where(accounts_table.c.id == user_id)
         result = await session.execute(stmt)
         row = result.first()
 
@@ -264,9 +264,9 @@ class UsersServicer(users_pb2_grpc.UsersServiceServicer):
         """OAuth 프로필로 새 사용자 생성."""
         from sqlalchemy import insert
 
-        from apps.users.infrastructure.persistence_postgres.mappings.user import users_table
+        from apps.users.infrastructure.persistence_postgres.mappings.user import accounts_table
         from apps.users.infrastructure.persistence_postgres.mappings.user_social_account import (
-            user_social_accounts_table,
+            social_accounts_table,
         )
 
         now = datetime.now(timezone.utc)
@@ -284,7 +284,7 @@ class UsersServicer(users_pb2_grpc.UsersServiceServicer):
             "updated_at": now,
             "last_login_at": now,
         }
-        await session.execute(insert(users_table).values(**user_values))
+        await session.execute(insert(accounts_table).values(**user_values))
 
         # SocialAccount 생성
         social_account_id = uuid4()
@@ -298,7 +298,7 @@ class UsersServicer(users_pb2_grpc.UsersServiceServicer):
             "created_at": now,
             "updated_at": now,
         }
-        await session.execute(insert(user_social_accounts_table).values(**social_values))
+        await session.execute(insert(social_accounts_table).values(**social_values))
 
         user = User(
             id=user_id,
@@ -336,27 +336,27 @@ class UsersServicer(users_pb2_grpc.UsersServiceServicer):
         """로그인 시간 업데이트."""
         from sqlalchemy import update
 
-        from apps.users.infrastructure.persistence_postgres.mappings.user import users_table
+        from apps.users.infrastructure.persistence_postgres.mappings.user import accounts_table
         from apps.users.infrastructure.persistence_postgres.mappings.user_social_account import (
-            user_social_accounts_table,
+            social_accounts_table,
         )
 
         now = datetime.now(timezone.utc)
 
         # User last_login_at 업데이트
         await session.execute(
-            update(users_table)
-            .where(users_table.c.id == user_id)
+            update(accounts_table)
+            .where(accounts_table.c.id == user_id)
             .values(last_login_at=now, updated_at=now)
         )
 
         # SocialAccount last_login_at 업데이트
         await session.execute(
-            update(user_social_accounts_table)
+            update(social_accounts_table)
             .where(
-                user_social_accounts_table.c.user_id == user_id,
-                user_social_accounts_table.c.provider == provider,
-                user_social_accounts_table.c.provider_user_id == provider_user_id,
+                social_accounts_table.c.user_id == user_id,
+                social_accounts_table.c.provider == provider,
+                social_accounts_table.c.provider_user_id == provider_user_id,
             )
             .values(last_login_at=now, updated_at=now)
         )

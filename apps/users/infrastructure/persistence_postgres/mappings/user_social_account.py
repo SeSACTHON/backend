@@ -1,8 +1,9 @@
-"""UserSocialAccount ORM mapping - Imperative mapping for users.user_social_accounts table.
+"""UserSocialAccount ORM mapping - Imperative mapping for users.social_accounts table.
 
 통합 스키마:
-    - auth.user_social_accounts → users.user_social_accounts 이동
-    - user_id는 users.users.id 참조 (FK CASCADE)
+    - auth.user_social_accounts → users.social_accounts 이동
+    - user_id는 users.accounts.id 참조 (FK CASCADE)
+    - (provider, provider_user_id) 유니크 제약
 """
 
 from __future__ import annotations
@@ -42,15 +43,15 @@ class UserSocialAccount:
     updated_at: datetime | None = None
 
 
-# users.user_social_accounts 테이블 정의
-user_social_accounts_table = Table(
-    "user_social_accounts",
+# users.social_accounts 테이블 정의
+social_accounts_table = Table(
+    "social_accounts",
     metadata,
     Column("id", PG_UUID(as_uuid=True), primary_key=True),
     Column(
         "user_id",
         PG_UUID(as_uuid=True),
-        ForeignKey("users.users.id", ondelete="CASCADE"),
+        ForeignKey("users.accounts.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     ),
@@ -71,28 +72,28 @@ user_social_accounts_table = Table(
 
 
 def start_user_social_account_mapper() -> None:
-    """UserSocialAccount 엔티티를 users.user_social_accounts 테이블에 매핑합니다."""
+    """UserSocialAccount 엔티티를 users.social_accounts 테이블에 매핑합니다."""
     if hasattr(UserSocialAccount, "__mapper__"):
         return
 
     mapper_registry.map_imperatively(
         UserSocialAccount,
-        user_social_accounts_table,
+        social_accounts_table,
         properties={
-            "id": user_social_accounts_table.c.id,
-            "user_id": user_social_accounts_table.c.user_id,
-            "provider": user_social_accounts_table.c.provider,
-            "provider_user_id": user_social_accounts_table.c.provider_user_id,
-            "email": user_social_accounts_table.c.email,
-            "last_login_at": user_social_accounts_table.c.last_login_at,
-            "created_at": user_social_accounts_table.c.created_at,
-            "updated_at": user_social_accounts_table.c.updated_at,
+            "id": social_accounts_table.c.id,
+            "user_id": social_accounts_table.c.user_id,
+            "provider": social_accounts_table.c.provider,
+            "provider_user_id": social_accounts_table.c.provider_user_id,
+            "email": social_accounts_table.c.email,
+            "last_login_at": social_accounts_table.c.last_login_at,
+            "created_at": social_accounts_table.c.created_at,
+            "updated_at": social_accounts_table.c.updated_at,
         },
     )
 
 
 __all__ = [
     "UserSocialAccount",
-    "user_social_accounts_table",
+    "social_accounts_table",
     "start_user_social_account_mapper",
 ]

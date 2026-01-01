@@ -2,8 +2,8 @@
 -- V003: users 스키마 생성 및 데이터 통합
 --
 -- 목표:
---   - auth.users + user_profile.users → users.users (통합)
---   - auth.user_social_accounts → users.user_social_accounts (이동)
+--   - auth.users + user_profile.users → users.accounts (통합)
+--   - auth.user_social_accounts → users.social_accounts (이동)
 --   - user_profile.user_characters → users.user_characters (이동)
 --
 -- Note:
@@ -18,9 +18,9 @@
 CREATE SCHEMA IF NOT EXISTS users;
 
 -- ============================================
--- Step 2: users.users 테이블 생성 (통합)
+-- Step 2: users.accounts 테이블 생성 (통합)
 -- ============================================
-CREATE TABLE users.users (
+CREATE TABLE users.accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nickname VARCHAR(120),
     name VARCHAR(120),
@@ -31,18 +31,18 @@ CREATE TABLE users.users (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     last_login_at TIMESTAMPTZ,
 
-    CONSTRAINT uq_users_phone UNIQUE (phone_number)
+    CONSTRAINT uq_accounts_phone UNIQUE (phone_number)
 );
 
 -- Partial indexes (NULL 제외)
-CREATE INDEX idx_users_nickname ON users.users(nickname) WHERE nickname IS NOT NULL;
-CREATE INDEX idx_users_phone ON users.users(phone_number) WHERE phone_number IS NOT NULL;
-CREATE INDEX idx_users_email ON users.users(email) WHERE email IS NOT NULL;
+CREATE INDEX idx_accounts_nickname ON users.accounts(nickname) WHERE nickname IS NOT NULL;
+CREATE INDEX idx_accounts_phone ON users.accounts(phone_number) WHERE phone_number IS NOT NULL;
+CREATE INDEX idx_accounts_email ON users.accounts(email) WHERE email IS NOT NULL;
 
 -- ============================================
--- Step 3: users.user_social_accounts 테이블 생성
+-- Step 3: users.social_accounts 테이블 생성
 -- ============================================
-CREATE TABLE users.user_social_accounts (
+CREATE TABLE users.social_accounts (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
     provider VARCHAR(32) NOT NULL,
@@ -53,14 +53,14 @@ CREATE TABLE users.user_social_accounts (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT fk_social_user
-        FOREIGN KEY (user_id) REFERENCES users.users(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users.accounts(id) ON DELETE CASCADE,
     CONSTRAINT uq_social_identity
         UNIQUE (provider, provider_user_id)
 );
 
-CREATE INDEX idx_social_user_id ON users.user_social_accounts(user_id);
-CREATE INDEX idx_social_provider ON users.user_social_accounts(provider);
-CREATE INDEX idx_social_provider_user ON users.user_social_accounts(provider, provider_user_id);
+CREATE INDEX idx_social_user_id ON users.social_accounts(user_id);
+CREATE INDEX idx_social_provider ON users.social_accounts(provider);
+CREATE INDEX idx_social_provider_user ON users.social_accounts(provider, provider_user_id);
 
 -- ============================================
 -- Step 4: users.user_characters 테이블 생성
@@ -79,7 +79,7 @@ CREATE TABLE users.user_characters (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
     CONSTRAINT fk_character_user
-        FOREIGN KEY (user_id) REFERENCES users.users(id) ON DELETE CASCADE,
+        FOREIGN KEY (user_id) REFERENCES users.accounts(id) ON DELETE CASCADE,
     CONSTRAINT uq_user_character
         UNIQUE (user_id, character_code),
     CONSTRAINT chk_status
@@ -94,9 +94,9 @@ CREATE INDEX idx_characters_code ON users.user_characters(character_code);
 -- Step 5: 데이터 마이그레이션 (auth → users)
 -- ============================================
 
--- 5.1: auth.users → users.users (기본 데이터)
+-- 5.1: auth.users → users.accounts (기본 데이터)
 -- Note: username 컬럼은 마이그레이션하지 않음 (nickname으로 대체)
-INSERT INTO users.users (
+INSERT INTO users.accounts (
     id,
     nickname,
     name,
@@ -121,8 +121,8 @@ FROM auth.users au
 LEFT JOIN user_profile.users up ON au.id = up.auth_user_id
 ON CONFLICT (id) DO NOTHING;
 
--- 5.2: auth.user_social_accounts → users.user_social_accounts
-INSERT INTO users.user_social_accounts (
+-- 5.2: auth.user_social_accounts → users.social_accounts
+INSERT INTO users.social_accounts (
     id,
     user_id,
     provider,
@@ -176,9 +176,9 @@ ON CONFLICT (user_id, character_code) DO NOTHING;
 -- ============================================
 -- Step 6: 검증 쿼리 (실행 후 확인용)
 -- ============================================
--- SELECT 'users.users' AS table_name, COUNT(*) FROM users.users
+-- SELECT 'users.accounts' AS table_name, COUNT(*) FROM users.accounts
 -- UNION ALL
--- SELECT 'users.user_social_accounts', COUNT(*) FROM users.user_social_accounts
+-- SELECT 'users.social_accounts', COUNT(*) FROM users.social_accounts
 -- UNION ALL
 -- SELECT 'users.user_characters', COUNT(*) FROM users.user_characters
 -- UNION ALL

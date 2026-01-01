@@ -1,4 +1,4 @@
-"""User ORM mapping - Imperative mapping for users.users table.
+"""User ORM mapping - Imperative mapping for users.accounts table.
 
 통합 스키마:
     - auth.users + user_profile.users 병합
@@ -18,9 +18,9 @@ from apps.users.domain.entities.user import User
 metadata = MetaData(schema="users")
 mapper_registry = registry(metadata=metadata)
 
-# users.users 테이블 정의 (통합 스키마)
-users_table = Table(
-    "users",
+# users.accounts 테이블 정의 (통합 스키마)
+accounts_table = Table(
+    "accounts",
     metadata,
     Column("id", UUID(as_uuid=True), primary_key=True),
     Column("nickname", String(120), nullable=True),
@@ -41,19 +41,19 @@ users_table = Table(
 
 
 def start_user_mapper() -> None:
-    """User 엔티티를 users.users 테이블에 매핑합니다."""
+    """User 엔티티를 users.accounts 테이블에 매핑합니다."""
     mapper_registry.map_imperatively(
         User,
-        users_table,
+        accounts_table,
         properties={
-            "id": users_table.c.id,
-            "nickname": users_table.c.nickname,
-            "name": users_table.c.name,
-            "email": users_table.c.email,
-            "phone_number": users_table.c.phone_number,
-            "profile_image_url": users_table.c.profile_image_url,
-            "created_at": users_table.c.created_at,
-            "updated_at": users_table.c.updated_at,
-            "last_login_at": users_table.c.last_login_at,
+            "id": accounts_table.c.id,
+            "nickname": accounts_table.c.nickname,
+            "name": accounts_table.c.name,
+            "email": accounts_table.c.email,
+            "phone_number": accounts_table.c.phone_number,
+            "profile_image_url": accounts_table.c.profile_image_url,
+            "created_at": accounts_table.c.created_at,
+            "updated_at": accounts_table.c.updated_at,
+            "last_login_at": accounts_table.c.last_login_at,
         },
     )
