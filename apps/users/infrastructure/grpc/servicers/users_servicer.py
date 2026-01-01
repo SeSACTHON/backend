@@ -173,11 +173,6 @@ class UsersServicer(users_pb2_grpc.UsersServiceServicer):
         from sqlalchemy import select
         from sqlalchemy.orm import selectinload
 
-        from apps.users.infrastructure.persistence_postgres.mappings.auth_user import (
-            auth_users_table,
-            auth_user_social_accounts_table,
-        )
-
         stmt = (
             select(AuthUserModel)
             .join(AuthSocialAccountModel)
@@ -263,11 +258,6 @@ class UsersServicer(users_pb2_grpc.UsersServiceServicer):
     ) -> bool:
         """로그인 시간 업데이트."""
         from sqlalchemy import update
-
-        from apps.users.infrastructure.persistence_postgres.mappings.auth_user import (
-            auth_users_table,
-            auth_user_social_accounts_table,
-        )
 
         now = datetime.now(timezone.utc)
 

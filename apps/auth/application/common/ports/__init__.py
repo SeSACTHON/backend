@@ -59,6 +59,7 @@ OAuthClientService = OAuthProviderGateway  # oauth_client.py → oauth_provider_
 
 __all__ = [
     # 공용 포트
+    "BlacklistEventPublisher",
     "Flusher",
     "OutboxGateway",
     "TransactionManager",

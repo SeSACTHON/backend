@@ -140,6 +140,36 @@ get_token_blacklist = get_token_blacklist_store
 
 
 # ============================================================
+# Auth Domain - Messaging Dependencies
+# ============================================================
+
+
+_blacklist_event_publisher = None
+
+
+async def get_blacklist_event_publisher(settings: Settings = Depends(get_settings)):
+    """BlacklistEventPublisher 제공자 (RabbitMQ).
+
+    Note:
+        Singleton 패턴으로 연결을 재사용합니다.
+        AMQP_URL이 설정되지 않은 경우 None을 반환합니다.
+    """
+    global _blacklist_event_publisher
+
+    if settings.amqp_url is None:
+        # AMQP 미설정 시 None 반환 (로컬 개발 환경 등)
+        return None
+
+    if _blacklist_event_publisher is None:
+        from apps.auth.infrastructure.messaging import RabbitMQBlacklistEventPublisher
+
+        _blacklist_event_publisher = RabbitMQBlacklistEventPublisher(settings.amqp_url)
+        await _blacklist_event_publisher.connect()
+
+    return _blacklist_event_publisher
+
+
+# ============================================================
 # Auth Domain - Token & OAuth Dependencies
 # ============================================================
 
