@@ -3,6 +3,7 @@
 OAuth 인증 URL 생성 엔드포인트입니다.
 """
 
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, Query, Request
@@ -10,11 +11,18 @@ from fastapi.responses import RedirectResponse
 
 from apps.auth.application.oauth.commands import OAuthAuthorizeInteractor
 from apps.auth.application.oauth.dto import OAuthAuthorizeRequest
-from apps.auth.presentation.http.schemas.auth import AuthorizeResponse
+from apps.auth.presentation.http.schemas.auth import (
+    AuthorizationData,
+    AuthorizationSuccessResponse,
+    AuthorizeResponse,
+)
 from apps.auth.presentation.http.utils.redirect import FRONTEND_ORIGIN_HEADER
 from apps.auth.setup.dependencies import get_oauth_authorize_interactor
 
 router = APIRouter()
+
+# OAuth state TTL (레거시 호환)
+OAUTH_STATE_TTL_SECONDS = 600  # 10분
 
 
 @router.get(
@@ -81,12 +89,11 @@ async def _do_login_redirect(
 
 @router.get(
     "/{provider}",
-    response_class=RedirectResponse,
-    summary="OAuth 로그인 (레거시)",
-    deprecated=True,
-    description="Deprecated: /{provider}/login 사용 권장",
+    response_model=AuthorizationSuccessResponse,
+    summary="OAuth 인증 URL 생성 (레거시)",
+    description="레거시 호환: JSON 응답으로 authorization_url 반환",
 )
-async def login_legacy(
+async def authorize_legacy(
     provider: str,
     request: Request,
     redirect_uri: str | None = Query(None),
@@ -94,14 +101,30 @@ async def login_legacy(
     frontend_origin: str | None = Query(None),
     x_frontend_origin: Optional[str] = Header(None, alias=FRONTEND_ORIGIN_HEADER),
     interactor: OAuthAuthorizeInteractor = Depends(get_oauth_authorize_interactor),
-) -> RedirectResponse:
-    """[레거시] OAuth 인증 페이지로 리다이렉트합니다.
+) -> AuthorizationSuccessResponse:
+    """[레거시] OAuth 인증 URL을 JSON으로 반환합니다.
 
-    하위 호환성을 위해 유지됩니다. /{provider}/login 사용을 권장합니다.
+    프론트엔드는 응답의 authorization_url로 직접 이동해야 합니다.
+    하위 호환성을 위해 유지됩니다.
     """
     resolved_frontend_origin = frontend_origin or x_frontend_origin
-    return await _do_login_redirect(
-        provider, redirect_uri, device_id, resolved_frontend_origin, interactor
+    auth_request = OAuthAuthorizeRequest(
+        provider=provider,
+        redirect_uri=redirect_uri,
+        device_id=device_id,
+        frontend_origin=resolved_frontend_origin,
+    )
+    result = await interactor.execute(auth_request)
+
+    # 레거시 응답 형식 (expires_at 포함)
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=OAUTH_STATE_TTL_SECONDS)
+    return AuthorizationSuccessResponse(
+        data=AuthorizationData(
+            provider=provider,
+            state=result.state,
+            authorization_url=result.authorization_url,
+            expires_at=expires_at,
+        )
     )
 
 
