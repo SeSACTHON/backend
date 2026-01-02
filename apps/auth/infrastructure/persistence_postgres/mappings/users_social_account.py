@@ -1,4 +1,4 @@
-"""UserSocialAccount ORM Mapping."""
+"""UsersSocialAccount ORM Mapping."""
 
 from sqlalchemy import Table, Column, String, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
@@ -7,7 +7,7 @@ from sqlalchemy.sql import func
 from apps.auth.infrastructure.persistence_postgres.registry import mapper_registry
 
 
-user_social_accounts_table = Table(
+users_social_accounts_table = Table(
     "user_social_accounts",
     mapper_registry.metadata,
     Column("id", UUID(as_uuid=True), primary_key=True),
@@ -29,8 +29,8 @@ user_social_accounts_table = Table(
 )
 
 
-def start_social_account_mapper() -> None:
-    """UserSocialAccount 매퍼 시작."""
+def start_users_social_account_mapper() -> None:
+    """UsersSocialAccount 매퍼 시작."""
     from apps.auth.domain.entities.user_social_account import UserSocialAccount
 
     if hasattr(UserSocialAccount, "__mapper__"):
@@ -38,5 +38,5 @@ def start_social_account_mapper() -> None:
 
     mapper_registry.map_imperatively(
         UserSocialAccount,
-        user_social_accounts_table,
+        users_social_accounts_table,
     )

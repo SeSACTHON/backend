@@ -1,6 +1,6 @@
-"""Redis User Token Store.
+"""Redis Users Token Store.
 
-UserTokenStore 포트의 구현체입니다.
+UsersTokenStore 포트의 구현체입니다.
 """
 
 from __future__ import annotations
@@ -18,10 +18,10 @@ USER_TOKENS_KEY_PREFIX = "user:tokens:"
 TOKEN_META_KEY_PREFIX = "token:meta:"
 
 
-class RedisUserTokenStore:
+class RedisUsersTokenStore:
     """Redis 기반 사용자 토큰 저장소.
 
-    UserTokenStore 구현체.
+    UsersTokenStore 구현체.
     """
 
     def __init__(self, redis: "aioredis.Redis") -> None:

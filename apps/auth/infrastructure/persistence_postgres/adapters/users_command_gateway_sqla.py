@@ -1,6 +1,6 @@
-"""SQLAlchemy User Data Mapper.
+"""SQLAlchemy Users Command Gateway.
 
-UserCommandGateway의 구현체입니다.
+UsersCommandGateway 포트의 구현체입니다.
 """
 
 from __future__ import annotations
@@ -11,16 +11,16 @@ from sqlalchemy import delete
 
 from apps.auth.domain.entities.user import User
 from apps.auth.domain.value_objects.user_id import UserId
-from apps.auth.infrastructure.persistence_postgres.mappings.user import users_table
+from apps.auth.infrastructure.persistence_postgres.mappings.users import users_table
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-class SqlaUserDataMapper:
-    """SQLAlchemy 기반 User 쓰기 Gateway.
+class SqlaUsersCommandGateway:
+    """SQLAlchemy 기반 Users Command Gateway.
 
-    UserCommandGateway 구현체.
+    UsersCommandGateway 구현체.
     """
 
     def __init__(self, session: "AsyncSession") -> None:

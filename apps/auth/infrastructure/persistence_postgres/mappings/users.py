@@ -1,4 +1,4 @@
-"""User ORM Mapping.
+"""Users ORM Mapping.
 
 User 도메인 엔티티와 DB 테이블의 매핑입니다.
 """
@@ -26,8 +26,8 @@ users_table = Table(
 )
 
 
-def start_user_mapper() -> None:
-    """User 매퍼 시작.
+def start_users_mapper() -> None:
+    """Users 매퍼 시작.
 
     Note:
         Imperative Mapping 사용.

@@ -1,6 +1,6 @@
-"""SQLAlchemy SocialAccount Mapper.
+"""SQLAlchemy SocialAccount Query Gateway.
 
-SocialAccountGateway의 구현체입니다.
+SocialAccountQueryGateway 포트의 구현체입니다.
 """
 
 from __future__ import annotations
@@ -10,18 +10,18 @@ from typing import TYPE_CHECKING
 from sqlalchemy import select
 
 from apps.auth.domain.entities.user_social_account import UserSocialAccount
-from apps.auth.infrastructure.persistence_postgres.mappings.user_social_account import (
-    user_social_accounts_table,
+from apps.auth.infrastructure.persistence_postgres.mappings.users_social_account import (
+    users_social_accounts_table,
 )
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-class SqlaSocialAccountMapper:
-    """SQLAlchemy 기반 SocialAccount Gateway.
+class SqlaSocialAccountQueryGateway:
+    """SQLAlchemy 기반 SocialAccount Query Gateway.
 
-    SocialAccountGateway 구현체.
+    SocialAccountQueryGateway 구현체.
     """
 
     def __init__(self, session: "AsyncSession") -> None:
@@ -40,8 +40,8 @@ class SqlaSocialAccountMapper:
     ) -> UserSocialAccount | None:
         """프로바이더 정보로 소셜 계정 조회."""
         stmt = select(UserSocialAccount).where(
-            user_social_accounts_table.c.provider == provider,
-            user_social_accounts_table.c.provider_user_id == provider_user_id,
+            users_social_accounts_table.c.provider == provider,
+            users_social_accounts_table.c.provider_user_id == provider_user_id,
         )
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()

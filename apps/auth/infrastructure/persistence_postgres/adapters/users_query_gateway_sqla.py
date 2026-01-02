@@ -1,6 +1,6 @@
-"""SQLAlchemy User Reader.
+"""SQLAlchemy Users Query Gateway.
 
-UserQueryGateway의 구현체입니다.
+UsersQueryGateway 포트의 구현체입니다.
 """
 
 from __future__ import annotations
@@ -12,19 +12,19 @@ from sqlalchemy.orm import selectinload
 
 from apps.auth.domain.entities.user import User
 from apps.auth.domain.value_objects.user_id import UserId
-from apps.auth.infrastructure.persistence_postgres.mappings.user import users_table
-from apps.auth.infrastructure.persistence_postgres.mappings.user_social_account import (
-    user_social_accounts_table,
+from apps.auth.infrastructure.persistence_postgres.mappings.users import users_table
+from apps.auth.infrastructure.persistence_postgres.mappings.users_social_account import (
+    users_social_accounts_table,
 )
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-class SqlaUserReader:
-    """SQLAlchemy 기반 User 읽기 Gateway.
+class SqlaUsersQueryGateway:
+    """SQLAlchemy 기반 Users Query Gateway.
 
-    UserQueryGateway 구현체.
+    UsersQueryGateway 구현체.
     """
 
     def __init__(self, session: "AsyncSession") -> None:
@@ -52,12 +52,12 @@ class SqlaUserReader:
         stmt = (
             select(User)
             .join(
-                user_social_accounts_table,
-                users_table.c.id == user_social_accounts_table.c.user_id,
+                users_social_accounts_table,
+                users_table.c.id == users_social_accounts_table.c.user_id,
             )
             .where(
-                user_social_accounts_table.c.provider == provider,
-                user_social_accounts_table.c.provider_user_id == provider_user_id,
+                users_social_accounts_table.c.provider == provider,
+                users_social_accounts_table.c.provider_user_id == provider_user_id,
             )
             .options(selectinload(User.social_accounts))
         )

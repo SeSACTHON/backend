@@ -1,6 +1,6 @@
-"""UUID User ID Generator.
+"""UUID Users ID Generator.
 
-UserIdGenerator 포트의 구현체입니다.
+UsersIdGenerator 포트의 구현체입니다.
 """
 
 import uuid
@@ -8,10 +8,10 @@ import uuid
 from apps.auth.domain.value_objects.user_id import UserId
 
 
-class UuidUserIdGenerator:
+class UuidUsersIdGenerator:
     """UUID v4 기반 사용자 ID 생성기.
 
-    UserIdGenerator 구현체.
+    UsersIdGenerator 구현체.
     """
 
     def __call__(self) -> UserId:

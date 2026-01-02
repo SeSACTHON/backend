@@ -1,30 +1,30 @@
-"""Naver OAuth Provider."""
+"""Kakao OAuth Provider."""
 
 from __future__ import annotations
 
 from urllib.parse import urlencode
 from typing import TYPE_CHECKING
 
-from apps.auth.infrastructure.oauth.base import OAuthProvider, OAuthProviderError
+from apps.auth.infrastructure.oauth.providers.base import OAuthProvider, OAuthProviderError
 from apps.auth.application.common.services.oauth_client import OAuthProfile
 
 if TYPE_CHECKING:
     import httpx
 
-NAVER_AUTH_URL = "https://nid.naver.com/oauth2.0/authorize"
-NAVER_TOKEN_URL = "https://nid.naver.com/oauth2.0/token"
-NAVER_PROFILE_URL = "https://openapi.naver.com/v1/nid/me"
+KAKAO_AUTH_URL = "https://kauth.kakao.com/oauth/authorize"
+KAKAO_TOKEN_URL = "https://kauth.kakao.com/oauth/token"
+KAKAO_PROFILE_URL = "https://kapi.kakao.com/v2/user/me"
 
 
-class NaverOAuthProvider(OAuthProvider):
-    """Naver OAuth 프로바이더."""
+class KakaoOAuthProvider(OAuthProvider):
+    """Kakao OAuth 프로바이더."""
 
-    name = "naver"
-    supports_pkce = False
+    name = "kakao"
 
     @property
     def default_scopes(self) -> tuple[str, ...]:
-        return ("profile", "email")
+        # 카카오는 scope를 사용하지 않고, 개발자 콘솔에서 동의항목을 설정
+        return ()
 
     def build_authorization_url(
         self,
@@ -40,10 +40,12 @@ class NaverOAuthProvider(OAuthProvider):
             "response_type": "code",
             "state": state,
         }
-        scope_values = scope or " ".join(self.default_scopes)
-        if scope_values:
-            params["scope"] = scope_values
-        return f"{NAVER_AUTH_URL}?{urlencode(params)}"
+        if scope:
+            params["scope"] = scope
+        if code_challenge:
+            params["code_challenge"] = code_challenge
+            params["code_challenge_method"] = "S256"
+        return f"{KAKAO_AUTH_URL}?{urlencode(params)}"
 
     async def exchange_code(
         self,
@@ -57,12 +59,14 @@ class NaverOAuthProvider(OAuthProvider):
         data = {
             "grant_type": "authorization_code",
             "client_id": self.client_id,
-            "client_secret": self.client_secret,
             "redirect_uri": redirect_uri,
             "code": code,
-            "state": state,
         }
-        response = await client.post(NAVER_TOKEN_URL, data=data)
+        if self.client_secret:
+            data["client_secret"] = self.client_secret
+        if code_verifier:
+            data["code_verifier"] = code_verifier
+        response = await client.post(KAKAO_TOKEN_URL, data=data)
         response.raise_for_status()
         return response.json()
 
@@ -74,16 +78,19 @@ class NaverOAuthProvider(OAuthProvider):
     ) -> OAuthProfile:
         access_token = tokens.get("access_token")
         if not access_token:
-            raise OAuthProviderError("Missing Naver access token")
+            raise OAuthProviderError("Missing Kakao access token")
         headers = {"Authorization": f"Bearer {access_token}"}
-        response = await client.get(NAVER_PROFILE_URL, headers=headers)
+        response = await client.get(KAKAO_PROFILE_URL, headers=headers)
         response.raise_for_status()
-        body = response.json()
-        response_data = body.get("response") or {}
+        payload = response.json()
+
+        kakao_account = payload.get("kakao_account") or {}
+        profile = kakao_account.get("profile") or {}
+
         return OAuthProfile(
             provider=self.name,
-            provider_user_id=response_data.get("id"),
-            email=response_data.get("email"),
-            nickname=response_data.get("nickname"),
-            profile_image_url=response_data.get("profile_image"),
+            provider_user_id=str(payload.get("id")),
+            email=kakao_account.get("email"),
+            nickname=profile.get("nickname"),
+            profile_image_url=profile.get("profile_image_url"),
         )

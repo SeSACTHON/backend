@@ -1,6 +1,6 @@
-"""SQLAlchemy LoginAudit Mapper.
+"""SQLAlchemy LoginAudit Gateway.
 
-LoginAuditGateway의 구현체입니다.
+LoginAuditGateway 포트의 구현체입니다.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
 
-class SqlaLoginAuditMapper:
+class SqlaLoginAuditGateway:
     """SQLAlchemy 기반 LoginAudit Gateway.
 
     LoginAuditGateway 구현체.

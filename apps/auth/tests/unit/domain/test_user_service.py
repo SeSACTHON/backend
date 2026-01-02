@@ -153,11 +153,11 @@ class TestUserServiceEdgeCases:
 
     @pytest.fixture
     def user_service(self) -> UserService:
-        from apps.auth.infrastructure.adapters.user_id_generator_uuid import (
-            UuidUserIdGenerator,
+        from apps.auth.infrastructure.common.adapters.users_id_generator_uuid import (
+            UuidUsersIdGenerator,
         )
 
-        return UserService(user_id_generator=UuidUserIdGenerator())
+        return UserService(user_id_generator=UuidUsersIdGenerator())
 
     def test_multiple_users_have_unique_ids(
         self,

@@ -9,16 +9,16 @@ from unittest.mock import AsyncMock
 from uuid import uuid4
 import pytest
 
-from apps.auth.infrastructure.persistence_redis.state_store_redis import (
+from apps.auth.infrastructure.persistence_redis.adapters.state_store_redis import (
     RedisStateStore,
     STATE_KEY_PREFIX,
 )
-from apps.auth.infrastructure.persistence_redis.token_blacklist_redis import (
+from apps.auth.infrastructure.persistence_redis.adapters.token_blacklist_redis import (
     RedisTokenBlacklist,
     BLACKLIST_KEY_PREFIX,
 )
-from apps.auth.infrastructure.persistence_redis.user_token_store_redis import (
-    RedisUserTokenStore,
+from apps.auth.infrastructure.persistence_redis.adapters.users_token_store_redis import (
+    RedisUsersTokenStore,
     USER_TOKENS_KEY_PREFIX,
     TOKEN_META_KEY_PREFIX,
 )
@@ -172,21 +172,21 @@ class TestRedisTokenBlacklist:
         assert result is False
 
 
-class TestRedisUserTokenStore:
-    """RedisUserTokenStore 테스트."""
+class TestRedisUsersTokenStore:
+    """RedisUsersTokenStore 테스트."""
 
     @pytest.fixture
     def mock_redis(self) -> AsyncMock:
         return AsyncMock()
 
     @pytest.fixture
-    def store(self, mock_redis: AsyncMock) -> RedisUserTokenStore:
-        return RedisUserTokenStore(redis=mock_redis)
+    def store(self, mock_redis: AsyncMock) -> RedisUsersTokenStore:
+        return RedisUsersTokenStore(redis=mock_redis)
 
     @pytest.mark.asyncio
     async def test_register_token(
         self,
-        store: RedisUserTokenStore,
+        store: RedisUsersTokenStore,
         mock_redis: AsyncMock,
     ) -> None:
         """토큰 등록 테스트."""
@@ -227,7 +227,7 @@ class TestRedisUserTokenStore:
     @pytest.mark.asyncio
     async def test_contains_existing_token(
         self,
-        store: RedisUserTokenStore,
+        store: RedisUsersTokenStore,
         mock_redis: AsyncMock,
     ) -> None:
         """토큰 존재 확인 테스트."""
@@ -246,7 +246,7 @@ class TestRedisUserTokenStore:
     @pytest.mark.asyncio
     async def test_contains_nonexistent_token(
         self,
-        store: RedisUserTokenStore,
+        store: RedisUsersTokenStore,
         mock_redis: AsyncMock,
     ) -> None:
         """토큰 미존재 확인 테스트."""
@@ -263,7 +263,7 @@ class TestRedisUserTokenStore:
     @pytest.mark.asyncio
     async def test_remove_token(
         self,
-        store: RedisUserTokenStore,
+        store: RedisUsersTokenStore,
         mock_redis: AsyncMock,
     ) -> None:
         """토큰 삭제 테스트."""
@@ -284,7 +284,7 @@ class TestRedisUserTokenStore:
     @pytest.mark.asyncio
     async def test_get_metadata_existing(
         self,
-        store: RedisUserTokenStore,
+        store: RedisUsersTokenStore,
         mock_redis: AsyncMock,
     ) -> None:
         """메타데이터 조회 테스트 - 존재하는 경우."""
@@ -312,7 +312,7 @@ class TestRedisUserTokenStore:
     @pytest.mark.asyncio
     async def test_get_metadata_nonexistent(
         self,
-        store: RedisUserTokenStore,
+        store: RedisUsersTokenStore,
         mock_redis: AsyncMock,
     ) -> None:
         """메타데이터 조회 테스트 - 존재하지 않는 경우."""
