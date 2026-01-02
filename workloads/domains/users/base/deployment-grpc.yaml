@@ -1,0 +1,80 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: users-api-grpc
+  namespace: users
+  labels:
+    app: users-api-grpc
+    version: v1
+    tier: business-logic
+    domain: users
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: users-api-grpc
+      version: v1
+  template:
+    metadata:
+      labels:
+        app: users-api-grpc
+        version: v1
+        tier: business-logic
+        domain: users
+    spec:
+      containers:
+      - name: users-api-grpc
+        image: docker.io/mng990/eco2:users-api-dev-latest
+        imagePullPolicy: Always
+        command: [python, -m, apps.users.presentation.grpc.server]
+        ports:
+        - containerPort: 50051
+          name: grpc
+        env:
+        - name: OTEL_SERVICE_NAME
+          value: users-api-grpc
+        - name: OTEL_TRACES_EXPORTER
+          value: otlp
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://jaeger-collector-clusterip.istio-system.svc.cluster.local:4317
+        - name: OTEL_METRICS_EXPORTER
+          value: none
+        - name: OTEL_LOGS_EXPORTER
+          value: none
+        - name: OTEL_PROPAGATORS
+          value: b3,tracecontext,baggage
+        - name: POSTGRES_HOST
+          value: postgresql.postgres.svc.cluster.local
+        - name: GRPC_SERVER_PORT
+          value: '50051'
+        envFrom:
+        - configMapRef:
+            name: users-config
+        - secretRef:
+            name: users-secret
+        livenessProbe:
+          tcpSocket:
+            port: 50051
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          tcpSocket:
+            port: 50051
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: '1'
+            memory: 512Mi
+      imagePullSecrets:
+      - name: dockerhub-secret
+      nodeSelector:
+        domain: users
+      tolerations:
+      - key: domain
+        operator: Equal
+        value: users
+        effect: NoSchedule

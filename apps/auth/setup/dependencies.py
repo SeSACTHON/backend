@@ -54,47 +54,49 @@ def get_oauth_state_redis() -> "aioredis.Redis":
 # ============================================================
 
 
-async def get_user_command_gateway(
+async def get_users_command_gateway(
     session: "AsyncSession" = Depends(get_db_session),
 ):
-    """UserCommandGateway 제공자."""
-    from apps.auth.infrastructure.adapters import SqlaUserDataMapper
+    """UsersCommandGateway 제공자."""
+    from apps.auth.infrastructure.persistence_postgres.adapters import SqlaUsersCommandGateway
 
-    return SqlaUserDataMapper(session)
+    return SqlaUsersCommandGateway(session)
 
 
-async def get_user_query_gateway(
+async def get_users_query_gateway(
     session: "AsyncSession" = Depends(get_db_session),
 ):
-    """UserQueryGateway 제공자."""
-    from apps.auth.infrastructure.adapters import SqlaUserReader
+    """UsersQueryGateway 제공자."""
+    from apps.auth.infrastructure.persistence_postgres.adapters import SqlaUsersQueryGateway
 
-    return SqlaUserReader(session)
+    return SqlaUsersQueryGateway(session)
 
 
 async def get_social_account_gateway(
     session: "AsyncSession" = Depends(get_db_session),
 ):
-    """SocialAccountGateway 제공자."""
-    from apps.auth.infrastructure.adapters import SqlaSocialAccountMapper
+    """SocialAccountQueryGateway 제공자."""
+    from apps.auth.infrastructure.persistence_postgres.adapters import (
+        SqlaSocialAccountQueryGateway,
+    )
 
-    return SqlaSocialAccountMapper(session)
+    return SqlaSocialAccountQueryGateway(session)
 
 
 async def get_login_audit_gateway(
     session: "AsyncSession" = Depends(get_db_session),
 ):
     """LoginAuditGateway 제공자."""
-    from apps.auth.infrastructure.adapters import SqlaLoginAuditMapper
+    from apps.auth.infrastructure.persistence_postgres.adapters import SqlaLoginAuditGateway
 
-    return SqlaLoginAuditMapper(session)
+    return SqlaLoginAuditGateway(session)
 
 
 async def get_flusher(
     session: "AsyncSession" = Depends(get_db_session),
 ):
     """Flusher 제공자."""
-    from apps.auth.infrastructure.adapters import SqlaFlusher
+    from apps.auth.infrastructure.persistence_postgres.adapters import SqlaFlusher
 
     return SqlaFlusher(session)
 
@@ -103,9 +105,14 @@ async def get_transaction_manager(
     session: "AsyncSession" = Depends(get_db_session),
 ):
     """TransactionManager 제공자."""
-    from apps.auth.infrastructure.adapters import SqlaTransactionManager
+    from apps.auth.infrastructure.persistence_postgres.adapters import SqlaTransactionManager
 
     return SqlaTransactionManager(session)
+
+
+# Deprecated aliases for backward compatibility
+get_user_command_gateway = get_users_command_gateway
+get_user_query_gateway = get_users_query_gateway
 
 
 # ============================================================
@@ -140,9 +147,9 @@ def get_token_session_store(
     redis: "aioredis.Redis" = Depends(get_blacklist_redis),
 ):
     """TokenSessionStore 제공자 (블랙리스트용 Redis)."""
-    from apps.auth.infrastructure.persistence_redis import RedisUserTokenStore
+    from apps.auth.infrastructure.persistence_redis import RedisUsersTokenStore
 
-    return RedisUserTokenStore(redis)
+    return RedisUsersTokenStore(redis)
 
 
 # Deprecated aliases
@@ -212,11 +219,14 @@ def get_oauth_provider_registry(settings: Settings = Depends(get_settings)):
     return ProviderRegistry(settings)
 
 
-def get_oauth_provider_gateway(registry=Depends(get_oauth_provider_registry)):
+def get_oauth_provider_gateway(
+    registry=Depends(get_oauth_provider_registry),
+    settings: Settings = Depends(get_settings),
+):
     """OAuthProviderGateway 제공자."""
     from apps.auth.infrastructure.oauth import OAuthClientImpl
 
-    return OAuthClientImpl(registry)
+    return OAuthClientImpl(registry, timeout_seconds=settings.oauth_client_timeout_seconds)
 
 
 # ============================================================
@@ -224,34 +234,40 @@ def get_oauth_provider_gateway(registry=Depends(get_oauth_provider_registry)):
 # ============================================================
 
 
-def get_user_id_generator():
-    """UserIdGenerator 제공자."""
-    from apps.auth.infrastructure.adapters import UuidUserIdGenerator
+def get_users_id_generator():
+    """UsersIdGenerator 제공자."""
+    from apps.auth.infrastructure.common.adapters import UuidUsersIdGenerator
 
-    return UuidUserIdGenerator()
+    return UuidUsersIdGenerator()
+
+
+# Deprecated alias
+get_user_id_generator = get_users_id_generator
 
 
 def get_user_service(
-    user_id_generator=Depends(get_user_id_generator),
+    user_id_generator=Depends(get_users_id_generator),
 ):
-    """UserService 제공자 (deprecated - use UserManagementGateway)."""
+    """UserService 제공자 (deprecated - use UsersManagementGateway)."""
     from apps.auth.domain.services import UserService
 
     return UserService(user_id_generator)
 
 
-def get_user_management_gateway(settings: Settings = Depends(get_settings)):
-    """UserManagementGateway 제공자 (gRPC 클라이언트).
+def get_users_management_gateway(settings: Settings = Depends(get_settings)):
+    """UsersManagementGateway 제공자 (gRPC 클라이언트).
 
     users 도메인과 gRPC 통신을 위한 어댑터입니다.
     """
-    from apps.auth.infrastructure.grpc.users_client import UsersGrpcClient
-    from apps.auth.infrastructure.grpc.user_management_adapter import (
-        UserManagementGrpcAdapter,
-    )
+    from apps.auth.infrastructure.grpc.client import UsersGrpcClient
+    from apps.auth.infrastructure.grpc.adapters import UsersManagementGatewayGrpc
 
     client = UsersGrpcClient(settings)
-    return UserManagementGrpcAdapter(client)
+    return UsersManagementGatewayGrpc(client)
+
+
+# Deprecated alias
+get_user_management_gateway = get_users_management_gateway
 
 
 # ============================================================
@@ -326,7 +342,7 @@ async def get_oauth_callback_interactor(
     token_service=Depends(get_token_service),
     audit_service=Depends(get_login_audit_service),
     # Ports (인프라)
-    user_management=Depends(get_user_management_gateway),
+    user_management=Depends(get_users_management_gateway),
     audit_gateway=Depends(get_login_audit_gateway),
     flusher=Depends(get_flusher),
     transaction_manager=Depends(get_transaction_manager),
@@ -373,7 +389,7 @@ async def get_refresh_tokens_interactor(
     # Services (연주자)
     token_service=Depends(get_token_service),
     # Ports (인프라)
-    user_query_gateway=Depends(get_user_query_gateway),
+    user_query_gateway=Depends(get_users_query_gateway),
     blacklist_publisher=Depends(get_blacklist_event_publisher),
     transaction_manager=Depends(get_transaction_manager),
 ):
@@ -393,7 +409,7 @@ async def get_refresh_tokens_interactor(
 
 async def get_validate_token_service(
     token_service=Depends(get_token_service),
-    user_query_gateway=Depends(get_user_query_gateway),
+    user_query_gateway=Depends(get_users_query_gateway),
 ):
     """ValidateTokenQueryService 제공자.
 

@@ -1,29 +1,47 @@
-"""UserCharacter ORM mapping - Imperative mapping for users.user_characters table."""
+"""UserCharacter ORM mapping - Imperative mapping for users.user_characters table.
+
+타입 규칙 (Unbounded String 기본 전략):
+    - status: ENUM - 고정 값 (owned, burned, traded)
+    - TEXT: 기본 문자열 타입 (character_*, source 등)
+    - PostgreSQL에서 VARCHAR와 TEXT는 성능 동일
+"""
 
 from __future__ import annotations
 
-from sqlalchemy import Column, DateTime, String, Table, func
+from sqlalchemy import Column, DateTime, Enum, Table, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import registry
 
 from apps.users.domain.entities.user_character import UserCharacter
+from apps.users.domain.enums import UserCharacterStatus
+from apps.users.infrastructure.persistence_postgres.constants import USER_CHARACTERS_TABLE
 from apps.users.infrastructure.persistence_postgres.mappings.user import metadata
 
 mapper_registry = registry(metadata=metadata)
 
 # users.user_characters 테이블 정의
 user_characters_table = Table(
-    "user_characters",
+    USER_CHARACTERS_TABLE,
     metadata,
     Column("id", UUID(as_uuid=True), primary_key=True),
     Column("user_id", UUID(as_uuid=True), nullable=False, index=True),
     Column("character_id", UUID(as_uuid=True), nullable=False, index=True),
-    Column("character_code", String(64), nullable=False),
-    Column("character_name", String(120), nullable=False),
-    Column("character_type", String(64), nullable=True),
-    Column("character_dialog", String(500), nullable=True),
-    Column("source", String(120), nullable=True),
-    Column("status", String(20), nullable=False, default="owned"),
+    Column("character_code", Text, nullable=False),
+    Column("character_name", Text, nullable=False),
+    Column("character_type", Text, nullable=True),
+    Column("character_dialog", Text, nullable=True),
+    Column("source", Text, nullable=True),
+    Column(
+        "status",
+        Enum(
+            UserCharacterStatus,
+            name="user_character_status",
+            create_constraint=True,
+            native_enum=True,
+        ),
+        nullable=False,
+        default=UserCharacterStatus.OWNED,
+    ),
     Column("acquired_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column(
         "updated_at",

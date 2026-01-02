@@ -4,6 +4,12 @@
     - auth.user_social_accounts → users.social_accounts 이동
     - user_id는 users.accounts.id 참조 (FK CASCADE)
     - (provider, provider_user_id) 유니크 제약
+
+타입 규칙 (Unbounded String 기본 전략):
+    - provider: ENUM - 고정 값 (google, kakao, naver)
+    - TEXT: 기본 문자열 타입
+    - VARCHAR: 표준 규격이 명확한 경우만 사용
+        - email: VARCHAR(320) - RFC 5321 표준
 """
 
 from __future__ import annotations
@@ -15,15 +21,19 @@ from uuid import UUID
 from sqlalchemy import (
     Column,
     DateTime,
+    Enum,
     ForeignKey,
     String,
     Table,
+    Text,
     UniqueConstraint,
     func,
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 from sqlalchemy.orm import registry
 
+from apps.users.domain.enums import OAuthProvider
+from apps.users.infrastructure.persistence_postgres.constants import SOCIAL_ACCOUNTS_TABLE
 from apps.users.infrastructure.persistence_postgres.mappings.user import metadata
 
 mapper_registry = registry(metadata=metadata)
@@ -35,7 +45,7 @@ class UserSocialAccount:
 
     id: UUID | None = None
     user_id: UUID | None = None
-    provider: str = ""
+    provider: OAuthProvider | None = None
     provider_user_id: str = ""
     email: str | None = None
     last_login_at: datetime | None = None
@@ -45,7 +55,7 @@ class UserSocialAccount:
 
 # users.social_accounts 테이블 정의
 social_accounts_table = Table(
-    "social_accounts",
+    SOCIAL_ACCOUNTS_TABLE,
     metadata,
     Column("id", PG_UUID(as_uuid=True), primary_key=True),
     Column(
@@ -55,9 +65,14 @@ social_accounts_table = Table(
         nullable=False,
         index=True,
     ),
-    Column("provider", String(32), nullable=False, index=True),
-    Column("provider_user_id", String(255), nullable=False),
-    Column("email", String(320), nullable=True),
+    Column(
+        "provider",
+        Enum(OAuthProvider, name="oauth_provider", create_constraint=True, native_enum=True),
+        nullable=False,
+        index=True,
+    ),
+    Column("provider_user_id", Text, nullable=False),
+    Column("email", String(320), nullable=True),  # RFC 5321
     Column("last_login_at", DateTime(timezone=True), nullable=True),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column(

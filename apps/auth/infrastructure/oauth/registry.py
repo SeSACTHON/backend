@@ -4,12 +4,14 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from apps.auth.infrastructure.oauth.google import GoogleOAuthProvider
-from apps.auth.infrastructure.oauth.kakao import KakaoOAuthProvider
-from apps.auth.infrastructure.oauth.naver import NaverOAuthProvider
+from apps.auth.infrastructure.oauth.providers import (
+    GoogleOAuthProvider,
+    KakaoOAuthProvider,
+    NaverOAuthProvider,
+)
 
 if TYPE_CHECKING:
-    from apps.auth.infrastructure.oauth.base import OAuthProvider
+    from apps.auth.infrastructure.oauth.providers.base import OAuthProvider
     from apps.auth.setup.config import Settings
 
 
