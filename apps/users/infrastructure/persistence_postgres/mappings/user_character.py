@@ -1,12 +1,19 @@
-"""UserCharacter ORM mapping - Imperative mapping for users.user_characters table."""
+"""UserCharacter ORM mapping - Imperative mapping for users.user_characters table.
+
+타입 규칙:
+    - status: ENUM - 고정 값 (owned, burned, traded)
+    - character_dialog: TEXT - 다국어 대사, 길이 다양
+    - source: VARCHAR(120) - 획득 경로
+"""
 
 from __future__ import annotations
 
-from sqlalchemy import Column, DateTime, String, Table, func
+from sqlalchemy import Column, DateTime, Enum, String, Table, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import registry
 
 from apps.users.domain.entities.user_character import UserCharacter
+from apps.users.domain.enums import UserCharacterStatus
 from apps.users.infrastructure.persistence_postgres.constants import USER_CHARACTERS_TABLE
 from apps.users.infrastructure.persistence_postgres.mappings.user import metadata
 
@@ -22,9 +29,19 @@ user_characters_table = Table(
     Column("character_code", String(64), nullable=False),
     Column("character_name", String(120), nullable=False),
     Column("character_type", String(64), nullable=True),
-    Column("character_dialog", String(500), nullable=True),
+    Column("character_dialog", Text, nullable=True),  # 다국어 대사
     Column("source", String(120), nullable=True),
-    Column("status", String(20), nullable=False, default="owned"),
+    Column(
+        "status",
+        Enum(
+            UserCharacterStatus,
+            name="user_character_status",
+            create_constraint=True,
+            native_enum=True,
+        ),
+        nullable=False,
+        default=UserCharacterStatus.OWNED,
+    ),
     Column("acquired_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
     Column(
         "updated_at",
