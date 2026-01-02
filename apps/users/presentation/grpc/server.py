@@ -47,8 +47,8 @@ async def serve() -> None:
 
     # 인터셉터 설정 (순서 중요: 먼저 등록된 것이 먼저 실행)
     interceptors = [
-        LoggingInterceptor(),      # 1. 요청/응답 로깅
-        ErrorHandlerInterceptor(), # 2. 예외 → gRPC status 변환
+        LoggingInterceptor(),  # 1. 요청/응답 로깅
+        ErrorHandlerInterceptor(),  # 2. 예외 → gRPC status 변환
     ]
 
     # gRPC 서버 생성

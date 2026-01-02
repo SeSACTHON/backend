@@ -47,9 +47,7 @@ class SqlaIdentityQueryGateway:
             return None
 
         # 연결된 사용자 조회
-        user_result = await self._session.execute(
-            select(User).where(User.id == social.user_id)
-        )
+        user_result = await self._session.execute(select(User).where(User.id == social.user_id))
         user = user_result.scalar_one_or_none()
 
         if user is None:
@@ -114,9 +112,7 @@ class SqlaIdentityCommandGateway:
     ) -> None:
         """소셜 계정과 사용자의 로그인 시간을 업데이트합니다."""
         # 1. 사용자 로그인 시간 업데이트
-        user_result = await self._session.execute(
-            select(User).where(User.id == user_id)
-        )
+        user_result = await self._session.execute(select(User).where(User.id == user_id))
         user = user_result.scalar_one_or_none()
         if user:
             user.last_login_at = login_time
