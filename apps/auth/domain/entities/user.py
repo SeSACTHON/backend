@@ -40,6 +40,7 @@ class User(Entity[UserId]):
         "updated_at",
         "last_login_at",
         "social_accounts",
+        "__weakref__",  # SQLAlchemy weak reference 지원
     )
 
     def __init__(
