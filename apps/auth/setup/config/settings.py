@@ -84,7 +84,7 @@ class Settings(BaseSettings):
 
     @property
     def oauth_failure_redirect_url(self) -> str:
-        return f"{self.frontend_url}/login?error=oauth_failed"
+        return f"{self.frontend_url}/#/login?error=oauth_failed"
 
     # OAuth Providers - Google
     google_client_id: str = ""
