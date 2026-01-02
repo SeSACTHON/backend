@@ -28,7 +28,7 @@ def get_cookie_params() -> dict:
         "secure": True,
         "samesite": COOKIE_SAMESITE,
     }
-    cookie_domain = os.getenv("COOKIE_DOMAIN")
+    cookie_domain = os.getenv("AUTH_COOKIE_DOMAIN")
     if cookie_domain:
         params["domain"] = cookie_domain
     return params
