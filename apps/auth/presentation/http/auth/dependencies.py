@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 from fastapi import Cookie, Depends, HTTPException, status
 
 from apps.auth.presentation.http.auth.cookie_params import ACCESS_COOKIE_NAME
-from apps.auth.application.queries.validate_token import (
+from apps.auth.application.token.queries.validate import (
     ValidateTokenQueryService,
     ValidatedUser,
 )
