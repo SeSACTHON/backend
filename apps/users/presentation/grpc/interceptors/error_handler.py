@@ -40,7 +40,7 @@ class ErrorHandlerInterceptor(grpc.aio.ServerInterceptor):
 
         if handler.unary_unary:
             return grpc.unary_unary_rpc_method_handler(
-                self._wrap_unary_unary(handler.unary_unary),
+                self._wrap_unary_unary(handler.unary_unary, handler_call_details.method),
                 request_deserializer=handler.request_deserializer,
                 response_serializer=handler.response_serializer,
             )
@@ -51,6 +51,7 @@ class ErrorHandlerInterceptor(grpc.aio.ServerInterceptor):
     def _wrap_unary_unary(
         self,
         behavior: Callable,
+        method: str,
     ) -> Callable:
         """Unary-Unary RPC를 래핑합니다."""
 
@@ -65,7 +66,7 @@ class ErrorHandlerInterceptor(grpc.aio.ServerInterceptor):
                     "Invalid argument",
                     extra={
                         "error": str(e),
-                        "method": context.method(),
+                        "method": method,
                     },
                 )
                 await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(e))
@@ -74,7 +75,7 @@ class ErrorHandlerInterceptor(grpc.aio.ServerInterceptor):
                     "Resource not found",
                     extra={
                         "error": str(e),
-                        "method": context.method(),
+                        "method": method,
                     },
                 )
                 await context.abort(grpc.StatusCode.NOT_FOUND, str(e))
@@ -83,7 +84,7 @@ class ErrorHandlerInterceptor(grpc.aio.ServerInterceptor):
                     "Permission denied",
                     extra={
                         "error": str(e),
-                        "method": context.method(),
+                        "method": method,
                     },
                 )
                 await context.abort(grpc.StatusCode.PERMISSION_DENIED, str(e))
@@ -92,14 +93,14 @@ class ErrorHandlerInterceptor(grpc.aio.ServerInterceptor):
                     "Not implemented",
                     extra={
                         "error": str(e),
-                        "method": context.method(),
+                        "method": method,
                     },
                 )
                 await context.abort(grpc.StatusCode.UNIMPLEMENTED, str(e))
             except Exception:
                 logger.exception(
                     "Internal error",
-                    extra={"method": context.method()},
+                    extra={"method": method},
                 )
                 await context.abort(grpc.StatusCode.INTERNAL, "Internal server error")
 
