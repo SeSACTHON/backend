@@ -144,7 +144,7 @@ class TestProfileController:
         self,
         client: TestClient,
         mock_get_profile_query: AsyncMock,
-        sample_profile: UserProfileDTO,
+        sample_profile: UserProfile,
     ) -> None:
         """프로필 조회."""
         mock_get_profile_query.execute.return_value = sample_profile
