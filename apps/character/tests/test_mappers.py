@@ -59,9 +59,7 @@ class TestCharacterModelToEntity:
     3. Optional 필드 처리
     """
 
-    def test_maps_all_required_fields(
-        self, character_model: MagicMock
-    ) -> None:
+    def test_maps_all_required_fields(self, character_model: MagicMock) -> None:
         """필수 필드 매핑.
 
         검증:
@@ -80,9 +78,7 @@ class TestCharacterModelToEntity:
         assert entity.type_label == "재활용"
         assert entity.dialog == "안녕! 나는 페트야!"
 
-    def test_maps_optional_fields(
-        self, character_model: MagicMock
-    ) -> None:
+    def test_maps_optional_fields(self, character_model: MagicMock) -> None:
         """Optional 필드 매핑.
 
         검증:
@@ -97,9 +93,7 @@ class TestCharacterModelToEntity:
         assert entity.description == "페트병 캐릭터"
         assert entity.match_label == "무색페트병"
 
-    def test_maps_timestamps(
-        self, character_model: MagicMock
-    ) -> None:
+    def test_maps_timestamps(self, character_model: MagicMock) -> None:
         """타임스탬프 매핑.
 
         검증:
@@ -113,9 +107,7 @@ class TestCharacterModelToEntity:
         assert entity.created_at == datetime(2024, 1, 1, tzinfo=timezone.utc)
         assert entity.updated_at == datetime(2024, 6, 1, tzinfo=timezone.utc)
 
-    def test_handles_none_optional_fields(
-        self, character_model: MagicMock
-    ) -> None:
+    def test_handles_none_optional_fields(self, character_model: MagicMock) -> None:
         """None인 Optional 필드 처리.
 
         검증:
@@ -142,9 +134,7 @@ class TestOwnershipModelToEntity:
     3. status enum 변환
     """
 
-    def test_maps_all_fields(
-        self, ownership_model: MagicMock
-    ) -> None:
+    def test_maps_all_fields(self, ownership_model: MagicMock) -> None:
         """모든 필드 매핑.
 
         검증:
@@ -163,9 +153,7 @@ class TestOwnershipModelToEntity:
         assert entity.character_code == "char-pet"
         assert entity.source == "scan-reward"
 
-    def test_converts_status_to_enum(
-        self, ownership_model: MagicMock
-    ) -> None:
+    def test_converts_status_to_enum(self, ownership_model: MagicMock) -> None:
         """status 문자열을 Enum으로 변환.
 
         검증:
@@ -179,9 +167,7 @@ class TestOwnershipModelToEntity:
         assert entity.status == CharacterOwnershipStatus.OWNED
         assert isinstance(entity.status, CharacterOwnershipStatus)
 
-    def test_maps_character_relationship(
-        self, ownership_model: MagicMock
-    ) -> None:
+    def test_maps_character_relationship(self, ownership_model: MagicMock) -> None:
         """character 관계 매핑.
 
         검증:
@@ -198,9 +184,7 @@ class TestOwnershipModelToEntity:
         assert entity.character.code == "char-pet"
         assert entity.character.name == "페트"
 
-    def test_handles_missing_character_relationship(
-        self, ownership_model: MagicMock
-    ) -> None:
+    def test_handles_missing_character_relationship(self, ownership_model: MagicMock) -> None:
         """character 관계가 없는 경우.
 
         검증:

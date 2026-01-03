@@ -85,17 +85,19 @@ class TestCacheHitMiss:
         캐시 히트 시 DB 부하를 줄이는 것이 핵심 목적입니다.
         """
         # Given: Redis에 캐시된 데이터 존재
-        cached_data = json.dumps([
-            {
-                "id": str(sample_characters[0].id),
-                "code": "char-eco",
-                "name": "이코",
-                "description": "기본 캐릭터",
-                "type_label": "기본",
-                "dialog": "안녕! 나는 이코야!",
-                "match_label": None,
-            }
-        ])
+        cached_data = json.dumps(
+            [
+                {
+                    "id": str(sample_characters[0].id),
+                    "code": "char-eco",
+                    "name": "이코",
+                    "description": "기본 캐릭터",
+                    "type_label": "기본",
+                    "dialog": "안녕! 나는 이코야!",
+                    "match_label": None,
+                }
+            ]
+        )
         mock_redis.get.return_value = cached_data
 
         reader = CachedCatalogReader(mock_delegate, mock_redis)
@@ -210,17 +212,19 @@ class TestSerialization:
         두 경우 모두 처리해야 합니다.
         """
         # Given: bytes 타입으로 반환
-        cached_data = json.dumps([
-            {
-                "id": str(uuid4()),
-                "code": "char-eco",
-                "name": "이코",
-                "description": None,
-                "type_label": "기본",
-                "dialog": "안녕!",
-                "match_label": None,
-            }
-        ]).encode("utf-8")
+        cached_data = json.dumps(
+            [
+                {
+                    "id": str(uuid4()),
+                    "code": "char-eco",
+                    "name": "이코",
+                    "description": None,
+                    "type_label": "기본",
+                    "dialog": "안녕!",
+                    "match_label": None,
+                }
+            ]
+        ).encode("utf-8")
         mock_redis.get.return_value = cached_data
 
         reader = CachedCatalogReader(mock_delegate, mock_redis)
@@ -245,16 +249,18 @@ class TestSerialization:
         이유:
         캐시 스키마가 변경되거나 일부 캐릭터에 optional 필드가 없을 수 있습니다.
         """
-        cached_data = json.dumps([
-            {
-                "id": str(uuid4()),
-                "code": "char-eco",
-                "name": "이코",
-                "type_label": "기본",
-                "dialog": "안녕!",
-                # description, match_label 없음
-            }
-        ])
+        cached_data = json.dumps(
+            [
+                {
+                    "id": str(uuid4()),
+                    "code": "char-eco",
+                    "name": "이코",
+                    "type_label": "기본",
+                    "dialog": "안녕!",
+                    # description, match_label 없음
+                }
+            ]
+        )
         mock_redis.get.return_value = cached_data
 
         reader = CachedCatalogReader(mock_delegate, mock_redis)

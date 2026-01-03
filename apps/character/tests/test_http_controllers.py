@@ -64,9 +64,7 @@ class TestCatalogController:
     3. 필드 strip 처리
     """
 
-    async def test_returns_character_list(
-        self, mock_catalog_query: AsyncMock
-    ) -> None:
+    async def test_returns_character_list(self, mock_catalog_query: AsyncMock) -> None:
         """정상 카탈로그 반환.
 
         검증:
@@ -180,9 +178,7 @@ class TestRewardController:
     3. 레거시 호환 필드 (type)
     """
 
-    async def test_successful_reward(
-        self, mock_evaluate_command: AsyncMock
-    ) -> None:
+    async def test_successful_reward(self, mock_evaluate_command: AsyncMock) -> None:
         """리워드 성공 응답.
 
         검증:
@@ -230,9 +226,7 @@ class TestRewardController:
         assert data["character_type"] == "재활용"
         assert data["type"] == "재활용"  # 같은 값
 
-    async def test_already_owned_response(
-        self, mock_evaluate_command: AsyncMock
-    ) -> None:
+    async def test_already_owned_response(self, mock_evaluate_command: AsyncMock) -> None:
         """이미 소유한 캐릭터 응답.
 
         검증:
@@ -274,9 +268,7 @@ class TestRewardController:
         assert data["already_owned"] is True
         assert data["name"] == "페트"
 
-    async def test_conditions_not_met_response(
-        self, mock_evaluate_command: AsyncMock
-    ) -> None:
+    async def test_conditions_not_met_response(self, mock_evaluate_command: AsyncMock) -> None:
         """리워드 조건 미충족 응답.
 
         검증:
@@ -318,9 +310,7 @@ class TestRewardController:
         assert data["name"] is None
         assert data["match_reason"] == "Reward conditions not met"
 
-    async def test_invalid_request_returns_422(
-        self, mock_evaluate_command: AsyncMock
-    ) -> None:
+    async def test_invalid_request_returns_422(self, mock_evaluate_command: AsyncMock) -> None:
         """잘못된 요청 처리.
 
         검증:
@@ -345,9 +335,7 @@ class TestRewardController:
 
         assert response.status_code == 422
 
-    async def test_invalid_uuid_returns_422(
-        self, mock_evaluate_command: AsyncMock
-    ) -> None:
+    async def test_invalid_uuid_returns_422(self, mock_evaluate_command: AsyncMock) -> None:
         """잘못된 UUID 형식.
 
         검증:
