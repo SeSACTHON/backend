@@ -50,9 +50,7 @@ class CacheUpdateConsumer(ConsumerMixin):
         - delete: 단일 캐릭터 삭제 {"type": "delete", "character_id": "..."}
     """
 
-    def __init__(
-        self, connection: Connection, cache: CharacterLocalCache | None = None
-    ) -> None:
+    def __init__(self, connection: Connection, cache: CharacterLocalCache | None = None) -> None:
         """Consumer 초기화.
 
         Args:
@@ -143,9 +141,7 @@ class CacheConsumerThread(threading.Thread):
         thread.stop()
     """
 
-    def __init__(
-        self, broker_url: str, cache: CharacterLocalCache | None = None
-    ) -> None:
+    def __init__(self, broker_url: str, cache: CharacterLocalCache | None = None) -> None:
         """Thread 초기화.
 
         Args:
