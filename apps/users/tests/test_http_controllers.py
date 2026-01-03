@@ -8,8 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from apps.users.application.character.dto import UserCharacterDTO
-from apps.users.application.profile.dto import UserProfileDTO
-from apps.users.domain.enums import OAuthProvider
+from apps.users.application.profile.dto import UserProfile
 from apps.users.main import app
 from apps.users.setup.dependencies import (
     get_get_characters_query,
@@ -60,18 +59,13 @@ def sample_characters() -> list[UserCharacterDTO]:
 
 
 @pytest.fixture
-def sample_profile() -> UserProfileDTO:
+def sample_profile() -> UserProfile:
     """테스트용 프로필."""
-    return UserProfileDTO(
-        id=uuid4(),
-        email="test@test.com",
-        name="테스트",
-        nickname="닉네임",
-        profile_image_url="https://example.com/image.png",
+    return UserProfile(
         display_name="닉네임",
+        nickname="닉네임",
         phone_number="010-1234-5678",
-        linked_accounts=[OAuthProvider.KAKAO],
-        created_at=datetime.now(timezone.utc),
+        provider="kakao",
         last_login_at=datetime.now(timezone.utc),
     )
 
