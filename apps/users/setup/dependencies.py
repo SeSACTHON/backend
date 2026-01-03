@@ -43,7 +43,7 @@ from apps.users.infrastructure.persistence_postgres.adapters import (
     SqlaUsersQueryGateway,
 )
 from apps.users.infrastructure.persistence_postgres.session import get_db_session
-from apps.users.setup.config import Settings, get_settings
+from apps.users.setup.config import get_settings
 
 # Type alias for dependency injection
 SessionDep = Annotated[AsyncSession, Depends(get_db_session)]
