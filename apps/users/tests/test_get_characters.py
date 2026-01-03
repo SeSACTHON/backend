@@ -41,32 +41,34 @@ def mock_settings() -> MagicMock:
 
 
 @pytest.fixture
-def sample_characters() -> list[UserCharacterDTO]:
-    """테스트용 캐릭터 목록."""
-    return [
-        UserCharacterDTO(
-            id=uuid4(),
-            character_id=uuid4(),
-            character_code="char-eco",
-            character_name="이코",
-            character_type="기본",
-            character_dialog="안녕!",
-            source="default",
-            status="owned",
-            acquired_at=datetime.now(timezone.utc),
-        ),
-        UserCharacterDTO(
-            id=uuid4(),
-            character_id=uuid4(),
-            character_code="char-pet",
-            character_name="페트",
-            character_type="재활용",
-            character_dialog="나는 페트!",
-            source="scan",
-            status="owned",
-            acquired_at=datetime.now(timezone.utc),
-        ),
-    ]
+def sample_characters() -> list:
+    """테스트용 캐릭터 목록 (DB 엔티티 mock)."""
+    from unittest.mock import MagicMock
+    from apps.users.domain.enums import UserCharacterStatus
+
+    char1 = MagicMock()
+    char1.id = uuid4()
+    char1.character_id = uuid4()
+    char1.character_code = "char-eco"
+    char1.character_name = "이코"
+    char1.character_type = "기본"
+    char1.character_dialog = "안녕!"
+    char1.source = "default"
+    char1.status = UserCharacterStatus.OWNED
+    char1.acquired_at = datetime.now(timezone.utc)
+
+    char2 = MagicMock()
+    char2.id = uuid4()
+    char2.character_id = uuid4()
+    char2.character_code = "char-pet"
+    char2.character_name = "페트"
+    char2.character_type = "재활용"
+    char2.character_dialog = "나는 페트!"
+    char2.source = "scan"
+    char2.status = UserCharacterStatus.OWNED
+    char2.acquired_at = datetime.now(timezone.utc)
+
+    return [char1, char2]
 
 
 class TestGetCharactersQuery:
@@ -77,7 +79,7 @@ class TestGetCharactersQuery:
         mock_character_gateway: AsyncMock,
         mock_default_publisher: MagicMock,
         mock_settings: MagicMock,
-        sample_characters: list[UserCharacterDTO],
+        sample_characters: list,
     ) -> None:
         """캐릭터가 있으면 해당 목록을 반환."""
         mock_character_gateway.list_by_user_id.return_value = sample_characters

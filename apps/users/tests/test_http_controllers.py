@@ -79,7 +79,7 @@ class TestHealthController:
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "healthy"
-        assert data["service"] == "users"
+        assert data["service"] == "users-api"
 
 
 class TestCharactersController:
@@ -97,7 +97,7 @@ class TestCharactersController:
 
         # X-User-Id 헤더로 인증 시뮬레이션
         response = client.get(
-            "/me/characters",
+            "/user/me/characters",
             headers={"X-User-Id": str(uuid4())},
         )
         # 인증 미들웨어 없이 테스트하면 401이 될 수 있음
@@ -128,7 +128,7 @@ class TestCharactersController:
         app.dependency_overrides[get_get_characters_query] = lambda: mock_get_characters_query
 
         response = client.get(
-            "/me/characters",
+            "/user/me/characters",
             headers={"X-User-Id": str(uuid4())},
         )
         assert response.status_code in [200, 401, 403]
@@ -151,7 +151,7 @@ class TestProfileController:
         app.dependency_overrides[get_get_profile_query] = lambda: mock_get_profile_query
 
         response = client.get(
-            "/me/profile",
+            "/user/me/profile",
             headers={"X-User-Id": str(uuid4())},
         )
         assert response.status_code in [200, 401, 403]
