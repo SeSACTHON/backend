@@ -1,0 +1,30 @@
+# Character 단위 테스트용 Dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# 시스템 패키지 설치
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# 테스트 의존성 설치
+COPY apps/character/requirements.txt /app/requirements-character.txt
+RUN pip install --no-cache-dir -r /app/requirements-character.txt
+
+# 테스트 추가 의존성
+RUN pip install --no-cache-dir \
+    pytest \
+    pytest-asyncio \
+    pytest-cov \
+    httpx
+
+# 소스 복사
+COPY apps/ /app/apps/
+COPY domains/ /app/domains/
+COPY pyproject.toml /app/
+
+ENV PYTHONPATH=/app
+
+CMD ["pytest", "apps/character/tests", "-v", "--tb=short"]
