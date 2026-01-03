@@ -6,7 +6,6 @@ from uuid import uuid4
 
 import pytest
 
-from apps.users.application.character.dto import UserCharacterDTO
 from apps.users.application.character.queries import GetCharactersQuery
 
 pytestmark = pytest.mark.asyncio
