@@ -46,9 +46,7 @@ class SqlaCharacterReader(CatalogReader, CharacterMatcher):
 
     async def get_default(self) -> Character:
         """기본 캐릭터를 반환합니다."""
-        stmt = select(CharacterModel).where(
-            CharacterModel.code == DEFAULT_CHARACTER_CODE
-        )
+        stmt = select(CharacterModel).where(CharacterModel.code == DEFAULT_CHARACTER_CODE)
         result = await self._session.execute(stmt)
         model = result.scalar_one_or_none()
 
