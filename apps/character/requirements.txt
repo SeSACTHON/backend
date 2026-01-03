@@ -26,3 +26,8 @@ opentelemetry-instrumentation-redis>=0.42b0
 opentelemetry-instrumentation-grpc>=0.42b0
 opentelemetry-exporter-otlp>=1.21.0
 opentelemetry-distro>=0.42b0
+
+# Testing
+httpx>=0.25.0
+pytest>=8.0.0
+pytest-asyncio>=0.24.0
