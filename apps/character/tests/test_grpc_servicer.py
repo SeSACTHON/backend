@@ -97,7 +97,7 @@ class TestGetCharacterReward:
         request = character_pb2.RewardRequest(
             user_id=str(uuid4()),
             source="scan",
-            classification=character_pb2.Classification(
+            classification=character_pb2.ClassificationSummary(
                 major_category="재활용폐기물",
                 middle_category="무색페트병",
             ),
@@ -148,7 +148,7 @@ class TestGetCharacterReward:
         request = character_pb2.RewardRequest(
             user_id=str(uuid4()),
             source="scan",
-            classification=character_pb2.Classification(
+            classification=character_pb2.ClassificationSummary(
                 major_category="재활용폐기물",
                 middle_category="무색페트병",
             ),
@@ -184,7 +184,7 @@ class TestGetCharacterReward:
         request = character_pb2.RewardRequest(
             user_id="not-a-valid-uuid",
             source="scan",
-            classification=character_pb2.Classification(
+            classification=character_pb2.ClassificationSummary(
                 major_category="재활용폐기물",
                 middle_category="무색페트병",
             ),
@@ -222,7 +222,7 @@ class TestGetCharacterReward:
         request = character_pb2.RewardRequest(
             user_id=str(uuid4()),
             source="scan",
-            classification=character_pb2.Classification(
+            classification=character_pb2.ClassificationSummary(
                 major_category="재활용폐기물",
                 middle_category="무색페트병",
             ),
