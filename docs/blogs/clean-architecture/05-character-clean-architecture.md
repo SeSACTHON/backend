@@ -758,48 +758,7 @@ class GetCatalogQuery:
 
 ## 6. 비동기 처리 전략
 
-### 6.1 레거시 구조 (domains)
-
-레거시에서는 **분산된 비동기 처리**로 복잡도가 높았습니다.
-
-```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│  scan API    │────▶│  character   │────▶│     my       │
-│              │     │   Worker     │     │   Worker     │
-└──────────────┘     └──────────────┘     └──────────────┘
-       │                    │                    │
-       ▼                    ▼                    ▼
- scan.reward         character.save       my.save_character
-     큐               _ownership 큐           큐
-                           │                    │
-                           ▼                    ▼
-                   character.character    user_profile.
-                      _ownerships        user_characters
-```
-
-**문제점**:
-
-| 문제 | 설명 |
-|------|------|
-| **이중 저장** | 같은 소유권을 `character_ownerships` + `user_characters` 두 곳에 저장 |
-| **도메인 침범** | character Worker가 my DB에 직접 접근 (`sync_to_my_task`) |
-| **장애 연쇄** | my Worker 장애 시 캐릭터 목록 조회 불가 |
-| **데이터 불일치** | 두 테이블 간 동기화 지연 및 불일치 가능 |
-
-```python
-# ❌ 레거시: domains/character/consumers/reward.py
-# character Worker가 my DB에 직접 저장 (도메인 침범)
-@celery_app.task(name="character.save_my_character", queue="my.sync")
-def save_my_character_task(self, user_id, character_id, ...):
-    """character Worker에서 my.user_characters에 직접 저장."""
-    # my DB 연결 생성
-    my_db_url = os.getenv("MY_DATABASE_URL")
-    engine = create_async_engine(my_db_url)
-    # my 테이블에 INSERT
-    await session.execute(text("INSERT INTO user_profile.user_characters ..."))
-```
-
-### 6.2 Clean Architecture 전환 후 (apps)
+### 6.1 비동기 처리 플로우
 
 **단일 책임 원칙**을 적용하여 도메인 경계를 명확히 분리했습니다.
 
@@ -853,7 +812,7 @@ def save_my_character_task(self, user_id, character_id, ...):
 
 > **Note**: 아직 두 테이블을 사용 중이지만, 향후 마이그레이션을 통해 `users.user_characters` 단일 테이블로 통합 예정입니다.
 
-### 6.3 기본 캐릭터 지급 플로우
+### 6.2 기본 캐릭터 지급 플로우
 
 **레거시 (동기)** vs **Clean Architecture (비동기)** 비교:
 
@@ -888,7 +847,7 @@ async def execute(self, user_id: UUID) -> list[UserCharacterDTO]:
 | Fire-and-forget | 저장 실패해도 응답에 영향 없음 |
 | Eventual Consistency | 다음 조회 시 DB에서 확인됨 |
 
-### 6.4 Worker 태스크 설계
+### 6.3 Worker 태스크 설계
 
 ```python
 # apps/character_worker/presentation/tasks/grant_default_task.py
@@ -936,7 +895,7 @@ async def _save_to_users_db(...):
 | `ON CONFLICT DO NOTHING` | 중복 지급 방지 (재시도 안전) |
 | 로컬 캐시 우선 조회 | Worker 시작 시 캐시 워밍업됨 |
 
-### 6.5 소유권 저장 배치 처리
+### 6.4 소유권 저장 배치 처리
 
 대량 처리 효율을 위해 **Celery Batches**를 사용합니다.
 
@@ -1043,7 +1002,7 @@ def save_ownership_task(requests: list) -> dict[str, Any]:
 
 ## References
 
-- [async/10-local-cache-event-broadcast.md](../async/10-local-cache-event-broadcast.md) - Worker 캐시 동기화
+- [Local Cache Event Broadcast](https://rooftopsnow.tistory.com/69) - Worker 캐시 동기화
 - [RabbitMQ Fanout Exchange](https://www.rabbitmq.com/tutorials/tutorial-three-python.html)
 - [FastAPI Lifespan](https://fastapi.tiangolo.com/advanced/events/)
 - [Decorator Pattern](https://refactoring.guru/design-patterns/decorator)
