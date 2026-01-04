@@ -807,46 +807,48 @@ def save_my_character_task(self, user_id, character_id, ...):
 ┌──────────────────────────────────────────────────────────────────────┐
 │  Scan Reward Flow (캐릭터 획득)                                       │
 └──────────────────────────────────────────────────────────────────────┘
-┌──────────────┐     ┌──────────────────┐
-│  scan API    │────▶│ character_worker │
-└──────────────┘     └────────┬─────────┘
-                              │
-                              ▼
-                   character.save_ownership 큐
-                              │
-                              ▼
-                   character.character_ownerships
-                   (리워드 평가용 소유권)
+                    ┌──────────────────┐
+                    │ character_worker │ ──► character.character_ownerships
+                    │ (character.reward)│     (리워드 평가용)
+┌──────────────┐   └──────────────────┘
+│  scan API    │────
+└──────────────┘   ┌──────────────────┐
+                    │   users_worker   │ ──► users.user_characters
+                    │ (users.character)│     (인벤토리 조회용)
+                    └──────────────────┘
 
 ┌──────────────────────────────────────────────────────────────────────┐
 │  Default Character Flow (기본 캐릭터 지급)                            │
 └──────────────────────────────────────────────────────────────────────┘
-┌──────────────┐     ┌──────────────────┐
-│  users API   │────▶│ character_worker │
-│ (빈 목록 시)  │     └────────┬─────────┘
-└──────────────┘              │
-                              ▼
-                   character.grant_default 큐
-                              │
-                              ▼
-                   users.user_characters
-                   (사용자 인벤토리 조회용)
+┌──────────────┐   ┌────────────────────┐
+│  users API   │──▶│  character_worker  │ ──► users.user_characters
+│ (빈 목록 시)  │   │(character.grant_   │     (기본 캐릭터 저장)
+└──────────────┘   │   default)         │
+                    └────────────────────┘
 ```
+
+**Worker별 책임**:
+
+| Worker | 큐 | 태스크 | 저장 테이블 |
+|--------|----|----|----------|
+| `character_worker` | `character.reward` | `save_ownership_task` | `character.character_ownerships` |
+| `character_worker` | `character.grant_default` | `grant_default_task` | `users.user_characters` |
+| `users_worker` | `users.character` | `save_characters_task` | `users.user_characters` |
 
 **테이블 역할 분리**:
 
-| 테이블 | 용도 | 저장 시점 |
+| 테이블 | 용도 | 저장 주체 |
 |--------|------|----------|
-| `character.character_ownerships` | 리워드 평가 시 소유 여부 확인 | scan reward |
-| `users.user_characters` | 사용자 캐릭터 목록 조회 | 기본 캐릭터 지급 |
+| `character.character_ownerships` | 리워드 평가 시 소유 여부 확인 | character_worker |
+| `users.user_characters` | 사용자 캐릭터 목록 조회 | character_worker, users_worker |
 
 **개선점**:
 
 | 개선 | 설명 |
 |------|------|
-| **Worker 통합** | my Worker 제거 → character_worker가 양쪽 저장 |
-| **도메인 침범 제거** | character Worker가 my DB 직접 접근하던 코드 제거 |
-| **장애 격리** | Worker 장애 시에도 즉시 응답 (Eventual Consistency) |
+| **my Worker 제거** | 레거시 `domains/my` Worker 제거 → `users_worker`로 대체 |
+| **도메인 분리** | 각 Worker가 담당 큐만 처리 |
+| **장애 격리** | Worker 장애 시에도 API 즉시 응답 (Eventual Consistency) |
 | **명확한 책임** | 리워드 평가 ↔ 인벤토리 조회 분리 |
 
 > **Note**: 아직 두 테이블을 사용 중이지만, 향후 마이그레이션을 통해 `users.user_characters` 단일 테이블로 통합 예정입니다.
