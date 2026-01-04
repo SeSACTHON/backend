@@ -19,9 +19,9 @@ spec:
       - name: character
         namespace: character
         path: workloads/routing/character/prod
-      - name: my
-        namespace: my
-        path: workloads/routing/my/prod
+      - name: users
+        namespace: users
+        path: workloads/routing/users/prod
       - name: scan
         namespace: scan
         path: workloads/routing/scan/prod

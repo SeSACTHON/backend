@@ -1,0 +1,34 @@
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: users-vs
+  namespace: users
+spec:
+  hosts:
+  - api.growbin.app
+  gateways:
+  - istio-system/eco2-gateway
+  http:
+  # ======= Canary 라우팅 (X-Canary: true 헤더) =======
+  - match:
+    - headers:
+        x-canary:
+          exact: 'true'
+      uri:
+        prefix: /api/v1/user
+    route:
+    - destination:
+        host: users-api.users.svc.cluster.local
+        port:
+          number: 8000
+        subset: canary
+  # ======= 기본 트래픽 → Stable =======
+  - match:
+    - uri:
+        prefix: /api/v1/user
+    route:
+    - destination:
+        host: users-api.users.svc.cluster.local
+        port:
+          number: 8000
+        subset: stable

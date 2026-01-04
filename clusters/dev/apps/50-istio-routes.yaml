@@ -22,9 +22,9 @@ spec:
       - name: character
         namespace: character
         path: workloads/routing/character/dev
-      - name: my
-        namespace: my
-        path: workloads/routing/my/dev
+      - name: users
+        namespace: users
+        path: workloads/routing/users/dev
       - name: scan
         namespace: scan
         path: workloads/routing/scan/dev
