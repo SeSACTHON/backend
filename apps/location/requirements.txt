@@ -1,0 +1,28 @@
+# Web Framework
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Database
+sqlalchemy[asyncio]>=2.0.0
+asyncpg>=0.29.0
+
+# Redis (metrics cache)
+redis>=5.0.0
+
+# HTTP Client
+httpx>=0.26.0
+
+# OpenTelemetry
+opentelemetry-api>=1.21.0
+opentelemetry-sdk>=1.21.0
+opentelemetry-instrumentation-fastapi>=0.42b0
+opentelemetry-instrumentation-sqlalchemy>=0.42b0
+opentelemetry-exporter-otlp>=1.21.0
+opentelemetry-distro>=0.42b0
+opentelemetry-propagator-b3>=1.21.0
+
+# Testing
+pytest>=8.0.0
+pytest-asyncio>=0.24.0
