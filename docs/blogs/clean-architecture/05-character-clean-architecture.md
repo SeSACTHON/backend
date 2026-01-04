@@ -756,17 +756,223 @@ class GetCatalogQuery:
 
 ---
 
-## 6. 성능 비교
+## 6. 비동기 처리 전략
 
-| 방식 | 레이턴시 | Redis 의존 | 장애 영향 |
-|------|----------|-----------|----------|
-| DB 직접 | ~50ms | ❌ | DB 장애 시 전체 실패 |
-| Redis 캐시 | ~2ms | ✅ | Redis 장애 시 실패 |
-| **로컬 캐시** | ~0.01ms | ❌ | Pod 독립, Graceful Degradation |
+### 6.1 레거시 구조 (domains)
+
+레거시에서는 **분산된 비동기 처리**로 복잡도가 높았습니다.
+
+```
+┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+│  scan API    │────▶│  character   │────▶│     my       │
+│              │     │   Worker     │     │   Worker     │
+└──────────────┘     └──────────────┘     └──────────────┘
+       │                    │                    │
+       ▼                    ▼                    ▼
+ scan.reward         character.save       my.save_character
+     큐               _ownership 큐           큐
+                           │                    │
+                           ▼                    ▼
+                   character.character    user_profile.
+                      _ownerships        user_characters
+```
+
+**문제점**:
+
+| 문제 | 설명 |
+|------|------|
+| **이중 저장** | 같은 소유권을 `character_ownerships` + `user_characters` 두 곳에 저장 |
+| **도메인 침범** | character Worker가 my DB에 직접 접근 (`sync_to_my_task`) |
+| **장애 연쇄** | my Worker 장애 시 캐릭터 목록 조회 불가 |
+| **데이터 불일치** | 두 테이블 간 동기화 지연 및 불일치 가능 |
+
+```python
+# ❌ 레거시: domains/character/consumers/reward.py
+# character Worker가 my DB에 직접 저장 (도메인 침범)
+@celery_app.task(name="character.save_my_character", queue="my.sync")
+def save_my_character_task(self, user_id, character_id, ...):
+    """character Worker에서 my.user_characters에 직접 저장."""
+    # my DB 연결 생성
+    my_db_url = os.getenv("MY_DATABASE_URL")
+    engine = create_async_engine(my_db_url)
+    # my 테이블에 INSERT
+    await session.execute(text("INSERT INTO user_profile.user_characters ..."))
+```
+
+### 6.2 Clean Architecture 전환 후 (apps)
+
+**단일 책임 원칙**을 적용하여 도메인 경계를 명확히 분리했습니다.
+
+```
+┌──────────────┐     ┌──────────────┐
+│  scan API    │────▶│  character   │
+│              │     │   Worker     │
+└──────────────┘     └──────┬───────┘
+                           │
+                           ▼
+                   character.save_ownership 큐
+                           │
+                           ▼
+                   users.user_characters
+                   (유일한 소유권 저장소)
+```
+
+**개선점**:
+
+| 개선 | 설명 |
+|------|------|
+| **단일 저장소** | `users.user_characters`만 사용 (이중 저장 제거) |
+| **도메인 분리** | character Worker는 users DB에만 접근 |
+| **장애 격리** | Worker 장애 시에도 즉시 응답 (Eventual Consistency) |
+| **데이터 일관성** | 단일 소스로 불일치 원천 차단 |
+
+### 6.3 기본 캐릭터 지급 플로우
+
+**레거시 (동기)** vs **Clean Architecture (비동기)** 비교:
+
+```python
+# ❌ 레거시: domains/my - 동기 조회 후 빈 리스트 반환
+async def get_user_characters(user_id):
+    characters = await repo.list_by_user(user_id)
+    if not characters:
+        return []  # 빈 리스트 반환 (기본 캐릭터 없음)
+```
+
+```python
+# ✅ Clean Architecture: apps/users - 즉시 응답 + 비동기 저장
+async def execute(self, user_id: UUID) -> list[UserCharacterDTO]:
+    characters = await self._character_gateway.list_by_user_id(user_id)
+    
+    if not characters:
+        # 1. 기본 캐릭터(이코) 즉시 반환 (UX 우선)
+        # 2. 비동기로 DB 저장 이벤트 발행
+        if self._default_publisher:
+            self._default_publisher.publish(user_id)  # Fire-and-forget
+        return [self._get_default_character_dto(user_id)]
+    
+    return [_to_character_dto(char) for char in characters]
+```
+
+**설계 판단**:
+
+| 판단 | 근거 |
+|------|------|
+| 즉시 응답 | 사용자 경험 우선 - 첫 로그인 시 즉시 캐릭터 표시 |
+| Fire-and-forget | 저장 실패해도 응답에 영향 없음 |
+| Eventual Consistency | 다음 조회 시 DB에서 확인됨 |
+
+### 6.4 Worker 태스크 설계
+
+```python
+# apps/character_worker/presentation/tasks/grant_default_task.py
+@celery_app.task(
+    name="character.grant_default",
+    queue="character.grant_default",
+    max_retries=3,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+)
+def grant_default_character_task(self, user_id: str) -> dict[str, Any]:
+    """기본 캐릭터(이코)를 사용자에게 지급합니다."""
+    
+    # 1. 기본 캐릭터 정보 조회 (로컬 캐시 우선)
+    default_char = _get_default_character()
+    
+    # 2. users.user_characters에 저장 (멱등성 보장)
+    result = loop.run_until_complete(
+        _save_to_users_db(
+            user_id=UUID(user_id),
+            character_id=default_char["id"],
+            character_code=default_char["code"],
+            ...
+        )
+    )
+    return {"success": True, **result}
+```
+
+```python
+# 멱등성 보장: ON CONFLICT DO NOTHING
+async def _save_to_users_db(...):
+    await session.execute(text("""
+        INSERT INTO users.user_characters
+            (id, user_id, character_id, character_code, ...)
+        VALUES (:id, :user_id, :character_id, :character_code, ...)
+        ON CONFLICT (user_id, character_code) DO NOTHING
+    """), {...})
+```
+
+**설계 판단**:
+
+| 판단 | 근거 |
+|------|------|
+| `character_code` 기준 멱등성 | `character_id`는 캐시로 변할 수 있음, `code`는 불변 |
+| `ON CONFLICT DO NOTHING` | 중복 지급 방지 (재시도 안전) |
+| 로컬 캐시 우선 조회 | Worker 시작 시 캐시 워밍업됨 |
+
+### 6.5 소유권 저장 배치 처리
+
+대량 처리 효율을 위해 **Celery Batches**를 사용합니다.
+
+```python
+# apps/character_worker/presentation/tasks/ownership_task.py
+@celery_app.task(
+    base=Batches,
+    name="character.save_ownership",
+    queue="character.reward",
+    flush_every=50,      # 50개 모이면 처리
+    flush_interval=5,    # 또는 5초마다 처리
+)
+def save_ownership_task(requests: list) -> dict[str, Any]:
+    """Bulk INSERT로 DB 효율성 향상."""
+    batch_data = [extract_kwargs(req) for req in requests]
+    return loop.run_until_complete(_save_ownership_batch_async(batch_data))
+```
+
+**레거시 vs Clean Architecture 비교**:
+
+| 항목 | 레거시 (domains) | Clean Architecture (apps) |
+|------|------------------|---------------------------|
+| 저장 위치 | `character_ownerships` + `user_characters` | `users.user_characters` 단일 |
+| Worker | character Worker + my Worker | character_worker 단일 |
+| 멱등성 키 | `(user_id, character_id)` | `(user_id, character_code)` |
+| 충돌 전략 | `DO NOTHING` | `DO NOTHING` |
+
+### 6.6 전체 비동기 플로우
+
+```
+┌───────────────────────────────────────────────────────────────────────────┐
+│  1. 사용자 요청: GET /users/me/characters                                  │
+└───────────────────────────────────┬───────────────────────────────────────┘
+                                    ▼
+┌───────────────────────────────────────────────────────────────────────────┐
+│  2. users API: GetCharactersQuery.execute()                               │
+│     - 캐릭터 목록 조회                                                     │
+│     - 빈 목록이면 → 기본 캐릭터 즉시 반환 + 이벤트 발행                     │
+└───────────────────────────────────┬───────────────────────────────────────┘
+                                    ▼
+┌───────────────────────────────────────────────────────────────────────────┐
+│  3. RabbitMQ: character.grant_default 큐                                  │
+└───────────────────────────────────┬───────────────────────────────────────┘
+                                    ▼
+┌───────────────────────────────────────────────────────────────────────────┐
+│  4. character_worker: grant_default_character_task()                      │
+│     - 기본 캐릭터 정보 조회 (캐시 → DB)                                    │
+│     - users.user_characters에 저장 (ON CONFLICT DO NOTHING)               │
+└───────────────────────────────────────────────────────────────────────────┘
+```
+
+**장점**:
+
+| 장점 | 설명 |
+|------|------|
+| **즉시 응답** | 사용자는 기다리지 않고 즉시 캐릭터 확인 |
+| **재시도 안전** | 멱등성으로 중복 저장 방지 |
+| **장애 격리** | Worker 장애 시에도 API 정상 응답 |
+| **확장성** | Worker 스케일 아웃으로 처리량 증가 |
 
 ---
 
-## 7. Trade-off
+## 8. Trade-off
 
 | 장점 | 단점 |
 |------|------|
@@ -774,10 +980,12 @@ class GetCatalogQuery:
 | 극한 성능 (~0.01ms) | 메모리 사용 (~50KB, 미미) |
 | 장애 격리 | Eventual Consistency (수 초 지연) |
 | 운영 단순화 | 캐시 미스 시 첫 요청 느림 (워밍업으로 해결) |
+| 단일 소유권 저장소 | 레거시 데이터 마이그레이션 필요 |
+| 비동기 저장으로 즉시 응답 | Worker 장애 시 저장 지연 |
 
 ---
 
-## 8. 구성 요소 매핑 요약
+## 9. 구성 요소 매핑 요약
 
 ### Port-Adapter 매핑
 
