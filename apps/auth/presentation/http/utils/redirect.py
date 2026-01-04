@@ -110,11 +110,12 @@ def build_frontend_redirect_url(
     Returns:
         최종 리다이렉트 URL
     """
-    origin = frontend_origin or get_request_origin(request)
-    if not origin:
+    # frontend_origin이 명시적으로 지정된 경우에만 origin을 변경
+    # OAuth 콜백에서 헤더가 없으면 fallback_url 그대로 사용
+    if not frontend_origin:
         return fallback_url
 
-    parsed_origin = urlparse(origin)
+    parsed_origin = urlparse(frontend_origin)
     parsed_fallback = urlparse(fallback_url)
 
     scheme = parsed_origin.scheme or parsed_fallback.scheme
