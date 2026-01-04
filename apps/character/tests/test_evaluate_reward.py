@@ -82,9 +82,7 @@ class TestEvaluateRewardCommand:
         policy_service: RewardPolicyService,
     ) -> None:
         """disposal_rules가 없으면 리워드 미지급."""
-        command = EvaluateRewardCommand(
-            mock_matcher, mock_ownership_checker, policy_service
-        )
+        command = EvaluateRewardCommand(mock_matcher, mock_ownership_checker, policy_service)
 
         request = RewardRequest(
             user_id=uuid4(),
@@ -111,9 +109,7 @@ class TestEvaluateRewardCommand:
         policy_service: RewardPolicyService,
     ) -> None:
         """insufficiencies가 있으면 리워드 미지급."""
-        command = EvaluateRewardCommand(
-            mock_matcher, mock_ownership_checker, policy_service
-        )
+        command = EvaluateRewardCommand(mock_matcher, mock_ownership_checker, policy_service)
 
         request = RewardRequest(
             user_id=uuid4(),
@@ -144,9 +140,7 @@ class TestEvaluateRewardCommand:
         mock_matcher.match_by_label.return_value = sample_character
         mock_ownership_checker.is_owned.return_value = False
 
-        command = EvaluateRewardCommand(
-            mock_matcher, mock_ownership_checker, policy_service
-        )
+        command = EvaluateRewardCommand(mock_matcher, mock_ownership_checker, policy_service)
 
         request = RewardRequest(
             user_id=uuid4(),
@@ -178,9 +172,7 @@ class TestEvaluateRewardCommand:
         mock_matcher.match_by_label.return_value = sample_character
         mock_ownership_checker.is_owned.return_value = True  # 이미 소유
 
-        command = EvaluateRewardCommand(
-            mock_matcher, mock_ownership_checker, policy_service
-        )
+        command = EvaluateRewardCommand(mock_matcher, mock_ownership_checker, policy_service)
 
         request = RewardRequest(
             user_id=uuid4(),
@@ -211,9 +203,7 @@ class TestEvaluateRewardCommand:
         mock_matcher.get_default.return_value = default_character
         mock_ownership_checker.is_owned.return_value = False
 
-        command = EvaluateRewardCommand(
-            mock_matcher, mock_ownership_checker, policy_service
-        )
+        command = EvaluateRewardCommand(mock_matcher, mock_ownership_checker, policy_service)
 
         request = RewardRequest(
             user_id=uuid4(),
