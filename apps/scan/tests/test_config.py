@@ -3,6 +3,8 @@
 import os
 from unittest.mock import patch
 
+import pytest
+
 
 # 테스트용 환경변수 (OPENAI_API_KEY 필수)
 TEST_ENV = {
@@ -10,61 +12,86 @@ TEST_ENV = {
 }
 
 
-class TestSettingsGetModel:
-    """Settings.get_model() 테스트."""
+class TestSettingsResolveProvider:
+    """Settings.resolve_provider() 테스트."""
 
-    def test_get_model_openai_default(self):
-        """OpenAI 기본 모델 반환."""
+    def test_resolve_provider_gpt(self):
+        """GPT 모델 → gpt provider."""
         with patch.dict(os.environ, TEST_ENV, clear=False):
             from apps.scan.setup.config import Settings
 
             settings = Settings()
-            assert settings.get_model("openai") == "gpt-5.2"
+            assert settings.resolve_provider("gpt-5.2") == "gpt"
+            assert settings.resolve_provider("gpt-5.1") == "gpt"
+            assert settings.resolve_provider("gpt-5-mini") == "gpt"
 
-    def test_get_model_gemini_default(self):
-        """Gemini 기본 모델 반환."""
+    def test_resolve_provider_gemini(self):
+        """Gemini 모델 → gemini provider."""
         with patch.dict(os.environ, TEST_ENV, clear=False):
             from apps.scan.setup.config import Settings
 
             settings = Settings()
-            assert settings.get_model("gemini") == "gemini-3.0-flash"
+            assert settings.resolve_provider("gemini-2.5-pro") == "gemini"
+            assert settings.resolve_provider("gemini-2.5-flash") == "gemini"
 
-    def test_get_model_unknown_fallback_to_openai(self):
-        """알 수 없는 provider는 OpenAI로 fallback."""
+    def test_resolve_provider_unknown_raises(self):
+        """알 수 없는 모델은 KeyError."""
         with patch.dict(os.environ, TEST_ENV, clear=False):
             from apps.scan.setup.config import Settings
 
             settings = Settings()
-            assert settings.get_model("unknown") == "gpt-5.2"
+            with pytest.raises(KeyError):
+                settings.resolve_provider("unknown-model")
 
-    def test_get_model_custom_openai(self):
-        """환경변수로 OpenAI 모델 커스텀."""
-        env = {**TEST_ENV, "SCAN_LLM_OPENAI_MODEL": "gpt-6.0"}
+
+class TestSettingsValidateModel:
+    """Settings.validate_model() 테스트."""
+
+    def test_validate_model_supported(self):
+        """지원 모델 검증."""
+        with patch.dict(os.environ, TEST_ENV, clear=False):
+            from apps.scan.setup.config import Settings
+
+            settings = Settings()
+            assert settings.validate_model("gpt-5.2") is True
+            assert settings.validate_model("gemini-2.5-pro") is True
+
+    def test_validate_model_unsupported(self):
+        """미지원 모델 검증."""
+        with patch.dict(os.environ, TEST_ENV, clear=False):
+            from apps.scan.setup.config import Settings
+
+            settings = Settings()
+            assert settings.validate_model("unknown-model") is False
+
+
+class TestSettingsDefaults:
+    """Settings 기본값 테스트."""
+
+    def test_default_model(self):
+        """기본 LLM 모델."""
+        with patch.dict(os.environ, TEST_ENV, clear=False):
+            from apps.scan.setup.config import Settings
+
+            settings = Settings()
+            assert settings.llm_default_model == "gpt-5.2"
+
+    def test_custom_default_model(self):
+        """환경변수로 기본 모델 변경."""
+        env = {**TEST_ENV, "SCAN_LLM_DEFAULT_MODEL": "gpt-5-mini"}
         with patch.dict(os.environ, env, clear=False):
             from apps.scan.setup.config import Settings
 
             settings = Settings()
-            assert settings.get_model("openai") == "gpt-6.0"
+            assert settings.llm_default_model == "gpt-5-mini"
 
-    def test_get_model_custom_gemini(self):
-        """환경변수로 Gemini 모델 커스텀."""
-        env = {**TEST_ENV, "SCAN_LLM_GEMINI_MODEL": "gemini-4.0-ultra"}
-        with patch.dict(os.environ, env, clear=False):
+    def test_get_all_supported_models(self):
+        """지원 모델 목록 확인."""
+        with patch.dict(os.environ, TEST_ENV, clear=False):
             from apps.scan.setup.config import Settings
 
             settings = Settings()
-            assert settings.get_model("gemini") == "gemini-4.0-ultra"
-
-    def test_settings_from_env(self):
-        """환경변수에서 설정 로드."""
-        env_vars = {
-            "OPENAI_API_KEY": "env-test-key",
-            "SCAN_LLM_OPENAI_MODEL": "gpt-env-model",
-            "SCAN_LLM_GEMINI_MODEL": "gemini-env-model",
-        }
-
-        with patch.dict(os.environ, env_vars, clear=False):
-            from apps.scan.setup.config import Settings
-
-            settings = Settings()
-            assert settings.llm_openai_model == "gpt-env-model"
+            models = settings.get_all_supported_models()
+            assert "gpt-5.2" in models
+            assert "gemini-2.5-pro" in models
+            assert len(models) > 0
