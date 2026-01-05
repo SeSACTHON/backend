@@ -92,13 +92,15 @@ class MockEventPublisher(EventPublisherPort):
         progress: int | None = None,
         result: dict[str, Any] | None = None,
     ) -> str:
-        self.events.append({
-            "task_id": task_id,
-            "stage": stage,
-            "status": status,
-            "progress": progress,
-            "result": result,
-        })
+        self.events.append(
+            {
+                "task_id": task_id,
+                "stage": stage,
+                "status": status,
+                "progress": progress,
+                "result": result,
+            }
+        )
         return f"mock-msg-{len(self.events)}"
 
 

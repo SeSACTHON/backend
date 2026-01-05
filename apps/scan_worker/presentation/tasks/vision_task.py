@@ -97,9 +97,11 @@ def vision_task(
         extra={
             **log_ctx,
             "elapsed_ms": ctx.latencies.get("duration_vision_ms"),
-            "major_category": ctx.classification.get("classification", {}).get("major_category")
-            if ctx.classification
-            else None,
+            "major_category": (
+                ctx.classification.get("classification", {}).get("major_category")
+                if ctx.classification
+                else None
+            ),
         },
     )
 

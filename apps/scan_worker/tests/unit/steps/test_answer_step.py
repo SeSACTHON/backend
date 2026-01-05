@@ -80,9 +80,7 @@ class TestAnswerStep:
             task_id="test-task-001",
             user_id="user-001",
             image_url="https://example.com/image.jpg",
-            classification={
-                "classification": {"major_category": "재활용폐기물"}
-            },
+            classification={"classification": {"major_category": "재활용폐기물"}},
             disposal_rules={
                 "규정명": "플라스틱류 배출 규정",
                 "배출방법": "내용물 비우고 물로 헹궈서 배출",
@@ -113,9 +111,7 @@ class TestAnswerStep:
             task_id="test-task-002",
             user_id="user-002",
             image_url="https://example.com/image.jpg",
-            classification={
-                "classification": {"major_category": "알수없음"}
-            },
+            classification={"classification": {"major_category": "알수없음"}},
             disposal_rules=None,  # 규정 없음
             progress=50,
         )
@@ -141,9 +137,7 @@ class TestAnswerStep:
             task_id="test-task-003",
             user_id="user-003",
             image_url="https://example.com/image.jpg",
-            classification={
-                "classification": {"major_category": "재활용폐기물"}
-            },
+            classification={"classification": {"major_category": "재활용폐기물"}},
             disposal_rules={"규정": "테스트"},
             latencies={
                 "duration_vision_ms": 1000.0,

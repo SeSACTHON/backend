@@ -84,9 +84,11 @@ def reward_task(
             "event_type": "scan_completed",
             "task_id": ctx.task_id,
             "user_id": ctx.user_id,
-            "category": ctx.classification.get("classification", {}).get("major_category")
-            if ctx.classification
-            else None,
+            "category": (
+                ctx.classification.get("classification", {}).get("major_category")
+                if ctx.classification
+                else None
+            ),
             "duration_total_ms": ctx.latencies.get("duration_total_ms"),
             "duration_vision_ms": ctx.latencies.get("duration_vision_ms"),
             "duration_rule_ms": ctx.latencies.get("duration_rule_ms"),
