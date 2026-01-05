@@ -4,7 +4,6 @@ import os
 from unittest.mock import patch
 
 
-
 # 테스트용 환경변수 (OPENAI_API_KEY 필수)
 TEST_ENV = {
     "OPENAI_API_KEY": "test-key",
@@ -18,6 +17,7 @@ class TestSettingsGetModel:
         """OpenAI 기본 모델 반환."""
         with patch.dict(os.environ, TEST_ENV, clear=False):
             from apps.scan.setup.config import Settings
+
             settings = Settings()
             assert settings.get_model("openai") == "gpt-5.2"
 
@@ -25,6 +25,7 @@ class TestSettingsGetModel:
         """Gemini 기본 모델 반환."""
         with patch.dict(os.environ, TEST_ENV, clear=False):
             from apps.scan.setup.config import Settings
+
             settings = Settings()
             assert settings.get_model("gemini") == "gemini-3.0-flash"
 
@@ -32,6 +33,7 @@ class TestSettingsGetModel:
         """알 수 없는 provider는 OpenAI로 fallback."""
         with patch.dict(os.environ, TEST_ENV, clear=False):
             from apps.scan.setup.config import Settings
+
             settings = Settings()
             assert settings.get_model("unknown") == "gpt-5.2"
 
@@ -40,6 +42,7 @@ class TestSettingsGetModel:
         env = {**TEST_ENV, "SCAN_LLM_OPENAI_MODEL": "gpt-6.0"}
         with patch.dict(os.environ, env, clear=False):
             from apps.scan.setup.config import Settings
+
             settings = Settings()
             assert settings.get_model("openai") == "gpt-6.0"
 
@@ -48,6 +51,7 @@ class TestSettingsGetModel:
         env = {**TEST_ENV, "SCAN_LLM_GEMINI_MODEL": "gemini-4.0-ultra"}
         with patch.dict(os.environ, env, clear=False):
             from apps.scan.setup.config import Settings
+
             settings = Settings()
             assert settings.get_model("gemini") == "gemini-4.0-ultra"
 
@@ -61,5 +65,6 @@ class TestSettingsGetModel:
 
         with patch.dict(os.environ, env_vars, clear=False):
             from apps.scan.setup.config import Settings
+
             settings = Settings()
             assert settings.llm_openai_model == "gpt-env-model"

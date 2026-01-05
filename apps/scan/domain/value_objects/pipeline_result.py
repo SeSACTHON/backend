@@ -48,7 +48,4 @@ class PipelineResult:
     def has_insufficiencies(self) -> bool:
         """답변에 부족한 점이 있는지 확인."""
         insufficiencies = self.final_answer.get("insufficiencies", [])
-        return any(
-            isinstance(entry, str) and entry.strip()
-            for entry in insufficiencies
-        )
+        return any(isinstance(entry, str) and entry.strip() for entry in insufficiencies)

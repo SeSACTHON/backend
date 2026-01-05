@@ -72,5 +72,6 @@ class EventPublisherRedis(EventPublisher):
         """
         if self._sync_client is None:
             from domains._shared.events import get_sync_redis_client
+
             self._sync_client = get_sync_redis_client()
         return self._sync_client

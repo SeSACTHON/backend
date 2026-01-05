@@ -7,5 +7,4 @@ from apps.scan.infrastructure.rule_retrieval.yaml_rule_repository import (
 __all__ = ["YamlRuleRepository"]
 
 
-
 __all__ = ["YamlRuleRepository"]

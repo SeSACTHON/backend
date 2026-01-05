@@ -6,5 +6,4 @@ from apps.scan.presentation.http.controllers.health import router as health_rout
 __all__ = ["scan_router", "health_router"]
 
 
-
 __all__ = ["scan_router", "health_router"]

@@ -8,5 +8,4 @@ from apps.scan.domain.enums.waste_category import WasteCategory
 __all__ = ["LLMProvider", "PipelineStage", "TaskStatus", "WasteCategory"]
 
 
-
 __all__ = ["LLMProvider", "PipelineStage", "TaskStatus", "WasteCategory"]

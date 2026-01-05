@@ -32,9 +32,8 @@ class Classification:
 
         조건: 대분류가 '재활용폐기물'이고 중분류가 있어야 함.
         """
-        return (
-            WasteCategory.is_rewardable(self.major_category)
-            and bool(self.middle_category.strip())
+        return WasteCategory.is_rewardable(self.major_category) and bool(
+            self.middle_category.strip()
         )
 
     @classmethod

@@ -146,9 +146,7 @@ class TestSubmitClassificationCommand:
         assert call_kwargs["status"] == "started"
 
     @pytest.mark.anyio
-    async def test_execute_passes_model_to_chain(
-        self, command, mock_celery_app, mock_celery_chain
-    ):
+    async def test_execute_passes_model_to_chain(self, command, mock_celery_app, mock_celery_chain):
         """execute()는 모델명을 Celery chain에 전달."""
         request = SubmitClassificationRequest(
             user_id="user-1",

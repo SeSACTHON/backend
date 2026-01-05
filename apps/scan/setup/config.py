@@ -181,8 +181,7 @@ class Settings(BaseSettings):
         """
         if model not in MODEL_PROVIDER_MAP:
             raise KeyError(
-                f"Unknown model: '{model}'. "
-                f"Supported: {list(MODEL_PROVIDER_MAP.keys())}"
+                f"Unknown model: '{model}'. " f"Supported: {list(MODEL_PROVIDER_MAP.keys())}"
             )
         return MODEL_PROVIDER_MAP[model]
 
