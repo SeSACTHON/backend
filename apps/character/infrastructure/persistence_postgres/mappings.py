@@ -7,7 +7,6 @@ Imperative Mapping을 사용하여 도메인 엔티티를 테이블에 매핑합
 from sqlalchemy.orm import relationship
 
 from character.domain.entities import Character, CharacterOwnership
-from character.domain.enums import CharacterOwnershipStatus
 from character.infrastructure.persistence_postgres.registry import mapper_registry
 from character.infrastructure.persistence_postgres.tables import (
     character_ownerships_table,
