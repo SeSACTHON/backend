@@ -9,21 +9,44 @@ from typing import Any
 
 from celery import Celery
 from celery.signals import worker_ready, worker_shutdown
-from kombu import Queue
+from kombu import Exchange, Queue
 
 from scan_worker.setup.config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+# RabbitMQ Exchange 설정 (기존 설정과 동일하게 topic 타입)
+CELERY_EXCHANGE = Exchange("celery", type="topic")
+
 # RabbitMQ 큐 설정 (기존 큐와 동일하게 x-message-ttl 설정)
 QUEUE_TTL_MS = 3600000  # 1시간 (3600초 * 1000)
 
 SCAN_TASK_QUEUES = (
-    Queue("scan.vision", queue_arguments={"x-message-ttl": QUEUE_TTL_MS}),
-    Queue("scan.rule", queue_arguments={"x-message-ttl": QUEUE_TTL_MS}),
-    Queue("scan.answer", queue_arguments={"x-message-ttl": QUEUE_TTL_MS}),
-    Queue("scan.reward", queue_arguments={"x-message-ttl": QUEUE_TTL_MS}),
+    Queue(
+        "scan.vision",
+        exchange=CELERY_EXCHANGE,
+        routing_key="scan.vision",
+        queue_arguments={"x-message-ttl": QUEUE_TTL_MS},
+    ),
+    Queue(
+        "scan.rule",
+        exchange=CELERY_EXCHANGE,
+        routing_key="scan.rule",
+        queue_arguments={"x-message-ttl": QUEUE_TTL_MS},
+    ),
+    Queue(
+        "scan.answer",
+        exchange=CELERY_EXCHANGE,
+        routing_key="scan.answer",
+        queue_arguments={"x-message-ttl": QUEUE_TTL_MS},
+    ),
+    Queue(
+        "scan.reward",
+        exchange=CELERY_EXCHANGE,
+        routing_key="scan.reward",
+        queue_arguments={"x-message-ttl": QUEUE_TTL_MS},
+    ),
 )
 
 # Scan Worker Task Routes (태스크 = 큐 1:1)
@@ -54,6 +77,11 @@ celery_app.conf.task_queues = SCAN_TASK_QUEUES
 
 # Celery 설정
 celery_app.conf.update(
+    # Exchange 설정 (기존 RabbitMQ와 동일하게 topic 타입)
+    task_default_exchange="celery",
+    task_default_exchange_type="topic",
+    task_default_routing_key="celery",
+    # 일반 설정
     task_track_started=True,
     task_serializer="json",
     result_serializer="json",
