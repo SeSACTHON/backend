@@ -5,13 +5,13 @@ from typing import Sequence
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.character.application.catalog.ports import CatalogReader
-from apps.character.application.reward.ports import CharacterMatcher
-from apps.character.domain.entities import Character
-from apps.character.infrastructure.persistence_postgres.mappers import (
+from character.application.catalog.ports import CatalogReader
+from character.application.reward.ports import CharacterMatcher
+from character.domain.entities import Character
+from character.infrastructure.persistence_postgres.mappers import (
     character_model_to_entity,
 )
-from apps.character.infrastructure.persistence_postgres.models import CharacterModel
+from character.infrastructure.persistence_postgres.models import CharacterModel
 
 DEFAULT_CHARACTER_CODE = "char-eco"
 

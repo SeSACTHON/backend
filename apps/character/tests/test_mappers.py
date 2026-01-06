@@ -10,9 +10,9 @@ from uuid import uuid4
 
 import pytest
 
-from apps.character.domain.entities import Character, CharacterOwnership
-from apps.character.domain.enums import CharacterOwnershipStatus
-from apps.character.infrastructure.persistence_postgres.mappers import (
+from character.domain.entities import Character, CharacterOwnership
+from character.domain.enums import CharacterOwnershipStatus
+from character.infrastructure.persistence_postgres.mappers import (
     character_model_to_entity,
     ownership_model_to_entity,
 )

@@ -14,7 +14,9 @@ from sqlalchemy.orm import registry
 
 from apps.users.domain.entities.user_character import UserCharacter
 from apps.users.domain.enums import UserCharacterStatus
-from apps.users.infrastructure.persistence_postgres.constants import USER_CHARACTERS_TABLE
+from apps.users.infrastructure.persistence_postgres.constants import (
+    USER_CHARACTERS_TABLE,
+)
 from apps.users.infrastructure.persistence_postgres.mappings.user import metadata
 
 mapper_registry = registry(metadata=metadata)

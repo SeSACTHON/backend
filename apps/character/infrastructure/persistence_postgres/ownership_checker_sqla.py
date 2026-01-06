@@ -5,8 +5,8 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.character.application.reward.ports import OwnershipChecker
-from apps.character.infrastructure.persistence_postgres.models import (
+from character.application.reward.ports import OwnershipChecker
+from character.infrastructure.persistence_postgres.models import (
     CharacterOwnershipModel,
 )
 

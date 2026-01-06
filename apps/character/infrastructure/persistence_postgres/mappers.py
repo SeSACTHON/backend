@@ -1,8 +1,8 @@
 """ORM to Domain Mappers."""
 
-from apps.character.domain.entities import Character, CharacterOwnership
-from apps.character.domain.enums import CharacterOwnershipStatus
-from apps.character.infrastructure.persistence_postgres.models import (
+from character.domain.entities import Character, CharacterOwnership
+from character.domain.enums import CharacterOwnershipStatus
+from character.infrastructure.persistence_postgres.models import (
     CharacterModel,
     CharacterOwnershipModel,
 )
