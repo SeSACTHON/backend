@@ -1,17 +1,18 @@
 """Google Gemini Vision Adapter - VisionModelPort 구현체.
 
-Gemini API generate_content 사용 (gemini-3.0-flash-preview).
+Gemini 3 API generate_content 사용 (gemini-3-flash-preview).
+https://ai.google.dev/gemini-api/docs/gemini-3
 """
 
 from __future__ import annotations
 
-import base64
 import logging
 import os
 from typing import Any, List, Optional
 
-import google.generativeai as genai
 import httpx
+from google import genai
+from google.genai import types
 from pydantic import BaseModel
 
 from scan_worker.application.classify.ports.vision_model import VisionModelPort
@@ -55,34 +56,29 @@ class VisionResult(BaseModel):
 class GeminiVisionAdapter(VisionModelPort):
     """Google Gemini Vision API 구현체.
 
-    generate_content API 사용으로 JSON 구조화 출력.
+    Gemini 3 API (google-genai 패키지) 사용.
+    https://ai.google.dev/gemini-api/docs/gemini-3
     """
 
     def __init__(
         self,
-        model: str = "gemini-3.0-flash-preview",
+        model: str = "gemini-3-flash-preview",
         api_key: str | None = None,
     ):
         """초기화.
 
         Args:
-            model: Gemini 모델명 (기본: gemini-3.0-flash-preview)
+            model: Gemini 모델명 (기본: gemini-3-flash-preview)
             api_key: Google API 키 (None이면 GOOGLE_API_KEY 환경변수 사용)
         """
         # API 키 설정
         key = api_key or os.getenv("GOOGLE_API_KEY")
         if key:
-            genai.configure(api_key=key)
+            self._client = genai.Client(api_key=key)
+        else:
+            self._client = genai.Client()
 
-        # GenerativeModel 인스턴스 생성
-        self._model_name = model
-        self._model = genai.GenerativeModel(
-            model_name=model,
-            generation_config=genai.types.GenerationConfig(
-                max_output_tokens=MAX_OUTPUT_TOKENS,
-                temperature=TEMPERATURE,
-            ),
-        )
+        self._model = model
         self._http_client = httpx.Client(
             timeout=httpx.Timeout(
                 connect=GEMINI_CONNECT_TIMEOUT,
@@ -132,38 +128,28 @@ class GeminiVisionAdapter(VisionModelPort):
         # 사용자 입력 결정
         input_text = user_input or "이 폐기물을 분류해주세요."
 
-        logger.debug("Vision API call starting (model=%s)", self._model_name)
+        logger.debug("Vision API call starting (model=%s)", self._model)
 
         # 이미지 다운로드
         image_bytes, mime_type = self._fetch_image_bytes(image_url)
 
-        # JSON 스키마 지시
-        schema_instruction = """
-응답은 반드시 다음 JSON 형식으로 작성하세요:
-{
-  "classification": {
-    "major_category": "대분류",
-    "middle_category": "중분류",
-    "minor_category": "소분류 (없으면 null)"
-  },
-  "situation_tags": ["태그1", "태그2"],
-  "meta": {
-    "user_input": "사용자 입력"
-  }
-}
-"""
-
         # 콘텐츠 구성 (이미지 + 프롬프트 + 사용자 입력)
-        image_part = {
-            "inline_data": {
-                "mime_type": mime_type,
-                "data": base64.b64encode(image_bytes).decode("utf-8"),
-            }
-        }
-        full_prompt = f"{prompt}\n\n{schema_instruction}\n\n{input_text}"
+        contents = [
+            types.Part.from_bytes(data=image_bytes, mime_type=mime_type),
+            f"{prompt}\n\n{input_text}",
+        ]
 
-        # Gemini API 호출
-        response = self._model.generate_content([image_part, full_prompt])
+        # Gemini 3 API 호출 (구조화 출력)
+        response = self._client.models.generate_content(
+            model=self._model,
+            contents=contents,
+            config={
+                "response_mime_type": "application/json",
+                "response_schema": VisionResult,
+                "max_output_tokens": MAX_OUTPUT_TOKENS,
+                "temperature": TEMPERATURE,
+            },
+        )
 
         # JSON 파싱 및 Pydantic 검증
         try:
