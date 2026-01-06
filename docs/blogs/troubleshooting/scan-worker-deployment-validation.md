@@ -437,10 +437,21 @@ pipeline = chain(
 │   SSE: { stage, status, progress }         │
 ├────────────────────────────────────────────┤
 │ Client (결과 조회)                         │
-│   GET /api/v1/scan/result/{job_id}         │
+│   GET /api/v1/scan/{job_id}/result         │
 │   → Redis Cache 조회                       │
 │   → 200/202/404                            │
 └────────────────────────────────────────────┘
+
+### 8.2 RESTful 엔드포인트 (2026-01-07 변경)
+
+| 기존 | 변경 후 | 비고 |
+|------|---------|------|
+| `/api/v1/scan/result/{id}` | `/api/v1/scan/{id}/result` | 결과 조회 |
+| `/api/v1/stream?job_id={id}` | `/api/v1/scan/{id}/events` | SSE 스트리밍 |
+
+**VirtualService 라우팅**:
+- `/api/v1/scan/{id}/events` → SSE Gateway (regex 매칭)
+- `/api/v1/scan/{id}/result` → Scan API
 ```
 
 ### 8.2 핵심 컴포넌트
