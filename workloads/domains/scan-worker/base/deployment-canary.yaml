@@ -56,7 +56,7 @@ spec:
         args:
         - |
           ulimit -n 65536 2>/dev/null || echo "ulimit setting skipped (not privileged)"
-          exec celery -A apps.scan_worker.main worker \
+          exec celery -A scan_worker.setup.celery:celery_app worker \
             --loglevel=info \
             -E \
             -P gevent \
@@ -127,21 +127,42 @@ spec:
             memory: 1Gi
         startupProbe:
           exec:
-            command: [celery, -A, apps.scan_worker.main, inspect, ping, -t, '15']
+            command:
+            - celery
+            - -A
+            - scan_worker.setup.celery:celery_app
+            - inspect
+            - ping
+            - -t
+            - '15'
           initialDelaySeconds: 30
           periodSeconds: 10
           timeoutSeconds: 20
           failureThreshold: 12
         livenessProbe:
           exec:
-            command: [celery, -A, apps.scan_worker.main, inspect, ping, -t, '15']
+            command:
+            - celery
+            - -A
+            - scan_worker.setup.celery:celery_app
+            - inspect
+            - ping
+            - -t
+            - '15'
           initialDelaySeconds: 10
           periodSeconds: 30
           timeoutSeconds: 20
           failureThreshold: 3
         readinessProbe:
           exec:
-            command: [celery, -A, apps.scan_worker.main, inspect, ping, -t, '15']
+            command:
+            - celery
+            - -A
+            - scan_worker.setup.celery:celery_app
+            - inspect
+            - ping
+            - -t
+            - '15'
           initialDelaySeconds: 5
           periodSeconds: 20
           timeoutSeconds: 20
