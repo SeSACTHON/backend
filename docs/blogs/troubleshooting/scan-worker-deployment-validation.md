@@ -221,20 +221,9 @@ cache_key = f"scan:result:{job_id}"
 
 ---
 
-## 6. 수정 사항 요약
+## 6. 배포 후 검증 절차
 
-| 파일 | 변경 내용 |
-|------|----------|
-| `workloads/secrets/external-secrets/dev/users-api-secrets.yaml` | `rabbitmq` → `admin` |
-| `workloads/secrets/external-secrets/prod/users-api-secrets.yaml` | `rabbitmq` → `admin` |
-| `workloads/secrets/external-secrets/dev/api-secrets.yaml` | `rabbitmq` → `admin` |
-| `apps/scan_worker/setup/config.py` | `env_prefix` 제거 |
-
----
-
-## 7. 배포 후 검증 절차
-
-### 7.1 RabbitMQ 큐 확인
+### RabbitMQ 큐 확인
 
 ```bash
 kubectl exec -n rabbitmq eco2-rabbitmq-server-0 -- \
@@ -251,14 +240,14 @@ scan.reward       0
 users.save_character  0
 ```
 
-### 7.2 Workers 상태 확인
+### Workers 상태 확인
 
 ```bash
 kubectl get pod -n scan | grep worker
 kubectl get pod -n users | grep worker
 ```
 
-### 7.3 Celery 연결 확인
+### Celery 연결 확인
 
 ```bash
 kubectl exec -n scan deployment/scan-worker -- \
@@ -267,28 +256,9 @@ kubectl exec -n scan deployment/scan-worker -- \
 
 ---
 
-## 8. 교훈
+## 7. Legacy vs Apps 정합성 비교
 
-### 8.1 일관된 네이밍의 중요성
-
-- RabbitMQ 사용자명이 서비스마다 다르게 설정되어 있었음
-- **대책:** ExternalSecret 템플릿 표준화 (공통 변수 추출)
-
-### 8.2 환경변수 매핑 검증
-
-- pydantic `env_prefix`와 Kubernetes env 주입 간 불일치
-- **대책:** 배포 전 환경변수 매핑 테이블 검증 추가
-
-### 8.3 큐 존재 검증
-
-- 연결 실패로 인해 큐가 자동 생성되지 않음
-- **대책:** startup probe에서 큐 생성 검증 추가 고려
-
----
-
-## 9. Legacy vs Apps 정합성 비교
-
-### 9.1 API Endpoint 비교
+### 7.1 API Endpoint 비교
 
 | 항목 | domains/scan | apps/scan | 정합성 |
 |------|:-----------:|:---------:|:------:|
@@ -298,7 +268,7 @@ kubectl exec -n scan deployment/scan-worker -- \
 | 모델 선택 | ❌ | `model` 필드 | ➕ 추가 |
 | 응답 스키마 | `ScanSubmitResponse` | `ScanSubmitResponse` | ✅ |
 
-### 9.2 Celery Chain 비교
+### 7.2 Celery Chain 비교
 
 **domains/scan (레거시):**
 
@@ -333,7 +303,7 @@ pipeline = chain(
 | Queue 지정 | decorator에서 → 호출 시 명시 |
 | Model 전달 | ❌ → kwargs로 전달 |
 
-### 9.3 Task Return 형식 비교
+### 7.3 Task Return 형식 비교
 
 **vision_task 반환 형식:**
 
@@ -348,7 +318,7 @@ pipeline = chain(
 | `llm_provider` | ❌ | ✅ | ➕ 추가 |
 | `llm_model` | ❌ | ✅ | ➕ 추가 |
 
-### 9.4 Reward Task 큐 라우팅 비교
+### 7.4 Reward Task 큐 라우팅 비교
 
 | Task | domains/scan 큐 | apps/scan_worker 큐 | 변경 |
 |------|:--------------:|:------------------:|:----:|
@@ -356,7 +326,7 @@ pipeline = chain(
 | `users.save_character` | `users.character` | `users.save_character` | 🔄 1:1 정책 |
 | `my.save_character` | `my.reward` | **제거됨** | ❌ deprecated |
 
-### 9.5 이벤트 발행 비교
+### 7.5 이벤트 발행 비교
 
 | 항목 | domains/scan | apps/scan_worker | 정합성 |
 |------|:-----------:|:----------------:|:------:|
@@ -365,7 +335,7 @@ pipeline = chain(
 | 필드 형식 | `job_id, stage, status, seq, ts, progress, result` | 동일 | ✅ |
 | 멱등성 | Lua Script | Lua Script | ✅ |
 
-### 9.6 결과 캐시 비교
+### 7.6 결과 캐시 비교
 
 | 항목 | domains/scan | apps/scan_worker | 정합성 |
 |------|:-----------:|:----------------:|:------:|
@@ -373,7 +343,7 @@ pipeline = chain(
 | TTL | 3600초 (1시간) | 3600초 (1시간) | ✅ |
 | 저장 시점 | done 이벤트 전 | done 이벤트 전 | ✅ |
 
-### 9.7 정합성 결론
+### 7.7 정합성 결론
 
 | 카테고리 | 상태 | 비고 |
 |----------|:----:|------|
@@ -387,7 +357,7 @@ pipeline = chain(
 
 ---
 
-## 10. 관련 문서
+## 8. 관련 문서
 
 - [Scan Worker Migration Roadmap](../../plans/scan-worker-migration-roadmap.md)
 - [Stateless Reducer Pattern](../../plans/scan-worker-stateless-reducer.md)
