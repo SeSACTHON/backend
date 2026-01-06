@@ -19,33 +19,39 @@ settings = get_settings()
 # RabbitMQ Exchange 설정 (기존 설정과 동일하게 topic 타입)
 CELERY_EXCHANGE = Exchange("celery", type="topic")
 
-# RabbitMQ 큐 설정 (기존 큐와 동일하게 x-message-ttl 설정)
+# RabbitMQ 큐 설정 (기존 큐와 동일하게 설정)
 QUEUE_TTL_MS = 3600000  # 1시간 (3600초 * 1000)
+DLX_EXCHANGE = "dlx"  # Dead Letter Exchange
+
+QUEUE_ARGUMENTS = {
+    "x-message-ttl": QUEUE_TTL_MS,
+    "x-dead-letter-exchange": DLX_EXCHANGE,
+}
 
 SCAN_TASK_QUEUES = (
     Queue(
         "scan.vision",
         exchange=CELERY_EXCHANGE,
         routing_key="scan.vision",
-        queue_arguments={"x-message-ttl": QUEUE_TTL_MS},
+        queue_arguments=QUEUE_ARGUMENTS,
     ),
     Queue(
         "scan.rule",
         exchange=CELERY_EXCHANGE,
         routing_key="scan.rule",
-        queue_arguments={"x-message-ttl": QUEUE_TTL_MS},
+        queue_arguments=QUEUE_ARGUMENTS,
     ),
     Queue(
         "scan.answer",
         exchange=CELERY_EXCHANGE,
         routing_key="scan.answer",
-        queue_arguments={"x-message-ttl": QUEUE_TTL_MS},
+        queue_arguments=QUEUE_ARGUMENTS,
     ),
     Queue(
         "scan.reward",
         exchange=CELERY_EXCHANGE,
         routing_key="scan.reward",
-        queue_arguments={"x-message-ttl": QUEUE_TTL_MS},
+        queue_arguments=QUEUE_ARGUMENTS,
     ),
 )
 
