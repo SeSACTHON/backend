@@ -36,7 +36,22 @@ spec:
     name: eco2-rabbitmq
     namespace: rabbitmq
 ---
-# NOTE: my.direct exchange 제거됨 (my-worker → users-worker 마이그레이션)
+# 3. Users Exchange (Direct)
+# 라우팅 키: users.save_character (users DB 저장)
+apiVersion: rabbitmq.com/v1beta1
+kind: Exchange
+metadata:
+  name: users-direct
+  namespace: rabbitmq
+spec:
+  name: users.direct
+  type: direct
+  durable: true
+  autoDelete: false
+  vhost: eco2
+  rabbitmqClusterReference:
+    name: eco2-rabbitmq
+    namespace: rabbitmq
 ---
 # 4. Dead Letter Exchange (Direct)
 # 실패한 메시지 수집용

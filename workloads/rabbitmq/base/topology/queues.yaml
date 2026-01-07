@@ -152,6 +152,27 @@ spec:
     name: eco2-rabbitmq
     namespace: rabbitmq
 ---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Users Save Character Queue (users-worker)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: rabbitmq.com/v1beta1
+kind: Queue
+metadata:
+  name: users-save-character-queue
+  namespace: rabbitmq
+spec:
+  name: users.save_character
+  type: classic
+  durable: true
+  autoDelete: false
+  vhost: eco2
+  arguments:
+    x-dead-letter-exchange: dlx
+    x-dead-letter-routing-key: dlq.users.save_character
+    x-message-ttl: 86400000  # 24시간
+  rabbitmqClusterReference:
+    name: eco2-rabbitmq
+    namespace: rabbitmq
 ---
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Dead Letter Queues (실패 메시지 보관)
@@ -265,6 +286,23 @@ metadata:
   namespace: rabbitmq
 spec:
   name: dlq.character.grant_default
+  type: classic
+  durable: true
+  autoDelete: false
+  vhost: eco2
+  arguments:
+    x-message-ttl: 604800000  # 7일 보관
+  rabbitmqClusterReference:
+    name: eco2-rabbitmq
+    namespace: rabbitmq
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Queue
+metadata:
+  name: dlq-users-save-character
+  namespace: rabbitmq
+spec:
+  name: dlq.users.save_character
   type: classic
   durable: true
   autoDelete: false

@@ -123,6 +123,24 @@ spec:
     namespace: rabbitmq
 ---
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Users Save Character Binding
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: users-save-character-binding
+  namespace: rabbitmq
+spec:
+  source: users.direct
+  destination: users.save_character
+  destinationType: queue
+  routingKey: users.save_character
+  vhost: eco2
+  rabbitmqClusterReference:
+    name: eco2-rabbitmq
+    namespace: rabbitmq
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Auth Blacklist Binding (Fanout - ext-authz 캐시 동기화)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apiVersion: rabbitmq.com/v1beta1
@@ -243,6 +261,21 @@ spec:
   destination: dlq.character.grant_default
   destinationType: queue
   routingKey: dlq.character.grant_default
+  vhost: eco2
+  rabbitmqClusterReference:
+    name: eco2-rabbitmq
+    namespace: rabbitmq
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: dlq-users-save-character-binding
+  namespace: rabbitmq
+spec:
+  source: dlx
+  destination: dlq.users.save_character
+  destinationType: queue
+  routingKey: dlq.users.save_character
   vhost: eco2
   rabbitmqClusterReference:
     name: eco2-rabbitmq
