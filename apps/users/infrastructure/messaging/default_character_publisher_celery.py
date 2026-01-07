@@ -31,15 +31,15 @@ class CeleryDefaultCharacterPublisher(DefaultCharacterPublisher):
     def publish(self, user_id: UUID) -> None:
         """기본 캐릭터 지급 이벤트를 발행합니다.
 
-        ⚠️ 큐 auto-declare 회피:
-        - character.grant_default 큐는 Topology CR로 이미 생성됨 (TTL 24시간)
-        - Celery가 queue= 옵션으로 선언 시 TTL 없이 선언하여 PRECONDITION_FAILED
-        - routing_key만 사용하고 큐 선언은 건너뜀
+        ⚠️ exchange="" = AMQP default exchange (routing_key와 동일한 이름의 큐로 직접 전달)
+        - queue= 사용 시 Celery가 큐를 auto-declare하여 Topology CR과 충돌
+        - 'celery' exchange는 topic 타입이라 direct 선언 시 충돌
         """
         try:
             self._celery_app.send_task(
                 "character.grant_default",
                 kwargs={"user_id": str(user_id)},
+                exchange="",
                 routing_key="character.grant_default",
             )
             logger.info(

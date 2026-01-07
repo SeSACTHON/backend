@@ -184,7 +184,7 @@ class RewardStep(Step):
         - routing_key만 사용하고 큐 선언은 건너뜀
         """
         try:
-            # routing_key만 사용 (queue 선언 X, 기본 exchange로 라우팅)
+            # exchange="" = AMQP default exchange (routing_key와 동일한 이름의 큐로 직접 전달)
             async_result = self._celery.send_task(
                 "character.match",
                 kwargs={
@@ -192,6 +192,7 @@ class RewardStep(Step):
                     "classification_result": ctx.classification,
                     "disposal_rules_present": bool(ctx.disposal_rules),
                 },
+                exchange="",
                 routing_key="character.match",
             )
 
@@ -230,7 +231,7 @@ class RewardStep(Step):
         - character.save_ownership: character DB 저장
         - users.save_character: users DB 저장 (Clean Architecture)
 
-        ⚠️ routing_key만 사용 (queue 선언 X) - Topology CR과 arguments 충돌 방지
+        ⚠️ exchange="" = AMQP default exchange (routing_key와 동일한 이름의 큐로 직접 전달)
         """
         # character.save_ownership
         try:
@@ -242,6 +243,7 @@ class RewardStep(Step):
                     "character_code": reward.get("character_code", ""),
                     "source": "scan",
                 },
+                exchange="",
                 routing_key="character.save_ownership",
             )
             logger.info("save_ownership_task dispatched")
@@ -262,6 +264,7 @@ class RewardStep(Step):
                     "character_type": reward.get("character_type"),
                     "source": "scan",
                 },
+                exchange="",
                 routing_key="users.save_character",
             )
             logger.info("save_users_character_task dispatched")
