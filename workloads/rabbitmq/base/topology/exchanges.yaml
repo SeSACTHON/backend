@@ -36,15 +36,15 @@ spec:
     name: eco2-rabbitmq
     namespace: rabbitmq
 ---
-# 3. My Domain Exchange (Direct)
-# 라우팅 키: my.reward (my DB 저장)
+# 3. Users Exchange (Direct)
+# 라우팅 키: users.save_character (users DB 저장)
 apiVersion: rabbitmq.com/v1beta1
 kind: Exchange
 metadata:
-  name: my-direct
+  name: users-direct
   namespace: rabbitmq
 spec:
-  name: my.direct
+  name: users.direct
   type: direct
   durable: true
   autoDelete: false

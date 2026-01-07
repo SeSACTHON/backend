@@ -123,18 +123,36 @@ spec:
     namespace: rabbitmq
 ---
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# My Reward Binding (my.direct → my.reward)
+# Users Save Character Binding
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apiVersion: rabbitmq.com/v1beta1
 kind: Binding
 metadata:
-  name: my-reward-binding
+  name: users-save-character-binding
   namespace: rabbitmq
 spec:
-  source: my.direct
-  destination: my.reward
+  source: users.direct
+  destination: users.save_character
   destinationType: queue
-  routingKey: my.reward
+  routingKey: users.save_character
+  vhost: eco2
+  rabbitmqClusterReference:
+    name: eco2-rabbitmq
+    namespace: rabbitmq
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Auth Blacklist Binding (Fanout - ext-authz 캐시 동기화)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: auth-blacklist-binding
+  namespace: rabbitmq
+spec:
+  source: blacklist.events
+  destination: auth.blacklist
+  destinationType: queue
+  routingKey: ''  # Fanout exchange는 routing key 무시
   vhost: eco2
   rabbitmqClusterReference:
     name: eco2-rabbitmq
@@ -251,13 +269,13 @@ spec:
 apiVersion: rabbitmq.com/v1beta1
 kind: Binding
 metadata:
-  name: dlq-my-reward-binding
+  name: dlq-users-save-character-binding
   namespace: rabbitmq
 spec:
   source: dlx
-  destination: dlq.my.reward
+  destination: dlq.users.save_character
   destinationType: queue
-  routingKey: dlq.my.reward
+  routingKey: dlq.users.save_character
   vhost: eco2
   rabbitmqClusterReference:
     name: eco2-rabbitmq
@@ -266,31 +284,13 @@ spec:
 apiVersion: rabbitmq.com/v1beta1
 kind: Binding
 metadata:
-  name: dlq-celery-binding
+  name: dlq-auth-blacklist-binding
   namespace: rabbitmq
 spec:
   source: dlx
-  destination: dlq.celery
+  destination: dlq.auth.blacklist
   destinationType: queue
-  routingKey: dlq.celery
-  vhost: eco2
-  rabbitmqClusterReference:
-    name: eco2-rabbitmq
-    namespace: rabbitmq
----
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Celery Default Binding
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-apiVersion: rabbitmq.com/v1beta1
-kind: Binding
-metadata:
-  name: celery-default-binding
-  namespace: rabbitmq
-spec:
-  source: celery
-  destination: celery
-  destinationType: queue
-  routingKey: celery
+  routingKey: dlq.auth.blacklist
   vhost: eco2
   rabbitmqClusterReference:
     name: eco2-rabbitmq

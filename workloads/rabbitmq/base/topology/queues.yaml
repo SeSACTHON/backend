@@ -153,23 +153,23 @@ spec:
     namespace: rabbitmq
 ---
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# My Reward Queue (my DB 저장 - my-worker)
+# Users Save Character Queue (users-worker)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apiVersion: rabbitmq.com/v1beta1
 kind: Queue
 metadata:
-  name: my-reward-queue
+  name: users-save-character-queue
   namespace: rabbitmq
 spec:
-  name: my.reward
+  name: users.save_character
   type: classic
   durable: true
   autoDelete: false
   vhost: eco2
   arguments:
     x-dead-letter-exchange: dlx
-    x-dead-letter-routing-key: dlq.my.reward
-    x-message-ttl: 86400000  # 24시간 (DB 저장 중요)
+    x-dead-letter-routing-key: dlq.users.save_character
+    x-message-ttl: 86400000  # 24시간
   rabbitmqClusterReference:
     name: eco2-rabbitmq
     namespace: rabbitmq
@@ -299,10 +299,10 @@ spec:
 apiVersion: rabbitmq.com/v1beta1
 kind: Queue
 metadata:
-  name: dlq-my-reward
+  name: dlq-users-save-character
   namespace: rabbitmq
 spec:
-  name: dlq.my.reward
+  name: dlq.users.save_character
   type: classic
   durable: true
   autoDelete: false
@@ -314,23 +314,23 @@ spec:
     namespace: rabbitmq
 ---
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Celery Default Queue
+# Auth Blacklist Queue (auth-worker)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apiVersion: rabbitmq.com/v1beta1
 kind: Queue
 metadata:
-  name: celery-default-queue
+  name: auth-blacklist-queue
   namespace: rabbitmq
 spec:
-  name: celery
+  name: auth.blacklist
   type: classic
   durable: true
   autoDelete: false
   vhost: eco2
   arguments:
     x-dead-letter-exchange: dlx
-    x-dead-letter-routing-key: dlq.celery
-    x-message-ttl: 3600000
+    x-dead-letter-routing-key: dlq.auth.blacklist
+    x-message-ttl: 86400000  # 24시간
   rabbitmqClusterReference:
     name: eco2-rabbitmq
     namespace: rabbitmq
@@ -338,16 +338,16 @@ spec:
 apiVersion: rabbitmq.com/v1beta1
 kind: Queue
 metadata:
-  name: dlq-celery
+  name: dlq-auth-blacklist
   namespace: rabbitmq
 spec:
-  name: dlq.celery
+  name: dlq.auth.blacklist
   type: classic
   durable: true
   autoDelete: false
   vhost: eco2
   arguments:
-    x-message-ttl: 604800000
+    x-message-ttl: 604800000  # 7일 보관
   rabbitmqClusterReference:
     name: eco2-rabbitmq
     namespace: rabbitmq

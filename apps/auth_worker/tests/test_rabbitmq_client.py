@@ -28,7 +28,7 @@ class TestRabbitMQClient:
     def test_exchange_and_queue_names(self, client: RabbitMQClient) -> None:
         """Exchange와 Queue 이름 확인."""
         assert client.EXCHANGE_NAME == "blacklist.events"
-        assert client.QUEUE_NAME == "auth-worker.blacklist"
+        assert client.QUEUE_NAME == "auth.blacklist"
 
     @pytest.mark.asyncio
     async def test_connect(self, client: RabbitMQClient) -> None:

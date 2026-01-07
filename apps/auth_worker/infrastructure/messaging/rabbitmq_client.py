@@ -41,8 +41,8 @@ class RabbitMQClient:
     메시지 처리(decode/dispatch/ack)는 ConsumerAdapter에 위임합니다.
     """
 
-    EXCHANGE_NAME = "blacklist.events"
-    QUEUE_NAME = "auth-worker.blacklist"
+    EXCHANGE_NAME = "blacklist.events"  # Fanout exchange (ext-authz 캐시 동기화)
+    QUEUE_NAME = "auth.blacklist"  # 1:1 정책 적용
 
     def __init__(self, amqp_url: str) -> None:
         """Initialize.
