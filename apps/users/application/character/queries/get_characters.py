@@ -14,15 +14,15 @@ from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from apps.users.application.character.dto import CharacterOwnership, UserCharacterDTO
+from users.application.character.dto import CharacterOwnership, UserCharacterDTO
 
 if TYPE_CHECKING:
-    from apps.users.application.character.ports import (
+    from users.application.character.ports import (
         DefaultCharacterPublisher,
         UserCharacterQueryGateway,
     )
-    from apps.users.domain.entities.user_character import UserCharacter
-    from apps.users.setup.config import Settings
+    from users.domain.entities.user_character import UserCharacter
+    from users.setup.config import Settings
 
 logger = logging.getLogger(__name__)
 

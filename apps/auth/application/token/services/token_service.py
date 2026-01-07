@@ -12,15 +12,15 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from apps.auth.domain.enums.token_type import TokenType
+from auth.domain.enums.token_type import TokenType
 
 if TYPE_CHECKING:
-    from apps.auth.application.token.ports import (
+    from auth.application.token.ports import (
         TokenBlacklistStore,
         TokenIssuer,
         TokenSessionStore,
     )
-    from apps.auth.domain.value_objects.token_payload import TokenPayload
+    from auth.domain.value_objects.token_payload import TokenPayload
 
 logger = logging.getLogger(__name__)
 

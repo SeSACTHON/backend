@@ -6,11 +6,11 @@ import logging
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from apps.users.application.profile.exceptions import UserNotFoundError
+from users.application.profile.exceptions import UserNotFoundError
 
 if TYPE_CHECKING:
-    from apps.users.application.common.ports import TransactionManager
-    from apps.users.application.profile.ports import (
+    from users.application.common.ports import TransactionManager
+    from users.application.profile.ports import (
         ProfileCommandGateway,
         ProfileQueryGateway,
     )

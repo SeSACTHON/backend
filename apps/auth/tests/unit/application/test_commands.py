@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from apps.auth.application.token.commands.logout import LogoutInteractor
-from apps.auth.application.token.dto import LogoutRequest
+from auth.application.token.commands.logout import LogoutInteractor
+from auth.application.token.dto import LogoutRequest
 
 
 class TestLogoutInteractor:

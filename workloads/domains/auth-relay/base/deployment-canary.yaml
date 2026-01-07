@@ -72,14 +72,14 @@ spec:
             memory: 64Mi
         livenessProbe:
           exec:
-            command: [pgrep, -f, apps.auth_relay.main]
+            command: [pgrep, -f, auth_relay.main]
           initialDelaySeconds: 10
           periodSeconds: 30
           timeoutSeconds: 5
           failureThreshold: 3
         readinessProbe:
           exec:
-            command: [pgrep, -f, apps.auth_relay.main]
+            command: [pgrep, -f, auth_relay.main]
           initialDelaySeconds: 5
           periodSeconds: 10
           timeoutSeconds: 5

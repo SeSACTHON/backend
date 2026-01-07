@@ -70,7 +70,7 @@ def now() -> datetime:
 @pytest.fixture
 def mock_users_command_gateway() -> MagicMock:
     """Mock UsersCommandGateway."""
-    from apps.auth.application.users.ports import UsersCommandGateway
+    from auth.application.users.ports import UsersCommandGateway
 
     return create_autospec(UsersCommandGateway, instance=True)
 
@@ -78,7 +78,7 @@ def mock_users_command_gateway() -> MagicMock:
 @pytest.fixture
 def mock_users_query_gateway() -> MagicMock:
     """Mock UsersQueryGateway."""
-    from apps.auth.application.users.ports import UsersQueryGateway
+    from auth.application.users.ports import UsersQueryGateway
 
     return create_autospec(UsersQueryGateway, instance=True)
 
@@ -91,7 +91,7 @@ mock_user_query_gateway = mock_users_query_gateway
 @pytest.fixture
 def mock_token_service() -> MagicMock:
     """Mock TokenService."""
-    from apps.auth.application.token.ports import TokenIssuer
+    from auth.application.token.ports import TokenIssuer
 
     return create_autospec(TokenIssuer, instance=True)
 

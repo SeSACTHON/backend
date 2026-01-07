@@ -12,7 +12,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 if TYPE_CHECKING:
-    from apps.users_worker.application.character.dto.event import CharacterEvent
+    from users_worker.application.character.dto.event import CharacterEvent
 
 logger = logging.getLogger(__name__)
 

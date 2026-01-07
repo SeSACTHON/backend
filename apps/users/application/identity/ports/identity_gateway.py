@@ -11,8 +11,8 @@ from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
 
 if TYPE_CHECKING:
-    from apps.users.domain.entities.user import User
-    from apps.users.infrastructure.persistence_postgres.mappings.user_social_account import (
+    from users.domain.entities.user import User
+    from users.infrastructure.persistence_postgres.mappings.user_social_account import (
         UserSocialAccount,
     )
 

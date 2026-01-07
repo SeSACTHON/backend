@@ -26,7 +26,7 @@ Architecture:
         └── ack / nack / requeue
 
 Run:
-    python -m apps.auth_worker.main
+    python -m auth_worker.main
 """
 
 from __future__ import annotations
@@ -35,9 +35,9 @@ import asyncio
 import logging
 import signal
 
-from apps.auth_worker.setup.config import get_settings
-from apps.auth_worker.setup.dependencies import Container
-from apps.auth_worker.setup.logging import setup_logging
+from auth_worker.setup.config import get_settings
+from auth_worker.setup.dependencies import Container
+from auth_worker.setup.logging import setup_logging
 
 logger = logging.getLogger(__name__)
 

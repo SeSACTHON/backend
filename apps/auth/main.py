@@ -9,10 +9,10 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from apps.auth.presentation.http.controllers import root_router
-from apps.auth.presentation.http.errors import register_exception_handlers
-from apps.auth.setup.config import get_settings
-from apps.auth.setup.logging import setup_logging
+from auth.presentation.http.controllers import root_router
+from auth.presentation.http.errors import register_exception_handlers
+from auth.setup.config import get_settings
+from auth.setup.logging import setup_logging
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Auth API (Clean Architecture)")
 
     # ORM 매퍼 시작
-    from apps.auth.infrastructure.persistence_postgres.mappings import start_all_mappers
+    from auth.infrastructure.persistence_postgres.mappings import start_all_mappers
 
     try:
         start_all_mappers()
@@ -95,7 +95,7 @@ if __name__ == "__main__":
     import uvicorn
 
     uvicorn.run(
-        "apps.auth.main:app",
+        "auth.main:app",
         host="0.0.0.0",
         port=8000,
         reload=True,

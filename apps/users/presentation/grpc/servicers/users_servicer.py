@@ -22,8 +22,8 @@ from uuid import UUID
 
 import grpc
 
-from apps.users.application.identity.dto import OAuthUserRequest, UpdateLoginTimeRequest
-from apps.users.presentation.grpc.protos import (
+from users.application.identity.dto import OAuthUserRequest, UpdateLoginTimeRequest
+from users.presentation.grpc.protos import (
     GetOrCreateFromOAuthResponse,
     GetUserResponse,
     SocialAccountInfo,
@@ -33,14 +33,14 @@ from apps.users.presentation.grpc.protos import (
 )
 
 if TYPE_CHECKING:
-    from apps.users.presentation.grpc.protos import (
+    from users.presentation.grpc.protos import (
         GetOrCreateFromOAuthRequest,
         GetUserRequest,
     )
-    from apps.users.presentation.grpc.protos import (
+    from users.presentation.grpc.protos import (
         UpdateLoginTimeRequest as UpdateLoginTimeRequestProto,
     )
-    from apps.users.setup.dependencies import GrpcUseCaseFactory
+    from users.setup.dependencies import GrpcUseCaseFactory
 
 logger = logging.getLogger(__name__)
 

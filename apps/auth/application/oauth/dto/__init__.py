@@ -1,6 +1,6 @@
 """OAuth DTOs."""
 
-from apps.auth.application.oauth.dto.oauth import (
+from auth.application.oauth.dto.oauth import (
     OAuthAuthorizeRequest,
     OAuthAuthorizeResponse,
     OAuthCallbackRequest,

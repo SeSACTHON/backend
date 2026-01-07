@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from apps.auth.domain.value_objects.token_payload import TokenPayload
+from auth.domain.value_objects.token_payload import TokenPayload
 
 
 class BlacklistEventPublisher(Protocol):

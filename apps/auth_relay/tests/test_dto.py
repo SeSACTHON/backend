@@ -2,7 +2,7 @@
 
 import pytest
 
-from apps.auth_relay.application.common.dto.outbox_event import OutboxEvent
+from auth_relay.application.common.dto.outbox_event import OutboxEvent
 
 
 class TestOutboxEvent:

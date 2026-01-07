@@ -6,8 +6,8 @@
   - apps.auth.application.users.exceptions.*
 """
 
-from apps.auth.application.common.exceptions.base import ApplicationError
-from apps.auth.application.common.exceptions.gateway import (
+from auth.application.common.exceptions.base import ApplicationError
+from auth.application.common.exceptions.gateway import (
     DataMapperError,
     GatewayError,
 )

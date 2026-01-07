@@ -10,11 +10,11 @@ from __future__ import annotations
 import logging
 from uuid import UUID
 
-from apps.auth.application.users.ports.users_management_gateway import (
+from auth.application.users.ports.users_management_gateway import (
     OAuthUserResult,
     UsersManagementGateway,
 )
-from apps.auth.infrastructure.grpc.client import UsersGrpcClient
+from auth.infrastructure.grpc.client import UsersGrpcClient
 
 logger = logging.getLogger(__name__)
 

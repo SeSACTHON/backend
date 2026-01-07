@@ -7,8 +7,8 @@
   - apps.auth.application.audit.ports.*
 """
 
-from apps.auth.application.common.ports.flusher import Flusher
-from apps.auth.application.common.ports.transaction_manager import TransactionManager
+from auth.application.common.ports.flusher import Flusher
+from auth.application.common.ports.transaction_manager import TransactionManager
 
 __all__ = [
     "Flusher",

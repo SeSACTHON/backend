@@ -9,8 +9,8 @@ import json
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from apps.auth.application.token.ports import TokenMetadata
-from apps.auth.infrastructure.persistence_redis.constants import (
+from auth.application.token.ports import TokenMetadata
+from auth.infrastructure.persistence_redis.constants import (
     TOKEN_META_KEY_PREFIX,
     USER_TOKENS_KEY_PREFIX,
 )

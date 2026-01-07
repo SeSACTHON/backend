@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from apps.auth_worker.setup.config import Settings, get_settings
+from auth_worker.setup.config import Settings, get_settings
 
 
 class TestSettings:

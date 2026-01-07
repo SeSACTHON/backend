@@ -25,7 +25,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && useradd --create-home --shell /bin/bash appuser
 
 COPY --from=builder /install /usr/local
-COPY apps/auth_relay /app/apps/auth_relay
+# 앱 코드 복사 (새 패턴: /app/auth_relay)
+COPY apps/auth_relay /app/auth_relay
 
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
@@ -33,4 +34,4 @@ ENV PYTHONUNBUFFERED=1
 USER appuser
 
 # Relay Worker 시작
-CMD ["python", "-m", "apps.auth_relay.main"]
+CMD ["python", "-m", "auth_relay.main"]

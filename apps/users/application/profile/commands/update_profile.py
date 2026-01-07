@@ -6,22 +6,22 @@ import logging
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from apps.users.application.profile.dto import UserProfile, UserUpdate
-from apps.users.application.profile.exceptions import (
+from users.application.profile.dto import UserProfile, UserUpdate
+from users.application.profile.exceptions import (
     InvalidPhoneNumberError,
     NoChangesProvidedError,
     UserNotFoundError,
 )
 
 if TYPE_CHECKING:
-    from apps.users.application.common.ports import TransactionManager
-    from apps.users.application.identity.ports import SocialAccountQueryGateway
-    from apps.users.application.profile.ports import (
+    from users.application.common.ports import TransactionManager
+    from users.application.identity.ports import SocialAccountQueryGateway
+    from users.application.profile.ports import (
         ProfileCommandGateway,
         ProfileQueryGateway,
     )
-    from apps.users.application.profile.services import ProfileBuilder
-    from apps.users.domain.services import UserService
+    from users.application.profile.services import ProfileBuilder
+    from users.domain.services import UserService
 
 logger = logging.getLogger(__name__)
 

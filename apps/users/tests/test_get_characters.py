@@ -6,7 +6,7 @@ from uuid import uuid4
 
 import pytest
 
-from apps.users.application.character.queries import GetCharactersQuery
+from users.application.character.queries import GetCharactersQuery
 
 pytestmark = pytest.mark.asyncio
 
@@ -44,7 +44,7 @@ def sample_characters() -> list:
     """테스트용 캐릭터 목록 (DB 엔티티 mock)."""
     from unittest.mock import MagicMock
 
-    from apps.users.domain.enums import UserCharacterStatus
+    from users.domain.enums import UserCharacterStatus
 
     char1 = MagicMock()
     char1.id = uuid4()

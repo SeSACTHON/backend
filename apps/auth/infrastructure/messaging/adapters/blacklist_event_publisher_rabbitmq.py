@@ -16,7 +16,7 @@ from aio_pika import DeliveryMode, ExchangeType, Message
 if TYPE_CHECKING:
     from aio_pika.abc import AbstractChannel, AbstractConnection, AbstractExchange
 
-from apps.auth.domain.value_objects.token_payload import TokenPayload
+from auth.domain.value_objects.token_payload import TokenPayload
 
 logger = logging.getLogger(__name__)
 

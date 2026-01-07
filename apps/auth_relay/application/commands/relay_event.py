@@ -9,10 +9,10 @@ import json
 import logging
 from typing import TYPE_CHECKING
 
-from apps.auth_relay.application.common.result import RelayResult
+from auth_relay.application.common.result import RelayResult
 
 if TYPE_CHECKING:
-    from apps.auth_relay.application.common.ports.event_publisher import EventPublisher
+    from auth_relay.application.common.ports.event_publisher import EventPublisher
 
 logger = logging.getLogger(__name__)
 

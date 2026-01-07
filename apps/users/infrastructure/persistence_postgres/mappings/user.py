@@ -17,9 +17,9 @@ from __future__ import annotations
 from sqlalchemy import Column, DateTime, String, Table, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 
-from apps.users.domain.entities.user import User
-from apps.users.infrastructure.persistence_postgres.constants import ACCOUNTS_TABLE
-from apps.users.infrastructure.persistence_postgres.registry import (
+from users.domain.entities.user import User
+from users.infrastructure.persistence_postgres.constants import ACCOUNTS_TABLE
+from users.infrastructure.persistence_postgres.registry import (
     mapper_registry,
     metadata,
 )

@@ -4,7 +4,7 @@
   - apps.users.application.profile.exceptions.*
 """
 
-from apps.users.application.common.exceptions.base import ApplicationError
+from users.application.common.exceptions.base import ApplicationError
 
 __all__ = [
     "ApplicationError",

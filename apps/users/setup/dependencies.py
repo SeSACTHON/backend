@@ -10,29 +10,29 @@ from fastapi import Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Character domain
-from apps.users.application.character.ports import DefaultCharacterPublisher
-from apps.users.application.character.queries import (
+from users.application.character.ports import DefaultCharacterPublisher
+from users.application.character.queries import (
     CheckCharacterOwnershipQuery,
     GetCharactersQuery,
 )
 
 # Identity domain (gRPC)
-from apps.users.application.identity.commands import (
+from users.application.identity.commands import (
     GetOrCreateFromOAuthCommand,
     UpdateLoginTimeCommand,
 )
-from apps.users.application.identity.queries import GetUserQuery
+from users.application.identity.queries import GetUserQuery
 
 # Profile domain
-from apps.users.application.profile.commands import (
+from users.application.profile.commands import (
     DeleteUserInteractor,
     UpdateProfileInteractor,
 )
-from apps.users.application.profile.queries import GetProfileQuery
-from apps.users.application.profile.services import ProfileBuilder
-from apps.users.domain.services import UserService
-from apps.users.infrastructure.messaging import CeleryDefaultCharacterPublisher
-from apps.users.infrastructure.persistence_postgres.adapters import (
+from users.application.profile.queries import GetProfileQuery
+from users.application.profile.services import ProfileBuilder
+from users.domain.services import UserService
+from users.infrastructure.messaging import CeleryDefaultCharacterPublisher
+from users.infrastructure.persistence_postgres.adapters import (
     SqlaIdentityCommandGateway,
     SqlaIdentityQueryGateway,
     SqlaSocialAccountQueryGateway,
@@ -41,8 +41,8 @@ from apps.users.infrastructure.persistence_postgres.adapters import (
     SqlaUsersCommandGateway,
     SqlaUsersQueryGateway,
 )
-from apps.users.infrastructure.persistence_postgres.session import get_db_session
-from apps.users.setup.config import get_settings
+from users.infrastructure.persistence_postgres.session import get_db_session
+from users.setup.config import get_settings
 
 # Type alias for dependency injection
 SessionDep = Annotated[AsyncSession, Depends(get_db_session)]

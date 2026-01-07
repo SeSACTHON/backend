@@ -18,7 +18,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 
-from apps.auth.infrastructure.persistence_postgres.registry import mapper_registry
+from auth.infrastructure.persistence_postgres.registry import mapper_registry
 
 users_social_accounts_table = Table(
     "user_social_accounts",
@@ -44,7 +44,7 @@ users_social_accounts_table = Table(
 
 def start_users_social_account_mapper() -> None:
     """UsersSocialAccount 매퍼 시작."""
-    from apps.auth.domain.entities.user_social_account import UserSocialAccount
+    from auth.domain.entities.user_social_account import UserSocialAccount
 
     if hasattr(UserSocialAccount, "__mapper__"):
         return

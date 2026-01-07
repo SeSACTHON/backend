@@ -10,13 +10,13 @@ import logging
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from apps.auth.application.oauth.exceptions import (
+from auth.application.oauth.exceptions import (
     InvalidStateError,
     OAuthProviderError,
 )
 
 if TYPE_CHECKING:
-    from apps.auth.application.oauth.ports import (
+    from auth.application.oauth.ports import (
         OAuthProfile,
         OAuthProviderGateway,
         OAuthState,
@@ -171,7 +171,7 @@ class OAuthFlowService:
             frontend_origin: 프론트엔드 origin
             ttl_seconds: TTL (기본 10분)
         """
-        from apps.auth.application.oauth.ports import OAuthState
+        from auth.application.oauth.ports import OAuthState
 
         state_data = OAuthState(
             provider=provider,

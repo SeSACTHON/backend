@@ -8,11 +8,11 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from apps.users_worker.application.common.result import CommandResult
+from users_worker.application.common.result import CommandResult
 
 if TYPE_CHECKING:
-    from apps.users_worker.application.character.dto.event import CharacterEvent
-    from apps.users_worker.application.character.ports.store import CharacterStore
+    from users_worker.application.character.dto.event import CharacterEvent
+    from users_worker.application.character.ports.store import CharacterStore
 
 logger = logging.getLogger(__name__)
 

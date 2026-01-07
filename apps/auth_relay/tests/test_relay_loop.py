@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from apps.auth_relay.application.common.result import RelayResult
-from apps.auth_relay.presentation.relay_loop import RelayLoop
+from auth_relay.application.common.result import RelayResult
+from auth_relay.presentation.relay_loop import RelayLoop
 
 
 class TestRelayLoop:

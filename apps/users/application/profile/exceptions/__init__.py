@@ -1,6 +1,6 @@
 """Profile domain exceptions."""
 
-from apps.users.application.profile.exceptions.profile import (
+from users.application.profile.exceptions.profile import (
     InvalidPhoneNumberError,
     NoChangesProvidedError,
     UserNotFoundError,

@@ -22,7 +22,7 @@ Architecture:
             DROP: push_to_dlq
 
 Run:
-    python -m apps.auth_relay.main
+    python -m auth_relay.main
 """
 
 from __future__ import annotations
@@ -31,9 +31,9 @@ import asyncio
 import logging
 import signal
 
-from apps.auth_relay.setup.config import get_settings
-from apps.auth_relay.setup.dependencies import Container
-from apps.auth_relay.setup.logging import setup_logging
+from auth_relay.setup.config import get_settings
+from auth_relay.setup.dependencies import Container
+from auth_relay.setup.logging import setup_logging
 
 logger = logging.getLogger(__name__)
 

@@ -8,9 +8,9 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from apps.auth.domain.entities.user import User
-from apps.auth.domain.entities.user_social_account import UserSocialAccount
-from apps.auth.domain.value_objects.user_id import UserId
+from auth.domain.entities.user import User
+from auth.domain.entities.user_social_account import UserSocialAccount
+from auth.domain.value_objects.user_id import UserId
 
 
 def create_user(

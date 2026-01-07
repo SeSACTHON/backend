@@ -5,14 +5,14 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from apps.auth.application.token.commands.refresh import RefreshTokensInteractor
-from apps.auth.application.token.dto import RefreshTokensRequest
-from apps.auth.domain.entities.user import User
-from apps.auth.domain.enums.token_type import TokenType
-from apps.auth.domain.exceptions.auth import TokenRevokedError
-from apps.auth.domain.exceptions.user import UserNotFoundError
-from apps.auth.domain.value_objects.token_payload import TokenPayload
-from apps.auth.domain.value_objects.user_id import UserId
+from auth.application.token.commands.refresh import RefreshTokensInteractor
+from auth.application.token.dto import RefreshTokensRequest
+from auth.domain.entities.user import User
+from auth.domain.enums.token_type import TokenType
+from auth.domain.exceptions.auth import TokenRevokedError
+from auth.domain.exceptions.user import UserNotFoundError
+from auth.domain.value_objects.token_payload import TokenPayload
+from auth.domain.value_objects.user_id import UserId
 
 
 class TestRefreshTokensInteractor:

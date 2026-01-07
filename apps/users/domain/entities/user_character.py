@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from apps.users.domain.enums.user_character_status import UserCharacterStatus
+from users.domain.enums.user_character_status import UserCharacterStatus
 
 
 @dataclass

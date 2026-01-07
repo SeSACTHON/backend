@@ -5,7 +5,7 @@
 
 from typing import Protocol
 
-from apps.auth.domain.entities.login_audit import LoginAudit
+from auth.domain.entities.login_audit import LoginAudit
 
 
 class LoginAuditGateway(Protocol):

@@ -8,7 +8,7 @@ from __future__ import annotations
 import logging
 import sys
 
-from apps.users_worker.setup.config import get_settings
+from users_worker.setup.config import get_settings
 
 
 def setup_logging() -> None:

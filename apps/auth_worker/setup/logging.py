@@ -11,7 +11,7 @@ from typing import Any
 
 import ecs_logging
 
-from apps.auth_worker.setup.config import get_settings
+from auth_worker.setup.config import get_settings
 
 
 def setup_logging() -> None:

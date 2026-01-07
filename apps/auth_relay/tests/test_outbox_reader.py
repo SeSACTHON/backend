@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from apps.auth_relay.infrastructure.persistence_redis.outbox_reader_redis import (
+from auth_relay.infrastructure.persistence_redis.outbox_reader_redis import (
     RedisOutboxReader,
 )
 

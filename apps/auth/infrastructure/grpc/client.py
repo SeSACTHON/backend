@@ -16,10 +16,10 @@ from typing import TYPE_CHECKING
 import grpc
 from aiobreaker import CircuitBreaker, CircuitBreakerError, CircuitBreakerListener
 
-from apps.auth.infrastructure.grpc import users_pb2, users_pb2_grpc
+from auth.infrastructure.grpc import users_pb2, users_pb2_grpc
 
 if TYPE_CHECKING:
-    from apps.auth.setup.config import Settings
+    from auth.setup.config import Settings
 
 logger = logging.getLogger(__name__)
 
@@ -301,7 +301,7 @@ def get_users_client() -> UsersGrpcClient:
     """Get the singleton UsersGrpcClient instance."""
     global _client
     if _client is None:
-        from apps.auth.setup.config import get_settings
+        from auth.setup.config import get_settings
 
         _client = UsersGrpcClient(get_settings())
     return _client

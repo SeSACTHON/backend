@@ -32,8 +32,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Builder에서 설치된 패키지 복사
 COPY --from=builder /install /usr/local
 
-# 앱 코드만 복사 (apps.users 경로 유지)
-COPY apps/users /app/apps/users
+# 앱 코드만 복사 (새 패턴: /app/users)
+COPY apps/users /app/users
 
 # 환경 변수
 ENV PYTHONPATH=/app
@@ -49,4 +49,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # 실행
-CMD ["uvicorn", "apps.users.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "users.main:app", "--host", "0.0.0.0", "--port", "8000"]

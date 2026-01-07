@@ -9,11 +9,11 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING
 
-from apps.auth.domain.entities.base import Entity
-from apps.auth.domain.value_objects.user_id import UserId
+from auth.domain.entities.base import Entity
+from auth.domain.value_objects.user_id import UserId
 
 if TYPE_CHECKING:
-    from apps.auth.domain.entities.user_social_account import UserSocialAccount
+    from auth.domain.entities.user_social_account import UserSocialAccount
 
 
 class User(Entity[UserId]):

@@ -7,6 +7,6 @@
 - ConsumerAdapter: decode/dispatch/ack-nack (Presentation)
 """
 
-from apps.auth_worker.infrastructure.messaging.rabbitmq_client import RabbitMQClient
+from auth_worker.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 
 __all__ = ["RabbitMQClient"]

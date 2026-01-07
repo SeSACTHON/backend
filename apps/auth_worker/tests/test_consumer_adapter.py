@@ -8,8 +8,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from apps.auth_worker.application.common.result import CommandResult
-from apps.auth_worker.presentation.adapters.consumer_adapter import ConsumerAdapter
+from auth_worker.application.common.result import CommandResult
+from auth_worker.presentation.adapters.consumer_adapter import ConsumerAdapter
 
 
 class TestConsumerAdapter:

@@ -5,7 +5,7 @@ UsersIdGenerator 포트의 구현체입니다.
 
 import uuid
 
-from apps.auth.domain.value_objects.user_id import UserId
+from auth.domain.value_objects.user_id import UserId
 
 
 class UuidUsersIdGenerator:

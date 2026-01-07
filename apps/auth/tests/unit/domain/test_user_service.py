@@ -6,10 +6,10 @@ from uuid import uuid4
 
 import pytest
 
-from apps.auth.domain.entities.user import User
-from apps.auth.domain.entities.user_social_account import UserSocialAccount
-from apps.auth.domain.services.user_service import UserService
-from apps.auth.domain.value_objects.user_id import UserId
+from auth.domain.entities.user import User
+from auth.domain.entities.user_social_account import UserSocialAccount
+from auth.domain.services.user_service import UserService
+from auth.domain.value_objects.user_id import UserId
 
 
 class TestUserService:
@@ -154,7 +154,7 @@ class TestUserServiceEdgeCases:
 
     @pytest.fixture
     def user_service(self) -> UserService:
-        from apps.auth.infrastructure.common.adapters.users_id_generator_uuid import (
+        from auth.infrastructure.common.adapters.users_id_generator_uuid import (
             UuidUsersIdGenerator,
         )
 

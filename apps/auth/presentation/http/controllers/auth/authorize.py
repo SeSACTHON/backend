@@ -9,15 +9,15 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, Query, Request
 
-from apps.auth.application.oauth.commands import OAuthAuthorizeInteractor
-from apps.auth.application.oauth.dto import OAuthAuthorizeRequest
-from apps.auth.presentation.http.schemas.auth import (
+from auth.application.oauth.commands import OAuthAuthorizeInteractor
+from auth.application.oauth.dto import OAuthAuthorizeRequest
+from auth.presentation.http.schemas.auth import (
     AuthorizationData,
     AuthorizationSuccessResponse,
     AuthorizeResponse,
 )
-from apps.auth.presentation.http.utils.redirect import FRONTEND_ORIGIN_HEADER
-from apps.auth.setup.dependencies import get_oauth_authorize_interactor
+from auth.presentation.http.utils.redirect import FRONTEND_ORIGIN_HEADER
+from auth.setup.dependencies import get_oauth_authorize_interactor
 
 router = APIRouter()
 

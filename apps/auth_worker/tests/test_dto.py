@@ -6,7 +6,7 @@ from datetime import datetime
 
 import pytest
 
-from apps.auth_worker.application.blacklist.dto.event import BlacklistEvent
+from auth_worker.application.blacklist.dto.event import BlacklistEvent
 
 
 class TestBlacklistEvent:

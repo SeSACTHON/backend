@@ -60,5 +60,5 @@ export AUTH_REDIS_URL="redis://localhost:6379/0"
 export AUTH_AMQP_URL="amqp://guest:guest@localhost:5672/"
 
 # 실행
-python -m apps.auth_relay.main
+python -m auth_relay.main
 ```

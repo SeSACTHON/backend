@@ -8,15 +8,15 @@ from __future__ import annotations
 
 import redis.asyncio as aioredis
 
-from apps.auth_relay.application.commands.relay_event import RelayEventCommand
-from apps.auth_relay.infrastructure.messaging.rabbitmq_publisher import (
+from auth_relay.application.commands.relay_event import RelayEventCommand
+from auth_relay.infrastructure.messaging.rabbitmq_publisher import (
     RabbitMQEventPublisher,
 )
-from apps.auth_relay.infrastructure.persistence_redis.outbox_reader_redis import (
+from auth_relay.infrastructure.persistence_redis.outbox_reader_redis import (
     RedisOutboxReader,
 )
-from apps.auth_relay.presentation.relay_loop import RelayLoop
-from apps.auth_relay.setup.config import get_settings
+from auth_relay.presentation.relay_loop import RelayLoop
+from auth_relay.setup.config import get_settings
 
 
 class Container:

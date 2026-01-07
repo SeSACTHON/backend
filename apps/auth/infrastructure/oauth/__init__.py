@@ -1,14 +1,14 @@
 """OAuth Provider Implementations."""
 
-from apps.auth.infrastructure.oauth.client import OAuthClientImpl
-from apps.auth.infrastructure.oauth.providers import (
+from auth.infrastructure.oauth.client import OAuthClientImpl
+from auth.infrastructure.oauth.providers import (
     GoogleOAuthProvider,
     KakaoOAuthProvider,
     NaverOAuthProvider,
     OAuthProvider,
     OAuthProviderError,
 )
-from apps.auth.infrastructure.oauth.registry import ProviderRegistry
+from auth.infrastructure.oauth.registry import ProviderRegistry
 
 __all__ = [
     "OAuthProvider",

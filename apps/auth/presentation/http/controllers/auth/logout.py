@@ -7,11 +7,11 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, Response
 
-from apps.auth.application.token.commands import LogoutInteractor
-from apps.auth.application.token.dto import LogoutRequest
-from apps.auth.presentation.http.auth.cookie_params import clear_auth_cookies
-from apps.auth.presentation.http.schemas.auth import LogoutData, LogoutSuccessResponse
-from apps.auth.setup.dependencies import get_logout_interactor
+from auth.application.token.commands import LogoutInteractor
+from auth.application.token.dto import LogoutRequest
+from auth.presentation.http.auth.cookie_params import clear_auth_cookies
+from auth.presentation.http.schemas.auth import LogoutData, LogoutSuccessResponse
+from auth.setup.dependencies import get_logout_interactor
 
 router = APIRouter()
 

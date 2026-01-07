@@ -1,7 +1,7 @@
 """PostgreSQL Persistence Layer."""
 
-from apps.auth.infrastructure.persistence_postgres.registry import mapper_registry
-from apps.auth.infrastructure.persistence_postgres.session import (
+from auth.infrastructure.persistence_postgres.registry import mapper_registry
+from auth.infrastructure.persistence_postgres.session import (
     get_async_engine,
     get_async_session,
 )

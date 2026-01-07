@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-from apps.users.domain.entities.user import User
+from users.domain.entities.user import User
 
 
 @dataclass

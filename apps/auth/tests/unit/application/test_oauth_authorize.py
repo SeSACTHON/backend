@@ -4,8 +4,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from apps.auth.application.oauth.commands.authorize import OAuthAuthorizeInteractor
-from apps.auth.application.oauth.dto import OAuthAuthorizeRequest
+from auth.application.oauth.commands.authorize import OAuthAuthorizeInteractor
+from auth.application.oauth.dto import OAuthAuthorizeRequest
 
 
 class TestOAuthAuthorizeInteractor:

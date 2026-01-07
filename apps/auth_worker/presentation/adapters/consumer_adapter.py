@@ -39,7 +39,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from aio_pika.abc import AbstractIncomingMessage
 
-    from apps.auth_worker.presentation.handlers.blacklist_handler import (
+    from auth_worker.presentation.handlers.blacklist_handler import (
         BlacklistHandler,
     )
 

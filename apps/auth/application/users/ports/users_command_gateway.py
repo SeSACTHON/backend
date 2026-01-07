@@ -5,8 +5,8 @@
 
 from typing import Protocol
 
-from apps.auth.domain.entities.user import User
-from apps.auth.domain.value_objects.user_id import UserId
+from auth.domain.entities.user import User
+from auth.domain.value_objects.user_id import UserId
 
 
 class UsersCommandGateway(Protocol):

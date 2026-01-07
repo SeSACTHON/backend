@@ -2,7 +2,7 @@
 
 import pytest
 
-from apps.auth_relay.application.common.result import RelayResult, ResultStatus
+from auth_relay.application.common.result import RelayResult, ResultStatus
 
 
 class TestResultStatus:

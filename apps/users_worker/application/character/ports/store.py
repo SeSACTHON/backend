@@ -8,7 +8,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Protocol
 
 if TYPE_CHECKING:
-    from apps.users_worker.application.character.dto.event import CharacterEvent
+    from users_worker.application.character.dto.event import CharacterEvent
 
 
 class CharacterStore(Protocol):

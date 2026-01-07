@@ -7,7 +7,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from apps.auth.domain.entities.login_audit import LoginAudit
+from auth.domain.entities.login_audit import LoginAudit
 
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession

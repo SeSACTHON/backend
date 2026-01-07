@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
-from apps.auth.domain.value_objects.base import ValueObject
+from auth.domain.value_objects.base import ValueObject
 
 
 @dataclass(frozen=True, slots=True)

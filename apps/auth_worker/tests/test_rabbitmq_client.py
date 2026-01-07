@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from apps.auth_worker.infrastructure.messaging.rabbitmq_client import RabbitMQClient
+from auth_worker.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 
 
 class TestRabbitMQClient:

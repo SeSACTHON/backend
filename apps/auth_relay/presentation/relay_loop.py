@@ -23,8 +23,8 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from apps.auth_relay.application.commands.relay_event import RelayEventCommand
-    from apps.auth_relay.application.common.ports.outbox_reader import OutboxReader
+    from auth_relay.application.commands.relay_event import RelayEventCommand
+    from auth_relay.application.common.ports.outbox_reader import OutboxReader
 
 logger = logging.getLogger(__name__)
 

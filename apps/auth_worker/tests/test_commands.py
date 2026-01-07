@@ -7,11 +7,11 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from apps.auth_worker.application.blacklist.commands.persist import (
+from auth_worker.application.blacklist.commands.persist import (
     PersistBlacklistCommand,
 )
-from apps.auth_worker.application.blacklist.dto.event import BlacklistEvent
-from apps.auth_worker.application.common.result import ResultStatus
+from auth_worker.application.blacklist.dto.event import BlacklistEvent
+from auth_worker.application.common.result import ResultStatus
 
 
 class TestPersistBlacklistCommand:

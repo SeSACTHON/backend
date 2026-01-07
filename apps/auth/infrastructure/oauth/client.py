@@ -12,11 +12,11 @@ from typing import TYPE_CHECKING
 
 import httpx
 
-from apps.auth.application.common.services.oauth_client import OAuthProfile
-from apps.auth.application.oauth.exceptions import OAuthProviderError
+from auth.application.common.services.oauth_client import OAuthProfile
+from auth.application.oauth.exceptions import OAuthProviderError
 
 if TYPE_CHECKING:
-    from apps.auth.infrastructure.oauth.registry import ProviderRegistry
+    from auth.infrastructure.oauth.registry import ProviderRegistry
 
 logger = logging.getLogger(__name__)
 

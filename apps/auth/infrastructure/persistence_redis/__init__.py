@@ -1,11 +1,11 @@
 """Redis Persistence Layer."""
 
-from apps.auth.infrastructure.persistence_redis.adapters import (
+from auth.infrastructure.persistence_redis.adapters import (
     RedisStateStore,
     RedisTokenBlacklist,
     RedisUsersTokenStore,
 )
-from apps.auth.infrastructure.persistence_redis.client import (
+from auth.infrastructure.persistence_redis.client import (
     get_blacklist_redis,
     get_oauth_state_redis,
 )

@@ -12,7 +12,7 @@ from typing import Any
 from celery import Celery
 from celery.signals import worker_ready
 
-from apps.users_worker.setup.config import get_settings
+from users_worker.setup.config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -37,7 +37,7 @@ celery_app.conf.update(
 # Task 모듈 자동 검색
 celery_app.autodiscover_tasks(
     [
-        "apps.users_worker.presentation.tasks",
+        "users_worker.presentation.tasks",
     ]
 )
 

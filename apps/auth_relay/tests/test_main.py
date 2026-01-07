@@ -15,7 +15,7 @@ class TestAuthRelay:
     @pytest.fixture(autouse=True)
     def clear_settings_cache(self) -> None:
         """Clear settings cache before each test."""
-        from apps.auth_relay.setup.config import get_settings
+        from auth_relay.setup.config import get_settings
 
         get_settings.cache_clear()
 
@@ -43,9 +43,9 @@ class TestAuthRelay:
         mock_container.relay_loop = mock_relay_loop
 
         with patch.dict(os.environ, env_vars, clear=False):
-            with patch("apps.auth_relay.main.Container", return_value=mock_container):
-                with patch("apps.auth_relay.main.setup_logging"):
-                    from apps.auth_relay.main import AuthRelay
+            with patch("auth_relay.main.Container", return_value=mock_container):
+                with patch("auth_relay.main.setup_logging"):
+                    from auth_relay.main import AuthRelay
 
                     relay = AuthRelay()
                     relay._container = mock_container
@@ -65,7 +65,7 @@ class TestAuthRelay:
         mock_container.relay_loop = mock_relay_loop
 
         with patch.dict(os.environ, env_vars, clear=False):
-            from apps.auth_relay.main import AuthRelay
+            from auth_relay.main import AuthRelay
 
             relay = AuthRelay()
             relay._container = mock_container
@@ -82,7 +82,7 @@ class TestAuthRelay:
         mock_container.relay_loop = mock_relay_loop
 
         with patch.dict(os.environ, env_vars, clear=False):
-            from apps.auth_relay.main import AuthRelay
+            from auth_relay.main import AuthRelay
 
             relay = AuthRelay()
             relay._container = mock_container
@@ -98,7 +98,7 @@ class TestMain:
     @pytest.fixture(autouse=True)
     def clear_settings_cache(self) -> None:
         """Clear settings cache before each test."""
-        from apps.auth_relay.setup.config import get_settings
+        from auth_relay.setup.config import get_settings
 
         get_settings.cache_clear()
 
@@ -117,9 +117,9 @@ class TestMain:
         mock_relay.start = AsyncMock()
 
         with patch.dict(os.environ, env_vars, clear=False):
-            with patch("apps.auth_relay.main.setup_logging"):
-                with patch("apps.auth_relay.main.AuthRelay", return_value=mock_relay):
-                    from apps.auth_relay.main import main
+            with patch("auth_relay.main.setup_logging"):
+                with patch("auth_relay.main.AuthRelay", return_value=mock_relay):
+                    from auth_relay.main import main
 
                     await main()
 

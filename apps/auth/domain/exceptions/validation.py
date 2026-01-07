@@ -1,6 +1,6 @@
 """Validation Domain Exceptions."""
 
-from apps.auth.domain.exceptions.base import DomainError
+from auth.domain.exceptions.base import DomainError
 
 
 class ValidationError(DomainError):

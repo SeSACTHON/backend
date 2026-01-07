@@ -4,6 +4,6 @@
 구현체는 Infrastructure 레이어에 있습니다.
 """
 
-from apps.auth.domain.ports.user_id_generator import UserIdGenerator
+from auth.domain.ports.user_id_generator import UserIdGenerator
 
 __all__ = ["UserIdGenerator"]

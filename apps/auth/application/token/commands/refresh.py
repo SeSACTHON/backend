@@ -13,22 +13,22 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from apps.auth.application.token.dto import (
+from auth.application.token.dto import (
     RefreshTokensRequest,
     RefreshTokensResponse,
 )
-from apps.auth.domain.enums.token_type import TokenType
-from apps.auth.domain.exceptions.auth import TokenRevokedError
-from apps.auth.domain.exceptions.user import UserNotFoundError
-from apps.auth.domain.value_objects.user_id import UserId
+from auth.domain.enums.token_type import TokenType
+from auth.domain.exceptions.auth import TokenRevokedError
+from auth.domain.exceptions.user import UserNotFoundError
+from auth.domain.value_objects.user_id import UserId
 
 if TYPE_CHECKING:
     # Services (연주자)
     # Ports (인프라)
-    from apps.auth.application.common.ports import TransactionManager
-    from apps.auth.application.token.ports import BlacklistEventPublisher
-    from apps.auth.application.token.services import TokenService
-    from apps.auth.application.users.ports import UsersQueryGateway
+    from auth.application.common.ports import TransactionManager
+    from auth.application.token.ports import BlacklistEventPublisher
+    from auth.application.token.services import TokenService
+    from auth.application.users.ports import UsersQueryGateway
 
 logger = logging.getLogger(__name__)
 
