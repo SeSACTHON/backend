@@ -276,25 +276,40 @@ spec:
     namespace: rabbitmq
 ---
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# NOTE: my-reward, celery-default 큐 제거됨
-# - my-worker → users-worker 마이그레이션 완료
-# - celery 기본 큐 미사용
+# Auth Blacklist Queue (auth-worker)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-namespace: rabbitmq
----
 apiVersion: rabbitmq.com/v1beta1
 kind: Queue
 metadata:
-  name: dlq-celery
+  name: auth-blacklist-queue
   namespace: rabbitmq
 spec:
-  name: dlq.celery
+  name: auth.blacklist
   type: classic
   durable: true
   autoDelete: false
   vhost: eco2
   arguments:
-    x-message-ttl: 604800000
+    x-dead-letter-exchange: dlx
+    x-dead-letter-routing-key: dlq.auth.blacklist
+    x-message-ttl: 86400000  # 24시간
+  rabbitmqClusterReference:
+    name: eco2-rabbitmq
+    namespace: rabbitmq
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Queue
+metadata:
+  name: dlq-auth-blacklist
+  namespace: rabbitmq
+spec:
+  name: dlq.auth.blacklist
+  type: classic
+  durable: true
+  autoDelete: false
+  vhost: eco2
+  arguments:
+    x-message-ttl: 604800000  # 7일 보관
   rabbitmqClusterReference:
     name: eco2-rabbitmq
     namespace: rabbitmq
