@@ -29,12 +29,18 @@ class CeleryDefaultCharacterPublisher(DefaultCharacterPublisher):
         self._celery_app = celery_app
 
     def publish(self, user_id: UUID) -> None:
-        """기본 캐릭터 지급 이벤트를 발행합니다."""
+        """기본 캐릭터 지급 이벤트를 발행합니다.
+
+        ⚠️ Exchange 명시 필수: RabbitMQ Topology CR과 일치해야 함
+           - character.* → character.direct exchange
+        """
         try:
             self._celery_app.send_task(
                 "character.grant_default",
                 kwargs={"user_id": str(user_id)},
                 queue="character.grant_default",
+                exchange="character.direct",
+                routing_key="character.grant_default",
             )
             logger.info(
                 "Default character grant event published",
