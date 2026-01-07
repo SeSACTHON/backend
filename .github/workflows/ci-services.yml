@@ -10,6 +10,7 @@ on:
       # FastAPI API 서비스만 
       # (ext-authz는 Go → ci-ext-authz.yml)
       # (sse-gateway, event-router는 → ci-sse-components.yml)
+      # (domains/my는 apps/users로 마이그레이션 완료)
       - "apps/auth/**"
       - "apps/users/**"
       - "apps/character/**"
@@ -20,7 +21,6 @@ on:
       - "domains/chat/**"
       - "domains/image/**"
       - "domains/location/**"
-      - "domains/my/**"
       - "domains/scan/**"
       - "domains/_shared/**"
       - "domains/_base/**"
@@ -30,7 +30,6 @@ on:
       - "workloads/domains/chat/**"
       - "workloads/domains/image/**"
       - "workloads/domains/location/**"
-      - "workloads/domains/my/**"
       - "workloads/domains/scan/**"
       # Worker는 별도 파이프라인 → ci-workers.yml
   pull_request:
@@ -42,6 +41,7 @@ on:
       # FastAPI API 서비스만
       # (ext-authz는 Go → ci-ext-authz.yml)
       # (sse-gateway, event-router는 → ci-sse-components.yml)
+      # (domains/my는 apps/users로 마이그레이션 완료)
       - "apps/auth/**"
       - "apps/users/**"
       - "apps/character/**"
@@ -52,7 +52,6 @@ on:
       - "domains/chat/**"
       - "domains/image/**"
       - "domains/location/**"
-      - "domains/my/**"
       - "domains/scan/**"
       - "domains/_shared/**"
       - "domains/_base/**"
@@ -62,7 +61,6 @@ on:
       - "workloads/domains/chat/**"
       - "workloads/domains/image/**"
       - "workloads/domains/location/**"
-      - "workloads/domains/my/**"
       - "workloads/domains/scan/**"
       # Worker는 별도 파이프라인 → ci-workers.yml
   workflow_dispatch:
@@ -211,7 +209,6 @@ jobs:
             domains/chat/**
             domains/image/**
             domains/location/**
-            domains/my/**
             domains/scan/**
             domains/_base/**
             domains/_shared/waste_pipeline/**
@@ -222,7 +219,6 @@ jobs:
             workloads/domains/chat/**
             workloads/domains/image/**
             workloads/domains/location/**
-            workloads/domains/my/**
             workloads/domains/scan/**
 
       - name: Prepare service matrix
@@ -242,6 +238,7 @@ jobs:
           # FastAPI API 서비스 목록 (명시적 나열)
           # ext-authz는 Go 프로젝트 → ci-ext-authz.yml
           # sse-gateway, event-router는 SSE 컴포넌트 → ci-sse-components.yml
+          # domains/my는 apps/users로 마이그레이션 완료 (제거됨)
           FASTAPI_SERVICES = [
               "auth",
               "users",
@@ -249,7 +246,6 @@ jobs:
               "chat",
               "image",
               "location",
-              "my",
               "scan",
           ]
           
@@ -258,10 +254,10 @@ jobs:
           }
           shared_triggers = {
               "domains/_shared/waste_pipeline": ["chat", "scan"],
-              "domains/_shared/celery": ["scan", "character", "my"],
+              "domains/_shared/celery": ["scan", "character"],
               # domains/_shared/events는 SSE 컴포넌트 전용 → ci-sse-components.yml
               # Base 이미지 변경 시 모든 API 서비스 재빌드 (의존성 업데이트)
-              "domains/_base": ["auth", "users", "character", "chat", "image", "location", "my", "scan"],
+              "domains/_base": ["auth", "users", "character", "chat", "image", "location", "scan"],
           }
 
           def normalize(service: str) -> str:

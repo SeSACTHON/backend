@@ -122,11 +122,11 @@ jobs:
           files = os.environ.get("CHANGED_FILES", "").split()
           any_changed = os.environ.get("ANY_CHANGED", "false").lower() == "true"
           
-          # FastAPI API 서비스
-          API_SERVICES = ["auth", "users", "character", "chat", "image", "location", "my", "scan"]
+          # FastAPI API 서비스 (domains/my는 apps/users로 마이그레이션 완료)
+          API_SERVICES = ["auth", "users", "character", "chat", "image", "location", "scan"]
           
-          # Worker 서비스
-          WORKER_SERVICES = ["character-worker", "scan-worker", "my-worker"]
+          # Worker 서비스 (my-worker는 apps/users_worker로 마이그레이션 완료)
+          WORKER_SERVICES = ["character-worker", "scan-worker"]
           
           # 특수 서비스
           SPECIAL_SERVICES = ["ext-authz", "auth-relay", "sse-gateway"]
@@ -175,9 +175,6 @@ jobs:
                       elif svc == "scan" and "worker" in path:
                           if "scan-worker" not in worker_services:
                               worker_services.append("scan-worker")
-                      elif svc == "my" and "worker" in path:
-                          if "my-worker" not in worker_services:
-                              worker_services.append("my-worker")
                   
                   # workloads/domains/<service>/ 경로 감지
                   elif len(parts) >= 3 and parts[0] == "workloads" and parts[1] == "domains":
@@ -344,9 +341,6 @@ jobs:
               ;;
             scan-worker)
               echo "path=domains/scan/Dockerfile.worker" >> "$GITHUB_OUTPUT"
-              ;;
-            my-worker)
-              echo "path=domains/my/Dockerfile.worker" >> "$GITHUB_OUTPUT"
               ;;
             *)
               echo "path=domains/${SERVICE}/Dockerfile" >> "$GITHUB_OUTPUT"
