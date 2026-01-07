@@ -194,6 +194,8 @@ class RewardStep(Step):
                     "disposal_rules_present": bool(ctx.disposal_rules),
                 },
                 queue="character.match",
+                exchange="character.direct",
+                routing_key="character.match",
             )
 
             result = async_result.get(
@@ -247,6 +249,8 @@ class RewardStep(Step):
                     "source": "scan",
                 },
                 queue="character.save_ownership",
+                exchange="character.direct",
+                routing_key="character.save_ownership",
             )
             logger.info("save_ownership_task dispatched")
         except Exception:
@@ -267,6 +271,8 @@ class RewardStep(Step):
                     "source": "scan",
                 },
                 queue="users.save_character",
+                exchange="users.direct",
+                routing_key="users.save_character",
             )
             logger.info("save_users_character_task dispatched")
         except Exception:
