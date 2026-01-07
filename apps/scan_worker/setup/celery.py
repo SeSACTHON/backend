@@ -98,6 +98,8 @@ celery_app.conf.update(
     # Exchange 설정 (AMQP default exchange - domains와 동일)
     task_default_exchange="",  # AMQP default exchange (direct routing)
     task_default_routing_key="celery",
+    # 큐 자동 생성 비활성화 (RabbitMQ Topology CR로 생성된 큐 사용)
+    task_create_missing_queues=False,
     # 일반 설정
     task_track_started=True,
     task_serializer="json",
