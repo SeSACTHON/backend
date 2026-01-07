@@ -1,18 +1,75 @@
-"""Scan Celery Application."""
+"""Scan Celery Application.
+
+scan-worker와 동일한 큐 설정 사용 (TTL + DLX).
+⚠️ 큐 arguments가 다르면 PRECONDITION_FAILED 발생.
+"""
 
 from __future__ import annotations
 
 import os
 
 from celery import Celery
+from kombu import Exchange, Queue
 
-# Celery 앱 생성 (기존 domains/scan과 동일한 설정)
+# Celery 앱 생성
 celery_app = Celery("scan")
 
 # 브로커 URL
 broker_url = os.getenv(
     "CELERY_BROKER_URL",
     "amqp://admin:admin@localhost:5672/eco2",
+)
+
+# RabbitMQ Exchange 설정 (scan_worker와 동일)
+CELERY_EXCHANGE = Exchange("celery", type="topic")
+
+# Dead Letter Exchange
+DLX_EXCHANGE = "dlx"
+
+# 큐별 TTL 설정 (scan_worker와 동일)
+QUEUE_TTL_MAP = {
+    "scan.vision": 3600000,  # 1시간
+    "scan.rule": 300000,  # 5분
+    "scan.answer": 3600000,  # 1시간
+    "scan.reward": 3600000,  # 1시간
+}
+
+
+def _queue_args(queue_name: str) -> dict:
+    """큐별 arguments 생성 (TTL + DLX + DLQ 라우팅키)."""
+    return {
+        "x-message-ttl": QUEUE_TTL_MAP.get(queue_name, 3600000),
+        "x-dead-letter-exchange": DLX_EXCHANGE,
+        "x-dead-letter-routing-key": f"dlq.{queue_name}",
+    }
+
+
+# 큐 설정 (scan_worker와 동일)
+SCAN_TASK_QUEUES = (
+    Queue(
+        "scan.vision",
+        exchange=CELERY_EXCHANGE,
+        routing_key="scan.vision",
+        queue_arguments=_queue_args("scan.vision"),
+    ),
+    Queue(
+        "scan.rule",
+        exchange=CELERY_EXCHANGE,
+        routing_key="scan.rule",
+        queue_arguments=_queue_args("scan.rule"),
+    ),
+    Queue(
+        "scan.answer",
+        exchange=CELERY_EXCHANGE,
+        routing_key="scan.answer",
+        queue_arguments=_queue_args("scan.answer"),
+    ),
+    Queue(
+        "scan.reward",
+        exchange=CELERY_EXCHANGE,
+        routing_key="scan.reward",
+        queue_arguments=_queue_args("scan.reward"),
+    ),
 )
 
 celery_app.conf.update(
@@ -28,6 +85,8 @@ celery_app.conf.update(
     # Worker 설정
     worker_prefetch_multiplier=1,  # gevent 사용 시 1로 설정
     worker_concurrency=10,
+    # 큐 설정 (scan_worker와 동일한 arguments)
+    task_queues=SCAN_TASK_QUEUES,
     # Task 라우팅 (큐별 분리)
     task_routes={
         "scan.vision": {"queue": "scan.vision"},
@@ -37,7 +96,8 @@ celery_app.conf.update(
     },
     # Task 기본 설정
     task_default_queue="scan.default",
-    task_default_exchange="scan",
+    task_default_exchange="celery",  # scan_worker와 동일
+    task_default_exchange_type="topic",
     task_default_routing_key="scan.default",
     # 이벤트 설정 (레거시 호환)
     task_send_sent_event=True,
@@ -46,6 +106,3 @@ celery_app.conf.update(
     task_acks_late=True,
     task_reject_on_worker_lost=True,
 )
-
-# Task 자동 검색 (workers 모듈)
-celery_app.autodiscover_tasks(["apps.scan.workers"])
