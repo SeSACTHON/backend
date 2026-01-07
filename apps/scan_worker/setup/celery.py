@@ -16,8 +16,8 @@ from scan_worker.setup.config import get_settings
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-# RabbitMQ Exchange 설정 (기존 설정과 동일하게 topic 타입)
-CELERY_EXCHANGE = Exchange("celery", type="topic")
+# RabbitMQ Exchange 설정 (AMQP default exchange - domains와 동일)
+DEFAULT_EXCHANGE = Exchange("", type="direct")
 
 # RabbitMQ 큐 설정 (기존 큐와 동일하게 설정)
 DLX_EXCHANGE = "dlx"  # Dead Letter Exchange
@@ -43,25 +43,25 @@ def _queue_args(queue_name: str) -> dict:
 SCAN_TASK_QUEUES = (
     Queue(
         "scan.vision",
-        exchange=CELERY_EXCHANGE,
+        exchange=DEFAULT_EXCHANGE,
         routing_key="scan.vision",
         queue_arguments=_queue_args("scan.vision"),
     ),
     Queue(
         "scan.rule",
-        exchange=CELERY_EXCHANGE,
+        exchange=DEFAULT_EXCHANGE,
         routing_key="scan.rule",
         queue_arguments=_queue_args("scan.rule"),
     ),
     Queue(
         "scan.answer",
-        exchange=CELERY_EXCHANGE,
+        exchange=DEFAULT_EXCHANGE,
         routing_key="scan.answer",
         queue_arguments=_queue_args("scan.answer"),
     ),
     Queue(
         "scan.reward",
-        exchange=CELERY_EXCHANGE,
+        exchange=DEFAULT_EXCHANGE,
         routing_key="scan.reward",
         queue_arguments=_queue_args("scan.reward"),
     ),
@@ -95,9 +95,8 @@ celery_app.conf.task_queues = SCAN_TASK_QUEUES
 
 # Celery 설정
 celery_app.conf.update(
-    # Exchange 설정 (기존 RabbitMQ와 동일하게 topic 타입)
-    task_default_exchange="celery",
-    task_default_exchange_type="topic",
+    # Exchange 설정 (AMQP default exchange - domains와 동일)
+    task_default_exchange="",  # AMQP default exchange (direct routing)
     task_default_routing_key="celery",
     # 일반 설정
     task_track_started=True,
