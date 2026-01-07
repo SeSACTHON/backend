@@ -33,8 +33,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Builder에서 설치된 패키지 복사
 COPY --from=builder /install /usr/local
 
-# Worker 코드만 복사 (apps.users_worker 경로 유지)
-COPY apps/users_worker /app/apps/users_worker
+# Worker 코드만 복사 (새 패턴: /app/users_worker)
+COPY apps/users_worker /app/users_worker
 
 # 환경 변수
 ENV PYTHONPATH=/app
@@ -44,4 +44,4 @@ ENV PYTHONUNBUFFERED=1
 USER appuser
 
 # Celery Worker 실행
-CMD ["celery", "-A", "apps.users_worker.main", "worker", "-E", "--loglevel=info", "-Q", "users.save_character", "-c", "2"]
+CMD ["celery", "-A", "users_worker.main", "worker", "-E", "--loglevel=info", "-Q", "users.save_character", "-c", "2"]

@@ -1,6 +1,6 @@
 """Blacklist Commands."""
 
-from apps.auth_worker.application.blacklist.commands.persist import (
+from auth_worker.application.blacklist.commands.persist import (
     PersistBlacklistCommand,
 )
 

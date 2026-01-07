@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from apps.auth_relay.setup.config import Settings, get_settings
+from auth_relay.setup.config import Settings, get_settings
 
 
 class TestSettings:

@@ -15,21 +15,21 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from apps.auth.application.oauth.dto import (
+from auth.application.oauth.dto import (
     OAuthCallbackRequest,
     OAuthCallbackResponse,
 )
-from apps.auth.application.users.exceptions import UserServiceUnavailableError
+from auth.application.users.exceptions import UserServiceUnavailableError
 
 if TYPE_CHECKING:
     # Services (연주자)
     # Ports (인프라)
-    from apps.auth.application.audit.ports import LoginAuditGateway
-    from apps.auth.application.audit.services import LoginAuditService
-    from apps.auth.application.common.ports import Flusher, TransactionManager
-    from apps.auth.application.oauth.services import OAuthFlowService
-    from apps.auth.application.token.services import TokenService
-    from apps.auth.application.users.ports import UsersManagementGateway
+    from auth.application.audit.ports import LoginAuditGateway
+    from auth.application.audit.services import LoginAuditService
+    from auth.application.common.ports import Flusher, TransactionManager
+    from auth.application.oauth.services import OAuthFlowService
+    from auth.application.token.services import TokenService
+    from auth.application.users.ports import UsersManagementGateway
 
 logger = logging.getLogger(__name__)
 

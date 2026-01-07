@@ -6,7 +6,7 @@ import logging
 import os
 from unittest.mock import patch
 
-from apps.auth_worker.setup.config import get_settings
+from auth_worker.setup.config import get_settings
 
 
 class TestSetupLogging:
@@ -34,7 +34,7 @@ class TestSetupLogging:
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
-            from apps.auth_worker.setup.logging import setup_logging
+            from auth_worker.setup.logging import setup_logging
 
             setup_logging()
 
@@ -53,7 +53,7 @@ class TestSetupLogging:
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
-            from apps.auth_worker.setup.logging import setup_logging
+            from auth_worker.setup.logging import setup_logging
 
             setup_logging()
 
@@ -82,7 +82,7 @@ class TestSetupLogging:
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
-            from apps.auth_worker.setup.logging import setup_logging
+            from auth_worker.setup.logging import setup_logging
 
             setup_logging()
 

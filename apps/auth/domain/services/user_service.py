@@ -8,9 +8,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from apps.auth.domain.entities.user import User
-from apps.auth.domain.entities.user_social_account import UserSocialAccount
-from apps.auth.domain.ports.user_id_generator import UserIdGenerator
+from auth.domain.entities.user import User
+from auth.domain.entities.user_social_account import UserSocialAccount
+from auth.domain.ports.user_id_generator import UserIdGenerator
 
 
 class UserService:

@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, AsyncGenerator
 
 from fastapi import Depends
 
-from apps.auth.setup.config import Settings, get_settings
+from auth.setup.config import Settings, get_settings
 
 if TYPE_CHECKING:
     import redis.asyncio as aioredis
@@ -29,7 +29,7 @@ if TYPE_CHECKING:
 
 async def get_db_session() -> AsyncGenerator["AsyncSession", None]:
     """DB 세션 제공자."""
-    from apps.auth.infrastructure.persistence_postgres.session import get_async_session
+    from auth.infrastructure.persistence_postgres.session import get_async_session
 
     async for session in get_async_session():
         yield session
@@ -37,14 +37,14 @@ async def get_db_session() -> AsyncGenerator["AsyncSession", None]:
 
 def get_blacklist_redis() -> "aioredis.Redis":
     """토큰 블랙리스트용 Redis 클라이언트 제공자."""
-    from apps.auth.infrastructure.persistence_redis.client import get_blacklist_redis
+    from auth.infrastructure.persistence_redis.client import get_blacklist_redis
 
     return get_blacklist_redis()
 
 
 def get_oauth_state_redis() -> "aioredis.Redis":
     """OAuth 상태 저장용 Redis 클라이언트 제공자."""
-    from apps.auth.infrastructure.persistence_redis.client import get_oauth_state_redis
+    from auth.infrastructure.persistence_redis.client import get_oauth_state_redis
 
     return get_oauth_state_redis()
 
@@ -58,7 +58,7 @@ async def get_users_command_gateway(
     session: "AsyncSession" = Depends(get_db_session),
 ):
     """UsersCommandGateway 제공자."""
-    from apps.auth.infrastructure.persistence_postgres.adapters import (
+    from auth.infrastructure.persistence_postgres.adapters import (
         SqlaUsersCommandGateway,
     )
 
@@ -69,7 +69,7 @@ async def get_users_query_gateway(
     session: "AsyncSession" = Depends(get_db_session),
 ):
     """UsersQueryGateway 제공자."""
-    from apps.auth.infrastructure.persistence_postgres.adapters import (
+    from auth.infrastructure.persistence_postgres.adapters import (
         SqlaUsersQueryGateway,
     )
 
@@ -80,7 +80,7 @@ async def get_social_account_gateway(
     session: "AsyncSession" = Depends(get_db_session),
 ):
     """SocialAccountQueryGateway 제공자."""
-    from apps.auth.infrastructure.persistence_postgres.adapters import (
+    from auth.infrastructure.persistence_postgres.adapters import (
         SqlaSocialAccountQueryGateway,
     )
 
@@ -91,7 +91,7 @@ async def get_login_audit_gateway(
     session: "AsyncSession" = Depends(get_db_session),
 ):
     """LoginAuditGateway 제공자."""
-    from apps.auth.infrastructure.persistence_postgres.adapters import (
+    from auth.infrastructure.persistence_postgres.adapters import (
         SqlaLoginAuditGateway,
     )
 
@@ -102,7 +102,7 @@ async def get_flusher(
     session: "AsyncSession" = Depends(get_db_session),
 ):
     """Flusher 제공자."""
-    from apps.auth.infrastructure.persistence_postgres.adapters import SqlaFlusher
+    from auth.infrastructure.persistence_postgres.adapters import SqlaFlusher
 
     return SqlaFlusher(session)
 
@@ -111,7 +111,7 @@ async def get_transaction_manager(
     session: "AsyncSession" = Depends(get_db_session),
 ):
     """TransactionManager 제공자."""
-    from apps.auth.infrastructure.persistence_postgres.adapters import (
+    from auth.infrastructure.persistence_postgres.adapters import (
         SqlaTransactionManager,
     )
 
@@ -132,7 +132,7 @@ def get_oauth_state_store(
     redis: "aioredis.Redis" = Depends(get_oauth_state_redis),
 ):
     """OAuthStateStore 제공자 (OAuth 상태용 Redis)."""
-    from apps.auth.infrastructure.persistence_redis import RedisStateStore
+    from auth.infrastructure.persistence_redis import RedisStateStore
 
     return RedisStateStore(redis)
 
@@ -146,7 +146,7 @@ def get_token_blacklist_store(
     redis: "aioredis.Redis" = Depends(get_blacklist_redis),
 ):
     """TokenBlacklistStore 제공자 (블랙리스트용 Redis)."""
-    from apps.auth.infrastructure.persistence_redis import RedisTokenBlacklist
+    from auth.infrastructure.persistence_redis import RedisTokenBlacklist
 
     return RedisTokenBlacklist(redis)
 
@@ -155,7 +155,7 @@ def get_token_session_store(
     redis: "aioredis.Redis" = Depends(get_blacklist_redis),
 ):
     """TokenSessionStore 제공자 (블랙리스트용 Redis)."""
-    from apps.auth.infrastructure.persistence_redis import RedisUsersTokenStore
+    from auth.infrastructure.persistence_redis import RedisUsersTokenStore
 
     return RedisUsersTokenStore(redis)
 
@@ -188,7 +188,7 @@ async def get_blacklist_event_publisher(settings: Settings = Depends(get_setting
         return None
 
     if _blacklist_event_publisher is None:
-        from apps.auth.infrastructure.messaging import RabbitMQBlacklistEventPublisher
+        from auth.infrastructure.messaging import RabbitMQBlacklistEventPublisher
 
         _blacklist_event_publisher = RabbitMQBlacklistEventPublisher(settings.amqp_url)
         await _blacklist_event_publisher.connect()
@@ -203,7 +203,7 @@ async def get_blacklist_event_publisher(settings: Settings = Depends(get_setting
 
 def get_token_issuer(settings: Settings = Depends(get_settings)):
     """TokenIssuer 제공자."""
-    from apps.auth.infrastructure.security import JwtTokenService
+    from auth.infrastructure.security import JwtTokenService
 
     return JwtTokenService(
         secret_key=settings.jwt_secret_key,
@@ -222,7 +222,7 @@ def get_token_issuer(settings: Settings = Depends(get_settings)):
 
 def get_oauth_provider_registry(settings: Settings = Depends(get_settings)):
     """OAuth ProviderRegistry 제공자."""
-    from apps.auth.infrastructure.oauth import ProviderRegistry
+    from auth.infrastructure.oauth import ProviderRegistry
 
     return ProviderRegistry(settings)
 
@@ -232,7 +232,7 @@ def get_oauth_provider_gateway(
     settings: Settings = Depends(get_settings),
 ):
     """OAuthProviderGateway 제공자."""
-    from apps.auth.infrastructure.oauth import OAuthClientImpl
+    from auth.infrastructure.oauth import OAuthClientImpl
 
     return OAuthClientImpl(registry, timeout_seconds=settings.oauth_client_timeout_seconds)
 
@@ -244,7 +244,7 @@ def get_oauth_provider_gateway(
 
 def get_users_id_generator():
     """UsersIdGenerator 제공자."""
-    from apps.auth.infrastructure.common.adapters import UuidUsersIdGenerator
+    from auth.infrastructure.common.adapters import UuidUsersIdGenerator
 
     return UuidUsersIdGenerator()
 
@@ -257,7 +257,7 @@ def get_user_service(
     user_id_generator=Depends(get_users_id_generator),
 ):
     """UserService 제공자 (deprecated - use UsersManagementGateway)."""
-    from apps.auth.domain.services import UserService
+    from auth.domain.services import UserService
 
     return UserService(user_id_generator)
 
@@ -267,8 +267,8 @@ def get_users_management_gateway(settings: Settings = Depends(get_settings)):
 
     users 도메인과 gRPC 통신을 위한 어댑터입니다.
     """
-    from apps.auth.infrastructure.grpc.adapters import UsersManagementGatewayGrpc
-    from apps.auth.infrastructure.grpc.client import UsersGrpcClient
+    from auth.infrastructure.grpc.adapters import UsersManagementGatewayGrpc
+    from auth.infrastructure.grpc.client import UsersGrpcClient
 
     client = UsersGrpcClient(settings)
     return UsersManagementGatewayGrpc(client)
@@ -291,7 +291,7 @@ def get_oauth_flow_service(
 
     OAuth 인증 플로우 관련 비즈니스 로직을 캡슐화합니다.
     """
-    from apps.auth.application.oauth.services import OAuthFlowService
+    from auth.application.oauth.services import OAuthFlowService
 
     return OAuthFlowService(
         state_store=state_store,
@@ -308,7 +308,7 @@ def get_token_service(
 
     토큰 발급 및 세션 관리 비즈니스 로직을 캡슐화합니다.
     """
-    from apps.auth.application.token.services import TokenService
+    from auth.application.token.services import TokenService
 
     return TokenService(
         issuer=issuer,
@@ -322,7 +322,7 @@ def get_login_audit_service():
 
     로그인 감사 엔티티 팩토리입니다 (순수 로직, Port 없음).
     """
-    from apps.auth.application.audit.services import LoginAuditService
+    from auth.application.audit.services import LoginAuditService
 
     return LoginAuditService()
 
@@ -339,7 +339,7 @@ async def get_oauth_authorize_interactor(
 
     OAuth 인증 URL 생성 유스케이스입니다.
     """
-    from apps.auth.application.oauth.commands import OAuthAuthorizeInteractor
+    from auth.application.oauth.commands import OAuthAuthorizeInteractor
 
     return OAuthAuthorizeInteractor(oauth_service=oauth_service)
 
@@ -360,7 +360,7 @@ async def get_oauth_callback_interactor(
     OAuth 콜백 처리 유스케이스입니다.
     gRPC를 통해 users 도메인과 통신합니다.
     """
-    from apps.auth.application.oauth.commands import OAuthCallbackInteractor
+    from auth.application.oauth.commands import OAuthCallbackInteractor
 
     return OAuthCallbackInteractor(
         oauth_service=oauth_service,
@@ -384,7 +384,7 @@ async def get_logout_interactor(
 
     로그아웃 유스케이스입니다.
     """
-    from apps.auth.application.token.commands import LogoutInteractor
+    from auth.application.token.commands import LogoutInteractor
 
     return LogoutInteractor(
         token_service=token_service,
@@ -405,7 +405,7 @@ async def get_refresh_tokens_interactor(
 
     토큰 갱신 유스케이스입니다.
     """
-    from apps.auth.application.token.commands import RefreshTokensInteractor
+    from auth.application.token.commands import RefreshTokensInteractor
 
     return RefreshTokensInteractor(
         token_service=token_service,
@@ -423,7 +423,7 @@ async def get_validate_token_service(
 
     토큰 검증 쿼리 서비스입니다.
     """
-    from apps.auth.application.token.queries import ValidateTokenQueryService
+    from auth.application.token.queries import ValidateTokenQueryService
 
     return ValidateTokenQueryService(
         token_service=token_service,

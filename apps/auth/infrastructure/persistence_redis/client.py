@@ -69,7 +69,7 @@ def get_blacklist_redis() -> "aioredis.Redis":
     환경변수:
         - AUTH_REDIS_BLACKLIST_URL (default: redis://localhost:6379/0)
     """
-    from apps.auth.setup.config import get_settings
+    from auth.setup.config import get_settings
 
     settings = get_settings()
     return _build_async_client(settings.redis_blacklist_url)
@@ -82,7 +82,7 @@ def get_oauth_state_redis() -> "aioredis.Redis":
     환경변수:
         - AUTH_REDIS_OAUTH_STATE_URL (default: redis://localhost:6379/3)
     """
-    from apps.auth.setup.config import get_settings
+    from auth.setup.config import get_settings
 
     settings = get_settings()
     return _build_async_client(settings.redis_oauth_state_url)

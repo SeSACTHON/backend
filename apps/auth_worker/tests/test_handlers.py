@@ -7,8 +7,8 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from apps.auth_worker.application.common.result import CommandResult, ResultStatus
-from apps.auth_worker.presentation.handlers.blacklist_handler import BlacklistHandler
+from auth_worker.application.common.result import CommandResult, ResultStatus
+from auth_worker.presentation.handlers.blacklist_handler import BlacklistHandler
 
 
 class TestBlacklistHandler:

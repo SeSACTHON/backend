@@ -1,6 +1,6 @@
 """Gateway Exceptions."""
 
-from apps.auth.application.common.exceptions.base import ApplicationError
+from auth.application.common.exceptions.base import ApplicationError
 
 
 class GatewayError(ApplicationError):

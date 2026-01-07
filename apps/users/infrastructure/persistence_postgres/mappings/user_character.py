@@ -11,12 +11,12 @@ from __future__ import annotations
 from sqlalchemy import Column, DateTime, Table, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 
-from apps.users.domain.entities.user_character import UserCharacter
-from apps.users.domain.enums import UserCharacterStatus
-from apps.users.infrastructure.persistence_postgres.constants import (
+from users.domain.entities.user_character import UserCharacter
+from users.domain.enums import UserCharacterStatus
+from users.infrastructure.persistence_postgres.constants import (
     USER_CHARACTERS_TABLE,
 )
-from apps.users.infrastructure.persistence_postgres.registry import (
+from users.infrastructure.persistence_postgres.registry import (
     mapper_registry,
     metadata,
 )

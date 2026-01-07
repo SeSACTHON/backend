@@ -23,16 +23,16 @@ from __future__ import annotations
 
 import redis.asyncio as aioredis
 
-from apps.auth_worker.application.blacklist.commands.persist import (
+from auth_worker.application.blacklist.commands.persist import (
     PersistBlacklistCommand,
 )
-from apps.auth_worker.infrastructure.messaging.rabbitmq_client import RabbitMQClient
-from apps.auth_worker.infrastructure.persistence_redis.blacklist_store_redis import (
+from auth_worker.infrastructure.messaging.rabbitmq_client import RabbitMQClient
+from auth_worker.infrastructure.persistence_redis.blacklist_store_redis import (
     RedisBlacklistStore,
 )
-from apps.auth_worker.presentation.adapters.consumer_adapter import ConsumerAdapter
-from apps.auth_worker.presentation.handlers.blacklist_handler import BlacklistHandler
-from apps.auth_worker.setup.config import get_settings
+from auth_worker.presentation.adapters.consumer_adapter import ConsumerAdapter
+from auth_worker.presentation.handlers.blacklist_handler import BlacklistHandler
+from auth_worker.setup.config import get_settings
 
 
 class Container:

@@ -12,13 +12,13 @@ from __future__ import annotations
 import secrets
 from typing import TYPE_CHECKING
 
-from apps.auth.application.oauth.dto import (
+from auth.application.oauth.dto import (
     OAuthAuthorizeRequest,
     OAuthAuthorizeResponse,
 )
 
 if TYPE_CHECKING:
-    from apps.auth.application.oauth.services import OAuthFlowService
+    from auth.application.oauth.services import OAuthFlowService
 
 
 class OAuthAuthorizeInteractor:

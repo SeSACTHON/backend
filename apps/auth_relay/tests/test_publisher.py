@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from apps.auth_relay.infrastructure.messaging.rabbitmq_publisher import (
+from auth_relay.infrastructure.messaging.rabbitmq_publisher import (
     RabbitMQEventPublisher,
 )
 

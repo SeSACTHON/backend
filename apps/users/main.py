@@ -8,14 +8,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from apps.users.infrastructure.persistence_postgres.mappings import start_mappers
-from apps.users.presentation.http.controllers import (
+from users.infrastructure.persistence_postgres.mappings import start_mappers
+from users.presentation.http.controllers import (
     characters_router,
     health_router,
     profile_router,
 )
-from apps.users.setup.config import get_settings
-from apps.users.setup.logging import setup_logging
+from users.setup.config import get_settings
+from users.setup.logging import setup_logging
 
 logger = logging.getLogger(__name__)
 settings = get_settings()

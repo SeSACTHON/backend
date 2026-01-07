@@ -1,6 +1,6 @@
 """Identity DTO."""
 
-from apps.users.application.identity.dto.oauth import (
+from users.application.identity.dto.oauth import (
     OAuthUserRequest,
     OAuthUserResult,
     UpdateLoginTimeRequest,

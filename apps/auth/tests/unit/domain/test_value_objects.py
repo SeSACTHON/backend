@@ -7,10 +7,10 @@ import uuid
 
 import pytest
 
-from apps.auth.domain.enums.token_type import TokenType
-from apps.auth.domain.value_objects.email import Email
-from apps.auth.domain.value_objects.token_payload import TokenPayload
-from apps.auth.domain.value_objects.user_id import UserId
+from auth.domain.enums.token_type import TokenType
+from auth.domain.value_objects.email import Email
+from auth.domain.value_objects.token_payload import TokenPayload
+from auth.domain.value_objects.user_id import UserId
 
 
 class TestUserId:
@@ -64,7 +64,7 @@ class TestEmail:
 
     def test_invalid_email_raises(self) -> None:
         """유효하지 않은 이메일은 에러."""
-        from apps.auth.domain.exceptions.validation import InvalidEmailError
+        from auth.domain.exceptions.validation import InvalidEmailError
 
         # Act & Assert
         with pytest.raises(InvalidEmailError, match="Invalid email"):

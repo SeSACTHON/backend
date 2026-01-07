@@ -3,20 +3,20 @@
 OAuth 로그인 관련 사용자 식별/생성 기능을 제공합니다.
 """
 
-from apps.users.application.identity.commands import (
+from users.application.identity.commands import (
     GetOrCreateFromOAuthCommand,
     UpdateLoginTimeCommand,
 )
-from apps.users.application.identity.dto import (
+from users.application.identity.dto import (
     OAuthUserRequest,
     OAuthUserResult,
     UpdateLoginTimeRequest,
 )
-from apps.users.application.identity.ports import (
+from users.application.identity.ports import (
     IdentityCommandGateway,
     IdentityQueryGateway,
 )
-from apps.users.application.identity.queries import GetUserQuery
+from users.application.identity.queries import GetUserQuery
 
 __all__ = [
     # Commands

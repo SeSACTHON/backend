@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from apps.users.application.common.exceptions.base import ApplicationError
+from users.application.common.exceptions.base import ApplicationError
 
 
 class UserNotFoundError(ApplicationError):

@@ -14,7 +14,7 @@ class TestContainer:
     @pytest.fixture(autouse=True)
     def clear_settings_cache(self) -> None:
         """Clear settings cache before each test."""
-        from apps.auth_relay.setup.config import get_settings
+        from auth_relay.setup.config import get_settings
 
         get_settings.cache_clear()
 
@@ -41,7 +41,7 @@ class TestContainer:
                     "apps.auth_relay.setup.dependencies.RabbitMQEventPublisher",
                     return_value=mock_publisher,
                 ):
-                    from apps.auth_relay.setup.dependencies import Container
+                    from auth_relay.setup.dependencies import Container
 
                     container = Container()
                     await container.init()
@@ -67,7 +67,7 @@ class TestContainer:
                     "apps.auth_relay.setup.dependencies.RabbitMQEventPublisher",
                     return_value=mock_publisher,
                 ):
-                    from apps.auth_relay.setup.dependencies import Container
+                    from auth_relay.setup.dependencies import Container
 
                     container = Container()
                     await container.init()
@@ -79,7 +79,7 @@ class TestContainer:
     def test_relay_loop_raises_if_not_initialized(self, env_vars: dict[str, str]) -> None:
         """relay_loop property should raise if not initialized."""
         with patch.dict(os.environ, env_vars, clear=False):
-            from apps.auth_relay.setup.dependencies import Container
+            from auth_relay.setup.dependencies import Container
 
             container = Container()
 
@@ -101,12 +101,12 @@ class TestContainer:
                     "apps.auth_relay.setup.dependencies.RabbitMQEventPublisher",
                     return_value=mock_publisher,
                 ):
-                    from apps.auth_relay.setup.dependencies import Container
+                    from auth_relay.setup.dependencies import Container
 
                     container = Container()
                     await container.init()
                     loop = container.relay_loop
 
-        from apps.auth_relay.presentation.relay_loop import RelayLoop
+        from auth_relay.presentation.relay_loop import RelayLoop
 
         assert isinstance(loop, RelayLoop)

@@ -5,7 +5,7 @@
 
 from typing import Protocol
 
-from apps.auth.domain.entities.user_social_account import UserSocialAccount
+from auth.domain.entities.user_social_account import UserSocialAccount
 
 
 class SocialAccountGateway(Protocol):

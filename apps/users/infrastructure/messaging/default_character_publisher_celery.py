@@ -9,7 +9,7 @@ from uuid import UUID
 
 from celery import Celery
 
-from apps.users.application.character.ports import DefaultCharacterPublisher
+from users.application.character.ports import DefaultCharacterPublisher
 
 logger = logging.getLogger(__name__)
 

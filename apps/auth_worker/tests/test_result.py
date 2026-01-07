@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from apps.auth_worker.application.common.result import CommandResult, ResultStatus
+from auth_worker.application.common.result import CommandResult, ResultStatus
 
 
 class TestResultStatus:

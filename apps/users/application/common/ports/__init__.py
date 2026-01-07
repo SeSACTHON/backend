@@ -6,7 +6,7 @@
   - apps.users.application.character.ports.*
 """
 
-from apps.users.application.common.ports.transaction_manager import TransactionManager
+from users.application.common.ports.transaction_manager import TransactionManager
 
 __all__ = [
     "TransactionManager",

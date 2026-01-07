@@ -21,11 +21,11 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from apps.auth_worker.application.blacklist.dto.event import BlacklistEvent
-from apps.auth_worker.application.common.result import CommandResult
+from auth_worker.application.blacklist.dto.event import BlacklistEvent
+from auth_worker.application.common.result import CommandResult
 
 if TYPE_CHECKING:
-    from apps.auth_worker.application.blacklist.commands.persist import (
+    from auth_worker.application.blacklist.commands.persist import (
         PersistBlacklistCommand,
     )
 

@@ -14,13 +14,13 @@ import logging
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from apps.users.application.profile.dto import UserProfile
-from apps.users.application.profile.exceptions import UserNotFoundError
+from users.application.profile.dto import UserProfile
+from users.application.profile.exceptions import UserNotFoundError
 
 if TYPE_CHECKING:
-    from apps.users.application.identity.ports import SocialAccountQueryGateway
-    from apps.users.application.profile.ports import ProfileQueryGateway
-    from apps.users.application.profile.services import ProfileBuilder
+    from users.application.identity.ports import SocialAccountQueryGateway
+    from users.application.profile.ports import ProfileQueryGateway
+    from users.application.profile.services import ProfileBuilder
 
 logger = logging.getLogger(__name__)
 

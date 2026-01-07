@@ -10,12 +10,12 @@
     - server.py: gRPC 서버 부팅 코드
 """
 
-from apps.users.presentation.grpc import protos
-from apps.users.presentation.grpc.interceptors import (
+from users.presentation.grpc import protos
+from users.presentation.grpc.interceptors import (
     ErrorHandlerInterceptor,
     LoggingInterceptor,
 )
-from apps.users.presentation.grpc.servicers import UsersServicer
+from users.presentation.grpc.servicers import UsersServicer
 
 __all__ = [
     "protos",

@@ -62,7 +62,7 @@ def mock_outbox_reader() -> AsyncMock:
 @pytest.fixture
 def mock_relay_command() -> AsyncMock:
     """Mock relay command."""
-    from apps.auth_relay.application.common.result import RelayResult
+    from auth_relay.application.common.result import RelayResult
 
     command = AsyncMock()
     command.execute = AsyncMock(return_value=RelayResult.success())

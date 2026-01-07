@@ -1,14 +1,14 @@
 """SQLAlchemy ORM mappings."""
 
-from apps.users.infrastructure.persistence_postgres.mappings.user import (
+from users.infrastructure.persistence_postgres.mappings.user import (
     accounts_table,
     start_user_mapper,
 )
-from apps.users.infrastructure.persistence_postgres.mappings.user_character import (
+from users.infrastructure.persistence_postgres.mappings.user_character import (
     start_user_character_mapper,
     user_characters_table,
 )
-from apps.users.infrastructure.persistence_postgres.mappings.user_social_account import (
+from users.infrastructure.persistence_postgres.mappings.user_social_account import (
     social_accounts_table,
     start_user_social_account_mapper,
 )

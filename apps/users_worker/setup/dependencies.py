@@ -11,13 +11,13 @@ from typing import TYPE_CHECKING
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-from apps.users_worker.setup.config import get_settings
+from users_worker.setup.config import get_settings
 
 if TYPE_CHECKING:
-    from apps.users_worker.application.character.commands.save import (
+    from users_worker.application.character.commands.save import (
         SaveCharactersCommand,
     )
-    from apps.users_worker.infrastructure.persistence_postgres.character_store_sqla import (
+    from users_worker.infrastructure.persistence_postgres.character_store_sqla import (
         SqlaCharacterStore,
     )
 
@@ -65,14 +65,14 @@ class Container:
         self._session = self._session_factory()
 
         # 저장소 생성
-        from apps.users_worker.infrastructure.persistence_postgres.character_store_sqla import (
+        from users_worker.infrastructure.persistence_postgres.character_store_sqla import (
             SqlaCharacterStore,
         )
 
         self._character_store = SqlaCharacterStore(self._session)
 
         # Command 생성
-        from apps.users_worker.application.character.commands.save import (
+        from users_worker.application.character.commands.save import (
             SaveCharactersCommand,
         )
 

@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from apps.auth.presentation.http.schemas.common import HealthResponse
+from auth.presentation.http.schemas.common import HealthResponse
 
 router = APIRouter()
 

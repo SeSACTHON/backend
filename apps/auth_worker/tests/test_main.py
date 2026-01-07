@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from apps.auth_worker.setup.config import get_settings
+from auth_worker.setup.config import get_settings
 
 
 class TestAuthWorker:
@@ -33,7 +33,7 @@ class TestAuthWorker:
                 "apps.auth_worker.main.Container",
                 return_value=MagicMock(),
             ):
-                from apps.auth_worker.main import AuthWorker
+                from auth_worker.main import AuthWorker
 
                 worker = AuthWorker()
                 assert worker._shutdown is False
@@ -50,7 +50,7 @@ class TestAuthWorker:
                 "apps.auth_worker.main.Container",
                 return_value=MagicMock(),
             ):
-                from apps.auth_worker.main import AuthWorker
+                from auth_worker.main import AuthWorker
 
                 worker = AuthWorker()
                 assert worker._shutdown is False
@@ -79,7 +79,7 @@ class TestAuthWorker:
                 "apps.auth_worker.main.Container",
                 return_value=mock_container,
             ):
-                from apps.auth_worker.main import AuthWorker
+                from auth_worker.main import AuthWorker
 
                 worker = AuthWorker()
                 await worker._cleanup()
@@ -115,7 +115,7 @@ class TestAuthWorker:
                 with patch("asyncio.get_event_loop") as mock_loop:
                     mock_loop.return_value.add_signal_handler = MagicMock()
 
-                    from apps.auth_worker.main import AuthWorker
+                    from auth_worker.main import AuthWorker
 
                     worker = AuthWorker()
 
@@ -156,7 +156,7 @@ class TestMain:
                     "apps.auth_worker.main.AuthWorker",
                     return_value=mock_worker,
                 ):
-                    from apps.auth_worker.main import main
+                    from auth_worker.main import main
 
                     await main()
 

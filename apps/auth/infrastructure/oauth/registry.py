@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from apps.auth.infrastructure.oauth.providers import (
+from auth.infrastructure.oauth.providers import (
     GoogleOAuthProvider,
     KakaoOAuthProvider,
     NaverOAuthProvider,
 )
 
 if TYPE_CHECKING:
-    from apps.auth.infrastructure.oauth.providers.base import OAuthProvider
-    from apps.auth.setup.config import Settings
+    from auth.infrastructure.oauth.providers.base import OAuthProvider
+    from auth.setup.config import Settings
 
 
 class ProviderRegistry:

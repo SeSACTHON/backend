@@ -1,6 +1,6 @@
 """HTTP request/response schemas."""
 
-from apps.users.presentation.http.schemas.user import (
+from users.presentation.http.schemas.user import (
     CharacterListResponse,
     CharacterOwnershipResponse,
     UserCharacterResponse,

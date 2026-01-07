@@ -15,7 +15,7 @@ class TestSetupLogging:
     @pytest.fixture(autouse=True)
     def clear_settings_cache(self) -> None:
         """Clear settings cache before each test."""
-        from apps.auth_relay.setup.config import get_settings
+        from auth_relay.setup.config import get_settings
 
         get_settings.cache_clear()
 
@@ -37,7 +37,7 @@ class TestSetupLogging:
         }
 
         with patch.dict(os.environ, env, clear=False):
-            from apps.auth_relay.setup.logging import setup_logging
+            from auth_relay.setup.logging import setup_logging
 
             setup_logging()
 
@@ -53,7 +53,7 @@ class TestSetupLogging:
         }
 
         with patch.dict(os.environ, env, clear=False):
-            from apps.auth_relay.setup.logging import setup_logging
+            from auth_relay.setup.logging import setup_logging
 
             setup_logging()
 
@@ -71,7 +71,7 @@ class TestSetupLogging:
         }
 
         with patch.dict(os.environ, env, clear=False):
-            from apps.auth_relay.setup.logging import setup_logging
+            from auth_relay.setup.logging import setup_logging
 
             setup_logging()
 

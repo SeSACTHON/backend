@@ -8,15 +8,15 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 
-from apps.users.application.character.queries import (
+from users.application.character.queries import (
     CheckCharacterOwnershipQuery,
     GetCharactersQuery,
 )
-from apps.users.presentation.http.schemas import (
+from users.presentation.http.schemas import (
     CharacterOwnershipResponse,
     UserCharacterResponse,
 )
-from apps.users.setup.dependencies import (
+from users.setup.dependencies import (
     get_check_character_ownership_query,
     get_get_characters_query,
 )

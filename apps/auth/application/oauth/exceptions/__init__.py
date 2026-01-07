@@ -1,6 +1,6 @@
 """OAuth domain exceptions."""
 
-from apps.auth.application.oauth.exceptions.oauth import (
+from auth.application.oauth.exceptions.oauth import (
     InvalidStateError,
     OAuthProviderError,
 )

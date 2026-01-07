@@ -8,7 +8,7 @@ from sqlalchemy import Column, DateTime, ForeignKey, Table, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 
-from apps.auth.infrastructure.persistence_postgres.registry import mapper_registry
+from auth.infrastructure.persistence_postgres.registry import mapper_registry
 
 login_audits_table = Table(
     "login_audits",
@@ -32,7 +32,7 @@ login_audits_table = Table(
 
 def start_login_audit_mapper() -> None:
     """LoginAudit 매퍼 시작."""
-    from apps.auth.domain.entities.login_audit import LoginAudit
+    from auth.domain.entities.login_audit import LoginAudit
 
     if hasattr(LoginAudit, "__mapper__"):
         return

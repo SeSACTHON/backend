@@ -1,6 +1,6 @@
 """Token DTOs."""
 
-from apps.auth.application.token.dto.token import (
+from auth.application.token.dto.token import (
     LogoutRequest,
     RefreshTokensRequest,
     RefreshTokensResponse,

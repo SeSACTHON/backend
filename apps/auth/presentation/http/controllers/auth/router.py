@@ -5,14 +5,14 @@
 
 from fastapi import APIRouter
 
-from apps.auth.presentation.http.controllers.auth.authorize import (
+from auth.presentation.http.controllers.auth.authorize import (
     router as authorize_router,
 )
-from apps.auth.presentation.http.controllers.auth.callback import (
+from auth.presentation.http.controllers.auth.callback import (
     router as callback_router,
 )
-from apps.auth.presentation.http.controllers.auth.logout import router as logout_router
-from apps.auth.presentation.http.controllers.auth.refresh import (
+from auth.presentation.http.controllers.auth.logout import router as logout_router
+from auth.presentation.http.controllers.auth.refresh import (
     router as refresh_router,
 )
 

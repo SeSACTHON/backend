@@ -9,18 +9,18 @@ from typing import Optional
 from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from fastapi.responses import RedirectResponse
 
-from apps.auth.application.oauth.commands import OAuthCallbackInteractor
-from apps.auth.application.oauth.dto import OAuthCallbackRequest
-from apps.auth.presentation.http.auth.cookie_params import set_auth_cookies
-from apps.auth.presentation.http.schemas.auth import UserResponse
-from apps.auth.presentation.http.utils.redirect import (
+from auth.application.oauth.commands import OAuthCallbackInteractor
+from auth.application.oauth.dto import OAuthCallbackRequest
+from auth.presentation.http.auth.cookie_params import set_auth_cookies
+from auth.presentation.http.schemas.auth import UserResponse
+from auth.presentation.http.utils.redirect import (
     FRONTEND_ORIGIN_HEADER,
     build_frontend_redirect_response,
     build_frontend_redirect_url,
     build_frontend_success_url,
 )
-from apps.auth.setup.config import get_settings
-from apps.auth.setup.dependencies import get_oauth_callback_interactor
+from auth.setup.config import get_settings
+from auth.setup.dependencies import get_oauth_callback_interactor
 
 logger = logging.getLogger(__name__)
 

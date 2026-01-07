@@ -10,17 +10,17 @@ from uuid import uuid4
 
 import pytest
 
-from apps.auth.application.oauth.ports import OAuthState
-from apps.auth.infrastructure.persistence_redis.adapters.state_store_redis import (
+from auth.application.oauth.ports import OAuthState
+from auth.infrastructure.persistence_redis.adapters.state_store_redis import (
     RedisStateStore,
 )
-from apps.auth.infrastructure.persistence_redis.adapters.token_blacklist_redis import (
+from auth.infrastructure.persistence_redis.adapters.token_blacklist_redis import (
     RedisTokenBlacklist,
 )
-from apps.auth.infrastructure.persistence_redis.adapters.users_token_store_redis import (
+from auth.infrastructure.persistence_redis.adapters.users_token_store_redis import (
     RedisUsersTokenStore,
 )
-from apps.auth.infrastructure.persistence_redis.constants import (
+from auth.infrastructure.persistence_redis.constants import (
     BLACKLIST_KEY_PREFIX,
     STATE_KEY_PREFIX,
     TOKEN_META_KEY_PREFIX,

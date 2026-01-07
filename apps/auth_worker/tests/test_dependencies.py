@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from apps.auth_worker.setup.config import get_settings
+from auth_worker.setup.config import get_settings
 
 
 class TestContainer:
@@ -25,7 +25,7 @@ class TestContainer:
         """환경 변수 없이 Container 생성시 KeyError."""
         with patch.dict(os.environ, {}, clear=True):
             with pytest.raises(KeyError):
-                from apps.auth_worker.setup.dependencies import Container
+                from auth_worker.setup.dependencies import Container
 
                 Container()
 
@@ -37,7 +37,7 @@ class TestContainer:
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
-            from apps.auth_worker.setup.dependencies import Container
+            from auth_worker.setup.dependencies import Container
 
             container = Container()
 
@@ -67,7 +67,7 @@ class TestContainer:
                 "apps.auth_worker.setup.dependencies.aioredis.from_url",
                 return_value=mock_redis,
             ):
-                from apps.auth_worker.setup.dependencies import Container
+                from auth_worker.setup.dependencies import Container
 
                 container = Container()
                 await container.init()
@@ -90,7 +90,7 @@ class TestContainer:
         }
 
         with patch.dict(os.environ, env_vars, clear=True):
-            from apps.auth_worker.setup.dependencies import Container
+            from auth_worker.setup.dependencies import Container
 
             container = Container()
 

@@ -6,8 +6,8 @@ JWT 토큰 발급/검증을 위한 Gateway 인터페이스입니다.
 from typing import Protocol
 from uuid import UUID
 
-from apps.auth.domain.enums.token_type import TokenType
-from apps.auth.domain.value_objects.token_payload import TokenPayload
+from auth.domain.enums.token_type import TokenType
+from auth.domain.value_objects.token_payload import TokenPayload
 
 
 class TokenPair:

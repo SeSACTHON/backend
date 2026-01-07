@@ -7,10 +7,10 @@ from uuid import uuid4
 import pytest
 from fastapi.testclient import TestClient
 
-from apps.users.application.character.dto import UserCharacterDTO
-from apps.users.application.profile.dto import UserProfile
-from apps.users.main import app
-from apps.users.setup.dependencies import (
+from users.application.character.dto import UserCharacterDTO
+from users.application.profile.dto import UserProfile
+from users.main import app
+from users.setup.dependencies import (
     get_get_characters_query,
     get_get_profile_query,
 )

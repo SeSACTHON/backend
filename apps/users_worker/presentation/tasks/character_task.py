@@ -16,7 +16,7 @@ from typing import Any
 
 from celery_batches import Batches
 
-from apps.users_worker.setup.celery import celery_app
+from users_worker.setup.celery import celery_app
 
 logger = logging.getLogger(__name__)
 
@@ -121,8 +121,8 @@ async def _process_batch_async(batch_data: list[dict[str, Any]]) -> dict[str, An
     Returns:
         처리 결과
     """
-    from apps.users_worker.application.character.dto.event import CharacterEvent
-    from apps.users_worker.setup.dependencies import Container
+    from users_worker.application.character.dto.event import CharacterEvent
+    from users_worker.setup.dependencies import Container
 
     # DI 컨테이너 초기화
     container = Container()

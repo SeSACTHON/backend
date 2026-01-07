@@ -9,8 +9,8 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 
-from apps.auth.domain.entities.user_social_account import UserSocialAccount
-from apps.auth.infrastructure.persistence_postgres.mappings.users_social_account import (
+from auth.domain.entities.user_social_account import UserSocialAccount
+from auth.infrastructure.persistence_postgres.mappings.users_social_account import (
     users_social_accounts_table,
 )
 

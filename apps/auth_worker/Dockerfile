@@ -41,12 +41,12 @@ USER worker
 COPY --from=builder /usr/local/lib/python3.12/site-packages /usr/local/lib/python3.12/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# 애플리케이션 코드
-COPY --chown=worker:worker apps/auth_worker /app/apps/auth_worker
+# 애플리케이션 코드 (새 패턴: /app/auth_worker)
+COPY --chown=worker:worker apps/auth_worker /app/auth_worker
 
 # 헬스체크 (프로세스 존재 여부)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-    CMD pgrep -f "python -m apps.auth_worker.main" || exit 1
+    CMD pgrep -f "python -m auth_worker.main" || exit 1
 
 # 엔트리포인트
-CMD ["python", "-m", "apps.auth_worker.main"]
+CMD ["python", "-m", "auth_worker.main"]

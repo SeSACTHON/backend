@@ -1,6 +1,6 @@
 """Character DTOs."""
 
-from apps.users.application.character.dto.character import (
+from users.application.character.dto.character import (
     CharacterOwnership,
     UserCharacterDTO,
 )

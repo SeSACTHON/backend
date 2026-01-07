@@ -7,7 +7,7 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.users.domain.entities.user_character import UserCharacter
+from users.domain.entities.user_character import UserCharacter
 
 
 class SqlaUsersCharacterQueryGateway:

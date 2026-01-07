@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from apps.auth.domain.enums.token_type import TokenType
-from apps.auth.domain.value_objects.base import ValueObject
-from apps.auth.domain.value_objects.user_id import UserId
+from auth.domain.enums.token_type import TokenType
+from auth.domain.value_objects.base import ValueObject
+from auth.domain.value_objects.user_id import UserId
 
 
 @dataclass(frozen=True, slots=True)

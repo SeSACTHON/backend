@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from apps.users.application.profile.dto import UserProfile
-from apps.users.domain.services import UserService
+from users.application.profile.dto import UserProfile
+from users.domain.services import UserService
 
 if TYPE_CHECKING:
-    from apps.users.application.identity.ports import SocialAccountInfo
-    from apps.users.domain.entities.user import User
+    from users.application.identity.ports import SocialAccountInfo
+    from users.domain.entities.user import User
 
 
 class ProfileBuilder:

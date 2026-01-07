@@ -5,8 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 from urllib.parse import urlencode
 
-from apps.auth.application.common.services.oauth_client import OAuthProfile
-from apps.auth.infrastructure.oauth.providers.base import (
+from auth.application.common.services.oauth_client import OAuthProfile
+from auth.infrastructure.oauth.providers.base import (
     OAuthProvider,
     OAuthProviderError,
 )

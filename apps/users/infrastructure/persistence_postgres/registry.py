@@ -7,7 +7,7 @@ Users 도메인용 공용 Imperative Mapping Registry.
 from sqlalchemy import MetaData
 from sqlalchemy.orm import registry
 
-from apps.users.infrastructure.persistence_postgres.constants import USERS_SCHEMA
+from users.infrastructure.persistence_postgres.constants import USERS_SCHEMA
 
 # users 스키마용 공용 메타데이터
 metadata = MetaData(schema=USERS_SCHEMA)

@@ -11,10 +11,10 @@ from uuid import UUID, uuid4
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.users.application.identity.ports.identity_gateway import UserWithSocialAccount
-from apps.users.domain.entities.user import User
-from apps.users.domain.enums import OAuthProvider
-from apps.users.infrastructure.persistence_postgres.mappings.user_social_account import (
+from users.application.identity.ports.identity_gateway import UserWithSocialAccount
+from users.domain.entities.user import User
+from users.domain.enums import OAuthProvider
+from users.infrastructure.persistence_postgres.mappings.user_social_account import (
     UserSocialAccount,
 )
 

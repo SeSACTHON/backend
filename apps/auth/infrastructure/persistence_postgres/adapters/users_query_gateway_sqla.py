@@ -9,10 +9,10 @@ from typing import TYPE_CHECKING
 
 from sqlalchemy import select
 
-from apps.auth.domain.entities.user import User
-from apps.auth.domain.value_objects.user_id import UserId
-from apps.auth.infrastructure.persistence_postgres.mappings.users import users_table
-from apps.auth.infrastructure.persistence_postgres.mappings.users_social_account import (
+from auth.domain.entities.user import User
+from auth.domain.value_objects.user_id import UserId
+from auth.infrastructure.persistence_postgres.mappings.users import users_table
+from auth.infrastructure.persistence_postgres.mappings.users_social_account import (
     users_social_accounts_table,
 )
 

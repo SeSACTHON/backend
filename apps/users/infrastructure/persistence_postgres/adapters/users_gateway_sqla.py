@@ -12,7 +12,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from apps.users.domain.entities.user import User
+from users.domain.entities.user import User
 
 
 class SqlaUsersQueryGateway:

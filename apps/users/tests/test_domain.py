@@ -2,8 +2,8 @@
 
 from uuid import uuid4
 
-from apps.users.domain.entities.user import User
-from apps.users.domain.services.user_service import UserService
+from users.domain.entities.user import User
+from users.domain.services.user_service import UserService
 
 
 class TestUserService:

@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, Protocol
 from uuid import UUID
 
 if TYPE_CHECKING:
-    from apps.users.domain.entities.user_character import UserCharacter
+    from users.domain.entities.user_character import UserCharacter
 
 
 class UserCharacterQueryGateway(Protocol):

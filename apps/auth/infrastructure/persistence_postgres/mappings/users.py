@@ -12,7 +12,7 @@ from sqlalchemy import Column, DateTime, String, Table, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 
-from apps.auth.infrastructure.persistence_postgres.registry import mapper_registry
+from auth.infrastructure.persistence_postgres.registry import mapper_registry
 
 users_table = Table(
     "users",
@@ -37,7 +37,7 @@ def start_users_mapper() -> None:
         Imperative Mapping 사용.
         도메인 엔티티가 SQLAlchemy에 의존하지 않도록 합니다.
     """
-    from apps.auth.domain.entities.user import User
+    from auth.domain.entities.user import User
 
     # 이미 매핑된 경우 스킵
     if hasattr(User, "__mapper__"):

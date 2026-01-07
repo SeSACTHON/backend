@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
-from apps.users.application.profile.ports.profile_gateway import ProfileQueryGateway
+from users.application.profile.ports.profile_gateway import ProfileQueryGateway
 
 
 @dataclass(frozen=True, slots=True)

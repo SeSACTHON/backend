@@ -7,7 +7,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from apps.auth_worker.infrastructure.persistence_redis.blacklist_store_redis import (
+from auth_worker.infrastructure.persistence_redis.blacklist_store_redis import (
     BLACKLIST_KEY_PREFIX,
     RedisBlacklistStore,
 )

@@ -7,10 +7,10 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Response, status
 
-from apps.auth.application.token.commands import RefreshTokensInteractor
-from apps.auth.application.token.dto import RefreshTokensRequest
-from apps.auth.presentation.http.auth.cookie_params import set_auth_cookies
-from apps.auth.setup.dependencies import get_refresh_tokens_interactor
+from auth.application.token.commands import RefreshTokensInteractor
+from auth.application.token.dto import RefreshTokensRequest
+from auth.presentation.http.auth.cookie_params import set_auth_cookies
+from auth.setup.dependencies import get_refresh_tokens_interactor
 
 router = APIRouter()
 

@@ -31,11 +31,11 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
 
-from apps.users.domain.enums import OAuthProvider
-from apps.users.infrastructure.persistence_postgres.constants import (
+from users.domain.enums import OAuthProvider
+from users.infrastructure.persistence_postgres.constants import (
     SOCIAL_ACCOUNTS_TABLE,
 )
-from apps.users.infrastructure.persistence_postgres.registry import (
+from users.infrastructure.persistence_postgres.registry import (
     mapper_registry,
     metadata,
 )

@@ -26,7 +26,7 @@ spec:
       - name: users-api-grpc
         image: docker.io/mng990/eco2:users-api-dev-latest
         imagePullPolicy: Always
-        command: [python, -m, apps.users.presentation.grpc.server]
+        command: [python, -m, users.presentation.grpc.server]
         ports:
         - containerPort: 50051
           name: grpc

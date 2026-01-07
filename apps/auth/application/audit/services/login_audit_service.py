@@ -11,7 +11,7 @@ import logging
 from datetime import datetime, timezone
 from uuid import UUID, uuid4
 
-from apps.auth.domain.entities.login_audit import LoginAudit
+from auth.domain.entities.login_audit import LoginAudit
 
 logger = logging.getLogger(__name__)
 

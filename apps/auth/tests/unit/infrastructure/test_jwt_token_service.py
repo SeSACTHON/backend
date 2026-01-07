@@ -8,12 +8,12 @@ from uuid import uuid4
 
 import pytest
 
-from apps.auth.domain.enums.token_type import TokenType
-from apps.auth.domain.exceptions.auth import (
+from auth.domain.enums.token_type import TokenType
+from auth.domain.exceptions.auth import (
     InvalidTokenError,
     TokenTypeMismatchError,
 )
-from apps.auth.infrastructure.security.jwt_token_service import JwtTokenService
+from auth.infrastructure.security.jwt_token_service import JwtTokenService
 
 
 class TestJwtTokenService:

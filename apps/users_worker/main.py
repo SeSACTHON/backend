@@ -6,8 +6,8 @@ Usage:
     celery -A apps.users_worker.main worker -Q users.save_character -c 2 --loglevel=info
 """
 
-from apps.users_worker.setup.celery import celery_app
-from apps.users_worker.setup.logging import setup_logging
+from users_worker.setup.celery import celery_app
+from users_worker.setup.logging import setup_logging
 
 # 로깅 설정
 setup_logging()
