@@ -222,45 +222,36 @@ class RewardStep(Step):
             return None
 
     def _dispatch_save_tasks(self, user_id: str, reward: dict[str, Any]) -> None:
-        """DB 저장 Task 발행 (Fire & Forget).
+        """DB 저장 이벤트 발행 (Fire & Forget, 1:N 라우팅).
 
-        - character.save_ownership: character DB 저장
-        - users.save_character: users DB 저장
+        reward.direct Exchange로 1번 publish → RabbitMQ가 2개 큐로 복제:
+        - character.save_ownership 큐 → character-worker
+        - users.save_character 큐 → users-worker
 
-        ⚠️ queue= 사용: task_queues에 cross-domain 큐가 정의되어 있어야 함.
+        각 Worker가 동일 task 이름(reward.character)으로 자신만의 구현 제공.
         """
-        # character.save_ownership
         try:
             self._celery.send_task(
-                "character.save_ownership",
+                "reward.character",
                 kwargs={
                     "user_id": user_id,
                     "character_id": reward["character_id"],
                     "character_code": reward.get("character_code", ""),
-                    "source": "scan",
-                },
-                queue="character.save_ownership",
-            )
-            logger.info("save_ownership_task dispatched")
-        except Exception:
-            logger.exception("Failed to dispatch save_ownership_task")
-
-        # users.save_character
-        try:
-            self._celery.send_task(
-                "users.save_character",
-                args=[
-                    user_id,
-                    reward["character_id"],
-                    reward.get("character_code", ""),
-                ],
-                kwargs={
                     "character_name": reward.get("name", ""),
                     "character_type": reward.get("character_type"),
                     "source": "scan",
                 },
-                queue="users.save_character",
+                exchange="reward.direct",
+                routing_key="reward.character",
             )
-            logger.info("save_users_character_task dispatched")
+            logger.info(
+                "reward_character_event_dispatched",
+                extra={
+                    "user_id": user_id,
+                    "character_id": reward["character_id"],
+                    "exchange": "reward.direct",
+                    "routing_key": "reward.character",
+                },
+            )
         except Exception:
-            logger.exception("Failed to dispatch save_users_character_task")
+            logger.exception("Failed to dispatch reward.character event")
