@@ -123,6 +123,24 @@ spec:
     namespace: rabbitmq
 ---
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Auth Blacklist Binding (Fanout - ext-authz 캐시 동기화)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: auth-blacklist-binding
+  namespace: rabbitmq
+spec:
+  source: blacklist.events
+  destination: auth.blacklist
+  destinationType: queue
+  routingKey: ''  # Fanout exchange는 routing key 무시
+  vhost: eco2
+  rabbitmqClusterReference:
+    name: eco2-rabbitmq
+    namespace: rabbitmq
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Dead Letter Bindings
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apiVersion: rabbitmq.com/v1beta1
@@ -225,6 +243,21 @@ spec:
   destination: dlq.character.grant_default
   destinationType: queue
   routingKey: dlq.character.grant_default
+  vhost: eco2
+  rabbitmqClusterReference:
+    name: eco2-rabbitmq
+    namespace: rabbitmq
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: dlq-auth-blacklist-binding
+  namespace: rabbitmq
+spec:
+  source: dlx
+  destination: dlq.auth.blacklist
+  destinationType: queue
+  routingKey: dlq.auth.blacklist
   vhost: eco2
   rabbitmqClusterReference:
     name: eco2-rabbitmq
