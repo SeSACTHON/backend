@@ -122,14 +122,14 @@ jobs:
           files = os.environ.get("CHANGED_FILES", "").split()
           any_changed = os.environ.get("ANY_CHANGED", "false").lower() == "true"
           
-          # FastAPI API 서비스 (domains/my는 apps/users로 마이그레이션 완료)
-          API_SERVICES = ["auth", "users", "character", "chat", "image", "location", "scan"]
+          # API 서비스 (apps/ Clean Architecture + 레거시 chat, image)
+          API_SERVICES = ["auth", "users", "character", "location", "scan", "chat", "image"]
           
-          # Worker 서비스 (my-worker는 apps/users_worker로 마이그레이션 완료)
-          WORKER_SERVICES = ["character-worker", "scan-worker"]
-          
-          # 특수 서비스
-          SPECIAL_SERVICES = ["ext-authz", "auth-relay", "sse-gateway"]
+          # Worker 서비스 (apps/ Clean Architecture)
+          WORKER_MAP = {
+              "character_worker": "character-worker",
+              "scan_worker": "scan-worker",
+          }
           
           api_services = []
           worker_services = []
@@ -147,34 +147,32 @@ jobs:
                   if len(parts) >= 2 and parts[0] == "apps":
                       svc = parts[1]
                       
+                      # API 서비스
                       if svc in API_SERVICES and svc not in api_services:
                           api_services.append(svc)
-                      # apps/auth_relay/ 경로 감지
+                      # Worker 서비스
+                      if svc in WORKER_MAP:
+                          worker_slug = WORKER_MAP[svc]
+                          if worker_slug not in worker_services:
+                              worker_services.append(worker_slug)
+                      # 특수 서비스
                       if svc == "auth_relay":
                           has_auth_relay = True
-                      # apps/auth_worker/ 경로 감지
                       if svc == "auth_worker":
                           has_auth_worker = True
-                      # apps/users_worker/ 경로 감지
                       if svc == "users_worker":
                           has_users_worker = True
                   
-                  # domains/<service>/ 경로 감지 (레거시)
+                  # domains/<service>/ 경로 감지 (레거시: chat, image, ext-authz, sse-gateway)
                   elif len(parts) >= 2 and parts[0] == "domains":
                       svc = parts[1]
                       
-                      if svc in API_SERVICES and svc not in api_services:
+                      if svc in ["chat", "image"] and svc not in api_services:
                           api_services.append(svc)
                       elif svc == "ext-authz":
                           has_ext_authz = True
                       elif svc == "sse-gateway":
                           has_sse_gateway = True
-                      elif svc == "character" and "worker" in path:
-                          if "character-worker" not in worker_services:
-                              worker_services.append("character-worker")
-                      elif svc == "scan" and "worker" in path:
-                          if "scan-worker" not in worker_services:
-                              worker_services.append("scan-worker")
                   
                   # workloads/domains/<service>/ 경로 감지
                   elif len(parts) >= 3 and parts[0] == "workloads" and parts[1] == "domains":
@@ -337,13 +335,18 @@ jobs:
           SERVICE="${{ matrix.service }}"
           case "$SERVICE" in
             character-worker)
-              echo "path=domains/character/Dockerfile.worker" >> "$GITHUB_OUTPUT"
+              echo "path=apps/character_worker/Dockerfile" >> "$GITHUB_OUTPUT"
               ;;
             scan-worker)
-              echo "path=domains/scan/Dockerfile.worker" >> "$GITHUB_OUTPUT"
+              echo "path=apps/scan_worker/Dockerfile" >> "$GITHUB_OUTPUT"
               ;;
             *)
-              echo "path=domains/${SERVICE}/Dockerfile" >> "$GITHUB_OUTPUT"
+              # chat, image는 아직 domains/ 레거시
+              if [ "$SERVICE" = "chat" ] || [ "$SERVICE" = "image" ]; then
+                echo "path=domains/${SERVICE}/Dockerfile" >> "$GITHUB_OUTPUT"
+              else
+                echo "path=apps/${SERVICE}/Dockerfile" >> "$GITHUB_OUTPUT"
+              fi
               ;;
           esac
 
