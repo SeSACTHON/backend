@@ -118,16 +118,23 @@ class SubmitClassificationCommand:
         user_input = request.user_input or "이 폐기물을 어떻게 분리배출해야 하나요?"
         model = request.model
 
+        # ⚠️ routing_key만 사용 (queue 선언 X) - Topology CR과 arguments 충돌 방지
         pipeline = chain(
             self._celery_app.signature(
                 "scan.vision",
                 args=[job_id, request.user_id, request.image_url, user_input],
                 kwargs={"model": model},
-                queue="scan.vision",
+                options={"routing_key": "scan.vision"},
             ),
-            self._celery_app.signature("scan.rule", queue="scan.rule"),
-            self._celery_app.signature("scan.answer", queue="scan.answer"),
-            self._celery_app.signature("scan.reward", queue="scan.reward"),
+            self._celery_app.signature(
+                "scan.rule", options={"routing_key": "scan.rule"}
+            ),
+            self._celery_app.signature(
+                "scan.answer", options={"routing_key": "scan.answer"}
+            ),
+            self._celery_app.signature(
+                "scan.reward", options={"routing_key": "scan.reward"}
+            ),
         )
         pipeline.apply_async(task_id=job_id)
 
