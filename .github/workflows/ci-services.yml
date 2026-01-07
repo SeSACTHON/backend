@@ -5,66 +5,52 @@ on:
     branches:
       - main
       - develop
-      - refactor/gitops-sync-wave
     paths:
-      # FastAPI API 서비스만 
-      # (ext-authz는 Go → ci-ext-authz.yml)
-      # (sse-gateway, event-router는 → ci-sse-components.yml)
+      # FastAPI API 서비스 (apps/ Clean Architecture)
       - "apps/auth/**"
       - "apps/users/**"
       - "apps/character/**"
       - "apps/location/**"
       - "apps/scan/**"
-      - "domains/auth/**"
-      - "domains/character/**"
+      # 레거시 서비스 (아직 마이그레이션 안 됨)
       - "domains/chat/**"
       - "domains/image/**"
-      - "domains/location/**"
-      - "domains/my/**"
-      - "domains/scan/**"
-      - "domains/_shared/**"
-      - "domains/_base/**"
+      # Kubernetes manifests
       - "workloads/domains/auth/**"
       - "workloads/domains/users/**"
       - "workloads/domains/character/**"
+      - "workloads/domains/location/**"
+      - "workloads/domains/scan/**"
       - "workloads/domains/chat/**"
       - "workloads/domains/image/**"
-      - "workloads/domains/location/**"
-      - "workloads/domains/my/**"
-      - "workloads/domains/scan/**"
       # Worker는 별도 파이프라인 → ci-workers.yml
+      # ext-authz는 Go → ci-ext-authz.yml
+      # sse-gateway, event-router는 → ci-sse-components.yml
   pull_request:
     branches:
       - main
       - develop
-      - refactor/gitops-sync-wave
     paths:
-      # FastAPI API 서비스만
-      # (ext-authz는 Go → ci-ext-authz.yml)
-      # (sse-gateway, event-router는 → ci-sse-components.yml)
+      # FastAPI API 서비스 (apps/ Clean Architecture)
       - "apps/auth/**"
       - "apps/users/**"
       - "apps/character/**"
       - "apps/location/**"
       - "apps/scan/**"
-      - "domains/auth/**"
-      - "domains/character/**"
+      # 레거시 서비스 (아직 마이그레이션 안 됨)
       - "domains/chat/**"
       - "domains/image/**"
-      - "domains/location/**"
-      - "domains/my/**"
-      - "domains/scan/**"
-      - "domains/_shared/**"
-      - "domains/_base/**"
+      # Kubernetes manifests
       - "workloads/domains/auth/**"
       - "workloads/domains/users/**"
       - "workloads/domains/character/**"
+      - "workloads/domains/location/**"
+      - "workloads/domains/scan/**"
       - "workloads/domains/chat/**"
       - "workloads/domains/image/**"
-      - "workloads/domains/location/**"
-      - "workloads/domains/my/**"
-      - "workloads/domains/scan/**"
       # Worker는 별도 파이프라인 → ci-workers.yml
+      # ext-authz는 Go → ci-ext-authz.yml
+      # sse-gateway, event-router는 → ci-sse-components.yml
   workflow_dispatch:
     inputs:
       force_all:
@@ -72,7 +58,7 @@ on:
         type: boolean
         default: false
       target_services:
-        description: "콤마로 구분된 서비스 이름 목록 (예: auth,my)"
+        description: "콤마로 구분된 서비스 이름 목록 (예: auth,users,chat)"
         required: false
 
 permissions:
@@ -206,24 +192,15 @@ jobs:
             apps/character/**
             apps/location/**
             apps/scan/**
-            domains/auth/**
-            domains/character/**
             domains/chat/**
             domains/image/**
-            domains/location/**
-            domains/my/**
-            domains/scan/**
-            domains/_base/**
-            domains/_shared/waste_pipeline/**
-            domains/_shared/celery/**
             workloads/domains/auth/**
             workloads/domains/users/**
             workloads/domains/character/**
+            workloads/domains/location/**
+            workloads/domains/scan/**
             workloads/domains/chat/**
             workloads/domains/image/**
-            workloads/domains/location/**
-            workloads/domains/my/**
-            workloads/domains/scan/**
 
       - name: Prepare service matrix
         id: prepare
@@ -239,29 +216,23 @@ jobs:
           event_name = os.environ.get("EVENT_NAME", "")
           force_all = os.environ.get("FORCE_ALL", "false").lower() == "true"
           
-          # FastAPI API 서비스 목록 (명시적 나열)
-          # ext-authz는 Go 프로젝트 → ci-ext-authz.yml
-          # sse-gateway, event-router는 SSE 컴포넌트 → ci-sse-components.yml
-          FASTAPI_SERVICES = [
-              "auth",
-              "users",
-              "character",
-              "chat",
-              "image",
-              "location",
-              "my",
-              "scan",
+          # FastAPI API 서비스 목록
+          # - apps/: Clean Architecture (마이그레이션 완료)
+          # - domains/chat, domains/image: 레거시 (마이그레이션 예정)
+          # ext-authz는 Go → ci-ext-authz.yml
+          # sse-gateway, event-router → ci-sse-components.yml
+          SERVICES = [
+              "auth",      # apps/auth
+              "users",     # apps/users (구 domains/my)
+              "character", # apps/character
+              "location",  # apps/location
+              "scan",      # apps/scan
+              "chat",      # domains/chat (레거시)
+              "image",     # domains/image (레거시)
           ]
           
           alias_map = {
               "info": "image",
-          }
-          shared_triggers = {
-              "domains/_shared/waste_pipeline": ["chat", "scan"],
-              "domains/_shared/celery": ["scan", "character", "my"],
-              # domains/_shared/events는 SSE 컴포넌트 전용 → ci-sse-components.yml
-              # Base 이미지 변경 시 모든 API 서비스 재빌드 (의존성 업데이트)
-              "domains/_base": ["auth", "users", "character", "chat", "image", "location", "my", "scan"],
           }
 
           def normalize(service: str) -> str:
@@ -275,7 +246,7 @@ jobs:
           target_services = [normalize(s) for s in raw_targets]
 
           services = []
-          all_services = sorted(FASTAPI_SERVICES)
+          all_services = sorted(SERVICES)
 
           if event_name == "workflow_dispatch":
               if force_all:
@@ -285,26 +256,17 @@ jobs:
                   if invalid:
                       sys.stderr.write(f"Unknown services: {', '.join(invalid)}\n")
                       sys.exit(1)
-                  # preserve order
                   services = list(OrderedDict.fromkeys(target_services))
 
           if not services and any_changed:
               for path in files:
-                  # shared 경로에 대한 트리거 (waste_pipeline 변경 시 chat, scan 재배포)
-                  for prefix, svc_list in shared_triggers.items():
-                      if path.startswith(prefix):
-                          for svc in svc_list:
-                              svc = normalize(svc)
-                              if svc in all_services and svc not in services:
-                                  services.append(svc)
-
                   parts = path.split("/")
                   # apps/<service>/ 경로 감지 (Clean Architecture)
                   if len(parts) >= 2 and parts[0] == "apps":
                       svc = normalize(parts[1])
                       if svc and svc in all_services and svc not in services:
                           services.append(svc)
-                  # domains/<service>/ 경로 감지 (레거시)
+                  # domains/<service>/ 경로 감지 (레거시: chat, image)
                   elif len(parts) >= 2 and parts[0] == "domains":
                       svc = normalize(parts[1])
                       if svc and svc in all_services and svc not in services:
@@ -372,9 +334,12 @@ jobs:
           if [ -d "apps/${SERVICE}" ]; then
             echo "path=apps/${SERVICE}" >> "$GITHUB_OUTPUT"
             echo "pythonpath=${{ github.workspace }}" >> "$GITHUB_OUTPUT"
+            echo "is_legacy=false" >> "$GITHUB_OUTPUT"
           else
+            # 레거시 서비스 (chat, image) - 테스트 skip
             echo "path=domains/${SERVICE}" >> "$GITHUB_OUTPUT"
             echo "pythonpath=${{ github.workspace }}/domains/${SERVICE}" >> "$GITHUB_OUTPUT"
+            echo "is_legacy=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Install tooling
@@ -390,6 +355,7 @@ jobs:
         run: ruff check ${{ steps.source.outputs.path }}
 
       - name: Pytest
+        if: steps.source.outputs.is_legacy != 'true'
         working-directory: ${{ steps.source.outputs.path }}
         env:
           PYTHONPATH: ${{ steps.source.outputs.pythonpath }}
