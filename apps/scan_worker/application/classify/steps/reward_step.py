@@ -184,6 +184,8 @@ class RewardStep(Step):
         - 명시적으로 exchange를 지정해야 메시지 전달됨
         """
         try:
+            # 기본 exchange 사용 (빈 문자열)
+            # RabbitMQ에서 routing_key와 동일한 이름의 큐로 직접 전달
             async_result = self._celery.send_task(
                 "character.match",
                 kwargs={
@@ -236,7 +238,7 @@ class RewardStep(Step):
            - character.* → character.direct exchange
            - users.* → users.direct exchange
         """
-        # character.save_ownership (Topology CR: character.direct exchange)
+        # character.save_ownership - 기본 exchange 사용 (queue 이름으로 직접 라우팅)
         try:
             self._celery.send_task(
                 "character.save_ownership",
@@ -254,7 +256,7 @@ class RewardStep(Step):
         except Exception:
             logger.exception("Failed to dispatch save_ownership_task")
 
-        # users.save_character (Topology CR: users.direct exchange)
+        # users.save_character - 기본 exchange 사용
         try:
             self._celery.send_task(
                 "users.save_character",
