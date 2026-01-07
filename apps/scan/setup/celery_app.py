@@ -98,6 +98,8 @@ celery_app.conf.update(
     task_default_queue="scan.default",
     task_default_exchange="",  # AMQP default exchange
     task_default_routing_key="scan.default",
+    # 큐 자동 생성 비활성화 (RabbitMQ Topology CR로 생성된 큐 사용)
+    task_create_missing_queues=False,
     # 이벤트 설정 (레거시 호환)
     task_send_sent_event=True,
     worker_send_task_events=True,
