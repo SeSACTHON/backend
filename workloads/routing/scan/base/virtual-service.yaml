@@ -4,11 +4,8 @@
 # 라우팅:
 # - POST /api/v1/scan → scan-api (비동기 제출)
 # - GET /api/v1/scan/{job_id}/result → scan-api (결과 조회)
+# - GET /api/v1/scan/{job_id}/events → sse-gateway (SSE 스트리밍)
 # - GET /api/v1/scan/classify → scan-api (동기 처리, 레거시)
-#
-# SSE 스트리밍은 별도 VirtualService:
-# - GET /api/v1/scan/{job_id}/events → sse-gateway (RESTful)
-#   (workloads/routing/sse-gateway)
 #
 # 참조: docs/blogs/async/31-sse-fanout-optimization.md
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -23,6 +20,48 @@ spec:
   gateways:
   - istio-system/eco2-gateway
   http:
+  # ======= SSE Events → sse-gateway (우선 매칭) =======
+  - name: scan-events-canary
+    match:
+    - headers:
+        x-canary:
+          exact: 'true'
+      method:
+        exact: GET
+      uri:
+        regex: /api/v1/scan/[^/]+/events
+    headers:
+      request:
+        set:
+          x-sse-gateway: 'true'
+    route:
+    - destination:
+        host: sse-gateway.sse-consumer.svc.cluster.local
+        port:
+          number: 8000
+        subset: canary
+    timeout: 86400s
+    retries:
+      attempts: 0
+  - name: scan-events
+    match:
+    - method:
+        exact: GET
+      uri:
+        regex: /api/v1/scan/[^/]+/events
+    headers:
+      request:
+        set:
+          x-sse-gateway: 'true'
+    route:
+    - destination:
+        host: sse-gateway.sse-consumer.svc.cluster.local
+        port:
+          number: 8000
+        subset: stable
+    timeout: 86400s
+    retries:
+      attempts: 0
   # ======= Canary 라우팅 (X-Canary: true 헤더) =======
   - name: scan-api-canary
     match:
