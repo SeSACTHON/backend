@@ -6,9 +6,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-ROOT_DIR = Path(__file__).resolve().parents[3]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
+# apps/ 디렉토리를 PYTHONPATH에 추가 (from images.* 가능하게)
+APPS_DIR = Path(__file__).resolve().parents[2]
+if str(APPS_DIR) not in sys.path:
+    sys.path.insert(0, str(APPS_DIR))
 
 from images.core.config import Settings  # noqa: E402
 from images.schemas.image import ImageChannel, ImageUploadRequest  # noqa: E402

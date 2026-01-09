@@ -336,8 +336,8 @@ jobs:
           SERVICE="${{ matrix.service }}"
           if [ -d "apps/${SERVICE}" ]; then
             echo "path=apps/${SERVICE}" >> "$GITHUB_OUTPUT"
-            # apps/ 서비스는 자체 디렉토리가 PYTHONPATH
-            echo "pythonpath=${{ github.workspace }}/apps/${SERVICE}" >> "$GITHUB_OUTPUT"
+            # apps/ 서비스: apps 디렉토리가 PYTHONPATH (from images.*, from scan.* 등)
+            echo "pythonpath=${{ github.workspace }}/apps" >> "$GITHUB_OUTPUT"
             echo "is_legacy=false" >> "$GITHUB_OUTPUT"
           else
             # 레거시 서비스 (chat) - 테스트 skip
