@@ -343,7 +343,7 @@ jobs:
             *)
               # chat, image는 아직 domains/ 레거시
               if [ "$SERVICE" = "chat" ] || [ "$SERVICE" = "image" ]; then
-                echo "path=domains/${SERVICE}/Dockerfile" >> "$GITHUB_OUTPUT"
+              echo "path=domains/${SERVICE}/Dockerfile" >> "$GITHUB_OUTPUT"
               else
                 echo "path=apps/${SERVICE}/Dockerfile" >> "$GITHUB_OUTPUT"
               fi

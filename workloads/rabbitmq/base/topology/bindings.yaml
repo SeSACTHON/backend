@@ -87,8 +87,8 @@ spec:
     namespace: rabbitmq
 ---
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Reward → Character Save Ownership Binding (1:N 라우팅 #1)
-# reward.direct에서 reward.character 키로 발행 시 이 큐로 전달
+# Reward Events → Character Save Ownership (Fanout 브로드캐스트)
+# Fanout Exchange: routing_key 무시, 모든 바인딩 큐에 복제
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apiVersion: rabbitmq.com/v1beta1
 kind: Binding
@@ -96,18 +96,18 @@ metadata:
   name: reward-to-character-ownership
   namespace: rabbitmq
 spec:
-  source: reward.direct
+  source: reward.events
   destination: character.save_ownership
   destinationType: queue
-  routingKey: reward.character
+  routingKey: ''  # Fanout은 routing_key 무시
   vhost: eco2
   rabbitmqClusterReference:
     name: eco2-rabbitmq
     namespace: rabbitmq
 ---
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Reward → Users Save Character Binding (1:N 라우팅 #2)
-# 동일한 reward.character 키로 이 큐에도 전달
+# Reward Events → Users Save Character (Fanout 브로드캐스트)
+# 동일한 이벤트가 이 큐에도 복제됨
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apiVersion: rabbitmq.com/v1beta1
 kind: Binding
@@ -115,10 +115,10 @@ metadata:
   name: reward-to-users-save-character
   namespace: rabbitmq
 spec:
-  source: reward.direct
+  source: reward.events
   destination: users.save_character
   destinationType: queue
-  routingKey: reward.character
+  routingKey: ''  # Fanout은 routing_key 무시
   vhost: eco2
   rabbitmqClusterReference:
     name: eco2-rabbitmq
