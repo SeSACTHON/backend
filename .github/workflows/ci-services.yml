@@ -23,7 +23,7 @@ on:
       - "workloads/domains/location/**"
       - "workloads/domains/scan/**"
       - "workloads/domains/chat/**"
-      - "workloads/domains/image/**"
+      - "workloads/domains/images/**"
       # Worker는 별도 파이프라인 → ci-workers.yml
       # ext-authz는 Go → ci-ext-authz.yml
       # sse-gateway, event-router는 → ci-sse-components.yml
@@ -49,7 +49,7 @@ on:
       - "workloads/domains/location/**"
       - "workloads/domains/scan/**"
       - "workloads/domains/chat/**"
-      - "workloads/domains/image/**"
+      - "workloads/domains/images/**"
       # Worker는 별도 파이프라인 → ci-workers.yml
       # ext-authz는 Go → ci-ext-authz.yml
       # sse-gateway, event-router는 → ci-sse-components.yml
@@ -202,7 +202,7 @@ jobs:
             workloads/domains/location/**
             workloads/domains/scan/**
             workloads/domains/chat/**
-            workloads/domains/image/**
+            workloads/domains/images/**
 
       - name: Prepare service matrix
         id: prepare
@@ -533,62 +533,6 @@ jobs:
           git push origin HEAD:${GITHUB_REF_NAME}
 
   # ============================================================================
-  # Base Image Build (공통 의존성)
-  # ============================================================================
-  base-build-push:
-    name: 🏗️ Build & Push Base Image
-    runs-on: ubuntu-latest
-    needs:
-      - commit-filter
-      - detect-api-changes
-    if: >
-      (github.event_name == 'push' || github.event_name == 'workflow_dispatch') &&
-      needs.commit-filter.outputs.skip != 'true'
-    steps:
-      - name: Check for base changes
-        id: check
-        run: |
-          # Base 이미지 변경 여부 확인 (간소화된 로직)
-          echo "should_build=true" >> "$GITHUB_OUTPUT"
-
-      - name: Checkout
-        if: steps.check.outputs.should_build == 'true'
-        uses: actions/checkout@v4
-
-      - name: Set up Docker Buildx
-        if: steps.check.outputs.should_build == 'true'
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to Docker Hub
-        if: steps.check.outputs.should_build == 'true'
-        uses: docker/login-action@v3
-        with:
-          registry: docker.io
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Prepare base image tags
-        if: steps.check.outputs.should_build == 'true'
-        id: meta
-        run: |
-          IMAGE_REPO="docker.io/mng990/eco2"
-          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
-            echo "tags=${IMAGE_REPO}:base-prod-latest,${IMAGE_REPO}:base-latest" >> "$GITHUB_OUTPUT"
-          else
-            echo "tags=${IMAGE_REPO}:base-dev-latest" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Build and push base image
-        if: steps.check.outputs.should_build == 'true'
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: domains/_base/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # ============================================================================
   # Worker Image Build → ci-workers.yml로 분리됨
+  # Base Image Build → domains/_base 삭제로 제거됨 (apps/ 서비스는 자체 Dockerfile 사용)
   # ============================================================================
