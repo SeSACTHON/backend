@@ -17,16 +17,16 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from apps.sse_gateway.api.v1.stream import router as stream_router
-from apps.sse_gateway.config import get_settings
-from apps.sse_gateway.core.broadcast_manager import SSEBroadcastManager
-from apps.sse_gateway.core.tracing import (
+from sse_gateway.api.v1.stream import router as stream_router
+from sse_gateway.config import get_settings
+from sse_gateway.core.broadcast_manager import SSEBroadcastManager
+from sse_gateway.core.tracing import (
     configure_tracing,
     instrument_fastapi,
     instrument_redis,
     shutdown_tracing,
 )
-from apps.sse_gateway.metrics import register_metrics
+from sse_gateway.metrics import register_metrics
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # Logging 설정

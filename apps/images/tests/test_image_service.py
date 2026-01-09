@@ -10,9 +10,9 @@ ROOT_DIR = Path(__file__).resolve().parents[3]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from apps.images.core.config import Settings  # noqa: E402
-from apps.images.schemas.image import ImageChannel, ImageUploadRequest  # noqa: E402
-from apps.images.services.image import (  # noqa: E402
+from images.core.config import Settings  # noqa: E402
+from images.schemas.image import ImageChannel, ImageUploadRequest  # noqa: E402
+from images.services.image import (  # noqa: E402
     ImageService,
     PendingUpload,
     PendingUploadChannelMismatchError,
@@ -144,7 +144,7 @@ class TestFinalizeUpload:
     @pytest.mark.asyncio
     async def test_finalizes_upload(self, service, mock_redis):
         """업로드를 완료합니다."""
-        from apps.images.schemas.image import ImageUploadCallbackRequest
+        from images.schemas.image import ImageUploadCallbackRequest
 
         pending = PendingUpload(
             channel=ImageChannel.scan,
@@ -173,7 +173,7 @@ class TestFinalizeUpload:
     @pytest.mark.asyncio
     async def test_raises_not_found(self, service, mock_redis):
         """Pending upload이 없으면 NotFoundError를 발생시킵니다."""
-        from apps.images.schemas.image import ImageUploadCallbackRequest
+        from images.schemas.image import ImageUploadCallbackRequest
 
         mock_redis.get = AsyncMock(return_value=None)
 
@@ -192,7 +192,7 @@ class TestFinalizeUpload:
     @pytest.mark.asyncio
     async def test_raises_channel_mismatch(self, service, mock_redis):
         """채널이 다르면 ChannelMismatchError를 발생시킵니다."""
-        from apps.images.schemas.image import ImageUploadCallbackRequest
+        from images.schemas.image import ImageUploadCallbackRequest
 
         pending = PendingUpload(
             channel=ImageChannel.chat,  # 다른 채널
@@ -218,7 +218,7 @@ class TestFinalizeUpload:
     @pytest.mark.asyncio
     async def test_raises_permission_denied(self, service, mock_redis):
         """다른 사용자의 업로드면 PermissionDeniedError를 발생시킵니다."""
-        from apps.images.schemas.image import ImageUploadCallbackRequest
+        from images.schemas.image import ImageUploadCallbackRequest
 
         pending = PendingUpload(
             channel=ImageChannel.scan,

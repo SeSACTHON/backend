@@ -13,7 +13,7 @@ import sys
 from datetime import datetime, timezone
 from typing import Any
 
-from apps.images.core.constants import (
+from images.core.constants import (
     DEFAULT_ENVIRONMENT,
     DEFAULT_LOG_FORMAT,
     DEFAULT_LOG_LEVEL,

@@ -16,12 +16,12 @@ import redis.asyncio as aioredis
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
-from apps.event_router.config import get_settings
-from apps.event_router.core.consumer import StreamConsumer
-from apps.event_router.core.processor import EventProcessor
-from apps.event_router.core.reclaimer import PendingReclaimer
-from apps.event_router.core.tracing import configure_tracing, instrument_redis, shutdown_tracing
-from apps.event_router.metrics import register_metrics
+from event_router.config import get_settings
+from event_router.core.consumer import StreamConsumer
+from event_router.core.processor import EventProcessor
+from event_router.core.reclaimer import PendingReclaimer
+from event_router.core.tracing import configure_tracing, instrument_redis, shutdown_tracing
+from event_router.metrics import register_metrics
 
 # ─────────────────────────────────────────────────────────────────
 # 로깅 설정

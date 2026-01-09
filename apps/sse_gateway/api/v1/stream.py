@@ -13,7 +13,7 @@ from typing import AsyncGenerator
 from fastapi import APIRouter, HTTPException, Query, Request
 from sse_starlette.sse import EventSourceResponse
 
-from apps.sse_gateway.core.broadcast_manager import SSEBroadcastManager
+from sse_gateway.core.broadcast_manager import SSEBroadcastManager
 
 logger = logging.getLogger(__name__)
 

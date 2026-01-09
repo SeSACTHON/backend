@@ -4,21 +4,21 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from apps.images.api.v1.routers import api_router, health_router
-from apps.images.core.constants import (
+from images.api.v1.routers import api_router, health_router
+from images.core.constants import (
     DEFAULT_ENVIRONMENT,
     ENV_KEY_ENVIRONMENT,
     SERVICE_NAME,
     SERVICE_VERSION,
 )
-from apps.images.core.logging import configure_logging
-from apps.images.core.tracing import (
+from images.core.logging import configure_logging
+from images.core.tracing import (
     configure_tracing,
     instrument_fastapi,
     instrument_httpx,
     shutdown_tracing,
 )
-from apps.images.metrics import register_metrics
+from images.metrics import register_metrics
 
 # 구조화된 로깅 설정 (ECS JSON 포맷)
 configure_logging()

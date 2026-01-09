@@ -23,7 +23,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, AsyncGenerator, ClassVar
 
-from apps.sse_gateway.metrics import (
+from sse_gateway.metrics import (
     SSE_ACTIVE_JOBS,
     SSE_CONNECTIONS_ACTIVE,
     SSE_CONNECTIONS_CLOSED,

@@ -33,7 +33,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /install /usr/local
 
 # 애플리케이션 코드 복사
-COPY apps/images /app/apps/images
+COPY apps/images /app/images
 
 USER appuser
 
@@ -42,4 +42,4 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
     CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"
 
-CMD ["opentelemetry-instrument", "uvicorn", "apps.images.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["opentelemetry-instrument", "uvicorn", "images.main:app", "--host", "0.0.0.0", "--port", "8000"]

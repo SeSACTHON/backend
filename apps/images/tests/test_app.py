@@ -8,7 +8,7 @@ ROOT_DIR = Path(__file__).resolve().parents[3]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-MODULE_CANDIDATES = ("apps.images.main", "app.main", "main")
+MODULE_CANDIDATES = ("images.main", "app.main", "main")
 
 
 def load_fastapi_app() -> FastAPI:

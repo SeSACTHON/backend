@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     import redis.asyncio as aioredis
 
-from apps.event_router.metrics import (
+from event_router.metrics import (
     EVENT_ROUTER_ACTIVE_SHARDS,
     EVENT_ROUTER_CONSUMER_STATUS,
     EVENT_ROUTER_XACK_TOTAL,

@@ -7,7 +7,7 @@ from redis.asyncio import Redis
 from redis.asyncio.retry import Retry
 from redis.backoff import ExponentialBackoff
 
-from apps.images.core.config import get_settings
+from images.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 

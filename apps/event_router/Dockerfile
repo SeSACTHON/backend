@@ -41,7 +41,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY --from=builder /install /usr/local
 
 # 애플리케이션 코드 복사
-COPY apps/event_router /app/apps/event_router
+COPY apps/event_router /app/event_router
 
 # 비루트 사용자
 RUN chown -R appuser:appuser /app
@@ -53,4 +53,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
 
 EXPOSE 8000
 
-CMD ["uvicorn", "apps.event_router.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "event_router.main:app", "--host", "0.0.0.0", "--port", "8000"]

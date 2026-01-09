@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     import redis.asyncio as aioredis
 
-from apps.event_router.metrics import (
+from event_router.metrics import (
     EVENT_ROUTER_EVENTS_PROCESSED,
     EVENT_ROUTER_EVENTS_SKIPPED,
     EVENT_ROUTER_PROCESS_ERRORS,

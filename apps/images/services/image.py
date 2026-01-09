@@ -14,9 +14,9 @@ from redis.asyncio import Redis
 from redis.exceptions import ConnectionError as RedisConnectionError
 from redis.exceptions import TimeoutError as RedisTimeoutError
 
-from apps.images.core import Settings, get_settings
-from apps.images.core.redis import get_upload_redis
-from apps.images.schemas.image import (
+from images.core import Settings, get_settings
+from images.core.redis import get_upload_redis
+from images.schemas.image import (
     ImageChannel,
     ImageUploadCallbackRequest,
     ImageUploadFinalizeResponse,

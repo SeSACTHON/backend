@@ -1,20 +1,20 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 
-from apps.images.api.v1.dependencies import get_image_service
-from apps.images.schemas.image import (
+from images.api.v1.dependencies import get_image_service
+from images.schemas.image import (
     ImageChannel,
     ImageUploadCallbackRequest,
     ImageUploadFinalizeResponse,
     ImageUploadRequest,
     ImageUploadResponse,
 )
-from apps.images.services.image import ImageService
-from apps.images.services.image import (
+from images.services.image import ImageService
+from images.services.image import (
     PendingUploadChannelMismatchError,
     PendingUploadNotFoundError,
     PendingUploadPermissionDeniedError,
 )
-from apps.images.security import get_current_user, UserInfo
+from images.security import get_current_user, UserInfo
 
 router = APIRouter(prefix="/images", tags=["images"])
 

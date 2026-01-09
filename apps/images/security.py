@@ -6,7 +6,7 @@ from typing import Optional
 from fastapi import Header, HTTPException, status
 from pydantic import BaseModel
 
-from apps.images.core.config import get_settings
+from images.core.config import get_settings
 
 
 class UserInfo(BaseModel):

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 
-from apps.images.api.v1.dependencies import get_image_service
-from apps.images.services.image import ImageService
+from images.api.v1.dependencies import get_image_service
+from images.services.image import ImageService
 
 router = APIRouter(prefix="/metrics", tags=["metrics"])
 
