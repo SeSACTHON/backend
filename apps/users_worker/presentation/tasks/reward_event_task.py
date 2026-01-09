@@ -1,12 +1,12 @@
 """Reward Character Event Task.
 
-reward.direct Exchange로 발행된 reward.character 이벤트를 처리합니다.
+reward.events (Fanout) Exchange로 브로드캐스트된 이벤트를 처리합니다.
 users.save_character 큐에서 수신합니다.
 
-1:N 라우팅: scan.reward → reward.direct → character.save_ownership 큐
-                                       → users.save_character 큐
+Fanout 패턴: scan.reward → reward.events (fanout) → character.save_ownership 큐
+                                                  → users.save_character 큐
 
-각 Worker가 동일한 task 이름(reward.character)으로 자신만의 구현을 제공합니다.
+모든 바인딩 큐에 동일 메시지가 복제됩니다.
 """
 
 from __future__ import annotations

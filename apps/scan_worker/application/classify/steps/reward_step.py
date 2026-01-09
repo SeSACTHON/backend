@@ -222,13 +222,13 @@ class RewardStep(Step):
             return None
 
     def _dispatch_save_tasks(self, user_id: str, reward: dict[str, Any]) -> None:
-        """DB 저장 이벤트 발행 (Fire & Forget, 1:N 라우팅).
+        """DB 저장 이벤트 발행 (Fire & Forget, Fanout 브로드캐스트).
 
-        reward.direct Exchange로 1번 publish → RabbitMQ가 2개 큐로 복제:
+        reward.events (Fanout) Exchange로 1번 publish → 모든 바인딩 큐로 복제:
         - character.save_ownership 큐 → character-worker
         - users.save_character 큐 → users-worker
 
-        각 Worker가 동일 task 이름(reward.character)으로 자신만의 구현 제공.
+        Fanout은 routing_key 무시, 바인딩된 모든 큐에 브로드캐스트.
         """
         try:
             self._celery.send_task(
@@ -241,16 +241,16 @@ class RewardStep(Step):
                     "character_type": reward.get("character_type"),
                     "source": "scan",
                 },
-                exchange="reward.direct",
-                routing_key="reward.character",
+                exchange="reward.events",  # Fanout Exchange
+                routing_key="",  # Fanout은 routing_key 무시
             )
             logger.info(
                 "reward_character_event_dispatched",
                 extra={
                     "user_id": user_id,
                     "character_id": reward["character_id"],
-                    "exchange": "reward.direct",
-                    "routing_key": "reward.character",
+                    "exchange": "reward.events",
+                    "pattern": "fanout",
                 },
             )
         except Exception:

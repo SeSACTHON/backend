@@ -36,17 +36,19 @@ spec:
     name: eco2-rabbitmq
     namespace: rabbitmq
 ---
-# 3. Reward Exchange (Direct)
-# 1:N 라우팅: reward.character → character.save_ownership + users.save_character
-# scan.reward 완료 시 1번 publish로 다중 Consumer에게 전달
+# 3. Reward Events Exchange (Fanout)
+# 이벤트 브로드캐스트: scan.reward 완료 → 모든 구독자에게 전달
+# - character.save_ownership (character_worker)
+# - users.save_character (users_worker)
+# routing_key 무시, 바인딩된 모든 큐에 복제
 apiVersion: rabbitmq.com/v1beta1
 kind: Exchange
 metadata:
-  name: reward-direct
+  name: reward-events
   namespace: rabbitmq
 spec:
-  name: reward.direct
-  type: direct
+  name: reward.events
+  type: fanout
   durable: true
   autoDelete: false
   vhost: eco2
