@@ -1,14 +1,14 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: image-api
-  namespace: image
+  name: images-api
+  namespace: images
 spec:
   replicas: 2
   template:
     spec:
       containers:
-      - name: image-api
+      - name: images-api
         resources:
           requests:
             cpu: 200m

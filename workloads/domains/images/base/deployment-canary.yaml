@@ -1,10 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: image-api-canary
-  namespace: image
+  name: images-api-canary
+  namespace: images
   labels:
-    app: image-api
+    app: images-api
     version: v2
     tier: business-logic
     domain: image
@@ -13,27 +13,27 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: image-api
+      app: images-api
       version: v2
   template:
     metadata:
       labels:
-        app: image-api
+        app: images-api
         version: v2
         tier: business-logic
         domain: image
         release: canary
     spec:
       containers:
-      - name: image-api
-        image: docker.io/mng990/eco2:image-api-dev-canary
+      - name: images-api
+        image: docker.io/mng990/eco2:images-api-dev-canary
         imagePullPolicy: Always
         ports:
         - containerPort: 8000
           name: http
         env:
         - name: OTEL_SERVICE_NAME
-          value: image-api-canary
+          value: images-api-canary
         - name: OTEL_TRACES_EXPORTER
           value: otlp
         - name: OTEL_EXPORTER_OTLP_ENDPOINT

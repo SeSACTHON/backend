@@ -1,16 +1,16 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: image-api
-  namespace: image
+  name: images-api
+  namespace: images
   labels:
-    app: image-api
+    app: images-api
     tier: business-logic
     domain: image
 spec:
   type: ClusterIP
   selector:
-    app: image-api
+    app: images-api
   ports:
   - port: 8000
     targetPort: 8000

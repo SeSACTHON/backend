@@ -1,10 +1,10 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: image-api
-  namespace: image
+  name: images-api
+  namespace: images
   labels:
-    app: image-api
+    app: images-api
     version: v1
     tier: business-logic
     domain: image
@@ -12,26 +12,26 @@ spec:
   replicas: 1
   selector:
     matchLabels:
-      app: image-api
+      app: images-api
       version: v1
   template:
     metadata:
       labels:
-        app: image-api
+        app: images-api
         version: v1
         tier: business-logic
         domain: image
     spec:
       containers:
-      - name: image-api
-        image: docker.io/mng990/eco2:image-api-dev-latest
+      - name: images-api
+        image: docker.io/mng990/eco2:images-api-dev-latest
         imagePullPolicy: Always
         ports:
         - containerPort: 8000
           name: http
         env:
         - name: OTEL_SERVICE_NAME
-          value: image-api
+          value: images-api
         - name: OTEL_TRACES_EXPORTER
           value: otlp
         - name: OTEL_EXPORTER_OTLP_ENDPOINT
