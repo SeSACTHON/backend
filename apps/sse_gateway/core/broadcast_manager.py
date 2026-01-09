@@ -293,45 +293,38 @@ class SSEBroadcastManager:
             except (ValueError, TypeError):
                 state_seq = 0
 
-            # 이미 완료된 경우: Streams에서 catch-up (done 포함)
+            # Streams에서 모든 이벤트 catch-up (초기 연결 시 항상 실행)
+            # NOTE: 진행 중/완료 상관없이 누락된 이벤트 복구
+            logger.info(
+                "broadcast_subscribe_catch_up",
+                extra={
+                    "job_id": job_id,
+                    "state_stage": state.get("stage"),
+                    "state_seq": state_seq,
+                    "last_seq": subscriber.last_seq,
+                },
+            )
+
+            async for event in self._catch_up_from_streams(
+                job_id, from_seq=subscriber.last_seq, to_seq=state_seq
+            ):
+                event_count += 1
+                if first_event_time is None:
+                    first_event_time = time.time()
+                    SSE_TTFB.observe(first_event_time - connection_start)
+                SSE_EVENTS_DISTRIBUTED.labels(
+                    stage=event.get("stage", "unknown"), status="success"
+                ).inc()
+                # seq 업데이트로 중복 방지
+                event_seq = int(event.get("seq", 0))
+                if event_seq > subscriber.last_seq:
+                    subscriber.last_seq = event_seq
+                yield event
+
+            # 이미 완료된 경우: 바로 종료
             if state.get("stage") == "done" or state.get("status") == "failed":
-                logger.info(
-                    "broadcast_subscribe_already_done_catch_up",
-                    extra={
-                        "job_id": job_id,
-                        "state_seq": state_seq,
-                        "last_seq": subscriber.last_seq,
-                    },
-                )
-
-                # Streams에서 모든 이벤트 catch-up (done 포함)
-                # NOTE: Pub/Sub에서 이미 done을 수신했을 수 있으므로,
-                #       catch-up에서 done을 포함하여 중복 제거는 클라이언트에서 처리
-                async for event in self._catch_up_from_streams(
-                    job_id, from_seq=subscriber.last_seq, to_seq=state_seq
-                ):
-                    event_count += 1
-                    if first_event_time is None:
-                        first_event_time = time.time()
-                        SSE_TTFB.observe(first_event_time - connection_start)
-                    SSE_EVENTS_DISTRIBUTED.labels(
-                        stage=event.get("stage", "unknown"), status="success"
-                    ).inc()
-                    yield event
-
-                # catch-up에서 done이 이미 yield되었으므로 State yield 불필요
                 close_reason = "normal"
                 return
-
-            # 진행 중인 경우: State yield만
-            event_count += 1
-            if first_event_time is None:
-                first_event_time = time.time()
-                SSE_TTFB.observe(first_event_time - connection_start)
-            SSE_EVENTS_DISTRIBUTED.labels(
-                stage=state.get("stage", "unknown"), status="success"
-            ).inc()
-            yield state
 
         logger.info(
             "broadcast_subscribe_started",
