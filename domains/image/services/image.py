@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -10,6 +11,8 @@ import boto3
 from botocore.client import BaseClient
 from pydantic import HttpUrl
 from redis.asyncio import Redis
+from redis.exceptions import ConnectionError as RedisConnectionError
+from redis.exceptions import TimeoutError as RedisTimeoutError
 
 from domains.image.core import Settings, get_settings
 from domains.image.core.redis import get_upload_redis
@@ -184,20 +187,85 @@ class ImageService:
         return f"image:pending:{object_key}"
 
     async def _save_pending_upload(self, object_key: str, pending: PendingUpload) -> None:
-        await self._redis.setex(
-            self._pending_key(object_key),
-            self.settings.upload_state_ttl,
-            pending.to_json(),
-        )
+        """Save pending upload with retry on Redis connection errors."""
+        last_error: Exception | None = None
+        max_retries = self.settings.redis_retry_attempts
+        base_delay = self.settings.redis_retry_base_delay
+
+        for attempt in range(max_retries):
+            try:
+                await self._redis.setex(
+                    self._pending_key(object_key),
+                    self.settings.upload_state_ttl,
+                    pending.to_json(),
+                )
+                return
+            except (RedisConnectionError, RedisTimeoutError, ConnectionResetError) as e:
+                last_error = e
+                logger.warning(
+                    "Redis setex failed, retrying",
+                    extra={
+                        "attempt": attempt + 1,
+                        "max_retries": max_retries,
+                        "key": object_key,
+                        "error": str(e),
+                    },
+                )
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(base_delay * (2**attempt))
+        raise last_error  # type: ignore[misc]
 
     async def _load_pending_upload(self, object_key: str) -> Optional[PendingUpload]:
-        payload = await self._redis.get(self._pending_key(object_key))
-        if not payload:
-            return None
-        return PendingUpload.from_json(payload)
+        """Load pending upload with retry on Redis connection errors."""
+        last_error: Exception | None = None
+        max_retries = self.settings.redis_retry_attempts
+        base_delay = self.settings.redis_retry_base_delay
+
+        for attempt in range(max_retries):
+            try:
+                payload = await self._redis.get(self._pending_key(object_key))
+                if not payload:
+                    return None
+                return PendingUpload.from_json(payload)
+            except (RedisConnectionError, RedisTimeoutError, ConnectionResetError) as e:
+                last_error = e
+                logger.warning(
+                    "Redis get failed, retrying",
+                    extra={
+                        "attempt": attempt + 1,
+                        "max_retries": max_retries,
+                        "key": object_key,
+                        "error": str(e),
+                    },
+                )
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(base_delay * (2**attempt))
+        raise last_error  # type: ignore[misc]
 
     async def _delete_pending_upload(self, object_key: str) -> None:
-        await self._redis.delete(self._pending_key(object_key))
+        """Delete pending upload with retry on Redis connection errors."""
+        last_error: Exception | None = None
+        max_retries = self.settings.redis_retry_attempts
+        base_delay = self.settings.redis_retry_base_delay
+
+        for attempt in range(max_retries):
+            try:
+                await self._redis.delete(self._pending_key(object_key))
+                return
+            except (RedisConnectionError, RedisTimeoutError, ConnectionResetError) as e:
+                last_error = e
+                logger.warning(
+                    "Redis delete failed, retrying",
+                    extra={
+                        "attempt": attempt + 1,
+                        "max_retries": max_retries,
+                        "key": object_key,
+                        "error": str(e),
+                    },
+                )
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(base_delay * (2**attempt))
+        raise last_error  # type: ignore[misc]
 
     async def metrics(self) -> dict:
         return {
