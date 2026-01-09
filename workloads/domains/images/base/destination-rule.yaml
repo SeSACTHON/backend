@@ -1,7 +1,7 @@
 apiVersion: networking.istio.io/v1beta1
 kind: DestinationRule
 metadata:
-  name: image-api
+  name: images-api
   namespace: images
   labels:
     app: images-api
