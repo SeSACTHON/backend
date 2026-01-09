@@ -229,11 +229,22 @@ class RewardStep(Step):
         - users.save_character 큐 → users-worker
 
         Fanout은 routing_key 무시, 바인딩된 모든 큐에 브로드캐스트.
+
+        ⚠️ Celery send_task는 exchange 파라미터를 무시하므로
+           kombu Producer로 Celery Protocol 형식 메시지를 직접 발행
         """
+        import uuid
+
+        from kombu import Exchange
+
         try:
-            self._celery.send_task(
-                "reward.character",
-                kwargs={
+            # Celery Protocol 형식 메시지 구성
+            task_id = str(uuid.uuid4())
+            message_body = {
+                "task": "reward.character",
+                "id": task_id,
+                "args": [],
+                "kwargs": {
                     "user_id": user_id,
                     "character_id": reward["character_id"],
                     "character_code": reward.get("character_code", ""),
@@ -241,14 +252,33 @@ class RewardStep(Step):
                     "character_type": reward.get("character_type"),
                     "source": "scan",
                 },
-                exchange="reward.events",  # Fanout Exchange
-                routing_key="",  # Fanout은 routing_key 무시
-            )
+                "retries": 0,
+            }
+
+            # Fanout Exchange 정의
+            fanout_exchange = Exchange("reward.events", type="fanout")
+
+            # kombu Producer로 직접 발행
+            with self._celery.connection_or_acquire() as conn:
+                producer = conn.Producer()
+                producer.publish(
+                    message_body,
+                    exchange=fanout_exchange,
+                    routing_key="",
+                    serializer="json",
+                    content_type="application/json",
+                    headers={
+                        "task": "reward.character",
+                        "id": task_id,
+                    },
+                )
+
             logger.info(
                 "reward_character_event_dispatched",
                 extra={
                     "user_id": user_id,
                     "character_id": reward["character_id"],
+                    "task_id": task_id,
                     "exchange": "reward.events",
                     "pattern": "fanout",
                 },
