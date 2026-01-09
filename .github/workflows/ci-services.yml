@@ -15,6 +15,7 @@ on:
       - "apps/images/**"
       # 레거시 서비스 (아직 마이그레이션 안 됨)
       - "domains/chat/**"
+      - "domains/_shared/**"
       # Kubernetes manifests
       - "workloads/domains/auth/**"
       - "workloads/domains/users/**"
@@ -40,6 +41,7 @@ on:
       - "apps/images/**"
       # 레거시 서비스 (아직 마이그레이션 안 됨)
       - "domains/chat/**"
+      - "domains/_shared/**"
       # Kubernetes manifests
       - "workloads/domains/auth/**"
       - "workloads/domains/users/**"

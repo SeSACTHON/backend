@@ -14,7 +14,9 @@ on:
       - main
     paths:
       - "apps/**"
-      - "domains/**"
+      # 레거시 서비스 (마이그레이션 대기)
+      - "domains/chat/**"
+      - "domains/_shared/**"
 
 permissions:
   contents: write
@@ -414,8 +416,8 @@ jobs:
       - name: Build and push canary image
         uses: docker/build-push-action@v5
         with:
-          context: ./domains/ext-authz
-          file: domains/ext-authz/Dockerfile
+          context: .
+          file: apps/ext_authz/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
@@ -633,7 +635,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: domains/sse-gateway/Dockerfile
+          file: apps/sse_gateway/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
