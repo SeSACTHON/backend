@@ -9,8 +9,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# 모듈 경로 추가
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# apps/ 디렉토리를 PYTHONPATH에 추가 (from sse_gateway.* 가능하게)
+APPS_DIR = Path(__file__).resolve().parents[2]
+if str(APPS_DIR) not in sys.path:
+    sys.path.insert(0, str(APPS_DIR))
 
 
 @pytest.fixture
@@ -56,7 +58,7 @@ def mock_settings():
 @pytest.fixture
 def reset_broadcast_manager():
     """테스트 간 BroadcastManager 싱글톤 초기화."""
-    from core.broadcast_manager import SSEBroadcastManager
+    from sse_gateway.core.broadcast_manager import SSEBroadcastManager
 
     # 테스트 전 초기화
     SSEBroadcastManager._instance = None

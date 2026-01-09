@@ -10,7 +10,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# apps/ 디렉토리를 PYTHONPATH에 추가 (from sse_gateway.* 가능하게)
+APPS_DIR = Path(__file__).resolve().parents[2]
+if str(APPS_DIR) not in sys.path:
+    sys.path.insert(0, str(APPS_DIR))
 
 
 class TestSubscriberQueue:
@@ -19,7 +22,7 @@ class TestSubscriberQueue:
     @pytest.mark.asyncio
     async def test_put_event_success(self):
         """이벤트 추가 성공."""
-        from core.broadcast_manager import SubscriberQueue
+        from sse_gateway.core.broadcast_manager import SubscriberQueue
 
         queue = SubscriberQueue(job_id="test-job")
         event = {"stage": "vision", "status": "success", "seq": 1}
@@ -33,7 +36,7 @@ class TestSubscriberQueue:
     async def test_put_event_updates_timestamp(self):
         """이벤트 추가 시 타임스탬프 업데이트."""
 
-        from core.broadcast_manager import SubscriberQueue
+        from sse_gateway.core.broadcast_manager import SubscriberQueue
 
         queue = SubscriberQueue(job_id="test-job")
         initial_time = queue.last_event_at
@@ -46,7 +49,7 @@ class TestSubscriberQueue:
     @pytest.mark.asyncio
     async def test_put_event_duplicate_seq_rejected(self):
         """중복 seq 이벤트 거부."""
-        from core.broadcast_manager import SubscriberQueue
+        from sse_gateway.core.broadcast_manager import SubscriberQueue
 
         queue = SubscriberQueue(job_id="test-job")
 
@@ -71,7 +74,7 @@ class TestSubscriberQueue:
     @pytest.mark.asyncio
     async def test_put_event_preserves_done(self):
         """done 이벤트는 드롭되지 않음."""
-        from core.broadcast_manager import SubscriberQueue
+        from sse_gateway.core.broadcast_manager import SubscriberQueue
 
         queue = SubscriberQueue(job_id="test-job")
         queue.queue = asyncio.Queue(maxsize=2)
@@ -94,7 +97,7 @@ class TestSSEBroadcastManager:
     @pytest.fixture(autouse=True)
     def reset_singleton(self):
         """테스트 간 싱글톤 초기화."""
-        from core.broadcast_manager import SSEBroadcastManager
+        from sse_gateway.core.broadcast_manager import SSEBroadcastManager
 
         SSEBroadcastManager._instance = None
         yield
@@ -102,14 +105,14 @@ class TestSSEBroadcastManager:
 
     def test_total_subscriber_count_empty(self):
         """구독자 없을 때 카운트."""
-        from core.broadcast_manager import SSEBroadcastManager
+        from sse_gateway.core.broadcast_manager import SSEBroadcastManager
 
         manager = SSEBroadcastManager()
         assert manager._total_subscriber_count() == 0
 
     def test_active_job_count(self):
         """활성 job 카운트."""
-        from core.broadcast_manager import SSEBroadcastManager
+        from sse_gateway.core.broadcast_manager import SSEBroadcastManager
 
         manager = SSEBroadcastManager()
 
@@ -125,7 +128,7 @@ class TestSSEBroadcastManager:
     @pytest.mark.asyncio
     async def test_get_state_snapshot_no_client(self):
         """Streams 클라이언트 없을 때 스냅샷 조회."""
-        from core.broadcast_manager import SSEBroadcastManager
+        from sse_gateway.core.broadcast_manager import SSEBroadcastManager
 
         manager = SSEBroadcastManager()
         manager._streams_client = None
@@ -137,7 +140,7 @@ class TestSSEBroadcastManager:
     @pytest.mark.asyncio
     async def test_get_state_snapshot_cache_miss(self):
         """캐시 미스 시 None 반환."""
-        from core.broadcast_manager import SSEBroadcastManager
+        from sse_gateway.core.broadcast_manager import SSEBroadcastManager
 
         manager = SSEBroadcastManager()
         mock_streams = AsyncMock()
@@ -152,7 +155,7 @@ class TestSSEBroadcastManager:
     @pytest.mark.asyncio
     async def test_get_state_snapshot_cache_hit(self):
         """캐시 히트 시 데이터 반환."""
-        from core.broadcast_manager import SSEBroadcastManager
+        from sse_gateway.core.broadcast_manager import SSEBroadcastManager
 
         manager = SSEBroadcastManager()
         mock_streams = AsyncMock()
@@ -167,7 +170,7 @@ class TestSSEBroadcastManager:
     @pytest.mark.asyncio
     async def test_get_state_snapshot_error(self):
         """Redis 오류 시 None 반환."""
-        from core.broadcast_manager import SSEBroadcastManager
+        from sse_gateway.core.broadcast_manager import SSEBroadcastManager
 
         manager = SSEBroadcastManager()
         mock_streams = AsyncMock()
@@ -181,7 +184,7 @@ class TestSSEBroadcastManager:
     @pytest.mark.asyncio
     async def test_shutdown_cleans_up(self):
         """shutdown 시 리소스 정리."""
-        from core.broadcast_manager import SSEBroadcastManager
+        from sse_gateway.core.broadcast_manager import SSEBroadcastManager
 
         # 인스턴스 생성
         SSEBroadcastManager._instance = SSEBroadcastManager()

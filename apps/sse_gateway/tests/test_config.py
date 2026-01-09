@@ -8,7 +8,10 @@ from pathlib import Path
 from unittest.mock import patch
 
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# apps/ 디렉토리를 PYTHONPATH에 추가 (from sse_gateway.* 가능하게)
+APPS_DIR = Path(__file__).resolve().parents[2]
+if str(APPS_DIR) not in sys.path:
+    sys.path.insert(0, str(APPS_DIR))
 
 
 class TestSettings:
@@ -16,7 +19,7 @@ class TestSettings:
 
     def test_default_settings(self):
         """기본 설정값 확인."""
-        from config import Settings
+        from sse_gateway.config import Settings
 
         settings = Settings()
 
@@ -37,7 +40,7 @@ class TestSettings:
                 "REDIS_PUBSUB_URL": "redis://test-pubsub:6379/0",
             },
         ):
-            from config import Settings
+            from sse_gateway.config import Settings
 
             settings = Settings()
             assert settings.log_level == "DEBUG"
@@ -46,7 +49,7 @@ class TestSettings:
 
     def test_get_settings_singleton(self):
         """get_settings 싱글톤 동작 확인."""
-        from config import get_settings
+        from sse_gateway.config import get_settings
 
         # 캐시 클리어
         get_settings.cache_clear()
@@ -57,21 +60,21 @@ class TestSettings:
 
     def test_pubsub_channel_prefix(self):
         """Pub/Sub 채널 접두사 확인."""
-        from config import Settings
+        from sse_gateway.config import Settings
 
         settings = Settings()
         assert settings.pubsub_channel_prefix == "sse:events"
 
     def test_state_key_prefix(self):
         """State KV 접두사 확인."""
-        from config import Settings
+        from sse_gateway.config import Settings
 
         settings = Settings()
         assert settings.state_key_prefix == "scan:state"
 
     def test_state_timeout_seconds(self):
         """State 타임아웃 확인."""
-        from config import Settings
+        from sse_gateway.config import Settings
 
         settings = Settings()
         assert settings.state_timeout_seconds == 5

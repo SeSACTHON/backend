@@ -8,7 +8,10 @@ from unittest.mock import AsyncMock, patch
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
+# apps/ 디렉토리를 PYTHONPATH에 추가 (from sse_gateway.* 가능하게)
+APPS_DIR = Path(__file__).resolve().parents[2]
+if str(APPS_DIR) not in sys.path:
+    sys.path.insert(0, str(APPS_DIR))
 
 
 class TestStreamEndpoint:
@@ -29,7 +32,7 @@ class TestStreamEndpoint:
 
     def test_stream_valid_job_id(self, client):
         """유효한 job_id 형식 (길이 >= 10)."""
-        from core.broadcast_manager import SSEBroadcastManager
+        from sse_gateway.core.broadcast_manager import SSEBroadcastManager
 
         # SSEBroadcastManager를 mock
         async def mock_subscribe(job_id):
@@ -56,8 +59,8 @@ class TestEventGenerator:
     @pytest.mark.asyncio
     async def test_event_generator_keepalive(self):
         """keepalive 이벤트 포맷."""
-        from api.v1.stream import event_generator
-        from core.broadcast_manager import SSEBroadcastManager
+        from sse_gateway.api.v1.stream import event_generator
+        from sse_gateway.core.broadcast_manager import SSEBroadcastManager
 
         async def mock_subscribe(job_id):
             yield {"type": "keepalive", "timestamp": "2025-01-01T00:00:00"}
@@ -89,8 +92,8 @@ class TestEventGenerator:
         """stage 이벤트 포맷."""
         import json
 
-        from api.v1.stream import event_generator
-        from core.broadcast_manager import SSEBroadcastManager
+        from sse_gateway.api.v1.stream import event_generator
+        from sse_gateway.core.broadcast_manager import SSEBroadcastManager
 
         async def mock_subscribe(job_id):
             yield {"stage": "vision", "status": "success", "progress": 25}
@@ -122,8 +125,8 @@ class TestEventGenerator:
         """error 이벤트 포맷."""
         import json
 
-        from api.v1.stream import event_generator
-        from core.broadcast_manager import SSEBroadcastManager
+        from sse_gateway.api.v1.stream import event_generator
+        from sse_gateway.core.broadcast_manager import SSEBroadcastManager
 
         async def mock_subscribe(job_id):
             yield {"type": "error", "error": "timeout", "message": "Maximum wait time exceeded"}
@@ -154,8 +157,8 @@ class TestEventGenerator:
     async def test_event_generator_failed_status(self):
         """failed status 이벤트 포맷."""
 
-        from api.v1.stream import event_generator
-        from core.broadcast_manager import SSEBroadcastManager
+        from sse_gateway.api.v1.stream import event_generator
+        from sse_gateway.core.broadcast_manager import SSEBroadcastManager
 
         async def mock_subscribe(job_id):
             yield {"stage": "vision", "status": "failed", "error": "API error"}
@@ -183,8 +186,8 @@ class TestEventGenerator:
     @pytest.mark.asyncio
     async def test_event_generator_client_disconnect(self):
         """클라이언트 연결 해제 감지."""
-        from api.v1.stream import event_generator
-        from core.broadcast_manager import SSEBroadcastManager
+        from sse_gateway.api.v1.stream import event_generator
+        from sse_gateway.core.broadcast_manager import SSEBroadcastManager
 
         async def mock_subscribe(job_id):
             yield {"stage": "vision", "status": "success"}

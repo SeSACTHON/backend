@@ -253,7 +253,8 @@ jobs:
       - name: Pytest
         working-directory: apps/${{ matrix.component }}
         env:
-          PYTHONPATH: ${{ github.workspace }}
+          # apps/ 디렉토리가 PYTHONPATH (from sse_gateway.*, from event_router.* 등)
+          PYTHONPATH: ${{ github.workspace }}/apps
         run: pytest
 
   build-push:
