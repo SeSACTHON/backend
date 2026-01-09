@@ -37,6 +37,8 @@ SCAN_TASK_QUEUES = [
     Queue("scan.rule", no_declare=True),
     Queue("scan.answer", no_declare=True),
     Queue("scan.reward", no_declare=True),
+    # Cross-domain 큐 (발행용, 소비하지 않음)
+    Queue("character.match", no_declare=True),  # RewardStep에서 발행
 ]
 
 # Celery 앱 생성
