@@ -32,8 +32,18 @@ CHARACTER_TASK_ROUTES = {
 # ⚠️ exchange="", routing_key=<queue_name> 명시 → AMQP Default Exchange 사용
 CHARACTER_TASK_QUEUES = [
     Queue("character.match", exchange="", routing_key="character.match", no_declare=True),
-    Queue("character.save_ownership", exchange="", routing_key="character.save_ownership", no_declare=True),
-    Queue("character.grant_default", exchange="", routing_key="character.grant_default", no_declare=True),
+    Queue(
+        "character.save_ownership",
+        exchange="",
+        routing_key="character.save_ownership",
+        no_declare=True,
+    ),
+    Queue(
+        "character.grant_default",
+        exchange="",
+        routing_key="character.grant_default",
+        no_declare=True,
+    ),
 ]
 
 # Celery 앱 생성
