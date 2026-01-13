@@ -1,8 +1,12 @@
 """Event Router 이벤트 처리기.
 
 Redis 역할 분리:
-- Streams Redis: State KV 갱신 (scan:state:{job_id}) - 내구성
+- Streams Redis: State KV 갱신 ({domain}:state:{job_id}) - 내구성
 - Pub/Sub Redis: 실시간 브로드캐스트 (sse:events:{job_id})
+
+멀티 도메인 지원:
+- scan:events → scan:state
+- chat:events → chat:state
 
 Lua Script는 Streams Redis에서만 실행 (State + 발행 마킹)
 Pub/Sub는 별도 Redis로 PUBLISH
@@ -91,13 +95,17 @@ class EventProcessor:
     - State KV 갱신 (Streams Redis - 내구성)
     - Pub/Sub 발행 (Pub/Sub Redis - 실시간)
     - 멱등성 보장
+
+    멀티 도메인 지원:
+    - 이벤트의 stream_name에서 도메인 추출
+    - scan:events:0 → scan:state:{job_id}
+    - chat:events:0 → chat:state:{job_id}
     """
 
     def __init__(
         self,
         streams_client: "aioredis.Redis",
         pubsub_client: "aioredis.Redis",
-        state_key_prefix: str = "scan:state",
         published_key_prefix: str = "router:published",
         pubsub_channel_prefix: str = "sse:events",
         state_ttl: int = 3600,
@@ -111,26 +119,40 @@ class EventProcessor:
         """
         self._streams_redis = streams_client
         self._pubsub_redis = pubsub_client
-        self._state_key_prefix = state_key_prefix
         self._published_key_prefix = published_key_prefix
         self._pubsub_channel_prefix = pubsub_channel_prefix
         self._state_ttl = state_ttl
         self._published_ttl = published_ttl
         self._script: Any = None
 
+    def _get_state_prefix(self, stream_name: str) -> str:
+        """스트림 이름에서 state prefix 유도.
+
+        scan:events:0 → scan:state
+        chat:events:0 → chat:state
+        """
+        # stream_name = "{domain}:events:{shard}"
+        parts = stream_name.split(":")
+        if len(parts) >= 2:
+            domain = parts[0]  # scan, chat
+            return f"{domain}:state"
+        return "scan:state"  # 기본값
+
     async def _ensure_script(self) -> None:
         """Lua Script 등록 (Streams Redis에)."""
         if self._script is None:
             self._script = self._streams_redis.register_script(UPDATE_STATE_SCRIPT)
 
-    async def process_event(self, event: dict[str, Any]) -> bool:
+    async def process_event(self, event: dict[str, Any], stream_name: str | None = None) -> bool:
         """이벤트 처리 (멱등성 보장).
 
         1. Streams Redis에서 State 갱신 (Lua Script)
+           - Token 이벤트는 State 갱신하지 않음 (스트리밍 데이터)
         2. State 갱신 성공 시 Pub/Sub Redis로 발행
 
         Args:
             event: Redis Streams 이벤트
+            stream_name: 이벤트가 온 스트림 이름 (도메인별 state prefix 결정용)
 
         Returns:
             True if processed, False if skipped (duplicate or out-of-order)
@@ -151,13 +173,53 @@ class EventProcessor:
 
         stage = event.get("stage", "unknown")
 
+        # Token 이벤트는 State 갱신 없이 Pub/Sub만 발행
+        # Token은 순간적인 스트리밍 데이터이므로 State에 저장할 필요 없음
+        is_token_event = stage == "token"
+
+        # 도메인별 state prefix 결정
+        state_prefix = self._get_state_prefix(stream_name or "scan:events:0")
+
         # Redis 키
-        state_key = f"{self._state_key_prefix}:{job_id}"
+        state_key = f"{state_prefix}:{job_id}"
         publish_key = f"{self._published_key_prefix}:{job_id}:{seq}"
         channel = f"{self._pubsub_channel_prefix}:{job_id}"
 
         # 이벤트 JSON
         event_data = json.dumps(event, ensure_ascii=False)
+
+        # Token 이벤트: State 갱신 없이 Pub/Sub만 발행
+        # Token은 순간적인 스트리밍 데이터이므로 State에 저장하면 안됨
+        # (done 이벤트보다 높은 seq로 인해 최종 상태가 덮어씌워지는 문제 방지)
+        if is_token_event:
+            start_time = time.perf_counter()
+            try:
+                await self._pubsub_redis.publish(channel, event_data)
+                EVENT_ROUTER_PUBSUB_PUBLISHED.labels(stage=stage).inc()
+                EVENT_ROUTER_PUBSUB_PUBLISH_LATENCY.observe(time.perf_counter() - start_time)
+                logger.debug(
+                    "token_event_published",
+                    extra={
+                        "job_id": job_id,
+                        "seq": seq,
+                        "channel": channel,
+                    },
+                )
+            except Exception as e:
+                EVENT_ROUTER_PUBSUB_PUBLISH_ERRORS.inc()
+                logger.warning(
+                    "token_pubsub_publish_failed",
+                    extra={
+                        "job_id": job_id,
+                        "seq": seq,
+                        "channel": channel,
+                        "error": str(e),
+                    },
+                )
+                return False
+
+            EVENT_ROUTER_EVENTS_PROCESSED.labels(stage=stage).inc()
+            return True
 
         # Step 1: State 갱신 (Streams Redis - Lua Script)
         start_time = time.perf_counter()
