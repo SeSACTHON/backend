@@ -3,20 +3,25 @@
 LangGraph 파이프라인의 위치 검색 노드입니다.
 
 노드 책임: 이벤트 발행 + 서비스 호출 + state 업데이트
-비즈니스 로직: LocationService, HumanInputService에 위임
+비즈니스 로직: LocationService에 위임
 
 Clean Architecture:
 - Node: Orchestration만 담당 (이 파일)
-- Service: LocationService (검색 + 컨텍스트 변환)
-- Service: HumanInputService (Human-in-the-Loop)
-- Domain: LocationData, HumanInputResponse (Value Objects)
-- Port: LocationClientPort (API 호출)
+- Service: LocationService (gRPC로 검색 + 컨텍스트 변환)
+- Port: LocationClientPort (gRPC API 호출)
 
-흐름 (Human-in-the-Loop):
+흐름:
 1. 진행 이벤트 발행
-2. 위치 확인 (state 또는 Human-in-the-Loop)
-3. LocationService로 주변 센터 검색
-4. state 업데이트
+2. 위치 확인 (state에서 user_location)
+3. 위치 없으면 → needs_input 이벤트 발행 (HITL via HTTP)
+4. 위치 있으면 → LocationService로 주변 센터 검색 (gRPC)
+5. state 업데이트
+
+HITL 흐름 (HTTP 기반):
+1. Worker: needs_input 이벤트 발행 → SSE로 클라이언트 전달
+2. Client: 위치 수집 (Geolocation API)
+3. Client: POST /chat/{job_id}/input → HTTP로 위치 전송
+4. Client: 새 요청 또는 재시도로 검색 수행
 """
 
 from __future__ import annotations
@@ -29,7 +34,6 @@ from chat_worker.domain import LocationData
 
 if TYPE_CHECKING:
     from chat_worker.application.integrations.location.ports import LocationClientPort
-    from chat_worker.application.interaction.ports import InputRequesterPort
     from chat_worker.application.ports.events import ProgressNotifierPort
 
 logger = logging.getLogger(__name__)
@@ -38,36 +42,29 @@ logger = logging.getLogger(__name__)
 def create_location_subagent_node(
     location_client: "LocationClientPort",
     event_publisher: "ProgressNotifierPort",
-    input_requester: "InputRequesterPort | None" = None,
 ):
     """Location Subagent 노드 생성.
 
     노드는 thin wrapper로:
     1. 이벤트 발행
-    2. LocationService 호출 (비즈니스 로직 위임)
+    2. LocationService 호출 (gRPC, 비즈니스 로직 위임)
     3. state 업데이트
 
     Args:
-        location_client: Location gRPC/HTTP 클라이언트
+        location_client: Location gRPC 클라이언트
         event_publisher: 이벤트 발행자 (SSE 진행 상황)
-        input_requester: Human-in-the-Loop 입력 요청자 (Port)
 
     Returns:
         LangGraph 노드 함수
     """
-    # Service 인스턴스들 (비즈니스 로직 담당)
-    # Note: HumanInteractionService는 InteractionStateStorePort도 필요하므로
-    #       여기서는 직접 생성하지 않고 DI로 주입받아야 함
-    #       현재는 input_requester만 사용하여 간단히 처리
-
     location_service = LocationService(client=location_client)
 
     async def location_subagent(state: dict[str, Any]) -> dict[str, Any]:
-        """주변 재활용 센터를 검색합니다.
+        """주변 재활용 센터를 검색합니다 (gRPC).
 
         노드 책임 (Orchestration):
         1. 이벤트 발행 (진행 상황)
-        2. 서비스 호출 (비즈니스 로직 위임)
+        2. 서비스 호출 (gRPC, 비즈니스 로직 위임)
         3. state 업데이트
         """
         job_id = state.get("job_id", "")
@@ -82,46 +79,46 @@ def create_location_subagent_node(
             message="📍 위치 정보 확인 중...",
         )
 
-        # 2. LocationService 호출 (Human-in-the-Loop 포함)
+        # 2. 위치 정보 확인
+        location_data = _extract_location_data(user_location_dict)
+        if location_data is None:
+            # 위치 정보 없음 → needs_input 이벤트 발행 (HITL via HTTP)
+            await event_publisher.notify_needs_input(
+                task_id=job_id,
+                input_type="location",
+                message="📍 주변 센터를 찾으려면 위치 정보가 필요해요.\n위치 권한을 허용해주세요!",
+                timeout=60,
+            )
+            # 스킵 후 진행 (클라이언트가 위치와 함께 재요청 가능)
+            await event_publisher.notify_stage(
+                task_id=job_id,
+                stage="location",
+                status="skipped",
+                message="위치 정보 없이 진행합니다.",
+            )
+            return {
+                **state,
+                "location_context": None,
+                "location_skipped": True,
+                "needs_location": True,  # 클라이언트 힌트
+            }
+
+        # 3. LocationService로 gRPC 검색
         try:
-            centers, error_msg = await location_service.search_with_human_input(
-                job_id=job_id,
-                user_location=user_location_dict,
+            centers = await location_service.search_recycling_centers(
+                location=location_data,
                 radius=5000,  # 5km 반경
                 limit=5,  # 최대 5개
             )
 
-            # 에러 또는 스킵
-            if error_msg:
-                return {
-                    **state,
-                    "location_context": None,
-                    "subagent_error": error_msg,
-                }
-
-            if centers is None:
-                # Human-in-the-Loop 취소/타임아웃
-                await event_publisher.notify_stage(
-                    task_id=job_id,
-                    stage="location",
-                    status="skipped",
-                    message="위치 정보 없이 진행합니다.",
-                )
-                return {
-                    **state,
-                    "location_context": None,
-                    "location_skipped": True,
-                }
-
-            # 3. 컨텍스트 구성 (Service의 메서드 사용)
-            location_data = _extract_location_data(user_location_dict)
+            # 4. 컨텍스트 구성
             context = LocationService.to_answer_context(
                 locations=centers,
                 user_location=location_data,
             )
 
             logger.info(
-                "Location search completed",
+                "Location search completed (gRPC)",
                 extra={
                     "job_id": job_id,
                     "count": len(centers),
@@ -135,7 +132,7 @@ def create_location_subagent_node(
 
         except Exception as e:
             logger.error(
-                "Location service call failed",
+                "Location gRPC call failed",
                 extra={"job_id": job_id, "error": str(e)},
             )
             return {

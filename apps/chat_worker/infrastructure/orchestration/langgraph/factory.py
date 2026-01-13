@@ -73,7 +73,7 @@ def create_chat_graph(
     event_publisher: "ProgressNotifierPort",
     character_client: "CharacterClientPort | None" = None,
     location_client: "LocationClientPort | None" = None,
-    input_requester: "InputRequesterPort | None" = None,
+    input_requester: "InputRequesterPort | None" = None,  # Reserved for future use
     checkpointer: "BaseCheckpointSaver | None" = None,
 ) -> StateGraph:
     """Chat 파이프라인 그래프 생성.
@@ -84,7 +84,7 @@ def create_chat_graph(
         event_publisher: 이벤트 발행자 (SSE)
         character_client: Character gRPC 클라이언트 (선택)
         location_client: Location gRPC 클라이언트 (선택)
-        input_requester: Human-in-the-Loop 입력 요청자 (선택)
+        input_requester: Reserved for future use (현재 미사용)
         checkpointer: LangGraph 체크포인터 (세션 유지용)
 
     Returns:
@@ -92,9 +92,10 @@ def create_chat_graph(
 
     Note:
         - character_client, location_client가 None이면 passthrough 노드 사용
-        - input_requester가 있으면 Location Subagent에서 Human-in-the-Loop 활성화
+        - 모든 Subagent는 gRPC로 통신
         - checkpointer가 있으면 thread_id로 멀티턴 대화 컨텍스트 유지
     """
+    _ = input_requester  # Reserved for future use
     # 핵심 노드 생성
     intent_node = create_intent_node(llm, event_publisher)
     rag_node = create_rag_node(retriever, event_publisher)
@@ -123,17 +124,13 @@ def create_chat_graph(
 
         logger.warning("Character subagent node using passthrough (no client)")
 
-    # Subagent 노드: Location (Human-in-the-Loop 지원)
+    # Subagent 노드: Location (gRPC)
     if location_client is not None:
         location_node = create_location_subagent_node(
             location_client=location_client,
             event_publisher=event_publisher,
-            input_requester=input_requester,  # Human-in-the-Loop
         )
-        if input_requester is not None:
-            logger.info("Location subagent node created (gRPC + Human-in-the-Loop)")
-        else:
-            logger.info("Location subagent node created (gRPC only)")
+        logger.info("Location subagent node created (gRPC)")
     else:
         # Fallback: passthrough
         async def location_node(state: dict[str, Any]) -> dict[str, Any]:
