@@ -11,35 +11,55 @@
 
 ## 1. 개요
 
-### 1.1 왜 Vision이 필요한가?
+### 1.1 기존 Vision 파이프라인
 
-기존 Chat Worker는 텍스트 입력만 처리했습니다:
-
-```
-사용자: "페트병 어떻게 버려요?"
-→ Intent 분류 → RAG 검색 → 답변 생성
-```
-
-그런데 사용자 입장에서 폐기물을 정확히 설명하기란 쉽지 않습니다. "이게 PP인지 PE인지 모르겠는데요"라는 질문에는 텍스트만으로 답하기 어렵습니다.
-
-**이미지가 있다면?**
+Vision 처리는 이미 `domains/chat`에 구현되어 있었습니다. 이미지가 포함된 요청이 들어오면 Vision 파이프라인을 타는 방식이었죠:
 
 ```
 사용자: [📷 이미지] "이거 어떻게 버려요?"
-→ 이미지 분류 → RAG 검색 → 답변 생성
+→ Vision 분류 → RAG 검색 → 답변 생성
 ```
 
-Vision 모델이 이미지를 먼저 분석하여 폐기물 종류를 파악하고, 그 결과를 기반으로 정확한 규정을 검색합니다.
+기존 구조:
+- `apps/chat/infrastructure/assets/prompts/vision_classification_prompt.txt` — Vision 프롬프트
+- `apps/chat/presentation/http/controllers/chat.py` — `image_url` 파라미터 처리
+- `apps/chat/application/chat/commands/submit_chat.py` — `image_url` 전달
 
-### 1.2 목표
+### 1.2 이번 작업: Clean Architecture로 재구성
+
+이번 리팩토링의 핵심은 **기능 추가가 아니라 아키텍처 개선**입니다:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                      Vision 처리 목표                        │
+│                    Before → After                           │
 ├─────────────────────────────────────────────────────────────┤
-│  1. 이미지 → 폐기물 분류 (major/middle/minor category)       │
-│  2. 분류 결과 → state에 저장                                 │
-│  3. RAG 노드가 분류 결과 활용                                │
+│  Before (domains/chat):                                     │
+│  - Vision 로직이 여러 파일에 분산                            │
+│  - LLM 클라이언트 직접 호출                                  │
+│  - 테스트 어려움                                            │
+│                                                             │
+│  After (chat_worker + Clean Architecture):                  │
+│  - VisionModelPort (추상화)                                 │
+│  - OpenAI/Gemini 어댑터 분리                                │
+│  - LangGraph 노드로 통합                                    │
+│  - Mock 주입으로 테스트 용이                                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**변경 사항 요약**:
+- `VisionModelPort` — Application Layer 추상 인터페이스
+- `OpenAIVisionClient`, `GeminiVisionClient` — Infrastructure 어댑터
+- `vision_node` — LangGraph 파이프라인 통합
+
+### 1.3 재구성 목표
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                   Clean Architecture 재구성 목표             │
+├─────────────────────────────────────────────────────────────┤
+│  1. Port/Adapter 패턴으로 LLM 의존성 분리                    │
+│  2. LangGraph 노드로 파이프라인 통합                         │
+│  3. 진행 이벤트(SSE) 발행 추가                               │
 │  4. 기존 텍스트 플로우 호환 유지                              │
 └─────────────────────────────────────────────────────────────┘
 ```
