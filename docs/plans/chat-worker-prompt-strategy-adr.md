@@ -436,9 +436,11 @@ Output: 안녕하세요! 저는 분리배출 도우미 **이코**예요.
 ## 참고 자료
 
 - [ai-agent-papers (GitHub)](https://github.com/masamasa59/ai-agent-papers) - 2025 AI Agent 논문 모음
-- [Local Prompt Optimization (2025)](https://arxiv.org/abs/...) - Global + Local 프롬프트 패턴
-- [Multi-Agent Collaboration via Evolving Orchestration (2025)](https://arxiv.org/abs/...) - 동적 오케스트레이션
-- [Mem0 (2025)](https://arxiv.org/abs/...) - 프로덕션 레벨 에이전트 메모리
-- [ChatDev (2023)](https://arxiv.org/abs/2307.07924) - 역할 기반 멀티 에이전트
-- [MetaGPT (2023)](https://arxiv.org/abs/2308.00352) - SOP 기반 멀티 에이전트
+- [Local Prompt Optimization (arxiv:2504.20355)](https://arxiv.org/abs/2504.20355) - Global + Local 프롬프트 패턴
+- [Multi-Agent Collaboration via Evolving Orchestration (arxiv:2505.19591)](https://arxiv.org/abs/2505.19591) - 동적 오케스트레이션
+- [Mem0 (arxiv:2504.19413)](https://arxiv.org/abs/2504.19413) - 프로덕션 레벨 에이전트 메모리
+- [SEW (arxiv:2505.18646)](https://arxiv.org/abs/2505.18646) - Self-Evolving 워크플로우
+- [FlowReasoner (arxiv:2504.15257)](https://arxiv.org/abs/2504.15257) - 메타 에이전트 프롬프트 선택
+- [ChatDev (arxiv:2307.07924)](https://arxiv.org/abs/2307.07924) - 역할 기반 멀티 에이전트
+- [MetaGPT (arxiv:2308.00352)](https://arxiv.org/abs/2308.00352) - SOP 기반 멀티 에이전트
 

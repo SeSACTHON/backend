@@ -142,7 +142,7 @@ def build_prompt(intent: str) -> str:
 
 ### 3.1 Local Prompt Optimization
 
-> **출처**: [ai-agent-papers](https://github.com/masamasa59/ai-agent-papers) - April 2025 Highlights
+> **출처**: [arxiv:2504.20355](https://arxiv.org/abs/2504.20355) - April 2025
 
 **핵심 아이디어**: 전역(Global) 프롬프트와 지역(Local) 프롬프트를 분리하여,
 각 태스크/노드에서 Local 프롬프트만 최적화
@@ -177,7 +177,7 @@ def build_prompt(intent: str) -> str:
 
 ### 3.2 Multi-Agent Collaboration via Evolving Orchestration
 
-> **출처**: [ai-agent-papers](https://github.com/masamasa59/ai-agent-papers) - Self-Evolution Section
+> **출처**: [arxiv:2505.19591](https://arxiv.org/abs/2505.19591) - May 2025
 
 **핵심 아이디어**: Orchestrator가 상황에 따라 동적으로 에이전트와 프롬프트를 선택
 
@@ -211,7 +211,7 @@ def build_prompt(intent: str) -> str:
 
 ### 3.3 Mem0: Building Production-Ready AI Agents with Scalable Long-Term Memory
 
-> **출처**: [ai-agent-papers](https://github.com/masamasa59/ai-agent-papers) - April 2025 Highlights
+> **출처**: [arxiv:2504.19413](https://arxiv.org/abs/2504.19413) - April 2025
 
 **핵심 아이디어**: 단기 컨텍스트(현재 요청)와 장기 메모리(대화 이력, 사용자 선호)를 분리
 
@@ -250,7 +250,7 @@ def build_prompt(intent: str) -> str:
 
 ### 3.4 SEW: Self-Evolving Agentic Workflows for Automated Code Generation
 
-> **출처**: [ai-agent-papers](https://github.com/masamasa59/ai-agent-papers) - Multi-Agent Architecture
+> **출처**: [arxiv:2505.18646](https://arxiv.org/abs/2505.18646) - May 2025
 
 **핵심 아이디어**: 워크플로우와 프롬프트가 자동으로 진화
 
@@ -293,7 +293,7 @@ def build_prompt(intent: str) -> str:
 
 ### 3.5 FlowReasoner: Reinforcing Query-Level Meta-Agents
 
-> **출처**: [ai-agent-papers](https://github.com/masamasa59/ai-agent-papers) - Meta Agents
+> **출처**: [arxiv:2504.15257](https://arxiv.org/abs/2504.15257) - April 2025
 
 **핵심 아이디어**: 쿼리 레벨에서 메타 에이전트가 최적의 워크플로우/프롬프트 선택
 
@@ -486,21 +486,23 @@ Debugger   → "실패 분석 및 수정 제안..."
 
 ### 2025년 논문
 - [ai-agent-papers (GitHub)](https://github.com/masamasa59/ai-agent-papers) - AI Agent 논문 모음 (격주 업데이트)
-- Local Prompt Optimization
-- Multi-Agent Collaboration via Evolving Orchestration
-- Mem0: Building Production-Ready AI Agents with Scalable Long-Term Memory
-- SEW: Self-Evolving Agentic Workflows for Automated Code Generation
-- FlowReasoner: Reinforcing Query-Level Meta-Agents
+- [Local Prompt Optimization (arxiv:2504.20355)](https://arxiv.org/abs/2504.20355)
+- [Multi-Agent Collaboration via Evolving Orchestration (arxiv:2505.19591)](https://arxiv.org/abs/2505.19591)
+- [Mem0: Building Production-Ready AI Agents with Scalable Long-Term Memory (arxiv:2504.19413)](https://arxiv.org/abs/2504.19413)
+- [SEW: Self-Evolving Agentic Workflows for Automated Code Generation (arxiv:2505.18646)](https://arxiv.org/abs/2505.18646)
+- [FlowReasoner: Reinforcing Query-Level Meta-Agents (arxiv:2504.15257)](https://arxiv.org/abs/2504.15257)
+- [SkillWeaver: Web Agents can Self-Improve by Discovering and Honing Skills (arxiv:2504.07079)](https://arxiv.org/abs/2504.07079)
 
 ### 2023-2024년 논문
-- [ChatDev (arxiv 2307.07924)](https://arxiv.org/abs/2307.07924) - 청화대 OpenBMB
-- [MetaGPT (arxiv 2308.00352)](https://arxiv.org/abs/2308.00352) - DeepWisdom
+- [ChatDev (arxiv:2307.07924)](https://arxiv.org/abs/2307.07924) - 청화대 OpenBMB
+- [MetaGPT (arxiv:2308.00352)](https://arxiv.org/abs/2308.00352) - DeepWisdom
 - AgentCoder - Multi-Agent-based Code Generation
 
 ### 서베이 논문
-- 📖 A Survey of Frontiers in LLM Reasoning: Inference Scaling, Learning to Reason, and Agentic Systems
-- 📖 Creativity in LLM-based Multi-Agent Systems: A Survey
-- 📖 A Survey of AI Agent Protocols
+- [A Survey of Frontiers in LLM Reasoning: Inference Scaling, Learning to Reason, and Agentic Systems](https://openreview.net/forum?id=SlsZZ25InC)
+- [Creativity in LLM-based Multi-Agent Systems: A Survey (arxiv:2505.21116)](https://arxiv.org/abs/2505.21116)
+- [A Survey of AI Agent Protocols (arxiv:2504.16736)](https://arxiv.org/abs/2504.16736)
+- [Rethinking Memory in AI: Taxonomy, Operations, Topics, and Future Directions (arxiv:2505.00675)](https://arxiv.org/abs/2505.00675)
 
 ---
 
@@ -508,9 +510,9 @@ Debugger   → "실패 분석 및 수정 제안..."
 
 > 아래 논문들은 실제로 읽고 상세 내용을 추가해야 합니다.
 
-- [ ] Local Prompt Optimization - arxiv 링크 확인 및 상세 분석
-- [ ] Multi-Agent Collaboration via Evolving Orchestration - 상세 분석
-- [ ] Mem0 - 구현 방식 상세 분석
-- [ ] SEW - Self-Evolution 메커니즘 분석
-- [ ] FlowReasoner - Meta Agent 구현 방식 분석
+- [ ] [Local Prompt Optimization (arxiv:2504.20355)](https://arxiv.org/abs/2504.20355) - 상세 분석
+- [ ] [Multi-Agent Collaboration via Evolving Orchestration (arxiv:2505.19591)](https://arxiv.org/abs/2505.19591) - 상세 분석
+- [ ] [Mem0 (arxiv:2504.19413)](https://arxiv.org/abs/2504.19413) - 구현 방식 상세 분석
+- [ ] [SEW (arxiv:2505.18646)](https://arxiv.org/abs/2505.18646) - Self-Evolution 메커니즘 분석
+- [ ] [FlowReasoner (arxiv:2504.15257)](https://arxiv.org/abs/2504.15257) - Meta Agent 구현 방식 분석
 
