@@ -16,6 +16,10 @@ Application Layer의 핵심 진입점.
 - waiting_human: Human-in-the-Loop 대기 (interaction)
 - completed: 완료
 - failed: 실패
+
+Clean Architecture:
+- Infrastructure(Prometheus) 직접 의존 제거
+- MetricsPort 추상화를 통한 메트릭 수집
 """
 
 from __future__ import annotations
@@ -27,18 +31,7 @@ from typing import TYPE_CHECKING, Any, Protocol
 
 if TYPE_CHECKING:
     from chat_worker.application.ports.events import ProgressNotifierPort
-
-# Prometheus Metrics (lazy import to avoid import errors in tests)
-try:
-    from chat_worker.infrastructure.metrics import (
-        track_request,
-        track_intent,
-        track_error,
-    )
-
-    METRICS_ENABLED = True
-except ImportError:
-    METRICS_ENABLED = False
+    from chat_worker.application.ports.metrics import MetricsPort
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +98,7 @@ class ProcessChatCommand:
     최상위 유스케이스로서:
     - 파이프라인 실행 조율 (LangGraph)
     - 시작/완료/실패 이벤트 발행 (ProgressNotifier)
+    - 메트릭 수집 (MetricsPort)
     - 결과 포맷팅
 
     서브 서비스들:
@@ -130,9 +124,21 @@ class ProcessChatCommand:
         self,
         pipeline: ChatPipelinePort,
         progress_notifier: "ProgressNotifierPort",
+        metrics: "MetricsPort | None" = None,
+        provider: str = "openai",
     ):
+        """초기화.
+
+        Args:
+            pipeline: Chat 파이프라인 (LangGraph)
+            progress_notifier: 진행 상황 알림 Port
+            metrics: 메트릭 수집 Port (선택)
+            provider: LLM 프로바이더
+        """
         self._pipeline = pipeline
         self._progress_notifier = progress_notifier
+        self._metrics = metrics
+        self._provider = provider
 
     async def execute(self, request: ProcessChatRequest) -> ProcessChatResponse:
         """Chat 파이프라인 실행.
@@ -183,8 +189,8 @@ class ProcessChatCommand:
             intent = result.get("intent", "unknown")
 
             # Metrics: Intent 추적
-            if METRICS_ENABLED:
-                track_intent(intent)
+            if self._metrics:
+                self._metrics.track_intent(intent)
 
             # 3. 작업 완료 이벤트 (running → completed)
             await self._progress_notifier.notify_stage(
@@ -220,8 +226,8 @@ class ProcessChatCommand:
             )
 
             # Metrics: 에러 추적
-            if METRICS_ENABLED:
-                track_error(intent, type(e).__name__)
+            if self._metrics:
+                self._metrics.track_error(intent, type(e).__name__)
 
             # 작업 실패 이벤트 (running → failed)
             await self._progress_notifier.notify_stage(
@@ -243,18 +249,10 @@ class ProcessChatCommand:
         finally:
             # Metrics: 요청 시간 추적
             duration = time.perf_counter() - start_time
-            if METRICS_ENABLED:
-                from chat_worker.infrastructure.metrics import (
-                    CHAT_REQUESTS_TOTAL,
-                    CHAT_REQUEST_DURATION,
-                )
-
-                CHAT_REQUESTS_TOTAL.labels(
+            if self._metrics:
+                self._metrics.track_request(
                     intent=intent,
                     status=status,
-                    provider="openai",  # TODO: 실제 provider 추적
-                ).inc()
-                CHAT_REQUEST_DURATION.labels(
-                    intent=intent,
-                    provider="openai",
-                ).observe(duration)
+                    provider=self._provider,
+                    duration=duration,
+                )

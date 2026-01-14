@@ -7,12 +7,12 @@ Clean Architecture:
 - Node: 오케스트레이션 (이 파일)
 - Service: IntentClassifier (비즈니스 로직)
 - Domain: Intent, ChatIntent (결과 VO)
-- Port: LLMPort (순수 LLM 호출)
+- Port: LLMPort (순수 LLM 호출), CachePort (캐싱)
 
 P0-P3 개선사항:
 - P0: 프롬프트 파일 기반 로딩
 - P1: 신뢰도 기반 Fallback
-- P2: Intent 캐싱 (Redis 주입)
+- P2: Intent 캐싱 (CachePort 추상화)
 - P3: 대화 맥락 활용 (context 전달)
 """
 
@@ -24,8 +24,7 @@ from typing import TYPE_CHECKING, Any
 from chat_worker.application.intent.services import IntentClassifier
 
 if TYPE_CHECKING:
-    from redis.asyncio import Redis
-
+    from chat_worker.application.ports.cache import CachePort
     from chat_worker.application.ports.events import ProgressNotifierPort
     from chat_worker.application.ports.llm import LLMClientPort
 
@@ -35,7 +34,7 @@ logger = logging.getLogger(__name__)
 def create_intent_node(
     llm: "LLMClientPort",
     event_publisher: "ProgressNotifierPort",
-    redis: "Redis | None" = None,
+    cache: "CachePort | None" = None,
 ):
     """의도 분류 노드 팩토리.
 
@@ -47,10 +46,10 @@ def create_intent_node(
     Args:
         llm: LLM 클라이언트
         event_publisher: 이벤트 발행자
-        redis: Redis 클라이언트 (P2: 캐싱용)
+        cache: 캐시 Port (CachePort 구현체)
     """
     # 서비스 인스턴스 (비즈니스 로직 담당)
-    classifier = IntentClassifier(llm, redis=redis, enable_cache=redis is not None)
+    classifier = IntentClassifier(llm, cache=cache, enable_cache=cache is not None)
 
     async def intent_node(state: dict[str, Any]) -> dict[str, Any]:
         job_id = state["job_id"]

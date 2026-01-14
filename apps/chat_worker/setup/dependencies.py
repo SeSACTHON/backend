@@ -32,6 +32,8 @@ from chat_worker.application.ports import (
     ProgressNotifierPort,
     RetrieverPort,
 )
+from chat_worker.application.ports.cache import CachePort
+from chat_worker.application.ports.metrics import MetricsPort
 from chat_worker.application.ports.vision import VisionModelPort
 from chat_worker.application.ports.web_search import WebSearchPort
 from chat_worker.application.integrations.character.ports import CharacterClientPort
@@ -62,6 +64,8 @@ from chat_worker.infrastructure.interaction import (
     RedisInputRequester,
     RedisInteractionStateStore,
 )
+from chat_worker.infrastructure.cache import RedisCacheAdapter
+from chat_worker.infrastructure.metrics import PrometheusMetricsAdapter, NoOpMetricsAdapter
 from chat_worker.setup.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -81,6 +85,8 @@ _web_search_client: WebSearchPort | None = None
 _interaction_state_store: InteractionStateStorePort | None = None
 _input_requester: InputRequesterPort | None = None
 _checkpointer = None  # BaseCheckpointSaver
+_cache: CachePort | None = None
+_metrics: MetricsPort | None = None
 
 
 async def get_redis() -> Redis:
@@ -122,6 +128,49 @@ async def get_domain_event_bus() -> RedisStreamDomainEventBus:
 def get_retriever() -> RetrieverPort:
     """Retriever 싱글톤."""
     return LocalAssetRetriever()
+
+
+# ============================================================
+# Cache Factory (Clean Architecture)
+# ============================================================
+
+
+async def get_cache() -> CachePort:
+    """CachePort 싱글톤.
+
+    Application Layer는 CachePort만 알고,
+    실제 구현(Redis)은 Infrastructure에서 제공.
+    """
+    global _cache
+    if _cache is None:
+        redis = await get_redis()
+        _cache = RedisCacheAdapter(redis, key_prefix="chat:cache:")
+        logger.info("RedisCacheAdapter created")
+    return _cache
+
+
+# ============================================================
+# Metrics Factory (Clean Architecture)
+# ============================================================
+
+
+def get_metrics() -> MetricsPort:
+    """MetricsPort 싱글톤.
+
+    Application Layer는 MetricsPort만 알고,
+    실제 구현(Prometheus)은 Infrastructure에서 제공.
+
+    테스트 환경에서는 NoOpMetricsAdapter로 교체 가능.
+    """
+    global _metrics
+    if _metrics is None:
+        try:
+            _metrics = PrometheusMetricsAdapter()
+            logger.info("PrometheusMetricsAdapter created")
+        except ImportError:
+            _metrics = NoOpMetricsAdapter()
+            logger.warning("Prometheus not available, using NoOpMetricsAdapter")
+    return _metrics
 
 
 # ============================================================
@@ -348,9 +397,7 @@ async def get_checkpointer():
                 )
                 logger.info("CachedPostgresSaver initialized (Redis L1 + PostgreSQL L2)")
             except Exception as e:
-                logger.warning(
-                    "CachedPostgresSaver failed, falling back to Redis only: %s", e
-                )
+                logger.warning("CachedPostgresSaver failed, falling back to Redis only: %s", e)
                 # Redis 폴백
                 from chat_worker.infrastructure.langgraph.checkpointer import (
                     create_redis_checkpointer,
@@ -406,7 +453,7 @@ async def get_chat_graph(
     llm = create_llm_client(provider, model)
     vision_model = create_vision_client(provider, model)
     retriever = get_retriever()
-    redis = await get_redis()  # P2: Intent 캐싱용
+    cache = await get_cache()  # P2: Intent 캐싱용 (CachePort)
     progress_notifier = await get_progress_notifier()
     character_client = await get_character_client()
     location_client = await get_location_client()
@@ -422,7 +469,7 @@ async def get_chat_graph(
         character_client=character_client,
         location_client=location_client,
         web_search_client=web_search_client,
-        redis=redis,  # P2: Intent 캐싱
+        cache=cache,  # P2: Intent 캐싱 (CachePort)
         input_requester=input_requester,
         checkpointer=checkpointer,
     )
@@ -459,10 +506,13 @@ async def get_process_chat_command(
 
     pipeline = await get_chat_graph(actual_provider, model)
     progress_notifier = await get_progress_notifier()
+    metrics = get_metrics()  # MetricsPort
 
     return ProcessChatCommand(
         pipeline=pipeline,
-        event_publisher=progress_notifier,
+        progress_notifier=progress_notifier,
+        metrics=metrics,
+        provider=actual_provider,
     )
 
 

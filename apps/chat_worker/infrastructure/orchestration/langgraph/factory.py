@@ -53,11 +53,11 @@ from chat_worker.infrastructure.orchestration.langgraph.nodes.web_search_node im
 
 if TYPE_CHECKING:
     from langgraph.checkpoint.base import BaseCheckpointSaver
-    from redis.asyncio import Redis
 
     from chat_worker.application.integrations.character.ports import CharacterClientPort
     from chat_worker.application.integrations.location.ports import LocationClientPort
     from chat_worker.application.interaction.ports import InputRequesterPort
+    from chat_worker.application.ports.cache import CachePort
     from chat_worker.application.ports.events import ProgressNotifierPort
     from chat_worker.application.ports.llm import LLMClientPort
     from chat_worker.application.ports.retrieval import RetrieverPort
@@ -102,7 +102,7 @@ def create_chat_graph(
     character_client: "CharacterClientPort | None" = None,
     location_client: "LocationClientPort | None" = None,
     web_search_client: "WebSearchPort | None" = None,
-    redis: "Redis | None" = None,  # P2: Intent 캐싱용
+    cache: "CachePort | None" = None,  # P2: Intent 캐싱용 (CachePort 추상화)
     input_requester: "InputRequesterPort | None" = None,  # Reserved for future use
     checkpointer: "BaseCheckpointSaver | None" = None,
 ) -> StateGraph:
@@ -131,7 +131,7 @@ def create_chat_graph(
     _ = input_requester  # Reserved for future use
 
     # 핵심 노드 생성
-    intent_node = create_intent_node(llm, event_publisher, redis=redis)  # P2: 캐싱
+    intent_node = create_intent_node(llm, event_publisher, cache=cache)  # P2: 캐싱
     rag_node = create_rag_node(retriever, event_publisher)
     answer_node = create_answer_node(llm, event_publisher)
 
@@ -140,9 +140,11 @@ def create_chat_graph(
         vision_node = create_vision_node(vision_model, event_publisher)
         logger.info("Vision node created")
     else:
+
         async def vision_node(state: dict[str, Any]) -> dict[str, Any]:
             logger.debug("Vision model not configured, skipping")
             return state
+
         logger.warning("Vision node using passthrough (no model)")
 
     # Router 노드 (조건부 라우팅을 위한 passthrough)

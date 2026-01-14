@@ -5,19 +5,21 @@ Domain Layer의 Intent, QueryComplexity, ChatIntent 사용.
 
 Clean Architecture:
 - Service: 비즈니스 로직 (이 파일)
-- Port: LLMClientPort (generate만 사용)
+- Port: LLMClientPort (generate만 사용), CachePort (캐싱)
 - Domain: Intent, ChatIntent (결과 VO)
 
 P0-P3 개선사항:
 - P0: 프롬프트 파일 기반 로딩 (scan_worker 형식)
 - P1: 신뢰도 기반 Fallback
-- P2: Intent 캐싱 (Redis)
+- P2: Intent 캐싱 (CachePort 추상화)
 - P2: Multi-Intent 지원
 - P3: 대화 맥락 활용
 """
 
 from __future__ import annotations
 
+import hashlib
+import json
 import logging
 from functools import lru_cache
 from pathlib import Path
@@ -26,8 +28,7 @@ from typing import TYPE_CHECKING
 from chat_worker.domain import ChatIntent, Intent, QueryComplexity
 
 if TYPE_CHECKING:
-    from redis.asyncio import Redis
-
+    from chat_worker.application.ports.cache import CachePort
     from chat_worker.application.ports.llm import LLMClientPort
 
 logger = logging.getLogger(__name__)
@@ -48,6 +49,9 @@ CONFIDENCE_THRESHOLD = 0.6
 
 # 캐시 TTL (초)
 INTENT_CACHE_TTL = 3600  # 1시간
+
+# 캐시 키 프리픽스
+INTENT_CACHE_PREFIX = "intent:"
 
 
 @lru_cache(maxsize=1)
@@ -73,24 +77,28 @@ class IntentClassifier:
 
     LangGraph 노드에서 호출되며,
     노드는 이 서비스의 결과를 state에 반영하는 역할만 수행.
+
+    Clean Architecture:
+    - Redis 직접 의존 제거 → CachePort 추상화
+    - 테스트 시 InMemoryCache로 교체 가능
     """
 
     def __init__(
         self,
         llm: "LLMClientPort",
-        redis: "Redis | None" = None,
+        cache: "CachePort | None" = None,
         enable_cache: bool = True,
     ):
         """초기화.
 
         Args:
             llm: LLM 클라이언트
-            redis: Redis 클라이언트 (캐싱용, 선택)
+            cache: 캐시 Port (CachePort 구현체)
             enable_cache: 캐싱 활성화 여부
         """
         self._llm = llm
-        self._redis = redis
-        self._enable_cache = enable_cache and redis is not None
+        self._cache = cache
+        self._enable_cache = enable_cache and cache is not None
         self._prompt = _load_intent_prompt()
 
     async def classify(
@@ -301,19 +309,21 @@ class IntentClassifier:
                 return True
         return False
 
-    # ===== P2: 캐싱 =====
+    # ===== P2: 캐싱 (CachePort 사용) =====
+
+    def _make_cache_key(self, message: str) -> str:
+        """메시지 해시로 캐시 키 생성."""
+        message_hash = hashlib.md5(message.encode()).hexdigest()
+        return f"{INTENT_CACHE_PREFIX}{message_hash}"
 
     async def _get_cached_intent(self, message: str) -> ChatIntent | None:
         """캐시에서 Intent 조회."""
-        if not self._redis:
+        if not self._cache:
             return None
 
         try:
-            import hashlib
-            import json
-
-            cache_key = f"intent:{hashlib.md5(message.encode()).hexdigest()}"
-            cached = await self._redis.get(cache_key)
+            cache_key = self._make_cache_key(message)
+            cached = await self._cache.get(cache_key)
 
             if cached:
                 data = json.loads(cached)
@@ -329,20 +339,19 @@ class IntentClassifier:
 
     async def _cache_intent(self, message: str, result: ChatIntent) -> None:
         """Intent를 캐시에 저장."""
-        if not self._redis:
+        if not self._cache:
             return
 
         try:
-            import hashlib
-            import json
-
-            cache_key = f"intent:{hashlib.md5(message.encode()).hexdigest()}"
-            data = json.dumps({
-                "intent": result.intent.value,
-                "complexity": result.complexity.value,
-                "confidence": result.confidence,
-            })
-            await self._redis.setex(cache_key, INTENT_CACHE_TTL, data)
+            cache_key = self._make_cache_key(message)
+            data = json.dumps(
+                {
+                    "intent": result.intent.value,
+                    "complexity": result.complexity.value,
+                    "confidence": result.confidence,
+                }
+            )
+            await self._cache.set(cache_key, data, ttl=INTENT_CACHE_TTL)
             logger.debug(f"Intent cached: {cache_key}")
         except Exception as e:
             logger.warning(f"Intent cache set failed: {e}")

@@ -16,8 +16,13 @@ from chat_worker.infrastructure.metrics.prometheus import (
     track_tokens,
     track_error,
 )
+from chat_worker.infrastructure.metrics.prometheus_adapter import (
+    PrometheusMetricsAdapter,
+    NoOpMetricsAdapter,
+)
 
 __all__ = [
+    # Raw Prometheus metrics (legacy)
     "CHAT_REQUESTS_TOTAL",
     "CHAT_REQUEST_DURATION",
     "CHAT_ERRORS_TOTAL",
@@ -26,10 +31,14 @@ __all__ = [
     "CHAT_VISION_REQUESTS",
     "CHAT_SUBAGENT_CALLS",
     "CHAT_TOKEN_USAGE",
+    # Legacy helper functions
     "track_request",
     "track_intent",
     "track_vision",
     "track_subagent",
     "track_tokens",
     "track_error",
+    # Clean Architecture adapters (recommended)
+    "PrometheusMetricsAdapter",
+    "NoOpMetricsAdapter",
 ]

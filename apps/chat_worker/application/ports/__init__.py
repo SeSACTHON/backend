@@ -7,13 +7,17 @@
 - vision/: Vision 모델 (이미지 분류)
 - events/: 이벤트 관련 (진행률 + 도메인 이벤트)
 - retrieval/: RAG 검색
+- cache/: 캐싱 추상화
+- metrics/: 메트릭 추상화
 """
 
+from chat_worker.application.ports.cache import CachePort
 from chat_worker.application.ports.events import (
     DomainEventBusPort,
     ProgressNotifierPort,
 )
 from chat_worker.application.ports.llm import LLMClientPort, LLMPolicyPort
+from chat_worker.application.ports.metrics import MetricsPort
 from chat_worker.application.ports.retrieval import RetrieverPort
 from chat_worker.application.ports.vision import VisionModelPort
 
@@ -28,4 +32,8 @@ __all__ = [
     "DomainEventBusPort",
     # Retrieval
     "RetrieverPort",
+    # Cache
+    "CachePort",
+    # Metrics
+    "MetricsPort",
 ]
