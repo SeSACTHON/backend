@@ -97,7 +97,7 @@ class OpenAIVisionClient(VisionModelPort):
                             {"type": "text", "text": input_text},
                             {
                                 "type": "image_url",
-                                "image_url": {"url": image_url, "detail": "low"},
+                                "image_url": {"url": image_url, "detail": "high"},
                             },
                         ],
                     },
