@@ -46,13 +46,13 @@ class OpenAIVisionClient(VisionModelPort):
 
     def __init__(
         self,
-        model: str = "gpt-5.2-vision",
+        model: str = "gpt-5.2",
         api_key: str | None = None,
     ):
         """초기화.
 
         Args:
-            model: 모델명 (기본: gpt-5.2-vision)
+            model: 모델명 (기본: gpt-5.2, 멀티모달 지원)
             api_key: API 키 (None이면 환경변수에서)
         """
         self._model = model

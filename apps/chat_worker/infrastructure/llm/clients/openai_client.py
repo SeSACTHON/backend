@@ -37,7 +37,7 @@ class OpenAILLMClient(LLMClientPort):
 
     def __init__(
         self,
-        model: str = "gpt-5.2-turbo",
+        model: str = "gpt-5.2",
         api_key: str | None = None,
     ):
         """초기화.

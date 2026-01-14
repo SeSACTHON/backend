@@ -18,10 +18,10 @@ HTTP_LIMITS = httpx.Limits(
 MAX_RETRIES = 2
 
 MODEL_CONTEXT_WINDOWS = {
-    "gpt-5.2-turbo": 256_000,
     "gpt-5.2": 256_000,
-    "gpt-5.1": 200_000,
+    "gpt-5.2-pro": 256_000,
+    "gpt-5.2-instant": 128_000,
+    "gpt-5-mini": 128_000,
     "gemini-3-flash-preview": 1_000_000,
     "gemini-3-pro-preview": 2_000_000,
-    "gemini-3.0-flash": 1_000_000,
 }

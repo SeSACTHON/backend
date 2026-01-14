@@ -153,15 +153,15 @@ def create_vision_client(
     settings = get_settings()
 
     if provider == "gemini":
-        # Gemini는 멀티모달이므로 LLM과 동일 모델 사용
+        # Gemini: 멀티모달 모델
         return GeminiVisionClient(
             model=model or settings.gemini_default_model,
             api_key=settings.google_api_key,
         )
     else:
-        # OpenAI는 Vision 전용 모델 사용 (gpt-5.2-vision)
+        # OpenAI: GPT-5.2-turbo 멀티모달 모델 (텍스트+이미지 통합)
         return OpenAIVisionClient(
-            model=model or "gpt-5.2-vision",
+            model=model or settings.openai_default_model,
             api_key=settings.openai_api_key,
         )
 

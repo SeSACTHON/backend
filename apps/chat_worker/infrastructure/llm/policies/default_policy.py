@@ -28,19 +28,19 @@ T = TypeVar("T")
 # 작업 타입별 추천 모델
 TASK_MODEL_MAP = {
     TaskType.INTENT_CLASSIFICATION: {
-        ModelTier.FAST: "gpt-5.2-turbo",
+        ModelTier.FAST: "gpt-5.2-instant",
         ModelTier.STANDARD: "gpt-5.2",
-        ModelTier.PREMIUM: "gpt-5.2",
+        ModelTier.PREMIUM: "gpt-5.2-pro",
     },
     TaskType.ANSWER_GENERATION: {
         ModelTier.FAST: "gemini-3-flash-preview",
-        ModelTier.STANDARD: "gpt-5.2-turbo",
-        ModelTier.PREMIUM: "gpt-5.2",
+        ModelTier.STANDARD: "gpt-5.2",
+        ModelTier.PREMIUM: "gpt-5.2-pro",
     },
     TaskType.SUMMARIZATION: {
         ModelTier.FAST: "gemini-3-flash-preview",
         ModelTier.STANDARD: "gemini-3-pro-preview",
-        ModelTier.PREMIUM: "gpt-5.2",
+        ModelTier.PREMIUM: "gpt-5.2-pro",
     },
 }
 
@@ -106,7 +106,7 @@ class DefaultLLMPolicy(LLMPolicyPort):
                 "Unknown task type, using default model",
                 extra={"task_type": task_type.value},
             )
-            return "gpt-5.2-turbo"
+            return "gpt-5.2"
 
         return task_models.get(preferred_tier, task_models[ModelTier.STANDARD])
 
