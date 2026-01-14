@@ -3,14 +3,13 @@
 노드 책임: 이벤트 발행 + 서비스 호출 + state 업데이트
 비즈니스 로직: AnswerGeneratorService에 위임
 
-Prompt Strategy: Hybrid (Global + Local)
-- Global: 이코 캐릭터 정의 (모든 Intent에 공통)
-- Local: Intent별 지침 (waste/character/location/general)
+Prompt Strategy: Local Prompt Optimization (arxiv:2504.20355)
+- Global: 이코 캐릭터 정의 (모든 Intent에 공통, 고정)
+- Local: Intent별 지침 (waste/character/location/general, 개별 최적화 가능)
 
 References:
 - docs/plans/chat-worker-prompt-strategy-adr.md
 - docs/foundations/24-multi-agent-prompt-patterns.md
-- arxiv:2504.20355 (Local Prompt Optimization)
 
 Clean Architecture:
 - Node: 오케스트레이션 (이 파일)
@@ -41,14 +40,14 @@ def create_answer_node(
     """답변 생성 노드 팩토리.
 
     노드는 thin wrapper로:
-    1. Intent에 따른 동적 프롬프트 생성 (Hybrid Pattern)
+    1. Intent에 따른 동적 프롬프트 생성 (Local Prompt Optimization)
     2. 이벤트 발행
     3. AnswerGeneratorService 호출
     4. state 업데이트
 
-    Prompt Strategy:
-    - Global: 이코 캐릭터 정의 (모든 Intent에 공통)
-    - Local: Intent별 지침 (waste/character/location/general)
+    Prompt Strategy (arxiv:2504.20355):
+    - Global: 이코 캐릭터 정의 (고정)
+    - Local: Intent별 지침 (개별 최적화 가능)
     """
     # 서비스 인스턴스 (비즈니스 로직 담당)
     answer_service = AnswerGeneratorService(llm)

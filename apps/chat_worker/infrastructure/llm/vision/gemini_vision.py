@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 # 프롬프트 경로
 PROMPT_PATH = os.path.join(
     os.path.dirname(__file__),
-    "../../assets/prompts/vision_classification_prompt.txt",
+    "../../assets/prompts/classification/vision.txt",
 )
 
 # Gemini 설정

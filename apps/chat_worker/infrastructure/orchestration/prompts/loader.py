@@ -1,20 +1,27 @@
-"""Hybrid Prompt Loader.
+"""Local Prompt Optimization Loader.
 
 Global + Local 프롬프트를 로드하고 조합하는 모듈.
 
 Architecture:
     assets/prompts/
-    ├── global/
-    │   └── eco_character.txt    # 이코 캐릭터 정의
-    └── local/
-        ├── waste_instruction.txt
-        ├── character_instruction.txt
-        ├── location_instruction.txt
-        └── general_instruction.txt
+    ├── global/              # 캐릭터 정의 (모든 Intent 공통)
+    │   └── eco_character.txt
+    ├── local/               # Intent별 Answer 지침
+    │   ├── waste_instruction.txt
+    │   ├── character_instruction.txt
+    │   ├── location_instruction.txt
+    │   └── general_instruction.txt
+    ├── classification/      # 분류 프롬프트
+    │   ├── intent.txt
+    │   ├── text.txt
+    │   └── vision.txt
+    └── subagent/            # 서브에이전트 프롬프트
+        ├── character.txt
+        └── location.txt
 
 Pattern: Local Prompt Optimization (arxiv:2504.20355)
 - Global: 캐릭터/톤 고정 (변하지 않음)
-- Local: Intent별 지침 동적 주입 (최적화 가능)
+- Local: Intent별 지침 동적 주입 (개별 최적화 가능)
 
 References:
 - docs/plans/chat-worker-prompt-strategy-adr.md
@@ -71,9 +78,10 @@ def load_prompt_file(category: str, name: str) -> str:
 
 
 class PromptBuilder:
-    """하이브리드 프롬프트 빌더.
+    """Local Prompt Optimization 빌더.
 
     Global + Local 프롬프트를 조합하여 최종 시스템 프롬프트 생성.
+    arxiv:2504.20355 패턴 적용.
 
     Usage:
         builder = PromptBuilder()
@@ -81,14 +89,14 @@ class PromptBuilder:
 
     Architecture:
         ┌─────────────────────────────────────────────────────┐
-        │               GLOBAL PROMPT                         │
-        │  (캐릭터 정의, 톤, 공통 규칙 - 모든 Intent에서 사용) │
+        │               GLOBAL PROMPT (고정)                  │
+        │  캐릭터 정의, 톤, 공통 규칙 - 모든 Intent에서 사용  │
         └─────────────────────────────────────────────────────┘
                                │
                                ▼
         ┌──────────┬──────────┬──────────┬──────────┐
         │  WASTE   │  CHAR    │ LOCATION │ GENERAL  │  LOCAL
-        │ INSTRUCT │ INSTRUCT │ INSTRUCT │ INSTRUCT │  INSTRUCTIONS
+        │ INSTRUCT │ INSTRUCT │ INSTRUCT │ INSTRUCT │  (최적화 가능)
         └──────────┴──────────┴──────────┴──────────┘
                                │
                                ▼

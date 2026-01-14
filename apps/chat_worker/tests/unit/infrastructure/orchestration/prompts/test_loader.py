@@ -1,6 +1,6 @@
 """PromptBuilder 단위 테스트.
 
-하이브리드 프롬프트 시스템 테스트:
+Local Prompt Optimization 시스템 테스트 (arxiv:2504.20355):
 - Global + Local 조합 검증
 - Intent 정규화 검증
 - 캐싱 동작 검증
