@@ -70,6 +70,12 @@ class Settings(BaseSettings):
     mois_waste_api_key: str | None = None
     mois_waste_api_timeout: float = 15.0
 
+    # 한국환경공단 폐전자제품 수거함 API (수거함 위치 검색)
+    # 공공데이터포털 인증키 (Decoding 키 권장)
+    # https://www.data.go.kr/data/15106385/fileData.do
+    keco_api_key: str | None = None
+    keco_api_timeout: float = 15.0
+
     # Logging
     log_level: str = "INFO"
 

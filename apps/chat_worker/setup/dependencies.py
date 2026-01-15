@@ -48,6 +48,9 @@ from chat_worker.application.ports.bulk_waste_client import BulkWasteClientPort
 from chat_worker.application.ports.recyclable_price_client import (
     RecyclablePriceClientPort,
 )
+from chat_worker.application.ports.collection_point_client import (
+    CollectionPointClientPort,
+)
 from chat_worker.infrastructure.assets.prompt_loader import get_prompt_loader
 from chat_worker.infrastructure.cache import RedisCacheAdapter
 from chat_worker.infrastructure.events import (
@@ -96,6 +99,7 @@ _web_search_client: WebSearchPort | None = None
 _weather_client: WeatherClientPort | None = None
 _bulk_waste_client: BulkWasteClientPort | None = None
 _recyclable_price_client: RecyclablePriceClientPort | None = None
+_collection_point_client: CollectionPointClientPort | None = None
 _interaction_state_store: InteractionStateStorePort | None = None
 _input_requester: InputRequesterPort | None = None
 _checkpointer = None  # BaseCheckpointSaver
@@ -481,6 +485,46 @@ def get_recyclable_price_client() -> RecyclablePriceClientPort:
 
 
 # ============================================================
+# Collection Point Client Factory (수거함 위치)
+# ============================================================
+
+
+def get_collection_point_client() -> CollectionPointClientPort | None:
+    """수거함 위치 클라이언트 싱글톤.
+
+    한국환경공단 폐전자제품 수거함 위치정보 API 사용.
+    API 키가 없으면 None 반환 (선택적 기능).
+
+    환경변수:
+    - CHAT_WORKER_KECO_API_KEY: 공공데이터포털 인증키
+
+    참고:
+    - https://www.data.go.kr/data/15106385/fileData.do
+    """
+    global _collection_point_client
+    if _collection_point_client is None:
+        settings = get_settings()
+
+        if settings.keco_api_key:
+            from chat_worker.infrastructure.integrations.keco import (
+                KecoCollectionPointClient,
+            )
+
+            _collection_point_client = KecoCollectionPointClient(
+                api_key=settings.keco_api_key,
+                timeout=settings.keco_api_timeout,
+            )
+            logger.info("KECO Collection Point HTTP client created")
+        else:
+            logger.warning(
+                "KECO_API_KEY not set, collection point feature disabled"
+            )
+            return None
+
+    return _collection_point_client
+
+
+# ============================================================
 # Interaction Factory (Human-in-the-Loop)
 # ============================================================
 
@@ -701,7 +745,7 @@ async def get_process_chat_command(
 
 async def cleanup():
     """리소스 정리."""
-    global _redis, _character_client, _location_client, _kakao_local_client, _weather_client, _bulk_waste_client, _checkpointer
+    global _redis, _character_client, _location_client, _kakao_local_client, _weather_client, _bulk_waste_client, _collection_point_client, _checkpointer
     global _progress_notifier, _domain_event_bus, _interaction_state_store, _input_requester
 
     # 체크포인터 종료
@@ -738,6 +782,12 @@ async def cleanup():
         await _bulk_waste_client.close()
         _bulk_waste_client = None
         logger.info("MOIS Bulk Waste HTTP client closed")
+
+    # KECO Collection Point HTTP 클라이언트 종료
+    if _collection_point_client and hasattr(_collection_point_client, "close"):
+        await _collection_point_client.close()
+        _collection_point_client = None
+        logger.info("KECO Collection Point HTTP client closed")
 
     # Redis 종료
     if _redis:
