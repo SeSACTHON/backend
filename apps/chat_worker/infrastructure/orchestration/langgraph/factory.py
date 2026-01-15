@@ -6,24 +6,24 @@ Intent-Routed Workflow with Subagent + Feedback Loop 패턴 그래프 생성.
 ```
 START → intent → [vision?] → router
                                │
-                    ┌──────────┼──────────┬───────────┬───────────┐
-                    ▼          ▼          ▼           ▼           ▼
-                 waste    character   location   web_search   general
-                 (RAG)    (gRPC)      (gRPC)    (DuckDuckGo)  (passthrough)
-                    │          │          │           │           │
-                    ▼          │          │           │           │
-               [feedback]      │          │           │           │
-                  │ ↓ ↓        │          │           │           │
-              fallback?        │          │           │           │
-                  │ ↓          │          │           │           │
-                  │ web_search │          │           │           │
-                    └──────────┴──────────┴───────────┴───────────┘
-                                          │
-                                          ▼
-                                   [summarize?] ← LangGraph 1.0+ Context Compression
-                                          │
-                                          ▼
-                                       answer → END
+            ┌──────────┬───────┼───────┬───────────┬───────────┬───────────┐
+            ▼          ▼       ▼       ▼           ▼           ▼           ▼
+         waste    character  location bulk_waste web_search  general
+         (RAG)    (gRPC)    (Kakao)   (MOIS)    (DDG)       (passthrough)
+            │          │       │        │          │           │
+            ▼          │       │        │          │           │
+       [feedback]      │       │        │          │           │
+          │ ↓ ↓        │       │        │          │           │
+      fallback?        │       │        │          │           │
+          │ ↓          │       │        │          │           │
+          │ web_search │       │        │          │           │
+            └──────────┴───────┴────────┴──────────┴───────────┘
+                                   │
+                                   ▼
+                            [summarize?] ← LangGraph 1.0+ Context Compression
+                                   │
+                                   ▼
+                                answer → END
 ```
 
 Feedback Loop (논문 참조):
@@ -61,6 +61,7 @@ from langgraph.graph import END, StateGraph
 
 from chat_worker.infrastructure.orchestration.langgraph.nodes import (
     create_answer_node,
+    create_bulk_waste_node,
     create_character_subagent_node,
     create_feedback_node,
     create_intent_node,
@@ -68,6 +69,9 @@ from chat_worker.infrastructure.orchestration.langgraph.nodes import (
     create_rag_node,
     create_vision_node,
     route_after_feedback,
+)
+from chat_worker.infrastructure.orchestration.langgraph.nodes.kakao_place_node import (
+    create_kakao_place_node,
 )
 from chat_worker.infrastructure.orchestration.langgraph.nodes.web_search_node import (
     create_web_search_node,
@@ -80,10 +84,12 @@ from chat_worker.infrastructure.orchestration.langgraph.summarization import (
 if TYPE_CHECKING:
     from langgraph.checkpoint.base import BaseCheckpointSaver
 
+    from chat_worker.application.ports.bulk_waste_client import BulkWasteClientPort
     from chat_worker.application.ports.cache import CachePort
     from chat_worker.application.ports.character_client import CharacterClientPort
     from chat_worker.application.ports.events import ProgressNotifierPort
     from chat_worker.application.ports.input_requester import InputRequesterPort
+    from chat_worker.application.ports.kakao_local_client import KakaoLocalClientPort
     from chat_worker.application.ports.llm import LLMClientPort
     from chat_worker.application.ports.llm_evaluator import LLMFeedbackEvaluatorPort
     from chat_worker.application.ports.location_client import LocationClientPort
@@ -133,7 +139,9 @@ def create_chat_graph(
     vision_model: "VisionModelPort | None" = None,
     character_client: "CharacterClientPort | None" = None,
     location_client: "LocationClientPort | None" = None,
+    kakao_client: "KakaoLocalClientPort | None" = None,  # 카카오 장소 검색 (HTTP)
     web_search_client: "WebSearchPort | None" = None,
+    bulk_waste_client: "BulkWasteClientPort | None" = None,  # 대형폐기물 정보 (행정안전부 API)
     cache: "CachePort | None" = None,  # P2: Intent 캐싱용 (CachePort 추상화)
     input_requester: "InputRequesterPort | None" = None,  # Reserved for future use
     checkpointer: "BaseCheckpointSaver | None" = None,
@@ -151,8 +159,10 @@ def create_chat_graph(
         prompt_loader: 프롬프트 로더 (필수)
         vision_model: Vision 모델 클라이언트 (선택, 이미지 분류)
         character_client: Character gRPC 클라이언트 (선택)
-        location_client: Location gRPC 클라이언트 (선택)
+        location_client: Location gRPC 클라이언트 (선택, Eco² 내부 DB)
+        kakao_client: 카카오 로컬 클라이언트 (선택, 일반 장소 검색)
         web_search_client: 웹 검색 클라이언트 (선택, DuckDuckGo/Tavily/Fallback)
+        bulk_waste_client: 대형폐기물 클라이언트 (선택, 행정안전부 API)
         input_requester: Reserved for future use (현재 미사용)
         checkpointer: LangGraph 체크포인터 (세션 유지용)
         fallback_orchestrator: Fallback 체인 오케스트레이터 (선택)
@@ -165,8 +175,8 @@ def create_chat_graph(
 
     Note:
         - vision_model이 있고 image_url이 있으면 Vision 분석 수행
-        - character_client, location_client, web_search_client가 None이면 passthrough
-        - 모든 Subagent는 gRPC로 통신 (web_search는 외부 API)
+        - character_client, location_client, web_search_client, bulk_waste_client가 None이면 passthrough
+        - 모든 Subagent는 gRPC로 통신 (web_search, bulk_waste는 외부 HTTP API)
         - checkpointer가 있으면 thread_id로 멀티턴 대화 컨텍스트 유지
         - fallback_orchestrator가 있으면 저품질 시 Fallback 실행
         - llm_evaluator가 있으면 Rule 기반 평가 후 LLM 정밀 평가 수행
@@ -258,20 +268,22 @@ def create_chat_graph(
 
         logger.warning("Character subagent node using passthrough (no client)")
 
-    # Subagent 노드: Location (gRPC)
-    if location_client is not None:
-        location_node = create_location_subagent_node(
-            location_client=location_client,
+    # Subagent 노드: Location (카카오맵 HTTP)
+    # gRPC location_client는 미사용 (deprecated)
+    _ = location_client  # suppress unused warning
+    if kakao_client is not None:
+        location_node = create_kakao_place_node(
+            kakao_client=kakao_client,
             event_publisher=event_publisher,
         )
-        logger.info("Location subagent node created (gRPC)")
+        logger.info("Location subagent node created (Kakao HTTP)")
     else:
         # Fallback: passthrough
         async def location_node(state: dict[str, Any]) -> dict[str, Any]:
-            logger.warning("Location client not configured, using passthrough")
+            logger.warning("Kakao client not configured, using passthrough")
             return state
 
-        logger.warning("Location subagent node using passthrough (no client)")
+        logger.warning("Location subagent node using passthrough (no Kakao client)")
 
     # Subagent 노드: Web Search
     if web_search_client is not None:
@@ -288,14 +300,30 @@ def create_chat_graph(
 
         logger.warning("Web search subagent node using passthrough (no client)")
 
+    # Subagent 노드: Bulk Waste (대형폐기물 - 행정안전부 API)
+    if bulk_waste_client is not None:
+        bulk_waste_node = create_bulk_waste_node(
+            bulk_waste_client=bulk_waste_client,
+            event_publisher=event_publisher,
+        )
+        logger.info("Bulk waste subagent node created (MOIS API)")
+    else:
+        # Fallback: passthrough
+        async def bulk_waste_node(state: dict[str, Any]) -> dict[str, Any]:
+            logger.warning("Bulk waste client not configured, using passthrough")
+            return state
+
+        logger.warning("Bulk waste subagent node using passthrough (no client)")
+
     # General 노드: passthrough
     async def general_node(state: dict[str, Any]) -> dict[str, Any]:
         return state
 
     # 노드 등록
     graph.add_node("character", character_node)
-    graph.add_node("location", location_node)
+    graph.add_node("location", location_node)  # 카카오맵 장소 검색
     graph.add_node("web_search", web_search_node)
+    graph.add_node("bulk_waste", bulk_waste_node)  # 대형폐기물 정보
     graph.add_node("general", general_node)
 
     # Summarization 노드 등록 (선택)
@@ -326,8 +354,9 @@ def create_chat_graph(
         {
             "waste": "waste_rag",
             "character": "character",
-            "location": "location",
+            "location": "location",  # 카카오맵 장소 검색
             "web_search": "web_search",
+            "bulk_waste": "bulk_waste",  # 대형폐기물 정보
             "general": "general",
         },
     )
@@ -349,7 +378,7 @@ def create_chat_graph(
     else:
         graph.add_edge("waste_rag", final_target)
 
-    for node_name in ["character", "location", "web_search", "general"]:
+    for node_name in ["character", "location", "web_search", "bulk_waste", "general"]:
         graph.add_edge(node_name, final_target)
 
     # Summarization → Answer (활성화된 경우에만)

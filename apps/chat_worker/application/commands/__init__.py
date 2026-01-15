@@ -13,6 +13,7 @@ Node(LangGraph 어댑터)에서 호출.
 - AnalyzeImageCommand: 이미지 분석
 - SearchWebCommand: 웹 검색
 - EvaluateFeedbackCommand: 피드백 평가
+- SearchBulkWasteCommand: 대형폐기물 정보 조회
 
 Clean Architecture:
 - Command(UseCase): 정책/흐름, Port 조립
@@ -84,6 +85,13 @@ from chat_worker.application.commands.search_web_command import (
     SearchWebOutput,
 )
 
+# SearchBulkWaste
+from chat_worker.application.commands.search_bulk_waste_command import (
+    SearchBulkWasteCommand,
+    SearchBulkWasteInput,
+    SearchBulkWasteOutput,
+)
+
 __all__ = [
     # ProcessChat
     "ChatPipelinePort",
@@ -122,4 +130,8 @@ __all__ = [
     "EvaluateFeedbackCommand",
     "EvaluateFeedbackInput",
     "EvaluateFeedbackOutput",
+    # SearchBulkWaste
+    "SearchBulkWasteCommand",
+    "SearchBulkWasteInput",
+    "SearchBulkWasteOutput",
 ]

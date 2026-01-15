@@ -71,6 +71,11 @@ from chat_worker.application.services.web_search_service import (
     WebSearchService,
 )
 
+# Bulk Waste 서비스
+from chat_worker.application.services.bulk_waste_service import (
+    BulkWasteService,
+)
+
 __all__ = [
     # Intent (순수 로직)
     "IntentClassifierService",
@@ -97,4 +102,6 @@ __all__ = [
     "WebSearchService",
     # Interaction
     "HumanInteractionService",
+    # BulkWaste
+    "BulkWasteService",
 ]

@@ -11,11 +11,15 @@
 - feedback_node: RAG 품질 평가 및 Fallback 결정
 - answer_node: 답변 생성
 - character_node: 캐릭터 서브에이전트
-- location_node: 위치 서브에이전트
+- location_node: 장소 검색 서브에이전트 (카카오맵)
+- bulk_waste_node: 대형폐기물 정보 조회 (행정안전부 API)
 """
 
 from chat_worker.infrastructure.orchestration.langgraph.nodes.answer_node import (
     create_answer_node,
+)
+from chat_worker.infrastructure.orchestration.langgraph.nodes.bulk_waste_node import (
+    create_bulk_waste_node,
 )
 from chat_worker.infrastructure.orchestration.langgraph.nodes.character_node import (
     create_character_subagent_node,
@@ -26,6 +30,9 @@ from chat_worker.infrastructure.orchestration.langgraph.nodes.feedback_node impo
 )
 from chat_worker.infrastructure.orchestration.langgraph.nodes.intent_node import (
     create_intent_node,
+)
+from chat_worker.infrastructure.orchestration.langgraph.nodes.kakao_place_node import (
+    create_kakao_place_node,
 )
 from chat_worker.infrastructure.orchestration.langgraph.nodes.location_node import (
     create_location_subagent_node,
@@ -46,4 +53,6 @@ __all__ = [
     "create_answer_node",
     "create_character_subagent_node",
     "create_location_subagent_node",
+    "create_kakao_place_node",
+    "create_bulk_waste_node",
 ]

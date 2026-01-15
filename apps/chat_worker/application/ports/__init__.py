@@ -27,6 +27,15 @@ Layer-first 구조:
 # Cache
 from chat_worker.application.ports.cache import CachePort
 
+# Integrations - Bulk Waste
+from chat_worker.application.ports.bulk_waste_client import (
+    BulkWasteClientPort,
+    BulkWasteCollectionDTO,
+    BulkWasteItemDTO,
+    WasteDisposalInfoDTO,
+    WasteInfoSearchResponse,
+)
+
 # Integrations - Character
 from chat_worker.application.ports.character_client import (
     CharacterClientPort,
@@ -98,7 +107,13 @@ __all__ = [
     "MetricsPort",
     # Web Search
     "WebSearchPort",
-    # Integrations
+    # Integrations - Bulk Waste
+    "BulkWasteClientPort",
+    "BulkWasteCollectionDTO",
+    "BulkWasteItemDTO",
+    "WasteDisposalInfoDTO",
+    "WasteInfoSearchResponse",
+    # Integrations - Character/Location
     "CharacterClientPort",
     "CharacterDTO",
     "LocationClientPort",

@@ -59,6 +59,17 @@ class Settings(BaseSettings):
     kakao_rest_api_key: str | None = None
     kakao_api_timeout: float = 10.0
 
+    # 기상청 단기예보 API (날씨 기반 분리배출 팁)
+    # 공공데이터포털 인증키 (Decoding 키 권장)
+    kma_api_key: str | None = None
+    kma_api_timeout: float = 10.0
+
+    # 행정안전부 생활쓰레기배출정보 API (대형폐기물 정보)
+    # 공공데이터포털 인증키 (Decoding 키 권장)
+    # https://www.data.go.kr/data/15155080/openapi.do
+    mois_waste_api_key: str | None = None
+    mois_waste_api_timeout: float = 15.0
+
     # Logging
     log_level: str = "INFO"
 

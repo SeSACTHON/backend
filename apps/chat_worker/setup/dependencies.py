@@ -42,7 +42,9 @@ from chat_worker.application.ports.kakao_local_client import KakaoLocalClientPor
 from chat_worker.application.ports.location_client import LocationClientPort
 from chat_worker.application.ports.metrics import MetricsPort
 from chat_worker.application.ports.vision import VisionModelPort
+from chat_worker.application.ports.weather_client import WeatherClientPort
 from chat_worker.application.ports.web_search import WebSearchPort
+from chat_worker.application.ports.bulk_waste_client import BulkWasteClientPort
 from chat_worker.infrastructure.assets.prompt_loader import get_prompt_loader
 from chat_worker.infrastructure.cache import RedisCacheAdapter
 from chat_worker.infrastructure.events import (
@@ -88,6 +90,8 @@ _character_client: CharacterClientPort | None = None
 _location_client: LocationClientPort | None = None
 _kakao_local_client: KakaoLocalClientPort | None = None
 _web_search_client: WebSearchPort | None = None
+_weather_client: WeatherClientPort | None = None
+_bulk_waste_client: BulkWasteClientPort | None = None
 _interaction_state_store: InteractionStateStorePort | None = None
 _input_requester: InputRequesterPort | None = None
 _checkpointer = None  # BaseCheckpointSaver
@@ -363,6 +367,86 @@ def get_kakao_local_client() -> KakaoLocalClientPort | None:
 
 
 # ============================================================
+# Weather Client Factory (기상청 단기예보)
+# ============================================================
+
+
+def get_weather_client() -> WeatherClientPort | None:
+    """기상청 날씨 클라이언트 싱글톤.
+
+    기상청 단기예보 API를 사용한 현재 날씨/예보 조회.
+    API 키가 없으면 None 반환 (선택적 기능).
+
+    환경변수:
+    - CHAT_WORKER_KMA_API_KEY: 공공데이터포털 인증키
+
+    참고:
+    - https://www.data.go.kr/data/15084084/openapi.do
+    """
+    global _weather_client
+    if _weather_client is None:
+        settings = get_settings()
+
+        if settings.kma_api_key:
+            from chat_worker.infrastructure.integrations.kma import (
+                KmaWeatherHttpClient,
+            )
+
+            _weather_client = KmaWeatherHttpClient(
+                api_key=settings.kma_api_key,
+                timeout=settings.kma_api_timeout,
+            )
+            logger.info("KMA Weather HTTP client created")
+        else:
+            logger.warning(
+                "KMA_API_KEY not set, weather feature disabled"
+            )
+            return None
+
+    return _weather_client
+
+
+# ============================================================
+# Bulk Waste Client Factory (대형폐기물 정보)
+# ============================================================
+
+
+def get_bulk_waste_client() -> BulkWasteClientPort | None:
+    """대형폐기물 클라이언트 싱글톤.
+
+    행정안전부 생활쓰레기배출정보 API를 사용한 대형폐기물 정보 조회.
+    API 키가 없으면 None 반환 (선택적 기능).
+
+    환경변수:
+    - CHAT_WORKER_MOIS_WASTE_API_KEY: 공공데이터포털 인증키
+
+    참고:
+    - https://www.data.go.kr/data/15155080/openapi.do
+    """
+    global _bulk_waste_client
+    if _bulk_waste_client is None:
+        settings = get_settings()
+
+        if settings.mois_waste_api_key:
+            from chat_worker.infrastructure.integrations.bulk_waste import (
+                MoisWasteInfoHttpClient,
+            )
+
+            _bulk_waste_client = MoisWasteInfoHttpClient(
+                api_key=settings.mois_waste_api_key,
+                timeout=settings.mois_waste_api_timeout,
+            )
+            logger.info("MOIS Bulk Waste HTTP client created")
+        else:
+            logger.warning(
+                "MOIS_WASTE_API_KEY not set, bulk waste feature disabled"
+            )
+            return None
+
+    return _bulk_waste_client
+
+
+# ============================================================
 # Interaction Factory (Human-in-the-Loop)
 # ============================================================
 
@@ -494,7 +578,7 @@ async def get_chat_graph(
                   ┌────────┬───────┼───────┬────────┬────────┐
                   ▼        ▼       ▼       ▼        ▼        ▼
                waste   character location web_search general
-               (RAG)   (gRPC)   (gRPC)   (DDG)   (passthrough)
+               (RAG)   (gRPC)   (Kakao)   (DDG)   (passthrough)
                   │        │       │       │        │
                   └────────┴───────┴───────┴────────┘
                                    │
@@ -510,7 +594,9 @@ async def get_chat_graph(
     progress_notifier = await get_progress_notifier()
     character_client = await get_character_client()
     location_client = await get_location_client()
+    kakao_client = get_kakao_local_client()  # 카카오 장소 검색
     web_search_client = get_web_search_client()
+    bulk_waste_client = get_bulk_waste_client()  # 대형폐기물 정보
     input_requester = await get_input_requester()
     checkpointer = await get_checkpointer()
 
@@ -522,7 +608,9 @@ async def get_chat_graph(
         vision_model=vision_model,
         character_client=character_client,
         location_client=location_client,
+        kakao_client=kakao_client,  # 카카오 장소 검색 (place_search intent)
         web_search_client=web_search_client,
+        bulk_waste_client=bulk_waste_client,  # 대형폐기물 정보 (행정안전부 API)
         cache=cache,  # P2: Intent 캐싱 (CachePort)
         input_requester=input_requester,
         checkpointer=checkpointer,
@@ -577,7 +665,7 @@ async def get_process_chat_command(
 
 async def cleanup():
     """리소스 정리."""
-    global _redis, _character_client, _location_client, _kakao_local_client, _checkpointer
+    global _redis, _character_client, _location_client, _kakao_local_client, _weather_client, _bulk_waste_client, _checkpointer
     global _progress_notifier, _domain_event_bus, _interaction_state_store, _input_requester
 
     # 체크포인터 종료
@@ -602,6 +690,18 @@ async def cleanup():
         await _kakao_local_client.close()
         _kakao_local_client = None
         logger.info("Kakao Local HTTP client closed")
+
+    # KMA Weather HTTP 클라이언트 종료
+    if _weather_client and hasattr(_weather_client, "close"):
+        await _weather_client.close()
+        _weather_client = None
+        logger.info("KMA Weather HTTP client closed")
+
+    # MOIS Bulk Waste HTTP 클라이언트 종료
+    if _bulk_waste_client and hasattr(_bulk_waste_client, "close"):
+        await _bulk_waste_client.close()
+        _bulk_waste_client = None
+        logger.info("MOIS Bulk Waste HTTP client closed")
 
     # Redis 종료
     if _redis:
