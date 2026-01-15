@@ -4,7 +4,6 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from chat_worker.application.integrations.character.ports import CharacterDTO
 from chat_worker.infrastructure.integrations.character.grpc_client import (
     CharacterGrpcClient,
 )

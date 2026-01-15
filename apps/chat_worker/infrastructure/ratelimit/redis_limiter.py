@@ -45,8 +45,7 @@ class RateLimitExceeded(Exception):
         self.remaining = remaining
         self.reset_after = reset_after
         super().__init__(
-            f"Rate limit exceeded for {user_id}: "
-            f"{limit}/min, reset in {reset_after}s"
+            f"Rate limit exceeded for {user_id}: " f"{limit}/min, reset in {reset_after}s"
         )
 
 

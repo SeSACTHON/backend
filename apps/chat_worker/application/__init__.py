@@ -1,77 +1,88 @@
-"""Chat Worker Application Layer.
+"""Chat Worker Application Layer (Layer-first).
 
-유스케이스와 비즈니스 로직을 담당.
+Clean Architecture의 Application Layer.
+모든 UseCase, Service, Port, DTO를 중앙에서 관리.
 
 구조:
-```
-application/
-├── commands/          # 최상위 유스케이스 엔트리 (메인 커맨드)
-│   └── process_chat   # queued → running → [waiting_human] → completed
-│
-├── intent/            # 의도 분류
-│   └── services/
-│       └── IntentClassifier
-│
-├── answer/            # 답변 생성
-│   └── services/
-│       └── AnswerGenerator
-│
-├── integrations/      # 외부 서비스 연동 (Tool Calling)
-│   ├── character/     # Character API (gRPC)
-│   └── location/      # Location API (gRPC)
-│
-├── interaction/       # Human-in-the-Loop (이벤트 발행만, 대기 X)
-│   └── services/
-│       └── HumanInputService
-│
-└── ports/             # 공용 포트
-    ├── llm/           # LLM (순수 호출 + 정책)
-    ├── events/        # 이벤트 (진행률 + 도메인)
-    └── retriever      # RAG 검색
-```
+├── commands/     # UseCase (CQRS Command)
+├── services/     # 순수 비즈니스 로직
+├── ports/        # 추상화 (인터페이스)
+└── dto/          # Data Transfer Objects
 
-상태 모델:
-- queued: 작업 대기
-- running: 파이프라인 실행 중
-- waiting_human: Human-in-the-Loop 대기
-- completed: 완료
-- failed: 실패
+사용 예시:
+    from chat_worker.application.commands import ClassifyIntentCommand
+    from chat_worker.application.services import IntentClassifier
+    from chat_worker.application.ports import LLMClientPort
+    from chat_worker.application.dto import AnswerContext
 """
 
-# Commands (최상위 유스케이스)
-from .commands import (
+# Commands (UseCase)
+from chat_worker.application.commands import (
+    # ProcessChat
     ChatPipelinePort,
+    # ClassifyIntent
+    ClassifyIntentCommand,
+    ClassifyIntentInput,
+    ClassifyIntentOutput,
+    # EvaluateFeedback
+    EvaluateFeedbackCommand,
+    EvaluateFeedbackInput,
+    EvaluateFeedbackOutput,
+    # GenerateAnswer
+    GenerateAnswerCommand,
+    GenerateAnswerInput,
+    GenerateAnswerOutput,
+    # GetCharacter
+    GetCharacterCommand,
+    GetCharacterInput,
+    GetCharacterOutput,
     ProcessChatCommand,
     ProcessChatRequest,
     ProcessChatResponse,
+    # SearchRAG
+    SearchRAGCommand,
+    SearchRAGInput,
+    SearchRAGOutput,
 )
 
-# Intent
-from .intent import IntentClassifier
+# DTOs
+from chat_worker.application.dto import (
+    AnswerContext,
+    ChatIntent,
+    FallbackResult,
+    FeedbackResult,
+)
 
-# Answer
-from .answer import AnswerContext, AnswerGeneratorService
-
-# Integrations (외부 서비스)
-from .integrations import (
+# Ports
+from chat_worker.application.ports import (
+    CachePort,
     CharacterClientPort,
-    CharacterDTO,
-    CharacterService,
-    LocationClientPort,
-    LocationDTO,
-    LocationService,
-)
-
-# Interaction (Human-in-the-Loop)
-from .interaction import HumanInteractionService, InputRequesterPort
-
-# Ports (공용)
-from .ports import (
     DomainEventBusPort,
+    InputRequesterPort,
+    InteractionStateStorePort,
     LLMClientPort,
+    LLMFeedbackEvaluatorPort,
     LLMPolicyPort,
+    LocationClientPort,
+    MetricsPort,
     ProgressNotifierPort,
     RetrieverPort,
+    VisionModelPort,
+    WebSearchPort,
+)
+
+# Services
+from chat_worker.application.services import (
+    AnswerGeneratorService,
+    CategoryExtractorService,
+    CharacterService,
+    FallbackOrchestrator,
+    FeedbackEvaluatorService,
+    HumanInteractionService,
+    IntentClassifier,
+    LocationService,
+    MultiIntentClassifier,
+    RAGSearcherService,
 )
 
 __all__ = [
@@ -80,25 +91,50 @@ __all__ = [
     "ProcessChatCommand",
     "ProcessChatRequest",
     "ProcessChatResponse",
-    # Intent
+    "ClassifyIntentCommand",
+    "ClassifyIntentInput",
+    "ClassifyIntentOutput",
+    "SearchRAGCommand",
+    "SearchRAGInput",
+    "SearchRAGOutput",
+    "GetCharacterCommand",
+    "GetCharacterInput",
+    "GetCharacterOutput",
+    "GenerateAnswerCommand",
+    "GenerateAnswerInput",
+    "GenerateAnswerOutput",
+    "EvaluateFeedbackCommand",
+    "EvaluateFeedbackInput",
+    "EvaluateFeedbackOutput",
+    # Services
     "IntentClassifier",
-    # Answer
-    "AnswerContext",
+    "MultiIntentClassifier",
+    "RAGSearcherService",
     "AnswerGeneratorService",
-    # Integrations
-    "CharacterClientPort",
-    "CharacterDTO",
+    "FeedbackEvaluatorService",
+    "FallbackOrchestrator",
     "CharacterService",
-    "LocationClientPort",
-    "LocationDTO",
+    "CategoryExtractorService",
     "LocationService",
-    # Interaction
     "HumanInteractionService",
-    "InputRequesterPort",
     # Ports
-    "DomainEventBusPort",
     "LLMClientPort",
     "LLMPolicyPort",
+    "VisionModelPort",
     "ProgressNotifierPort",
+    "DomainEventBusPort",
     "RetrieverPort",
+    "CachePort",
+    "MetricsPort",
+    "WebSearchPort",
+    "CharacterClientPort",
+    "LocationClientPort",
+    "LLMFeedbackEvaluatorPort",
+    "InputRequesterPort",
+    "InteractionStateStorePort",
+    # DTOs
+    "ChatIntent",
+    "AnswerContext",
+    "FeedbackResult",
+    "FallbackResult",
 ]

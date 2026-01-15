@@ -31,9 +31,7 @@ class LocalAssetRetriever(RetrieverPort):
             assets_path: 에셋 경로 (기본: infrastructure/assets/data/source)
         """
         if assets_path is None:
-            self._assets_path = (
-                Path(__file__).parent.parent / "assets" / "data" / "source"
-            )
+            self._assets_path = Path(__file__).parent.parent / "assets" / "data" / "source"
         else:
             self._assets_path = Path(assets_path)
 

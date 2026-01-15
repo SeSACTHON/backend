@@ -29,7 +29,7 @@ broker = AioPikaBroker(
     url=settings.rabbitmq_url,
     declare_exchange=not _is_production,  # 운영 환경에서는 기존 사용
     exchange_name="chat_tasks",
-    queue_name=settings.rabbitmq_queue,   # chat.process
+    queue_name=settings.rabbitmq_queue,  # chat.process
 )
 
 

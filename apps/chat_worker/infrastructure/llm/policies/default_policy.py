@@ -61,9 +61,7 @@ class DefaultLLMPolicy(LLMPolicyPort):
             prompts_path: 프롬프트 템플릿 경로
         """
         if prompts_path is None:
-            self._prompts_path = (
-                Path(__file__).parent.parent.parent / "assets" / "prompts"
-            )
+            self._prompts_path = Path(__file__).parent.parent.parent / "assets" / "prompts"
         else:
             self._prompts_path = Path(prompts_path)
 

@@ -56,7 +56,21 @@ class Settings(BaseSettings):
     )
 
     # Shard 설정 (scan_worker, event_router와 일치 필요)
-    shard_count: int = 4  # SSE_SHARD_COUNT 환경변수로 오버라이드 가능
+    shard_count: int = 4  # SSE_SHARD_COUNT 환경변수로 오버라이드 가능 (scan 기본)
+    chat_shard_count: int = 4  # CHAT_SHARD_COUNT 환경변수로 오버라이드 가능
+
+    def get_shard_count(self, domain: str) -> int:
+        """도메인별 shard 수 반환.
+
+        Args:
+            domain: 서비스 도메인 (scan, chat)
+
+        Returns:
+            해당 도메인의 shard 수
+        """
+        if domain == "chat":
+            return self.chat_shard_count
+        return self.shard_count
 
     # 로깅
     log_level: str = "INFO"

@@ -33,27 +33,21 @@ from chat_worker.application.ports import (
     RetrieverPort,
 )
 from chat_worker.application.ports.cache import CachePort
+from chat_worker.application.ports.character_client import CharacterClientPort
+from chat_worker.application.ports.input_requester import InputRequesterPort
+from chat_worker.application.ports.interaction_state_store import (
+    InteractionStateStorePort,
+)
+from chat_worker.application.ports.kakao_local_client import KakaoLocalClientPort
+from chat_worker.application.ports.location_client import LocationClientPort
 from chat_worker.application.ports.metrics import MetricsPort
 from chat_worker.application.ports.vision import VisionModelPort
 from chat_worker.application.ports.web_search import WebSearchPort
-from chat_worker.application.integrations.character.ports import CharacterClientPort
-from chat_worker.application.integrations.location.ports import LocationClientPort
-from chat_worker.application.interaction.ports import (
-    InputRequesterPort,
-    InteractionStateStorePort,
-)
-
-# Infrastructure Layer
-from chat_worker.infrastructure.retrieval import LocalAssetRetriever
+from chat_worker.infrastructure.assets.prompt_loader import get_prompt_loader
+from chat_worker.infrastructure.cache import RedisCacheAdapter
 from chat_worker.infrastructure.events import (
     RedisProgressNotifier,
     RedisStreamDomainEventBus,
-)
-from chat_worker.infrastructure.orchestration.langgraph import create_chat_graph
-from chat_worker.infrastructure.llm import GeminiLLMClient, OpenAILLMClient
-from chat_worker.infrastructure.llm.vision import (
-    GeminiVisionClient,
-    OpenAIVisionClient,
 )
 from chat_worker.infrastructure.integrations import (
     CharacterGrpcClient,
@@ -64,8 +58,19 @@ from chat_worker.infrastructure.interaction import (
     RedisInputRequester,
     RedisInteractionStateStore,
 )
-from chat_worker.infrastructure.cache import RedisCacheAdapter
-from chat_worker.infrastructure.metrics import PrometheusMetricsAdapter, NoOpMetricsAdapter
+from chat_worker.infrastructure.llm import GeminiLLMClient, OpenAILLMClient
+from chat_worker.infrastructure.llm.vision import (
+    GeminiVisionClient,
+    OpenAIVisionClient,
+)
+from chat_worker.infrastructure.metrics import (
+    NoOpMetricsAdapter,
+    PrometheusMetricsAdapter,
+)
+from chat_worker.infrastructure.orchestration.langgraph import create_chat_graph
+
+# Infrastructure Layer
+from chat_worker.infrastructure.retrieval import TagBasedRetriever
 from chat_worker.setup.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -81,6 +86,7 @@ _domain_event_bus: RedisStreamDomainEventBus | None = None
 _retriever: RetrieverPort | None = None
 _character_client: CharacterClientPort | None = None
 _location_client: LocationClientPort | None = None
+_kakao_local_client: KakaoLocalClientPort | None = None
 _web_search_client: WebSearchPort | None = None
 _interaction_state_store: InteractionStateStorePort | None = None
 _input_requester: InputRequesterPort | None = None
@@ -126,8 +132,13 @@ async def get_domain_event_bus() -> RedisStreamDomainEventBus:
 
 @lru_cache
 def get_retriever() -> RetrieverPort:
-    """Retriever 싱글톤."""
-    return LocalAssetRetriever()
+    """Retriever 싱글톤 (TagBasedRetriever 사용).
+
+    Anthropic Contextual Retrieval 패턴 적용:
+    - item_class_list.yaml: 품목 매칭
+    - situation_tags.yaml: 상황 태그 매칭
+    """
+    return TagBasedRetriever()
 
 
 # ============================================================
@@ -311,6 +322,47 @@ def get_web_search_client() -> WebSearchPort:
 
 
 # ============================================================
+# Kakao Local Client Factory (장소 검색)
+# ============================================================
+
+
+def get_kakao_local_client() -> KakaoLocalClientPort | None:
+    """카카오 로컬 클라이언트 싱글톤.
+
+    카카오 로컬 API를 사용한 장소 검색.
+    API 키가 없으면 None 반환 (선택적 기능).
+
+    환경변수:
+    - CHAT_WORKER_KAKAO_REST_API_KEY: 카카오 REST API 키
+
+    참고:
+    - https://developers.kakao.com/docs/latest/ko/local/dev-guide
+    - KakaoMap 설정 ON 필요 (2024년 12월 정책 변경)
+    """
+    global _kakao_local_client
+    if _kakao_local_client is None:
+        settings = get_settings()
+
+        if settings.kakao_rest_api_key:
+            from chat_worker.infrastructure.integrations.kakao import (
+                KakaoLocalHttpClient,
+            )
+
+            _kakao_local_client = KakaoLocalHttpClient(
+                api_key=settings.kakao_rest_api_key,
+                timeout=settings.kakao_api_timeout,
+            )
+            logger.info("Kakao Local HTTP client created")
+        else:
+            logger.warning(
+                "KAKAO_REST_API_KEY not set, Kakao Local search disabled"
+            )
+            return None
+
+    return _kakao_local_client
+
+
+# ============================================================
 # Interaction Factory (Human-in-the-Loop)
 # ============================================================
 
@@ -453,6 +505,7 @@ async def get_chat_graph(
     llm = create_llm_client(provider, model)
     vision_model = create_vision_client(provider, model)
     retriever = get_retriever()
+    prompt_loader = get_prompt_loader()  # 프롬프트 로더
     cache = await get_cache()  # P2: Intent 캐싱용 (CachePort)
     progress_notifier = await get_progress_notifier()
     character_client = await get_character_client()
@@ -465,6 +518,7 @@ async def get_chat_graph(
         llm=llm,
         retriever=retriever,
         event_publisher=progress_notifier,
+        prompt_loader=prompt_loader,  # 프롬프트 로더 주입
         vision_model=vision_model,
         character_client=character_client,
         location_client=location_client,
@@ -523,7 +577,7 @@ async def get_process_chat_command(
 
 async def cleanup():
     """리소스 정리."""
-    global _redis, _character_client, _location_client, _checkpointer
+    global _redis, _character_client, _location_client, _kakao_local_client, _checkpointer
     global _progress_notifier, _domain_event_bus, _interaction_state_store, _input_requester
 
     # 체크포인터 종료
@@ -542,6 +596,12 @@ async def cleanup():
         await _location_client.close()
         _location_client = None
         logger.info("Location gRPC client closed")
+
+    # Kakao Local HTTP 클라이언트 종료
+    if _kakao_local_client and hasattr(_kakao_local_client, "close"):
+        await _kakao_local_client.close()
+        _kakao_local_client = None
+        logger.info("Kakao Local HTTP client closed")
 
     # Redis 종료
     if _redis:

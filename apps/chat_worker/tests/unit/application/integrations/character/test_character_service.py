@@ -1,41 +1,22 @@
-"""CharacterService 단위 테스트."""
+"""CharacterService 단위 테스트.
+
+CharacterService는 순수 로직만 담당 (Port 의존 없음):
+- to_answer_context: 컨텍스트 변환
+- validate_character: 캐릭터 검증
+- build_not_found_context: 캐릭터 없음 컨텍스트
+- build_found_context: 캐릭터 찾음 컨텍스트
+"""
 
 from __future__ import annotations
 
 import pytest
 
-from chat_worker.application.integrations.character.ports import (
-    CharacterClientPort,
-    CharacterDTO,
-)
-from chat_worker.application.integrations.character.services.character_service import (
-    CharacterService,
-)
-
-
-class MockCharacterClient(CharacterClientPort):
-    """테스트용 Character Mock."""
-
-    def __init__(self, characters: dict[str, CharacterDTO] | None = None):
-        self._characters = characters or {}
-        self._catalog: list[CharacterDTO] = []
-        self.get_by_category_called = False
-        self.last_category: str | None = None
-
-    async def get_character_by_waste_category(
-        self,
-        waste_category: str,
-    ) -> CharacterDTO | None:
-        self.get_by_category_called = True
-        self.last_category = waste_category
-        return self._characters.get(waste_category)
-
-    async def get_catalog(self) -> list[CharacterDTO]:
-        return self._catalog
+from chat_worker.application.ports.character_client import CharacterDTO
+from chat_worker.application.services.character_service import CharacterService
 
 
 class TestCharacterService:
-    """CharacterService 테스트 스위트."""
+    """CharacterService 테스트 스위트 (순수 로직)."""
 
     @pytest.fixture
     def sample_character(self) -> CharacterDTO:
@@ -46,97 +27,6 @@ class TestCharacterService:
             dialog="재활용해줘서 고마워!",
             match_label="플라스틱",
         )
-
-    @pytest.fixture
-    def mock_client(self, sample_character: CharacterDTO) -> MockCharacterClient:
-        """Mock 클라이언트."""
-        return MockCharacterClient(
-            characters={"플라스틱": sample_character},
-        )
-
-    @pytest.fixture
-    def service(self, mock_client: MockCharacterClient) -> CharacterService:
-        """테스트용 서비스."""
-        return CharacterService(mock_client)
-
-    # ==========================================================
-    # find_by_waste_category Tests
-    # ==========================================================
-
-    @pytest.mark.asyncio
-    async def test_find_by_waste_category_found(
-        self,
-        service: CharacterService,
-        mock_client: MockCharacterClient,
-        sample_character: CharacterDTO,
-    ):
-        """캐릭터 검색 성공."""
-        result = await service.find_by_waste_category("플라스틱")
-
-        assert result is not None
-        assert result.name == sample_character.name
-        assert result.dialog == sample_character.dialog
-        assert mock_client.get_by_category_called
-        assert mock_client.last_category == "플라스틱"
-
-    @pytest.mark.asyncio
-    async def test_find_by_waste_category_not_found(
-        self,
-        service: CharacterService,
-    ):
-        """캐릭터 검색 실패."""
-        result = await service.find_by_waste_category("존재하지않는카테고리")
-
-        assert result is None
-
-    @pytest.mark.asyncio
-    async def test_find_by_waste_category_passes_category(
-        self,
-        service: CharacterService,
-        mock_client: MockCharacterClient,
-    ):
-        """카테고리가 올바르게 전달되는지."""
-        await service.find_by_waste_category("종이류")
-
-        assert mock_client.last_category == "종이류"
-
-    # ==========================================================
-    # get_all Tests
-    # ==========================================================
-
-    @pytest.mark.asyncio
-    async def test_get_all_empty(
-        self,
-        service: CharacterService,
-    ):
-        """빈 카탈로그."""
-        result = await service.get_all()
-
-        assert result == []
-
-    @pytest.mark.asyncio
-    async def test_get_all_with_characters(
-        self,
-        sample_character: CharacterDTO,
-    ):
-        """캐릭터 목록 조회."""
-        mock_client = MockCharacterClient()
-        mock_client._catalog = [
-            sample_character,
-            CharacterDTO(
-                name="글래시",
-                type_label="재활용",
-                dialog="유리도 재활용!",
-                match_label="유리",
-            ),
-        ]
-        service = CharacterService(mock_client)
-
-        result = await service.get_all()
-
-        assert len(result) == 2
-        assert result[0].name == "페트리"
-        assert result[1].name == "글래시"
 
     # ==========================================================
     # to_answer_context Tests
@@ -170,3 +60,52 @@ class TestCharacterService:
 
         expected_keys = {"name", "type", "dialog", "match_reason"}
         assert set(context.keys()) == expected_keys
+
+    # ==========================================================
+    # validate_character Tests
+    # ==========================================================
+
+    def test_validate_character_valid(self, sample_character: CharacterDTO):
+        """유효한 캐릭터 검증."""
+        assert CharacterService.validate_character(sample_character) is True
+
+    def test_validate_character_none(self):
+        """None 캐릭터 검증."""
+        assert CharacterService.validate_character(None) is False
+
+    def test_validate_character_empty_name(self):
+        """빈 이름 캐릭터 검증."""
+        character = CharacterDTO(
+            name="",
+            type_label="타입",
+            dialog="대사",
+            match_label="매칭",
+        )
+        assert CharacterService.validate_character(character) is False
+
+    # ==========================================================
+    # build_not_found_context Tests
+    # ==========================================================
+
+    def test_build_not_found_context(self):
+        """캐릭터 없음 컨텍스트."""
+        context = CharacterService.build_not_found_context("플라스틱")
+
+        assert context["waste_category"] == "플라스틱"
+        assert context["found"] is False
+        assert "찾지 못했어요" in context["message"]
+
+    # ==========================================================
+    # build_found_context Tests
+    # ==========================================================
+
+    def test_build_found_context(self, sample_character: CharacterDTO):
+        """캐릭터 찾음 컨텍스트."""
+        context = CharacterService.build_found_context(sample_character, "플라스틱")
+
+        assert context["waste_category"] == "플라스틱"
+        assert context["found"] is True
+        assert context["name"] == "페트리"
+        assert context["type"] == "재활용"
+        assert context["dialog"] == "재활용해줘서 고마워!"
+        assert context["match_reason"] == "플라스틱"

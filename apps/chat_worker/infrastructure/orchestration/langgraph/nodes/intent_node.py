@@ -1,19 +1,12 @@
-"""Intent Classification Node - 오케스트레이션 전용.
+"""Intent Classification Node - LangGraph 어댑터.
 
-노드 책임: 이벤트 발행 + 서비스 호출 + state 업데이트
-비즈니스 로직: IntentClassifier 서비스에 위임
+얇은 어댑터: state 변환 + Command 호출 + progress notify (UX).
+정책/흐름은 ClassifyIntentCommand(Application)에서 처리.
 
 Clean Architecture:
-- Node: 오케스트레이션 (이 파일)
-- Service: IntentClassifier (비즈니스 로직)
-- Domain: Intent, ChatIntent (결과 VO)
-- Port: LLMPort (순수 LLM 호출), CachePort (캐싱)
-
-P0-P3 개선사항:
-- P0: 프롬프트 파일 기반 로딩
-- P1: 신뢰도 기반 Fallback
-- P2: Intent 캐싱 (CachePort 추상화)
-- P3: 대화 맥락 활용 (context 전달)
+- Node(Adapter): 이 파일 - LangGraph glue code
+- Command(UseCase): ClassifyIntentCommand - 정책/흐름
+- Service: IntentClassifier, MultiIntentClassifier - 순수 비즈니스 로직
 """
 
 from __future__ import annotations
@@ -21,12 +14,16 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from chat_worker.application.intent.services import IntentClassifier
+from chat_worker.application.commands.classify_intent_command import (
+    ClassifyIntentCommand,
+    ClassifyIntentInput,
+)
 
 if TYPE_CHECKING:
     from chat_worker.application.ports.cache import CachePort
     from chat_worker.application.ports.events import ProgressNotifierPort
     from chat_worker.application.ports.llm import LLMClientPort
+    from chat_worker.application.ports.prompt_loader import PromptLoaderPort
 
 logger = logging.getLogger(__name__)
 
@@ -34,28 +31,53 @@ logger = logging.getLogger(__name__)
 def create_intent_node(
     llm: "LLMClientPort",
     event_publisher: "ProgressNotifierPort",
+    prompt_loader: "PromptLoaderPort",
     cache: "CachePort | None" = None,
+    enable_multi_intent: bool = True,
 ):
     """의도 분류 노드 팩토리.
 
-    노드는 thin wrapper로:
-    1. 이벤트 발행
-    2. IntentClassifier 서비스 호출
-    3. state 업데이트
+    Node는 LangGraph 어댑터:
+    - state → input DTO 변환
+    - Command(UseCase) 호출
+    - output → state 변환
+    - progress notify (UX)
 
     Args:
         llm: LLM 클라이언트
         event_publisher: 이벤트 발행자
-        cache: 캐시 Port (CachePort 구현체)
+        prompt_loader: 프롬프트 로더
+        cache: 캐시 Port
+        enable_multi_intent: Multi-Intent 처리 활성화 여부
+
+    Returns:
+        intent_node 함수
     """
-    # 서비스 인스턴스 (비즈니스 로직 담당)
-    classifier = IntentClassifier(llm, cache=cache, enable_cache=cache is not None)
+    # Command(UseCase) 인스턴스 생성 - Port 조립
+    command = ClassifyIntentCommand(
+        llm=llm,
+        prompt_loader=prompt_loader,
+        cache=cache,
+        enable_multi_intent=enable_multi_intent,
+    )
 
     async def intent_node(state: dict[str, Any]) -> dict[str, Any]:
-        job_id = state["job_id"]
-        message = state["message"]
+        """LangGraph 노드 (얇은 어댑터).
 
-        # 1. 이벤트: 시작
+        역할:
+        1. state에서 값 추출 (LangGraph glue)
+        2. Command 호출 (정책/흐름 위임)
+        3. output → state 변환
+
+        Args:
+            state: 현재 LangGraph 상태
+
+        Returns:
+            업데이트된 상태
+        """
+        job_id = state["job_id"]
+
+        # Progress: 시작 (UX)
         await event_publisher.notify_stage(
             task_id=job_id,
             stage="intent",
@@ -64,46 +86,53 @@ def create_intent_node(
             message="🧠 의도 파악 중...",
         )
 
-        # 2. 서비스 호출 (비즈니스 로직 위임)
-        #    반환: ChatIntent (Domain Value Object)
-        #    P3: context 전달 (대화 맥락)
-        context = state.get("conversation_history")
-        chat_intent = await classifier.classify(message, context=context)
+        # 1. state → input DTO 변환
+        input_dto = ClassifyIntentInput(
+            job_id=job_id,
+            message=state["message"],
+            conversation_history=state.get("conversation_history"),
+        )
 
-        # P2: Multi-Intent 감지 여부
-        has_multi_intent = classifier._has_multi_intent(message)
+        # 2. Command 실행 (정책/흐름은 Command에서)
+        output = await command.execute(input_dto)
 
         logger.info(
             "Intent node completed",
             extra={
                 "job_id": job_id,
-                "intent": chat_intent.intent.value,
-                "complexity": chat_intent.complexity.value,
-                "confidence": chat_intent.confidence,
-                "has_multi_intent": has_multi_intent,
+                "intent": output.intent,
+                "confidence": output.confidence,
+                "has_multi_intent": output.has_multi_intent,
             },
         )
 
-        # 3. 이벤트: 완료
+        # Progress: 완료 (UX)
         await event_publisher.notify_stage(
             task_id=job_id,
             stage="intent",
             status="completed",
             progress=20,
             result={
-                "intent": chat_intent.intent.value,
-                "complexity": chat_intent.complexity.value,
-                "confidence": chat_intent.confidence,
+                "intent": output.intent,
+                "complexity": "complex" if output.is_complex else "simple",
+                "confidence": output.confidence,
+                "has_multi_intent": output.has_multi_intent,
+                "additional_intents": output.additional_intents,
             },
         )
 
-        # 4. state 업데이트 (Domain VO → state 병합)
+        # 3. output → state 변환
+        decomposed_queries = output.decomposed_queries or [state["message"]]
+
         return {
             **state,
-            "intent": chat_intent.intent.value,
-            "is_complex": chat_intent.is_complex,
-            "intent_confidence": chat_intent.confidence,
-            "has_multi_intent": has_multi_intent,  # P2: Multi-Intent 감지
+            "intent": output.intent,
+            "is_complex": output.is_complex,
+            "intent_confidence": output.confidence,
+            "has_multi_intent": output.has_multi_intent,
+            "additional_intents": output.additional_intents,
+            "decomposed_queries": decomposed_queries,
+            "current_query": decomposed_queries[0] if decomposed_queries else state["message"],
         }
 
     return intent_node

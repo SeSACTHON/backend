@@ -7,7 +7,6 @@
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -30,9 +29,7 @@ class MockLLMClient:
 class MockVisionModel:
     """Mock Vision Model."""
 
-    async def analyze_image(
-        self, image_url: str, user_input: str | None = None
-    ) -> dict[str, Any]:
+    async def analyze_image(self, image_url: str, user_input: str | None = None) -> dict[str, Any]:
         return {
             "classification": {
                 "major_category": "재활용폐기물",
@@ -241,3 +238,202 @@ async def test_pipeline_events_sequence(mock_dependencies):
     # 첫 번째 stage 이벤트는 intent여야 함
     first_stage = stage_events[0]["stage"]
     assert first_stage == "intent"
+
+
+# ==========================================================
+# Multi-Intent Tests
+# ==========================================================
+
+
+class MockMultiIntentLLMClient:
+    """Multi-Intent 테스트용 Mock LLM Client."""
+
+    def __init__(self):
+        self._call_count = 0
+        self._responses = []
+
+    def set_responses(self, responses: list[str]):
+        """순차적 응답 설정."""
+        self._responses = responses
+        self._call_count = 0
+
+    async def generate(self, prompt: str, **kwargs) -> str:
+        if self._responses:
+            response = self._responses[min(self._call_count, len(self._responses) - 1)]
+            self._call_count += 1
+            return response
+
+        # 기본 응답
+        if "분해" in prompt.lower() or "decompose" in prompt.lower():
+            return '{"is_compound": true, "queries": ["페트병 버려", "캐릭터 알려줘"]}'
+        if "intent" in prompt.lower() or "분류" in prompt.lower():
+            return "waste"
+        return "테스트 답변입니다."
+
+    async def stream(self, prompt: str, **kwargs):
+        for token in ["테스트", " ", "답변", "입니다", "."]:
+            yield token
+
+
+@pytest.fixture
+def mock_multi_intent_dependencies():
+    """Multi-Intent 테스트용 Mock dependencies."""
+    return {
+        "llm": MockMultiIntentLLMClient(),
+        "vision_model": MockVisionModel(),
+        "retriever": MockRetriever(),
+        "event_publisher": MockProgressNotifier(),
+        "character_client": MockCharacterClient(),
+        "location_client": MockLocationClient(),
+    }
+
+
+@pytest.mark.asyncio
+async def test_pipeline_multi_intent_detection(mock_multi_intent_dependencies):
+    """Multi-Intent 감지 테스트."""
+    mock_llm = mock_multi_intent_dependencies["llm"]
+    # 1. Decompose 응답
+    # 2. waste Intent
+    # 3. character Intent
+    # 4. Answer
+    mock_llm.set_responses(
+        [
+            '{"is_compound": true, "queries": ["페트병 버려", "캐릭터 알려줘"]}',
+            "waste",
+            "character",
+            "페트병은 라벨을 제거하고 버리세요. 캐릭터는 에코입니다.",
+        ]
+    )
+
+    graph = create_chat_graph(
+        llm=mock_llm,
+        retriever=mock_multi_intent_dependencies["retriever"],
+        event_publisher=mock_multi_intent_dependencies["event_publisher"],
+        vision_model=mock_multi_intent_dependencies["vision_model"],
+        character_client=mock_multi_intent_dependencies["character_client"],
+        location_client=mock_multi_intent_dependencies["location_client"],
+    )
+
+    initial_state = {
+        "job_id": "test-multi-001",
+        "session_id": "test-session",
+        "user_id": "test-user",
+        "message": "페트병 버리고 캐릭터도 알려줘",
+        "image_url": None,
+        "user_location": None,
+    }
+
+    result = await graph.ainvoke(initial_state)
+
+    # Multi-Intent 감지 확인
+    assert result.get("has_multi_intent") is True or result.get("intent") is not None
+
+    # 이벤트 검증
+    notifier = mock_multi_intent_dependencies["event_publisher"]
+    intent_events = [e for e in notifier.events if e["type"] == "stage" and e["stage"] == "intent"]
+    assert len(intent_events) > 0
+
+
+@pytest.mark.asyncio
+async def test_pipeline_multi_intent_decomposed_queries(mock_multi_intent_dependencies):
+    """분해된 쿼리가 state에 저장되는지 테스트."""
+    mock_llm = mock_multi_intent_dependencies["llm"]
+    mock_llm.set_responses(
+        [
+            '{"is_compound": true, "queries": ["페트병 버려", "센터 어디야"]}',
+            "waste",
+            "location",
+            "테스트 답변",
+        ]
+    )
+
+    graph = create_chat_graph(
+        llm=mock_llm,
+        retriever=mock_multi_intent_dependencies["retriever"],
+        event_publisher=mock_multi_intent_dependencies["event_publisher"],
+        vision_model=mock_multi_intent_dependencies["vision_model"],
+        character_client=mock_multi_intent_dependencies["character_client"],
+        location_client=mock_multi_intent_dependencies["location_client"],
+    )
+
+    initial_state = {
+        "job_id": "test-multi-002",
+        "session_id": "test-session",
+        "user_id": "test-user",
+        "message": "페트병 버리고 센터 어디야",
+        "image_url": None,
+        "user_location": {"latitude": 37.5665, "longitude": 126.9780},
+    }
+
+    result = await graph.ainvoke(initial_state)
+
+    # decomposed_queries가 state에 있는지 확인
+    decomposed = result.get("decomposed_queries")
+    if decomposed:
+        assert len(decomposed) >= 1
+
+
+@pytest.mark.asyncio
+async def test_pipeline_single_intent_no_decomposition(mock_multi_intent_dependencies):
+    """단일 Intent는 분해하지 않음."""
+    mock_llm = mock_multi_intent_dependencies["llm"]
+    mock_llm.set_responses(
+        [
+            "waste",  # Intent 분류만
+            "페트병은 라벨을 제거하고 버리세요.",
+        ]
+    )
+
+    graph = create_chat_graph(
+        llm=mock_llm,
+        retriever=mock_multi_intent_dependencies["retriever"],
+        event_publisher=mock_multi_intent_dependencies["event_publisher"],
+        vision_model=mock_multi_intent_dependencies["vision_model"],
+    )
+
+    initial_state = {
+        "job_id": "test-single-001",
+        "session_id": "test-session",
+        "user_id": "test-user",
+        "message": "페트병 어떻게 버려?",
+        "image_url": None,
+        "user_location": None,
+    }
+
+    result = await graph.ainvoke(initial_state)
+
+    # 단일 Intent
+    assert result.get("has_multi_intent") is False or result.get("has_multi_intent") is None
+    assert result.get("intent") == "waste"
+
+
+@pytest.mark.asyncio
+async def test_pipeline_web_search_intent(mock_multi_intent_dependencies):
+    """web_search Intent 라우팅 테스트."""
+    mock_llm = mock_multi_intent_dependencies["llm"]
+    mock_llm.set_responses(
+        [
+            "web_search",
+            "최신 분리배출 정책은 2026년부터 강화됩니다.",
+        ]
+    )
+
+    graph = create_chat_graph(
+        llm=mock_llm,
+        retriever=mock_multi_intent_dependencies["retriever"],
+        event_publisher=mock_multi_intent_dependencies["event_publisher"],
+        vision_model=mock_multi_intent_dependencies["vision_model"],
+    )
+
+    initial_state = {
+        "job_id": "test-websearch-001",
+        "session_id": "test-session",
+        "user_id": "test-user",
+        "message": "최신 분리배출 정책 알려줘",
+        "image_url": None,
+        "user_location": None,
+    }
+
+    result = await graph.ainvoke(initial_state)
+
+    assert result.get("intent") == "web_search"

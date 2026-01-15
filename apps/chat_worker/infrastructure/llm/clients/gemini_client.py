@@ -4,6 +4,9 @@
 비즈니스 로직(의도 분류, 답변 생성)은 Service Layer에서 담당.
 
 Port: application/ports/llm/llm_client.py
+
+Structured Output 지원:
+- https://ai.google.dev/gemini-api/docs/structured-output
 """
 
 from __future__ import annotations
@@ -12,14 +15,17 @@ import json
 import logging
 import os
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, TypeVar
 
 from google import genai
+from pydantic import BaseModel
 
 from chat_worker.application.ports.llm import LLMClientPort
 from chat_worker.infrastructure.llm.config import MODEL_CONTEXT_WINDOWS
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class GeminiLLMClient(LLMClientPort):
@@ -101,3 +107,66 @@ class GeminiLLMClient(LLMClientPort):
         for chunk in response:
             if chunk.text:
                 yield chunk.text
+
+    async def generate_structured(
+        self,
+        prompt: str,
+        response_schema: type[T],
+        system_prompt: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> T:
+        """구조화된 응답 생성 (Gemini Structured Output).
+
+        Gemini의 네이티브 Structured Output API를 사용하여
+        JSON 스키마를 준수하는 응답을 보장합니다.
+
+        Args:
+            prompt: 사용자 프롬프트
+            response_schema: Pydantic BaseModel 서브클래스
+            system_prompt: 시스템 프롬프트
+            max_tokens: 최대 토큰 수
+            temperature: 생성 온도
+
+        Returns:
+            response_schema 타입의 인스턴스
+        """
+        full_prompt = ""
+        if system_prompt:
+            full_prompt = f"{system_prompt}\n\n"
+        full_prompt += f"## Question\n{prompt}"
+
+        # API 호출 파라미터
+        config: dict[str, Any] = {
+            "response_mime_type": "application/json",
+            "response_schema": response_schema,
+        }
+        if max_tokens is not None:
+            config["max_output_tokens"] = max_tokens
+        if temperature is not None:
+            config["temperature"] = temperature
+
+        try:
+            response = self._client.models.generate_content(
+                model=self._model,
+                contents=full_prompt,
+                config=config,
+            )
+            content = response.text or "{}"
+
+            # JSON 파싱 및 Pydantic 검증
+            data = json.loads(content)
+            result = response_schema.model_validate(data)
+
+            logger.debug(
+                "Structured output generated",
+                extra={"schema": response_schema.__name__},
+            )
+            return result
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse structured response: {e}")
+            raise ValueError(f"Invalid JSON response: {e}") from e
+        except Exception as e:
+            logger.error(f"Structured output generation failed: {e}")
+            raise

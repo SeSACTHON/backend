@@ -1,9 +1,23 @@
-"""RAG Node."""
+"""RAG Node - LangGraph 어댑터.
+
+얇은 어댑터: state 변환 + Command 호출 + progress notify (UX).
+정책/흐름은 SearchRAGCommand(Application)에서 처리.
+
+Clean Architecture:
+- Node(Adapter): 이 파일 - LangGraph glue code
+- Command(UseCase): SearchRAGCommand - 정책/흐름
+- Service: RAGSearcherService - 순수 비즈니스 로직
+"""
 
 from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Any
+
+from chat_worker.application.commands import (
+    SearchRAGCommand,
+    SearchRAGInput,
+)
 
 if TYPE_CHECKING:
     from chat_worker.application.ports.events import ProgressNotifierPort
@@ -16,13 +30,41 @@ def create_rag_node(
     retriever: "RetrieverPort",
     event_publisher: "ProgressNotifierPort",
 ):
-    """RAG 노드 팩토리."""
+    """RAG 노드 팩토리.
+
+    Node는 LangGraph 어댑터:
+    - state → input DTO 변환
+    - Command(UseCase) 호출
+    - output → state 변환
+    - progress notify (UX)
+
+    Args:
+        retriever: 검색 Port
+        event_publisher: 진행률 이벤트 발행자 (UX)
+
+    Returns:
+        rag_node 함수
+    """
+    # Command(UseCase) 인스턴스 생성 - Port 조립
+    command = SearchRAGCommand(retriever=retriever)
 
     async def rag_node(state: dict[str, Any]) -> dict[str, Any]:
-        job_id = state["job_id"]
-        message = state.get("message", "")
-        classification = state.get("classification_result")
+        """LangGraph 노드 (얇은 어댑터).
 
+        역할:
+        1. state에서 값 추출 (LangGraph glue)
+        2. Command 호출 (정책/흐름 위임)
+        3. output → state 변환
+
+        Args:
+            state: 현재 LangGraph 상태
+
+        Returns:
+            업데이트된 상태
+        """
+        job_id = state["job_id"]
+
+        # Progress: 시작 (UX)
         await event_publisher.notify_stage(
             task_id=job_id,
             stage="rag",
@@ -32,35 +74,38 @@ def create_rag_node(
         )
 
         try:
-            disposal_rules = None
+            # 1. state → input DTO 변환
+            input_dto = SearchRAGInput(
+                job_id=job_id,
+                message=state.get("message", ""),
+                classification=state.get("classification_result"),
+            )
 
-            if classification:
-                category = classification.get("classification", {}).get("major_category", "")
-                subcategory = classification.get("classification", {}).get("minor_category", "")
-                disposal_rules = retriever.search(category, subcategory)
+            # 2. Command 실행 (정책/흐름은 Command에서)
+            output = await command.execute(input_dto)
 
-            if not disposal_rules:
-                keywords = _extract_keywords(message)
-                for keyword in keywords:
-                    results = retriever.search_by_keyword(keyword, limit=1)
-                    if results:
-                        disposal_rules = results[0]
-                        break
+            # 3. output → state 변환
+            state_update = {
+                **state,
+                "disposal_rules": output.disposal_rules,
+            }
 
-            logger.info("RAG: %s for job=%s", "found" if disposal_rules else "not found", job_id)
-
+            # Progress: 완료 (UX)
             await event_publisher.notify_stage(
                 task_id=job_id,
                 stage="rag",
                 status="completed",
                 progress=60,
-                result={"found": disposal_rules is not None},
+                result={
+                    "found": output.found,
+                    "method": output.search_method,
+                },
             )
 
-            return {**state, "disposal_rules": disposal_rules}
+            return state_update
 
         except Exception as e:
-            logger.error("RAG failed: %s", e)
+            logger.error(f"RAG node failed: {e}", extra={"job_id": job_id})
             await event_publisher.notify_stage(
                 task_id=job_id,
                 stage="rag",
@@ -70,16 +115,3 @@ def create_rag_node(
             return {**state, "disposal_rules": None}
 
     return rag_node
-
-
-def _extract_keywords(message: str) -> list[str]:
-    waste_keywords = [
-        "페트병", "플라스틱", "유리병", "캔", "종이", "비닐",
-        "스티로폼", "음식물", "건전지", "형광등", "가전", "의류",
-    ]
-    found = []
-    message_lower = message.lower()
-    for keyword in waste_keywords:
-        if keyword in message_lower:
-            found.append(keyword)
-    return found

@@ -17,14 +17,9 @@ from google.genai import types
 from pydantic import BaseModel
 
 from chat_worker.application.ports.vision import VisionModelPort
+from chat_worker.infrastructure.assets.prompt_loader import load_prompt_file
 
 logger = logging.getLogger(__name__)
-
-# 프롬프트 경로
-PROMPT_PATH = os.path.join(
-    os.path.dirname(__file__),
-    "../../assets/prompts/classification/vision.txt",
-)
 
 # Gemini 설정
 MAX_OUTPUT_TOKENS = 1024
@@ -70,8 +65,7 @@ class GeminiVisionClient(VisionModelPort):
     def _load_prompt(self) -> str:
         """프롬프트 로드."""
         try:
-            with open(PROMPT_PATH, encoding="utf-8") as f:
-                return f.read()
+            return load_prompt_file("classification", "vision")
         except FileNotFoundError:
             logger.warning("Vision prompt not found, using default")
             return "이 이미지의 폐기물을 분류해주세요."

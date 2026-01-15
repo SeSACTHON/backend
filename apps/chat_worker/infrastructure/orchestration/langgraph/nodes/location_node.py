@@ -1,27 +1,12 @@
-"""Location Subagent Node - Orchestration Only.
+"""Location Subagent Node - LangGraph 어댑터.
 
-LangGraph 파이프라인의 위치 검색 노드입니다.
-
-노드 책임: 이벤트 발행 + 서비스 호출 + state 업데이트
-비즈니스 로직: LocationService에 위임
+얇은 어댑터: state 변환 + Command 호출 + progress notify (UX).
+정책/흐름은 GetLocationCommand(Application)에서 처리.
 
 Clean Architecture:
-- Node: Orchestration만 담당 (이 파일)
-- Service: LocationService (gRPC로 검색 + 컨텍스트 변환)
-- Port: LocationClientPort (gRPC API 호출)
-
-흐름:
-1. 진행 이벤트 발행
-2. 위치 확인 (state에서 user_location)
-3. 위치 없으면 → needs_input 이벤트 발행 (HITL via HTTP)
-4. 위치 있으면 → LocationService로 주변 센터 검색 (gRPC)
-5. state 업데이트
-
-HITL 흐름 (HTTP 기반):
-1. Worker: needs_input 이벤트 발행 → SSE로 클라이언트 전달
-2. Client: 위치 수집 (Geolocation API)
-3. Client: POST /chat/{job_id}/input → HTTP로 위치 전송
-4. Client: 새 요청 또는 재시도로 검색 수행
+- Node(Adapter): 이 파일 - LangGraph glue code
+- Command(UseCase): GetLocationCommand - 정책/흐름
+- Service: LocationService - 순수 비즈니스 로직
 """
 
 from __future__ import annotations
@@ -29,12 +14,14 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from chat_worker.application.integrations.location.services import LocationService
-from chat_worker.domain import LocationData
+from chat_worker.application.commands.get_location_command import (
+    GetLocationCommand,
+    GetLocationInput,
+)
 
 if TYPE_CHECKING:
-    from chat_worker.application.integrations.location.ports import LocationClientPort
     from chat_worker.application.ports.events import ProgressNotifierPort
+    from chat_worker.application.ports.location_client import LocationClientPort
 
 logger = logging.getLogger(__name__)
 
@@ -45,10 +32,11 @@ def create_location_subagent_node(
 ):
     """Location Subagent 노드 생성.
 
-    노드는 thin wrapper로:
-    1. 이벤트 발행
-    2. LocationService 호출 (gRPC, 비즈니스 로직 위임)
-    3. state 업데이트
+    Node는 LangGraph 어댑터:
+    - state → input DTO 변환
+    - Command(UseCase) 호출
+    - output → state 변환
+    - progress notify (UX)
 
     Args:
         location_client: Location gRPC 클라이언트
@@ -57,20 +45,26 @@ def create_location_subagent_node(
     Returns:
         LangGraph 노드 함수
     """
-    location_service = LocationService(client=location_client)
+    # Command(UseCase) 인스턴스 생성 - Port 조립
+    command = GetLocationCommand(location_client=location_client)
 
     async def location_subagent(state: dict[str, Any]) -> dict[str, Any]:
-        """주변 재활용 센터를 검색합니다 (gRPC).
+        """LangGraph 노드 (얇은 어댑터).
 
-        노드 책임 (Orchestration):
-        1. 이벤트 발행 (진행 상황)
-        2. 서비스 호출 (gRPC, 비즈니스 로직 위임)
-        3. state 업데이트
+        역할:
+        1. state에서 값 추출 (LangGraph glue)
+        2. Command 호출 (정책/흐름 위임)
+        3. output → state 변환
+
+        Args:
+            state: 현재 LangGraph 상태
+
+        Returns:
+            업데이트된 상태
         """
         job_id = state.get("job_id", "")
-        user_location_dict = state.get("user_location")
 
-        # 1. 이벤트: 시작
+        # Progress: 시작 (UX)
         await event_publisher.notify_stage(
             task_id=job_id,
             stage="location",
@@ -79,17 +73,27 @@ def create_location_subagent_node(
             message="📍 위치 정보 확인 중...",
         )
 
-        # 2. 위치 정보 확인
-        location_data = _extract_location_data(user_location_dict)
-        if location_data is None:
-            # 위치 정보 없음 → needs_input 이벤트 발행 (HITL via HTTP)
+        # 1. state → input DTO 변환
+        input_dto = GetLocationInput(
+            job_id=job_id,
+            user_location=state.get("user_location"),
+            search_type="recycling",  # TODO: intent에 따라 zerowaste 선택 가능
+            radius=5000,
+            limit=5,
+        )
+
+        # 2. Command 실행 (정책/흐름은 Command에서)
+        output = await command.execute(input_dto)
+
+        # 3. output → state 변환
+        if output.needs_location:
+            # 위치 정보 필요 → HITL 트리거
             await event_publisher.notify_needs_input(
                 task_id=job_id,
                 input_type="location",
                 message="📍 주변 센터를 찾으려면 위치 정보가 필요해요.\n위치 권한을 허용해주세요!",
                 timeout=60,
             )
-            # 스킵 후 진행 (클라이언트가 위치와 함께 재요청 가능)
             await event_publisher.notify_stage(
                 task_id=job_id,
                 stage="location",
@@ -98,59 +102,30 @@ def create_location_subagent_node(
             )
             return {
                 **state,
-                "location_context": None,
+                "location_context": output.location_context,
                 "location_skipped": True,
-                "needs_location": True,  # 클라이언트 힌트
+                "needs_location": True,
             }
 
-        # 3. LocationService로 gRPC 검색
-        try:
-            centers = await location_service.search_recycling_centers(
-                location=location_data,
-                radius=5000,  # 5km 반경
-                limit=5,  # 최대 5개
-            )
-
-            # 4. 컨텍스트 구성
-            context = LocationService.to_answer_context(
-                locations=centers,
-                user_location=location_data,
-            )
-
-            logger.info(
-                "Location search completed (gRPC)",
-                extra={
-                    "job_id": job_id,
-                    "count": len(centers),
-                },
-            )
-
-            return {
-                **state,
-                "location_context": context,
-            }
-
-        except Exception as e:
-            logger.error(
-                "Location gRPC call failed",
-                extra={"job_id": job_id, "error": str(e)},
-            )
+        if not output.success:
             return {
                 **state,
                 "location_context": None,
-                "subagent_error": "주변 센터 정보를 가져오는 데 실패했어요.",
+                "subagent_error": output.error_message,
             }
+
+        # Progress: 완료 (UX)
+        await event_publisher.notify_stage(
+            task_id=job_id,
+            stage="location",
+            status="completed",
+            progress=60,
+            result={"found": output.location_context.get("found", False)},
+        )
+
+        return {
+            **state,
+            "location_context": output.location_context,
+        }
 
     return location_subagent
-
-
-def _extract_location_data(user_location_dict: dict[str, Any] | None) -> LocationData | None:
-    """사용자 위치 dict에서 LocationData를 추출."""
-    if not user_location_dict:
-        return None
-
-    try:
-        data = LocationData.from_dict(user_location_dict)
-        return data if data.is_valid() else None
-    except (KeyError, ValueError):
-        return None

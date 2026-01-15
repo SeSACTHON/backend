@@ -31,10 +31,12 @@ CHAT_WORKER_INFO = Info(
     "chat_worker",
     "Chat Worker service information",
 )
-CHAT_WORKER_INFO.info({
-    "version": "1.0.0",
-    "framework": "langgraph",
-})
+CHAT_WORKER_INFO.info(
+    {
+        "version": "1.0.0",
+        "framework": "langgraph",
+    }
+)
 
 # ============================================================
 # Request Metrics

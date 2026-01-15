@@ -1,27 +1,23 @@
-"""Vision Node - 이미지 분류 노드.
+"""Vision Node - LangGraph 어댑터.
 
-LangGraph 파이프라인의 Vision 분석 노드입니다.
-
-노드 책임:
-1. 이벤트 발행 (진행 상황)
-2. Vision 모델 호출 (이미지 분류)
-3. state 업데이트 (classification_result)
+얇은 어댑터: state 변환 + Command 호출 + progress notify (UX).
+정책/흐름은 AnalyzeImageCommand(Application)에서 처리.
 
 Clean Architecture:
-- Node: Orchestration만 담당 (이 파일)
-- Port: VisionModelPort (이미지 분석 API)
-
-흐름:
-1. image_url 확인
-2. 진행 이벤트 발행
-3. Vision 모델로 분류
-4. classification_result를 state에 저장
+- Node(Adapter): 이 파일 - LangGraph glue code
+- Command(UseCase): AnalyzeImageCommand - 정책/흐름
+- Service: VisionService - 순수 비즈니스 로직
 """
 
 from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING, Any
+
+from chat_worker.application.commands.analyze_image_command import (
+    AnalyzeImageCommand,
+    AnalyzeImageInput,
+)
 
 if TYPE_CHECKING:
     from chat_worker.application.ports.events import ProgressNotifierPort
@@ -36,6 +32,12 @@ def create_vision_node(
 ):
     """Vision 노드 생성.
 
+    Node는 LangGraph 어댑터:
+    - state → input DTO 변환
+    - Command(UseCase) 호출
+    - output → state 변환
+    - progress notify (UX)
+
     Args:
         vision_model: Vision 모델 클라이언트
         event_publisher: 이벤트 발행자 (SSE)
@@ -43,26 +45,32 @@ def create_vision_node(
     Returns:
         LangGraph 노드 함수
     """
+    # Command(UseCase) 인스턴스 생성 - Port 조립
+    command = AnalyzeImageCommand(vision_model=vision_model)
 
     async def vision_node(state: dict[str, Any]) -> dict[str, Any]:
-        """이미지를 분석하여 폐기물을 분류합니다.
+        """LangGraph 노드 (얇은 어댑터).
+
+        역할:
+        1. state에서 값 추출 (LangGraph glue)
+        2. Command 호출 (정책/흐름 위임)
+        3. output → state 변환
 
         Args:
-            state: 현재 상태 (image_url 필드 필요)
+            state: 현재 상태
 
         Returns:
-            업데이트된 상태 (classification_result 추가)
+            업데이트된 상태
         """
         job_id = state.get("job_id", "")
         image_url = state.get("image_url")
-        message = state.get("message", "")
 
-        # image_url이 없으면 스킵
+        # 이미지 없으면 빠른 스킵 (Progress 없이)
         if not image_url:
             logger.debug("No image_url, skipping vision node (job=%s)", job_id)
             return state
 
-        # 1. 이벤트: 시작
+        # Progress: 시작 (UX)
         await event_publisher.notify_stage(
             task_id=job_id,
             stage="vision",
@@ -71,58 +79,55 @@ def create_vision_node(
             message="🔍 이미지 분석 중...",
         )
 
-        try:
-            # 2. Vision 모델 호출
-            result = await vision_model.analyze_image(
-                image_url=image_url,
-                user_input=message,
-            )
+        # 1. state → input DTO 변환
+        input_dto = AnalyzeImageInput(
+            job_id=job_id,
+            image_url=image_url,
+            message=state.get("message", ""),
+        )
 
-            # 3. 이벤트: 완료
-            major_category = result.get("classification", {}).get("major_category", "unknown")
-            await event_publisher.notify_stage(
-                task_id=job_id,
-                stage="vision",
-                status="completed",
-                progress=25,
-                result={"major_category": major_category},
-                message=f"✅ 분류 완료: {major_category}",
-            )
+        # 2. Command 실행 (정책/흐름은 Command에서)
+        output = await command.execute(input_dto)
 
-            logger.info(
-                "Vision analysis completed",
-                extra={
-                    "job_id": job_id,
-                    "major_category": major_category,
-                },
-            )
+        # 3. output → state 변환
+        if output.skipped:
+            # 이미지 없어서 스킵됨 (이 케이스는 위에서 처리되지만 안전장치)
+            return state
 
-            # 4. state 업데이트
-            return {
-                **state,
-                "classification_result": result,
-                "has_image": True,
-            }
-
-        except Exception as e:
-            logger.error(
-                "Vision analysis failed",
-                extra={"job_id": job_id, "error": str(e)},
-            )
-
+        if not output.success:
             await event_publisher.notify_stage(
                 task_id=job_id,
                 stage="vision",
                 status="failed",
-                result={"error": str(e)},
+                result={"error": output.error_message},
                 message="⚠️ 이미지 분석 실패",
             )
-
             return {
                 **state,
-                "classification_result": None,
-                "has_image": True,
-                "vision_error": str(e),
+                "classification_result": output.classification_result,
+                "has_image": output.has_image,
+                "vision_error": output.error_message,
             }
+
+        # Progress: 완료 (UX)
+        major_category = (
+            output.classification_result.get("classification", {}).get("major", "unknown")
+            if output.classification_result
+            else "unknown"
+        )
+        await event_publisher.notify_stage(
+            task_id=job_id,
+            stage="vision",
+            status="completed",
+            progress=25,
+            result={"major_category": major_category},
+            message=f"✅ 분류 완료: {major_category}",
+        )
+
+        return {
+            **state,
+            "classification_result": output.classification_result,
+            "has_image": output.has_image,
+        }
 
     return vision_node

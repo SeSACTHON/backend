@@ -99,12 +99,14 @@ class TestRedisInteractionStateStore:
     ):
         """요청 조회 성공."""
         # Redis에서 반환될 값
-        stored_data = json.dumps({
-            "job_id": "job-123",
-            "input_type": "location",
-            "message": "위치 정보를 입력해주세요.",
-            "timeout": 60,
-        })
+        stored_data = json.dumps(
+            {
+                "job_id": "job-123",
+                "input_type": "location",
+                "message": "위치 정보를 입력해주세요.",
+                "timeout": 60,
+            }
+        )
         mock_redis.get = AsyncMock(return_value=stored_data)
 
         result = await store.get_pending_request("job-123")
@@ -209,10 +211,12 @@ class TestRedisInteractionStateStore:
         mock_redis: AsyncMock,
     ):
         """파이프라인 상태 조회 성공."""
-        stored_data = json.dumps({
-            "state": {"message": "테스트"},
-            "resume_node": "answer_node",
-        })
+        stored_data = json.dumps(
+            {
+                "state": {"message": "테스트"},
+                "resume_node": "answer_node",
+            }
+        )
         mock_redis.get = AsyncMock(return_value=stored_data)
 
         result = await store.get_pipeline_state("job-123")

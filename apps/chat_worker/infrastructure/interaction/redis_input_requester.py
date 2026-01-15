@@ -18,7 +18,7 @@ import logging
 import time
 from typing import TYPE_CHECKING
 
-from chat_worker.application.interaction.ports import InputRequesterPort
+from chat_worker.application.ports.input_requester import InputRequesterPort
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis
@@ -92,9 +92,7 @@ class RedisInputRequester(InputRequesterPort):
             maxlen=self._maxlen,
         )
 
-        request_id = (
-            message_id.decode() if isinstance(message_id, bytes) else str(message_id)
-        )
+        request_id = message_id.decode() if isinstance(message_id, bytes) else str(message_id)
 
         logger.info(
             "Input request event published",

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -42,14 +42,16 @@ class MockProgressNotifier:
         result: dict[str, Any] | None = None,
         message: str | None = None,
     ) -> str:
-        self.events.append({
-            "task_id": task_id,
-            "stage": stage,
-            "status": status,
-            "progress": progress,
-            "result": result,
-            "message": message,
-        })
+        self.events.append(
+            {
+                "task_id": task_id,
+                "stage": stage,
+                "status": status,
+                "progress": progress,
+                "result": result,
+                "message": message,
+            }
+        )
         return "event-id"
 
     async def notify_token(self, task_id: str, content: str) -> str:
@@ -223,11 +225,13 @@ class TestProcessChatCommand:
         mock_notifier: MockProgressNotifier,
     ):
         """결과 반환."""
-        mock_pipeline = MockPipeline(result={
-            "job_id": "job-xyz",
-            "intent": "character",
-            "answer": "플라스틱 캐릭터 정보입니다.",
-        })
+        mock_pipeline = MockPipeline(
+            result={
+                "job_id": "job-xyz",
+                "intent": "character",
+                "answer": "플라스틱 캐릭터 정보입니다.",
+            }
+        )
         command = ProcessChatCommand(
             pipeline=mock_pipeline,
             progress_notifier=mock_notifier,

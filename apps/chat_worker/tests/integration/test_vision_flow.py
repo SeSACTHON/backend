@@ -6,7 +6,6 @@
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock
 
 import pytest
 
@@ -32,9 +31,7 @@ class MockVisionModel:
             "confidence": 0.92,
         }
 
-    async def analyze_image(
-        self, image_url: str, user_input: str | None = None
-    ) -> dict[str, Any]:
+    async def analyze_image(self, image_url: str, user_input: str | None = None) -> dict[str, Any]:
         return self._return_value
 
 

@@ -17,7 +17,7 @@ import json
 import logging
 from typing import TYPE_CHECKING, Any
 
-from chat_worker.application.interaction.ports import InteractionStateStorePort
+from chat_worker.application.ports.interaction_state_store import InteractionStateStorePort
 from chat_worker.domain import HumanInputRequest, InputType
 
 if TYPE_CHECKING:

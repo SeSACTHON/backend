@@ -4,6 +4,9 @@
 비즈니스 로직(의도 분류, 답변 생성)은 Service Layer에서 담당.
 
 Port: application/ports/llm/llm_client.py
+
+Structured Output 지원:
+- https://platform.openai.com/docs/guides/structured-outputs
 """
 
 from __future__ import annotations
@@ -11,10 +14,11 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, TypeVar
 
 import httpx
 from openai import AsyncOpenAI
+from pydantic import BaseModel
 
 from chat_worker.application.ports.llm import LLMClientPort
 from chat_worker.infrastructure.llm.config import (
@@ -24,6 +28,8 @@ from chat_worker.infrastructure.llm.config import (
 )
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T", bound=BaseModel)
 
 
 class OpenAILLMClient(LLMClientPort):
@@ -118,3 +124,70 @@ class OpenAILLMClient(LLMClientPort):
         async for chunk in stream:
             if chunk.choices and chunk.choices[0].delta.content:
                 yield chunk.choices[0].delta.content
+
+    async def generate_structured(
+        self,
+        prompt: str,
+        response_schema: type[T],
+        system_prompt: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> T:
+        """구조화된 응답 생성 (OpenAI Structured Outputs).
+
+        OpenAI의 네이티브 Structured Outputs API를 사용하여
+        JSON 스키마를 준수하는 응답을 보장합니다.
+
+        Args:
+            prompt: 사용자 프롬프트
+            response_schema: Pydantic BaseModel 서브클래스
+            system_prompt: 시스템 프롬프트
+            max_tokens: 최대 토큰 수
+            temperature: 생성 온도
+
+        Returns:
+            response_schema 타입의 인스턴스
+        """
+        messages = []
+        if system_prompt:
+            messages.append({"role": "system", "content": system_prompt})
+        messages.append({"role": "user", "content": prompt})
+
+        # API 호출 파라미터
+        kwargs: dict[str, Any] = {
+            "model": self._model,
+            "messages": messages,
+            "response_format": {
+                "type": "json_schema",
+                "json_schema": {
+                    "name": response_schema.__name__,
+                    "schema": response_schema.model_json_schema(),
+                    "strict": True,
+                },
+            },
+        }
+        if max_tokens is not None:
+            kwargs["max_tokens"] = max_tokens
+        if temperature is not None:
+            kwargs["temperature"] = temperature
+
+        try:
+            response = await self._client.chat.completions.create(**kwargs)
+            content = response.choices[0].message.content or "{}"
+
+            # JSON 파싱 및 Pydantic 검증
+            data = json.loads(content)
+            result = response_schema.model_validate(data)
+
+            logger.debug(
+                "Structured output generated",
+                extra={"schema": response_schema.__name__},
+            )
+            return result
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse structured response: {e}")
+            raise ValueError(f"Invalid JSON response: {e}") from e
+        except Exception as e:
+            logger.error(f"Structured output generation failed: {e}")
+            raise

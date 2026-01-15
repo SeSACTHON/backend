@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 
 import grpc
 
-from chat_worker.application.integrations.location.ports import (
+from chat_worker.application.ports.location_client import (
     LocationClientPort,
     LocationDTO,
 )

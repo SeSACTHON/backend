@@ -3,15 +3,12 @@
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from chat_worker.application.interaction.ports import (
-    InputRequesterPort,
-    InteractionStateStorePort,
-)
-from chat_worker.application.interaction.services.human_interaction_service import (
+from chat_worker.application.ports.input_requester import InputRequesterPort
+from chat_worker.application.ports.interaction_state_store import InteractionStateStorePort
+from chat_worker.application.services.human_interaction_service import (
     DEFAULT_MESSAGES,
     DEFAULT_TIMEOUT,
     HumanInteractionService,

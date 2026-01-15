@@ -61,9 +61,9 @@ register_metrics(app)
 redis_streams_client: aioredis.Redis | None = None
 redis_pubsub_client: aioredis.Redis | None = None
 consumer: StreamConsumer | None = None
-reclaimer: PendingReclaimer | None = None
+reclaimers: list[PendingReclaimer] = []  # 멀티 도메인 지원
 consumer_task: asyncio.Task | None = None
-reclaimer_task: asyncio.Task | None = None
+reclaimer_tasks: list[asyncio.Task] = []  # 멀티 도메인 지원
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -74,7 +74,7 @@ reclaimer_task: asyncio.Task | None = None
 @app.on_event("startup")
 async def startup() -> None:
     """앱 시작."""
-    global redis_streams_client, redis_pubsub_client, consumer, reclaimer, consumer_task, reclaimer_task
+    global redis_streams_client, redis_pubsub_client, consumer, reclaimers, consumer_task, reclaimer_tasks
 
     # 멀티 도메인 스트림 설정: [(prefix, shard_count), ...]
     stream_configs = [
@@ -135,26 +135,29 @@ async def startup() -> None:
         count=settings.xread_count,
     )
 
-    # Reclaimer 초기화 (첫 번째 스트림만 - TODO: 멀티 도메인 지원)
-    # 현재는 scan:events만 Reclaim
-    first_prefix, first_shard_count = stream_configs[0]
-    reclaimer = PendingReclaimer(
-        redis_client=redis_streams_client,
-        processor=processor,
-        consumer_group=settings.consumer_group,
-        consumer_name=settings.consumer_name,
-        stream_prefix=first_prefix,
-        shard_count=first_shard_count,
-        min_idle_ms=settings.reclaim_min_idle_ms,
-        interval_seconds=settings.reclaim_interval_seconds,
-    )
+    # Reclaimer 초기화 (멀티 도메인 지원)
+    # 각 도메인별로 별도 Reclaimer 생성
+    reclaimers = []
+    for prefix, shard_count in stream_configs:
+        reclaimer = PendingReclaimer(
+            redis_client=redis_streams_client,
+            processor=processor,
+            consumer_group=settings.consumer_group,
+            consumer_name=settings.consumer_name,
+            stream_prefix=prefix,
+            shard_count=shard_count,
+            min_idle_ms=settings.reclaim_min_idle_ms,
+            interval_seconds=settings.reclaim_interval_seconds,
+        )
+        reclaimers.append(reclaimer)
+        logger.info(f"Reclaimer initialized for {prefix} (shards={shard_count})")
 
     # Consumer Group 설정
     await consumer.setup()
 
     # Background tasks 시작
     consumer_task = asyncio.create_task(consumer.consume())
-    reclaimer_task = asyncio.create_task(reclaimer.run())
+    reclaimer_tasks = [asyncio.create_task(r.run()) for r in reclaimers]
 
     logger.info("event_router_started")
 
@@ -162,7 +165,7 @@ async def startup() -> None:
 @app.on_event("shutdown")
 async def shutdown() -> None:
     """앱 종료."""
-    global consumer, reclaimer, consumer_task, reclaimer_task, redis_streams_client, redis_pubsub_client
+    global consumer, reclaimers, consumer_task, reclaimer_tasks, redis_streams_client, redis_pubsub_client
 
     logger.info("event_router_stopping")
 
@@ -176,13 +179,13 @@ async def shutdown() -> None:
         except asyncio.CancelledError:
             pass
 
-    # Reclaimer 종료
-    if reclaimer:
+    # Reclaimers 종료 (멀티 도메인)
+    for reclaimer in reclaimers:
         await reclaimer.shutdown()
-    if reclaimer_task:
-        reclaimer_task.cancel()
+    for task in reclaimer_tasks:
+        task.cancel()
         try:
-            await reclaimer_task
+            await task
         except asyncio.CancelledError:
             pass
 

@@ -4,7 +4,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from chat_worker.application.integrations.location.ports import LocationDTO
+from chat_worker.application.ports.location_client import LocationDTO
 from chat_worker.infrastructure.integrations.location.grpc_client import (
     LocationGrpcClient,
 )

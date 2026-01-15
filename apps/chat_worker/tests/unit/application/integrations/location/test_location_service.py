@@ -1,59 +1,19 @@
-"""LocationService 단위 테스트."""
+"""LocationService 단위 테스트.
+
+LocationService는 순수 로직만 담당 (Port 의존 없음):
+- to_answer_context: 컨텍스트 변환
+- validate_location: 위치 검증
+- build_no_location_context: 위치 정보 없음 컨텍스트
+- build_not_found_context: 결과 없음 컨텍스트
+"""
 
 from __future__ import annotations
 
 import pytest
 
-from chat_worker.application.integrations.location.ports import (
-    LocationClientPort,
-    LocationDTO,
-)
-from chat_worker.application.integrations.location.services.location_service import (
-    LocationService,
-)
+from chat_worker.application.ports.location_client import LocationDTO
+from chat_worker.application.services.location_service import LocationService
 from chat_worker.domain import LocationData
-
-
-class MockLocationClient(LocationClientPort):
-    """테스트용 Location Mock."""
-
-    def __init__(self, centers: list[LocationDTO] | None = None):
-        self._centers = centers or []
-        self._zerowaste: list[LocationDTO] = []
-        self.search_recycling_called = False
-        self.search_zerowaste_called = False
-        self.last_lat: float | None = None
-        self.last_lon: float | None = None
-        self.last_radius: int | None = None
-        self.last_limit: int | None = None
-
-    async def search_recycling_centers(
-        self,
-        lat: float,
-        lon: float,
-        radius: int | None = None,
-        limit: int = 10,
-    ) -> list[LocationDTO]:
-        self.search_recycling_called = True
-        self.last_lat = lat
-        self.last_lon = lon
-        self.last_radius = radius
-        self.last_limit = limit
-        return self._centers
-
-    async def search_zerowaste_shops(
-        self,
-        lat: float,
-        lon: float,
-        radius: int = 5000,
-        limit: int = 10,
-    ) -> list[LocationDTO]:
-        self.search_zerowaste_called = True
-        self.last_lat = lat
-        self.last_lon = lon
-        self.last_radius = radius
-        self.last_limit = limit
-        return self._zerowaste
 
 
 def create_location_dto(
@@ -83,7 +43,7 @@ def create_location_dto(
 
 
 class TestLocationService:
-    """LocationService 테스트 스위트."""
+    """LocationService 테스트 스위트 (순수 로직)."""
 
     @pytest.fixture
     def sample_centers(self) -> list[LocationDTO]:
@@ -95,86 +55,9 @@ class TestLocationService:
         ]
 
     @pytest.fixture
-    def mock_client(self, sample_centers: list[LocationDTO]) -> MockLocationClient:
-        """Mock 클라이언트."""
-        return MockLocationClient(centers=sample_centers)
-
-    @pytest.fixture
-    def service(self, mock_client: MockLocationClient) -> LocationService:
-        """테스트용 서비스."""
-        return LocationService(mock_client)
-
-    @pytest.fixture
     def user_location(self) -> LocationData:
         """사용자 위치."""
         return LocationData(latitude=37.5665, longitude=126.9780)
-
-    # ==========================================================
-    # search_recycling_centers Tests
-    # ==========================================================
-
-    @pytest.mark.asyncio
-    async def test_search_recycling_centers(
-        self,
-        service: LocationService,
-        mock_client: MockLocationClient,
-        user_location: LocationData,
-        sample_centers: list[LocationDTO],
-    ):
-        """재활용 센터 검색."""
-        result = await service.search_recycling_centers(user_location)
-
-        assert len(result) == len(sample_centers)
-        assert mock_client.search_recycling_called
-        assert mock_client.last_lat == user_location.latitude
-        assert mock_client.last_lon == user_location.longitude
-
-    @pytest.mark.asyncio
-    async def test_search_recycling_centers_with_params(
-        self,
-        service: LocationService,
-        mock_client: MockLocationClient,
-        user_location: LocationData,
-    ):
-        """파라미터 전달 확인."""
-        await service.search_recycling_centers(
-            location=user_location,
-            radius=3000,
-            limit=10,
-        )
-
-        assert mock_client.last_radius == 3000
-        assert mock_client.last_limit == 10
-
-    @pytest.mark.asyncio
-    async def test_search_recycling_centers_empty(
-        self,
-        user_location: LocationData,
-    ):
-        """빈 결과."""
-        mock_client = MockLocationClient(centers=[])
-        service = LocationService(mock_client)
-
-        result = await service.search_recycling_centers(user_location)
-
-        assert result == []
-
-    # ==========================================================
-    # search_zerowaste_shops Tests
-    # ==========================================================
-
-    @pytest.mark.asyncio
-    async def test_search_zerowaste_shops(
-        self,
-        service: LocationService,
-        mock_client: MockLocationClient,
-        user_location: LocationData,
-    ):
-        """제로웨이스트샵 검색."""
-        await service.search_zerowaste_shops(user_location)
-
-        assert mock_client.search_zerowaste_called
-        assert mock_client.last_lat == user_location.latitude
 
     # ==========================================================
     # to_answer_context Tests
@@ -250,3 +133,51 @@ class TestLocationService:
         assert center_ctx["is_open"] is True
         assert center_ctx["phone"] == "010-1234-5678"
         assert center_ctx["categories"] == ["플라스틱"]
+
+    # ==========================================================
+    # validate_location Tests
+    # ==========================================================
+
+    def test_validate_location_valid(self, user_location: LocationData):
+        """유효한 위치 검증."""
+        assert LocationService.validate_location(user_location) is True
+
+    def test_validate_location_none(self):
+        """None 위치 검증."""
+        assert LocationService.validate_location(None) is False
+
+    def test_validate_location_zero_coordinates(self):
+        """좌표가 0인 경우."""
+        location = LocationData(latitude=0.0, longitude=0.0)
+        assert LocationService.validate_location(location) is False
+
+    def test_validate_location_zero_latitude_only(self):
+        """위도만 0인 경우."""
+        location = LocationData(latitude=0.0, longitude=126.9780)
+        assert LocationService.validate_location(location) is False
+
+    # ==========================================================
+    # build_no_location_context Tests
+    # ==========================================================
+
+    def test_build_no_location_context(self):
+        """위치 정보 없음 컨텍스트."""
+        context = LocationService.build_no_location_context()
+
+        assert context["found"] is False
+        assert context["count"] == 0
+        assert context["error"] == "location_not_provided"
+        assert "위치 정보가 필요해요" in context["message"]
+
+    # ==========================================================
+    # build_not_found_context Tests
+    # ==========================================================
+
+    def test_build_not_found_context(self, user_location: LocationData):
+        """결과 없음 컨텍스트."""
+        context = LocationService.build_not_found_context(user_location)
+
+        assert context["found"] is False
+        assert context["count"] == 0
+        assert "user_location" in context
+        assert "찾지 못했어요" in context["message"]

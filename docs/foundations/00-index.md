@@ -425,6 +425,29 @@ LLM 모델을 함수의 파라미터로 전달하여 에이전트 로직과 모�
 
 ---
 
+### 27. [RAG 품질 평가 전략: LLM-as-a-Judge](./27-rag-evaluation-strategy.md) 🆕
+
+RAG 시스템의 품질을 LLM Judge로 평가하기 위한 이론적 토대와 실전 설계 원칙.
+
+**핵심 논문/자료:**
+- [RAGAS: Automated Evaluation of RAG](https://arxiv.org/abs/2309.15217) (arXiv 2023)
+- [TREC 2024 RAG Track - AutoNuggetizer](https://trec-rag.github.io/)
+- [ConsJudge: Judge as a Judge](https://arxiv.org/) (2025)
+- [Anthropic - Contextual Retrieval](https://www.anthropic.com/news/contextual-retrieval) (2024)
+- [Anthropic - Multi-agent Research System](https://www.anthropic.com/engineering/built-multi-agent-research-system) (2025)
+- [TruLens RAG Triad](https://www.trulens.org/trulens_eval/core_concepts_rag_triad/)
+- [Snowflake - Eval-guided optimization of LLM judges](https://www.snowflake.com/engineering-blog/) (2025)
+
+**핵심 내용:**
+- 4가지 핵심 기둥: 정량화(RAGAS/TREC), 근거 기반(Citation), 맥락 관리(Just-in-Time), 신뢰성(ConsJudge)
+- Faithfulness, Groundedness, Context Relevance 지표 정의
+- Nugget 기반 Completeness 측정
+- Citation/Evidence 강제 전략
+- Judge Consistency 확보 방안
+- 실전 JSON 스키마 및 프롬프트 템플릿
+
+---
+
 ## 권장 학습 순서
 
 ```
@@ -591,3 +614,4 @@ LLM 모델을 함수의 파라미터로 전달하여 에이전트 로직과 모�
 || 2026-01-05 | LLM Gateway & Unified Interface Pattern 문서 추가 (19) |
 || 2026-01-05 | Dependency Injection for LLM 문서 추가 (20) |
 || 2026-01-14 | Multi-Agent Prompt Patterns 문서 추가 (24) |
+|| 2026-01-15 | RAG 품질 평가 전략 (LLM-as-a-Judge) 문서 추가 (27) |

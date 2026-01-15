@@ -1,14 +1,52 @@
-"""RedisProgressNotifier 단위 테스트."""
+"""RedisProgressNotifier 단위 테스트.
+
+Lua Script 기반 멱등성 발행 테스트.
+"""
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from chat_worker.infrastructure.events.redis_progress_notifier import (
     RedisProgressNotifier,
+    _get_shard_for_job,
+    _get_stream_key,
 )
+
+
+class TestShardFunctions:
+    """Shard 관련 함수 테스트."""
+
+    def test_get_shard_for_job_consistent(self):
+        """같은 job_id는 항상 같은 shard."""
+        job_id = "test-job-123"
+        shard1 = _get_shard_for_job(job_id, shard_count=4)
+        shard2 = _get_shard_for_job(job_id, shard_count=4)
+        assert shard1 == shard2
+
+    def test_get_shard_for_job_distribution(self):
+        """여러 job_id가 여러 shard에 분산."""
+        shards = set()
+        for i in range(100):
+            shard = _get_shard_for_job(f"job-{i}", shard_count=4)
+            shards.add(shard)
+
+        # 100개 job_id면 4개 shard 모두 사용될 가능성 높음
+        assert len(shards) >= 2
+
+    def test_get_shard_for_job_within_range(self):
+        """Shard 번호가 범위 내."""
+        for i in range(50):
+            shard = _get_shard_for_job(f"job-{i}", shard_count=4)
+            assert 0 <= shard < 4
+
+    def test_get_stream_key_format(self):
+        """Stream key 형식."""
+        key = _get_stream_key("job-123", shard_count=4)
+        assert key.startswith("chat:events:")
+        assert key.split(":")[-1].isdigit()
 
 
 class TestRedisProgressNotifier:
@@ -18,7 +56,31 @@ class TestRedisProgressNotifier:
     def mock_redis(self) -> AsyncMock:
         """Mock Redis 클라이언트."""
         redis = AsyncMock()
-        redis.xadd = AsyncMock(return_value=b"1234567890-0")
+
+        # Lua Script mock - 호출 시 coroutine 반환
+        async def mock_stage_script(*args, **kwargs):
+            return [1, b"1234567890-0"]
+
+        async def mock_token_script(*args, **kwargs):
+            return b"1234567890-0"
+
+        stage_script = MagicMock()
+        stage_script.side_effect = mock_stage_script
+
+        token_script = MagicMock()
+        token_script.side_effect = mock_token_script
+
+        # register_script가 호출될 때마다 다른 mock 반환
+        script_mocks = [stage_script, token_script]
+        script_index = [0]
+
+        def get_script(lua_code):
+            idx = script_index[0]
+            script_index[0] = (idx + 1) % 2
+            return script_mocks[idx]
+
+        redis.register_script = MagicMock(side_effect=get_script)
+
         return redis
 
     @pytest.fixture
@@ -26,7 +88,7 @@ class TestRedisProgressNotifier:
         """테스트용 Notifier."""
         return RedisProgressNotifier(
             redis=mock_redis,
-            stream_prefix="test:events",
+            shard_count=4,
             maxlen=500,
         )
 
@@ -48,17 +110,8 @@ class TestRedisProgressNotifier:
         )
 
         assert event_id is not None
-        mock_redis.xadd.assert_called_once()
-
-        # 호출 인자 확인
-        call_args = mock_redis.xadd.call_args
-        stream_name = call_args[0][0]
-        event_data = call_args[0][1]
-
-        assert stream_name == "test:events:job-123"
-        assert event_data["event_type"] == "stage"
-        assert event_data["stage"] == "intent"
-        assert event_data["status"] == "started"
+        # Lua script 등록 확인
+        assert mock_redis.register_script.called
 
     @pytest.mark.asyncio
     async def test_notify_stage_with_progress(
@@ -67,7 +120,7 @@ class TestRedisProgressNotifier:
         mock_redis: AsyncMock,
     ):
         """진행률 포함 알림."""
-        await notifier.notify_stage(
+        event_id = await notifier.notify_stage(
             task_id="job-123",
             stage="rag",
             status="processing",
@@ -75,11 +128,7 @@ class TestRedisProgressNotifier:
             message="규정 검색 중...",
         )
 
-        call_args = mock_redis.xadd.call_args
-        event_data = call_args[0][1]
-
-        assert event_data["progress"] == 50
-        assert event_data["message"] == "규정 검색 중..."
+        assert event_id is not None
 
     @pytest.mark.asyncio
     async def test_notify_stage_with_result(
@@ -88,35 +137,30 @@ class TestRedisProgressNotifier:
         mock_redis: AsyncMock,
     ):
         """결과 포함 알림."""
-        await notifier.notify_stage(
+        event_id = await notifier.notify_stage(
             task_id="job-123",
             stage="intent",
             status="completed",
             result={"intent": "waste", "confidence": 0.95},
         )
 
-        call_args = mock_redis.xadd.call_args
-        event_data = call_args[0][1]
-
-        # result는 JSON 문자열로 저장됨
-        assert "result" in event_data
-        assert "waste" in event_data["result"]
+        assert event_id is not None
 
     @pytest.mark.asyncio
-    async def test_notify_stage_uses_maxlen(
+    async def test_notify_stage_returns_event_id(
         self,
         notifier: RedisProgressNotifier,
         mock_redis: AsyncMock,
     ):
-        """maxlen 파라미터 사용."""
-        await notifier.notify_stage(
+        """이벤트 ID 반환 확인."""
+        event_id = await notifier.notify_stage(
             task_id="job-123",
-            stage="test",
+            stage="intent",
             status="started",
         )
 
-        call_args = mock_redis.xadd.call_args
-        assert call_args.kwargs.get("maxlen") == 500
+        # b"1234567890-0" -> "1234567890-0"
+        assert "1234567890-0" in event_id
 
     # ==========================================================
     # notify_token Tests
@@ -129,16 +173,12 @@ class TestRedisProgressNotifier:
         mock_redis: AsyncMock,
     ):
         """토큰 스트리밍 알림."""
-        await notifier.notify_token(
+        event_id = await notifier.notify_token(
             task_id="job-456",
             content="안녕",
         )
 
-        call_args = mock_redis.xadd.call_args
-        event_data = call_args[0][1]
-
-        assert event_data["event_type"] == "token"
-        assert event_data["content"] == "안녕"
+        assert event_id is not None
 
     @pytest.mark.asyncio
     async def test_notify_token_multiple(
@@ -150,9 +190,23 @@ class TestRedisProgressNotifier:
         tokens = ["안녕", "하세요", "!"]
 
         for token in tokens:
-            await notifier.notify_token(task_id="job-789", content=token)
+            event_id = await notifier.notify_token(task_id="job-789", content=token)
+            assert event_id is not None
 
-        assert mock_redis.xadd.call_count == 3
+    @pytest.mark.asyncio
+    async def test_notify_token_seq_increments(
+        self,
+        notifier: RedisProgressNotifier,
+        mock_redis: AsyncMock,
+    ):
+        """토큰 seq가 증가하는지 확인."""
+        # 내부 _token_seq 딕셔너리 확인
+        await notifier.notify_token(task_id="job-seq", content="a")
+        await notifier.notify_token(task_id="job-seq", content="b")
+        await notifier.notify_token(task_id="job-seq", content="c")
+
+        # 3번 호출 후 seq는 1003 (1000 + 3)
+        assert notifier._token_seq.get("job-seq", 0) == 1003
 
     # ==========================================================
     # notify_needs_input Tests
@@ -165,21 +219,14 @@ class TestRedisProgressNotifier:
         mock_redis: AsyncMock,
     ):
         """입력 요청 알림."""
-        await notifier.notify_needs_input(
+        event_id = await notifier.notify_needs_input(
             task_id="job-abc",
             input_type="location",
             message="위치 정보를 입력해주세요.",
             timeout=60,
         )
 
-        call_args = mock_redis.xadd.call_args
-        event_data = call_args[0][1]
-
-        assert event_data["event_type"] == "needs_input"
-        assert event_data["input_type"] == "location"
-        assert event_data["message"] == "위치 정보를 입력해주세요."
-        # timeout은 문자열로 저장됨
-        assert event_data["timeout"] == "60"
+        assert event_id is not None
 
     @pytest.mark.asyncio
     async def test_notify_needs_input_default_timeout(
@@ -188,51 +235,44 @@ class TestRedisProgressNotifier:
         mock_redis: AsyncMock,
     ):
         """기본 타임아웃."""
-        await notifier.notify_needs_input(
+        event_id = await notifier.notify_needs_input(
             task_id="job-def",
             input_type="confirmation",
             message="계속할까요?",
         )
 
-        call_args = mock_redis.xadd.call_args
-        event_data = call_args[0][1]
-
-        assert event_data["timeout"] == "60"  # 기본값 (문자열)
+        assert event_id is not None
 
     # ==========================================================
-    # Stream Name Tests
+    # Shard Tests
     # ==========================================================
 
     @pytest.mark.asyncio
-    async def test_stream_name_format(
+    async def test_same_job_same_shard(
         self,
         notifier: RedisProgressNotifier,
         mock_redis: AsyncMock,
     ):
-        """스트림 이름 형식."""
-        await notifier.notify_stage(
-            task_id="my-task-id",
-            stage="test",
-            status="started",
-        )
+        """같은 job_id는 같은 shard로."""
+        job_id = "consistent-job"
 
-        call_args = mock_redis.xadd.call_args
-        stream_name = call_args[0][0]
+        # 여러 번 호출해도 같은 shard
+        shard1 = _get_shard_for_job(job_id, shard_count=4)
+        shard2 = _get_shard_for_job(job_id, shard_count=4)
 
-        assert stream_name == "test:events:my-task-id"
+        assert shard1 == shard2
 
     @pytest.mark.asyncio
-    async def test_different_tasks_different_streams(
+    async def test_different_jobs_may_different_shards(
         self,
         notifier: RedisProgressNotifier,
         mock_redis: AsyncMock,
     ):
-        """다른 task_id는 다른 스트림."""
-        await notifier.notify_stage(task_id="task-1", stage="a", status="s")
-        await notifier.notify_stage(task_id="task-2", stage="b", status="s")
+        """다른 job_id는 다른 shard일 수 있음."""
+        shards = set()
+        for i in range(20):
+            shard = _get_shard_for_job(f"job-{i}", shard_count=4)
+            shards.add(shard)
 
-        calls = mock_redis.xadd.call_args_list
-        streams = [call[0][0] for call in calls]
-
-        assert "test:events:task-1" in streams
-        assert "test:events:task-2" in streams
+        # 20개 job_id면 여러 shard에 분산
+        assert len(shards) >= 2

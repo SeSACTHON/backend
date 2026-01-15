@@ -186,9 +186,7 @@ class CachedPostgresSaver:
         limit: int | None = None,
     ) -> AsyncIterator["CheckpointTuple"]:
         """체크포인트 목록 조회 (PostgreSQL 직접 조회)."""
-        async for item in self._postgres.alist(
-            config, filter=filter, before=before, limit=limit
-        ):
+        async for item in self._postgres.alist(config, filter=filter, before=before, limit=limit):
             yield item
 
     async def aput_writes(

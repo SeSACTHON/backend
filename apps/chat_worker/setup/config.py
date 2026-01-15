@@ -54,6 +54,11 @@ class Settings(BaseSettings):
     location_grpc_host: str = "location-grpc.location.svc.cluster.local"
     location_grpc_port: int = 50051
 
+    # Kakao Local API (장소 검색)
+    # REST API 키 (KakaoMap 설정 ON 필요)
+    kakao_rest_api_key: str | None = None
+    kakao_api_timeout: float = 10.0
+
     # Logging
     log_level: str = "INFO"
 

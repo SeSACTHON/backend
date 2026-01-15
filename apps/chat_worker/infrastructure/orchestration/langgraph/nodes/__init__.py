@@ -8,6 +8,7 @@
 - intent_node: 의도 분류
 - vision_node: 이미지 분류 (Vision)
 - rag_node: RAG 검색
+- feedback_node: RAG 품질 평가 및 Fallback 결정
 - answer_node: 답변 생성
 - character_node: 캐릭터 서브에이전트
 - location_node: 위치 서브에이전트
@@ -18,6 +19,10 @@ from chat_worker.infrastructure.orchestration.langgraph.nodes.answer_node import
 )
 from chat_worker.infrastructure.orchestration.langgraph.nodes.character_node import (
     create_character_subagent_node,
+)
+from chat_worker.infrastructure.orchestration.langgraph.nodes.feedback_node import (
+    create_feedback_node,
+    route_after_feedback,
 )
 from chat_worker.infrastructure.orchestration.langgraph.nodes.intent_node import (
     create_intent_node,
@@ -36,6 +41,8 @@ __all__ = [
     "create_intent_node",
     "create_vision_node",
     "create_rag_node",
+    "create_feedback_node",
+    "route_after_feedback",
     "create_answer_node",
     "create_character_subagent_node",
     "create_location_subagent_node",

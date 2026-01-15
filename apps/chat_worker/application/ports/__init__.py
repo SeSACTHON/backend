@@ -1,25 +1,85 @@
-"""Application Ports - 공용 인터페이스.
+"""Application Ports (Layer-first).
 
-여러 유스케이스가 공유하는 Port들.
+모든 Port(추상화/인터페이스)를 한 곳에서 관리.
+Infrastructure에서 Adapter로 구현.
 
-구조:
-- llm/: LLM 관련 (순수 호출 + 정책)
-- vision/: Vision 모델 (이미지 분류)
-- events/: 이벤트 관련 (진행률 + 도메인 이벤트)
-- retrieval/: RAG 검색
-- cache/: 캐싱 추상화
-- metrics/: 메트릭 추상화
+Layer-first 구조:
+- ports/: 이 폴더 (추상화)
+- services/: 비즈니스 로직
+- commands/: UseCase (정책/흐름)
+- dto/: Data Transfer Objects
+
+카테고리:
+- LLM: LLMClientPort, LLMPolicyPort
+- Vision: VisionModelPort
+- Events: ProgressNotifierPort, DomainEventBusPort
+- Retrieval: RetrieverPort
+- Cache: CachePort
+- Metrics: MetricsPort
+- WebSearch: WebSearchPort
+- Integrations: CharacterClientPort, LocationClientPort
+- Feedback: LLMFeedbackEvaluatorPort
+- Interaction: InputRequesterPort, InteractionStateStorePort
+- Prompt: PromptBuilderPort
 """
 
+# LLM
+# Cache
 from chat_worker.application.ports.cache import CachePort
+
+# Integrations - Character
+from chat_worker.application.ports.character_client import (
+    CharacterClientPort,
+    CharacterDTO,
+)
+
+# Events
 from chat_worker.application.ports.events import (
     DomainEventBusPort,
     ProgressNotifierPort,
 )
+
+# Interaction - HITL
+from chat_worker.application.ports.input_requester import (
+    InputRequesterPort,
+)
+from chat_worker.application.ports.interaction_state_store import (
+    InteractionStateStorePort,
+)
 from chat_worker.application.ports.llm import LLMClientPort, LLMPolicyPort
+
+# Feedback - LLM 평가기
+from chat_worker.application.ports.llm_evaluator import (
+    LLMFeedbackEvaluatorPort,
+)
+
+# Integrations - Location
+from chat_worker.application.ports.location_client import (
+    LocationClientPort,
+    LocationDTO,
+)
+
+# Metrics
 from chat_worker.application.ports.metrics import MetricsPort
+
+# Prompt Builder
+from chat_worker.application.ports.prompt_builder import (
+    PromptBuilderPort,
+)
+
+# Prompt Loader
+from chat_worker.application.ports.prompt_loader import (
+    PromptLoaderPort,
+)
+
+# Retrieval
 from chat_worker.application.ports.retrieval import RetrieverPort
+
+# Vision
 from chat_worker.application.ports.vision import VisionModelPort
+
+# Web Search
+from chat_worker.application.ports.web_search import WebSearchPort
 
 __all__ = [
     # LLM
@@ -36,4 +96,19 @@ __all__ = [
     "CachePort",
     # Metrics
     "MetricsPort",
+    # Web Search
+    "WebSearchPort",
+    # Integrations
+    "CharacterClientPort",
+    "CharacterDTO",
+    "LocationClientPort",
+    "LocationDTO",
+    # Feedback
+    "LLMFeedbackEvaluatorPort",
+    # Interaction
+    "InputRequesterPort",
+    "InteractionStateStorePort",
+    # Prompt
+    "PromptBuilderPort",
+    "PromptLoaderPort",
 ]
