@@ -18,11 +18,9 @@ API 문서:
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import date
 from enum import Enum
-from typing import Any
+from typing import TYPE_CHECKING, Protocol, runtime_checkable
 
 
 class RecyclableCategory(str, Enum):
@@ -145,7 +143,8 @@ class RecyclablePriceTrendDTO:
     trend: str = "stable"  # up, down, stable
 
 
-class RecyclablePriceClientPort(ABC):
+@runtime_checkable
+class RecyclablePriceClientPort(Protocol):
     """재활용자원 가격 정보 클라이언트 Port.
 
     데이터 소스:
@@ -155,7 +154,6 @@ class RecyclablePriceClientPort(ABC):
     Infrastructure Layer에서 파일/캐시 기반 구현체 제공.
     """
 
-    @abstractmethod
     async def search_price(
         self,
         item_name: str,
@@ -170,9 +168,8 @@ class RecyclablePriceClientPort(ABC):
         Returns:
             RecyclablePriceSearchResponse
         """
-        pass
+        ...
 
-    @abstractmethod
     async def get_category_prices(
         self,
         category: RecyclableCategory,
@@ -187,9 +184,8 @@ class RecyclablePriceClientPort(ABC):
         Returns:
             RecyclablePriceSearchResponse
         """
-        pass
+        ...
 
-    @abstractmethod
     async def get_all_prices(
         self,
         region: RecyclableRegion | None = None,
@@ -202,30 +198,7 @@ class RecyclablePriceClientPort(ABC):
         Returns:
             RecyclablePriceSearchResponse
         """
-        pass
-
-    @abstractmethod
-    async def get_price_trend(
-        self,
-        item_name: str,
-        region: RecyclableRegion | None = None,
-        months: int = 6,
-    ) -> RecyclablePriceTrendDTO | None:
-        """품목 가격 추이 조회.
-
-        Args:
-            item_name: 품목명
-            region: 권역
-            months: 조회 기간 (월)
-
-        Returns:
-            RecyclablePriceTrendDTO or None
-        """
-        pass
-
-    async def close(self) -> None:
-        """리소스 정리 (선택적 구현)."""
-        pass
+        ...
 
 
 __all__ = [

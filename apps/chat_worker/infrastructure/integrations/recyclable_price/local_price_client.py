@@ -27,7 +27,6 @@ import yaml
 from chat_worker.application.ports.recyclable_price_client import (
     REGION_NAMES,
     RecyclableCategory,
-    RecyclablePriceClientPort,
     RecyclablePriceDTO,
     RecyclablePriceSearchResponse,
     RecyclablePriceTrendDTO,
@@ -35,19 +34,6 @@ from chat_worker.application.ports.recyclable_price_client import (
 )
 
 logger = logging.getLogger(__name__)
-
-# Region ID → RecyclableRegion 매핑
-REGION_ID_MAP: dict[str, RecyclableRegion] = {
-    "nationwide": RecyclableRegion.NATIONAL,
-    "capital": RecyclableRegion.CAPITAL,
-    "gangwon": RecyclableRegion.GANGWON,
-    "chungbuk": RecyclableRegion.CHUNGBUK,
-    "chungnam": RecyclableRegion.CHUNGNAM,
-    "jeonbuk": RecyclableRegion.JEONBUK,
-    "jeonnam": RecyclableRegion.JEONNAM,
-    "gyeongbuk": RecyclableRegion.GYEONGBUK,
-    "gyeongnam": RecyclableRegion.GYEONGNAM,
-}
 
 # Category ID → RecyclableCategory 매핑
 CATEGORY_ID_MAP: dict[str, RecyclableCategory] = {
@@ -59,7 +45,7 @@ CATEGORY_ID_MAP: dict[str, RecyclableCategory] = {
 }
 
 
-class LocalRecyclablePriceClient(RecyclablePriceClientPort):
+class LocalRecyclablePriceClient:
     """재활용자원 가격 로컬 클라이언트.
 
     YAML 에셋 파일 기반 가격 조회.
@@ -387,15 +373,16 @@ class LocalRecyclablePriceClient(RecyclablePriceClientPort):
             region: 권역
             months: 조회 기간 (월)
 
+        Raises:
+            NotImplementedError: 히스토리 데이터 미지원
+
         Returns:
             RecyclablePriceTrendDTO or None
         """
-        # TODO: 히스토리 데이터 추가 시 구현
-        logger.warning(
-            "Price trend not yet implemented",
-            extra={"item_name": item_name},
+        raise NotImplementedError(
+            "가격 추이 조회는 아직 지원하지 않습니다. "
+            "히스토리 데이터 추가 후 구현 예정입니다."
         )
-        return None
 
     # ========== Context 생성 (프롬프트 주입용) ==========
 

@@ -135,13 +135,16 @@ class SearchRecyclablePriceCommand:
                     region=input_dto.region,
                 )
                 events.append("category_prices_fetched")
-            else:
+            elif item_name is not None:
                 # 품목명 검색
                 response = await self._price_client.search_price(
-                    item_name=item_name,  # type: ignore
+                    item_name=item_name,
                     region=input_dto.region,
                 )
                 events.append("item_price_searched")
+            else:
+                # 이 경우는 위에서 이미 처리됨 (unreachable)
+                raise ValueError("item_name or category required")
 
             logger.info(
                 "Recyclable price search completed",
