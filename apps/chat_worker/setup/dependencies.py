@@ -42,6 +42,7 @@ from chat_worker.application.ports.kakao_local_client import KakaoLocalClientPor
 from chat_worker.application.ports.location_client import LocationClientPort
 from chat_worker.application.ports.metrics import MetricsPort
 from chat_worker.application.ports.vision import VisionModelPort
+from chat_worker.application.ports.image_generator import ImageGeneratorPort
 from chat_worker.application.ports.weather_client import WeatherClientPort
 from chat_worker.application.ports.web_search import WebSearchPort
 from chat_worker.application.ports.bulk_waste_client import BulkWasteClientPort
@@ -105,6 +106,7 @@ _input_requester: InputRequesterPort | None = None
 _checkpointer = None  # BaseCheckpointSaver
 _cache: CachePort | None = None
 _metrics: MetricsPort | None = None
+_image_generator: ImageGeneratorPort | None = None
 
 
 async def get_redis() -> Redis:
@@ -239,6 +241,61 @@ def create_vision_client(
             model=model or settings.openai_default_model,
             api_key=settings.openai_api_key,
         )
+
+
+# ============================================================
+# Image Generator Factory (Responses API)
+# ============================================================
+
+
+def get_image_generator() -> ImageGeneratorPort | None:
+    """이미지 생성 클라이언트 싱글톤.
+
+    OpenAI Responses API의 네이티브 image_generation tool 사용.
+    enable_image_generation=True일 때만 활성화 (비용 발생).
+
+    아키텍처 의사결정:
+    - Chat Completions API: 기존 파이프라인 유지 (multi-intent 라우팅)
+    - Responses API: 이미지 생성 서브에이전트에서만 사용
+    - 같은 OpenAI API 키로 두 API 혼용 가능
+
+    비용 (gpt-image-1.5, 1024x1024 기준):
+    - low: ~$0.02
+    - medium: ~$0.07
+    - high: ~$0.19
+    + Responses API 토큰 비용 추가
+
+    환경변수:
+    - CHAT_WORKER_ENABLE_IMAGE_GENERATION: True로 설정 시 활성화
+    - CHAT_WORKER_IMAGE_GENERATION_MODEL: Responses API 모델 (기본: gpt-4o)
+    """
+    global _image_generator
+    if _image_generator is None:
+        settings = get_settings()
+
+        if settings.enable_image_generation and settings.openai_api_key:
+            from chat_worker.infrastructure.llm.image_generator import (
+                OpenAIResponsesImageGenerator,
+            )
+
+            _image_generator = OpenAIResponsesImageGenerator(
+                model=settings.image_generation_model,
+                api_key=settings.openai_api_key,
+                default_size=settings.image_generation_default_size,
+                default_quality=settings.image_generation_default_quality,
+            )
+            logger.info(
+                "OpenAI Image Generator created (Responses API, model=%s)",
+                settings.image_generation_model,
+            )
+        else:
+            if not settings.enable_image_generation:
+                logger.info("Image generation disabled (enable_image_generation=False)")
+            elif not settings.openai_api_key:
+                logger.warning("Image generation disabled (no OpenAI API key)")
+            return None
+
+    return _image_generator
 
 
 # ============================================================
@@ -664,6 +721,7 @@ async def get_chat_graph(
                                 answer → END
     ```
     """
+    settings = get_settings()
     llm = create_llm_client(provider, model)
     vision_model = create_vision_client(provider, model)
     retriever = get_retriever()
@@ -676,6 +734,7 @@ async def get_chat_graph(
     web_search_client = get_web_search_client()
     bulk_waste_client = get_bulk_waste_client()  # 대형폐기물 정보
     recyclable_price_client = get_recyclable_price_client()  # 재활용자원 시세
+    image_generator = get_image_generator()  # 이미지 생성 (Responses API)
     input_requester = await get_input_requester()
     checkpointer = await get_checkpointer()
 
@@ -691,6 +750,9 @@ async def get_chat_graph(
         web_search_client=web_search_client,
         bulk_waste_client=bulk_waste_client,  # 대형폐기물 정보 (행정안전부 API)
         recyclable_price_client=recyclable_price_client,  # 재활용자원 시세 (한국환경공단)
+        image_generator=image_generator,  # 이미지 생성 (Responses API)
+        image_default_size=settings.image_generation_default_size,
+        image_default_quality=settings.image_generation_default_quality,
         cache=cache,  # P2: Intent 캐싱 (CachePort)
         input_requester=input_requester,
         checkpointer=checkpointer,
@@ -746,7 +808,7 @@ async def get_process_chat_command(
 async def cleanup():
     """리소스 정리."""
     global _redis, _character_client, _location_client, _kakao_local_client, _weather_client, _bulk_waste_client, _collection_point_client, _checkpointer
-    global _progress_notifier, _domain_event_bus, _interaction_state_store, _input_requester
+    global _progress_notifier, _domain_event_bus, _interaction_state_store, _input_requester, _image_generator
 
     # 체크포인터 종료
     if _checkpointer and hasattr(_checkpointer, "close"):
@@ -788,6 +850,11 @@ async def cleanup():
         await _collection_point_client.close()
         _collection_point_client = None
         logger.info("KECO Collection Point HTTP client closed")
+
+    # Image Generator 정리
+    if _image_generator is not None:
+        _image_generator = None
+        logger.info("Image generator cleared")
 
     # Redis 종료
     if _redis:

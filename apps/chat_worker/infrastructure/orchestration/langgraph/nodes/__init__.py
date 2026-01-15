@@ -9,6 +9,7 @@
 - vision_node: 이미지 분류 (Vision)
 - rag_node: RAG 검색
 - feedback_node: RAG 품질 평가 및 Fallback 결정
+- aggregator_node: 병렬 실행 결과 수집 (Send API)
 - answer_node: 답변 생성
 - character_node: 캐릭터 서브에이전트
 - location_node: 장소 검색 서브에이전트 (카카오맵)
@@ -59,6 +60,9 @@ from chat_worker.infrastructure.orchestration.langgraph.nodes.weather_node impor
 from chat_worker.infrastructure.orchestration.langgraph.nodes.collection_point_node import (
     create_collection_point_node,
 )
+from chat_worker.infrastructure.orchestration.langgraph.nodes.aggregator_node import (
+    create_aggregator_node,
+)
 
 __all__ = [
     "create_intent_node",
@@ -66,6 +70,7 @@ __all__ = [
     "create_rag_node",
     "create_feedback_node",
     "route_after_feedback",
+    "create_aggregator_node",
     "create_answer_node",
     "create_character_subagent_node",
     "create_location_subagent_node",

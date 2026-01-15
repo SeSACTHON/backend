@@ -96,6 +96,13 @@ from chat_worker.application.ports.retrieval import RetrieverPort
 # Vision
 from chat_worker.application.ports.vision import VisionModelPort
 
+# Image Generator
+from chat_worker.application.ports.image_generator import (
+    ImageGenerationError,
+    ImageGenerationResult,
+    ImageGeneratorPort,
+)
+
 # Web Search
 from chat_worker.application.ports.web_search import WebSearchPort
 
@@ -105,6 +112,10 @@ __all__ = [
     "LLMPolicyPort",
     # Vision
     "VisionModelPort",
+    # Image Generator
+    "ImageGeneratorPort",
+    "ImageGenerationResult",
+    "ImageGenerationError",
     # Events
     "ProgressNotifierPort",
     "DomainEventBusPort",

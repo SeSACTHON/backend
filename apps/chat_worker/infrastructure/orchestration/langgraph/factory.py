@@ -1,30 +1,52 @@
 """LangGraph Factory.
 
-Intent-Routed Workflow with Subagent + Feedback Loop 패턴 그래프 생성.
+Intent-Routed Workflow with Dynamic Routing (Send API) 패턴 그래프 생성.
 
-아키텍처:
+아키텍처 (v2 - Dynamic Routing):
 ```
-START → intent → [vision?] → router
-                               │
-            ┌──────────┬───────┼───────┬───────────┬───────────┬───────────┐
-            ▼          ▼       ▼       ▼           ▼           ▼           ▼
-         waste    character  location bulk_waste web_search  general
-         (RAG)    (gRPC)    (Kakao)   (MOIS)    (DDG)       (passthrough)
-            │          │       │        │          │           │
-            ▼          │       │        │          │           │
-       [feedback]      │       │        │          │           │
-          │ ↓ ↓        │       │        │          │           │
-      fallback?        │       │        │          │           │
-          │ ↓          │       │        │          │           │
-          │ web_search │       │        │          │           │
-            └──────────┴───────┴────────┴──────────┴───────────┘
-                                   │
-                                   ▼
-                            [summarize?] ← LangGraph 1.0+ Context Compression
-                                   │
-                                   ▼
-                                answer → END
+START → intent → [vision?] → dynamic_router
+                                    │
+                    ╔═══════════════╪═══════════════╗
+                    ║   Send API (병렬 실행)         ║
+                    ║   ┌─────┬─────┼─────┬─────┐   ║
+                    ║   ▼     ▼     ▼     ▼     ▼   ║
+                    ║ waste char  loc  bulk  web   ║
+                    ║ (RAG) (gRPC)(Kakao)(MOIS)(DDG)║
+                    ║   │     │     │     │     │   ║
+                    ║   ▼     ▼     ▼     ▼     ▼   ║
+                    ║  [feedback]  │     │     │   ║
+                    ╚═══════╪══════╧═════╧═════╧═══╝
+                            │
+                            ▼
+                       aggregator ← 결과 수집
+                            │
+                            ▼
+                     [summarize?] ← Context Compression
+                            │
+                            ▼
+                         answer → END
 ```
+
+Dynamic Routing (Send API):
+1. Multi-intent fanout: additional_intents → 각각 병렬 Send
+2. Intent 기반 enrichment: 특정 intent에 보조 노드 자동 추가
+   - waste → weather (분리배출 + 날씨 팁)
+   - bulk_waste → weather (대형폐기물 + 날씨)
+3. 조건부 enrichment: state 조건 만족 시 노드 추가
+   - user_location 있으면 weather 자동 추가
+
+예시:
+    사용자: "종이 어떻게 버려? 그리고 수거함도 알려줘"
+
+    intent_node 결과:
+        intent="waste", additional_intents=["collection_point"]
+
+    dynamic_router 결과:
+        Send("waste_rag", state)        # 주 intent
+        Send("collection_point", state) # multi-intent fanout
+        Send("weather", state)          # enrichment (waste → weather)
+
+    → 3개 노드 병렬 실행!
 
 Feedback Loop (논문 참조):
 - "What Makes Large Language Models Reason in (Multi-Turn) Code Generation?"
@@ -60,6 +82,7 @@ from typing import TYPE_CHECKING, Any
 from langgraph.graph import END, StateGraph
 
 from chat_worker.infrastructure.orchestration.langgraph.nodes import (
+    create_aggregator_node,
     create_answer_node,
     create_bulk_waste_node,
     create_character_subagent_node,
@@ -73,6 +96,9 @@ from chat_worker.infrastructure.orchestration.langgraph.nodes import (
     create_vision_node,
     create_weather_node,
     route_after_feedback,
+)
+from chat_worker.infrastructure.orchestration.langgraph.routing import (
+    create_dynamic_router,
 )
 from chat_worker.infrastructure.orchestration.langgraph.nodes.kakao_place_node import (
     create_kakao_place_node,
@@ -132,7 +158,11 @@ def route_after_intent(state: dict[str, Any]) -> str:
 
 
 def route_by_intent(state: dict[str, Any]) -> str:
-    """의도 기반 라우팅.
+    """의도 기반 라우팅 (Legacy - 단일 노드 라우팅).
+
+    Note:
+        동적 라우팅(Send API)이 활성화되면 이 함수는 사용되지 않습니다.
+        하위 호환성을 위해 유지합니다.
 
     Args:
         state: 현재 상태 (intent 필드 포함)
@@ -167,6 +197,9 @@ def create_chat_graph(
     llm_evaluator: "LLMFeedbackEvaluatorPort | None" = None,  # LLM 기반 정밀 평가
     enable_summarization: bool = False,  # LangGraph 1.0+ 컨텍스트 압축
     max_tokens_before_summary: int = 3072,  # 요약 트리거 임계값
+    enable_dynamic_routing: bool = True,  # Send API 동적 라우팅
+    enable_multi_intent: bool = True,  # Multi-intent fanout
+    enable_enrichment: bool = True,  # Intent 기반 enrichment
 ) -> StateGraph:
     """Chat 파이프라인 그래프 생성.
 
@@ -189,6 +222,9 @@ def create_chat_graph(
         llm_evaluator: LLM 기반 품질 평가기 (선택, 정밀 평가용)
         enable_summarization: 컨텍스트 압축 활성화 (멀티턴 대화용)
         max_tokens_before_summary: 요약 트리거 임계값 (기본 3072)
+        enable_dynamic_routing: Send API 동적 라우팅 활성화 (기본 True)
+        enable_multi_intent: Multi-intent fanout 활성화 (기본 True)
+        enable_enrichment: Intent 기반 enrichment 활성화 (기본 True)
 
     Returns:
         컴파일된 LangGraph
@@ -407,6 +443,13 @@ def create_chat_graph(
     async def general_node(state: dict[str, Any]) -> dict[str, Any]:
         return state
 
+    # Aggregator 노드 (동적 라우팅용)
+    if enable_dynamic_routing:
+        aggregator_node = create_aggregator_node(event_publisher)
+        logger.info("Aggregator node created (for dynamic routing)")
+    else:
+        aggregator_node = None
+
     # 노드 등록
     graph.add_node("character", character_node)
     graph.add_node("location", location_node)  # 카카오맵 장소 검색
@@ -417,6 +460,10 @@ def create_chat_graph(
     graph.add_node("collection_point", collection_point_node)  # 수거함 위치
     graph.add_node("image_generation", image_generation_node)  # 이미지 생성 (Responses API)
     graph.add_node("general", general_node)
+
+    # Aggregator 노드 등록 (동적 라우팅용)
+    if aggregator_node is not None:
+        graph.add_node("aggregator", aggregator_node)
 
     # Summarization 노드 등록 (선택)
     if summarization_node is not None:
@@ -439,42 +486,90 @@ def create_chat_graph(
     # Vision → Router
     graph.add_edge("vision", "router")
 
-    # Router → Intent-based routing
-    graph.add_conditional_edges(
-        "router",
-        route_by_intent,
-        {
-            "waste": "waste_rag",
-            "character": "character",
-            "location": "location",  # 카카오맵 장소 검색
-            "web_search": "web_search",
-            "bulk_waste": "bulk_waste",  # 대형폐기물 정보
-            "recyclable_price": "recyclable_price",  # 재활용자원 시세
-            "collection_point": "collection_point",  # 수거함 위치
-            "image_generation": "image_generation",  # 이미지 생성 (Responses API)
-            "general": "general",
-        },
-    )
+    # 최종 목적지 결정
+    # 동적 라우팅: subagents → aggregator → [summarize?] → answer
+    # 정적 라우팅: subagents → [summarize?] → answer
+    if enable_dynamic_routing:
+        aggregator_target = "aggregator"
+    else:
+        aggregator_target = None
 
-    # 최종 목적지 결정: summarization 활성화 시 summarize → answer
-    final_target = "summarize" if summarization_node is not None else "answer"
+    final_before_answer = "summarize" if summarization_node is not None else "answer"
 
-    # waste_rag → feedback → [summarize?] → answer (Feedback Loop)
-    # 다른 노드들은 직접 [summarize?] → answer로
-    if feedback_enabled:
-        graph.add_edge("waste_rag", "feedback")
-        graph.add_conditional_edges(
-            "feedback",
-            route_after_feedback,
-            {
-                "answer": final_target,
+    if enable_dynamic_routing:
+        # 동적 라우팅 (Send API)
+        dynamic_router = create_dynamic_router(
+            enable_multi_intent=enable_multi_intent,
+            enable_enrichment=enable_enrichment,
+            enable_conditional=True,  # state 기반 조건부 enrichment
+        )
+
+        # Router → 동적 라우팅 (list[Send] 반환)
+        graph.add_conditional_edges("router", dynamic_router)
+
+        logger.info(
+            "Dynamic routing enabled",
+            extra={
+                "multi_intent": enable_multi_intent,
+                "enrichment": enable_enrichment,
             },
         )
-    else:
-        graph.add_edge("waste_rag", final_target)
 
-    for node_name in ["character", "location", "web_search", "bulk_waste", "recyclable_price", "weather", "collection_point", "image_generation", "general"]:
-        graph.add_edge(node_name, final_target)
+        # 모든 서브에이전트 노드 → aggregator
+        # feedback이 활성화되면 waste_rag → feedback → aggregator
+        if feedback_enabled:
+            graph.add_edge("waste_rag", "feedback")
+            graph.add_conditional_edges(
+                "feedback",
+                route_after_feedback,
+                {
+                    "answer": aggregator_target,
+                },
+            )
+        else:
+            graph.add_edge("waste_rag", aggregator_target)
+
+        for node_name in ["character", "location", "web_search", "bulk_waste", "recyclable_price", "weather", "collection_point", "image_generation", "general"]:
+            graph.add_edge(node_name, aggregator_target)
+
+        # aggregator → [summarize?] → answer
+        graph.add_edge("aggregator", final_before_answer)
+
+    else:
+        # 정적 라우팅 (Legacy - 단일 노드 라우팅)
+        graph.add_conditional_edges(
+            "router",
+            route_by_intent,
+            {
+                "waste": "waste_rag",
+                "character": "character",
+                "location": "location",
+                "web_search": "web_search",
+                "bulk_waste": "bulk_waste",
+                "recyclable_price": "recyclable_price",
+                "collection_point": "collection_point",
+                "image_generation": "image_generation",
+                "general": "general",
+            },
+        )
+
+        logger.info("Static routing enabled (legacy mode)")
+
+        # waste_rag → feedback → [summarize?] → answer (Feedback Loop)
+        if feedback_enabled:
+            graph.add_edge("waste_rag", "feedback")
+            graph.add_conditional_edges(
+                "feedback",
+                route_after_feedback,
+                {
+                    "answer": final_before_answer,
+                },
+            )
+        else:
+            graph.add_edge("waste_rag", final_before_answer)
+
+        for node_name in ["character", "location", "web_search", "bulk_waste", "recyclable_price", "weather", "collection_point", "image_generation", "general"]:
+            graph.add_edge(node_name, final_before_answer)
 
     # Summarization → Answer (활성화된 경우에만)
     if summarization_node is not None:

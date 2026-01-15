@@ -33,6 +33,17 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     openai_default_model: str = "gpt-5.2"
 
+    # Image Generation (Responses API)
+    # 이미지 생성 활성화 여부 (비용 발생, 기본 비활성화)
+    enable_image_generation: bool = False
+    # Responses API 모델 (프롬프트 최적화 + 오케스트레이션)
+    # 기본 LLM과 동일 모델 사용 (설정 단순화)
+    image_generation_model: str = "gpt-5.2"
+    # 기본 이미지 크기 (1024x1024, 1024x1792, 1792x1024)
+    image_generation_default_size: str = "1024x1024"
+    # 기본 이미지 품질 (low: ~$0.02, medium: ~$0.07, high: ~$0.19)
+    image_generation_default_quality: str = "medium"
+
     # Gemini
     google_api_key: str | None = None
     gemini_default_model: str = "gemini-3-flash-preview"

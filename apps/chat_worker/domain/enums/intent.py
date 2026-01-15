@@ -46,6 +46,17 @@ class Intent(str, Enum):
     - 환경부 재활용 공지사항
     """
 
+    IMAGE_GENERATION = "image_generation"
+    """이미지 생성 요청.
+
+    - 분리배출 방법 이미지로 만들어줘
+    - 페트병 버리는 법 그림으로 보여줘
+    - 인포그래픽 생성해줘
+    - 이미지로 설명해줘
+
+    Responses API의 네이티브 image_generation tool 사용.
+    """
+
     GENERAL = "general"
     """일반 대화 (그 외).
 
