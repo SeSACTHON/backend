@@ -6,7 +6,8 @@ namespace: chat
 resources:
 - deployment.yaml
 - configmap.yaml
-- hpa.yaml
+- keda-scaledobject.yaml
+# hpa.yaml 제거 - KEDA가 내부적으로 HPA 생성
 
 commonLabels:
   app.kubernetes.io/name: chat-worker
