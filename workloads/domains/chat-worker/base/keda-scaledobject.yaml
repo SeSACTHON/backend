@@ -24,7 +24,7 @@ spec:
     name: chat-worker
     kind: Deployment
   # 스케일링 범위
-  minReplicaCount: 2    # 기본 Worker 수 (HA 보장)
+  minReplicaCount: 1    # E2E 테스트용 (부하테스트 후 2로 조정)
   maxReplicaCount: 4    # 노드 리소스 기반 (scan-worker와 공유)
   # 쿨다운 기간 (스케일다운 전 최소 대기 시간)
   cooldownPeriod: 300   # 5분 (LLM 처리 시간 고려)
@@ -33,7 +33,7 @@ spec:
   # Fallback: 메트릭 실패 시 기본 replicas 유지
   fallback:
     failureThreshold: 3
-    replicas: 2
+    replicas: 1
   # 고급 설정
   advanced:
     restoreToOriginalReplicaCount: false
