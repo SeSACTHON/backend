@@ -8,6 +8,8 @@ from chat_worker.application.services.progress_tracker import (
     DynamicProgressTracker,
     PHASE_PROGRESS,
     SUBAGENT_NODES,
+    get_stage_for_node,
+    get_node_message,
 )
 
 
@@ -217,3 +219,60 @@ class TestDynamicProgressTracker:
 
         status = tracker.get_subagent_status()
         assert status["total"] == 1  # set이므로 중복 무시
+
+
+class TestGetStageForNode:
+    """get_stage_for_node 함수 테스트."""
+
+    def test_waste_rag_maps_to_rag(self):
+        """waste_rag 노드는 rag stage로 매핑."""
+        assert get_stage_for_node("waste_rag") == "rag"
+
+    def test_aggregator_maps_to_aggregate(self):
+        """aggregator 노드는 aggregate stage로 매핑."""
+        assert get_stage_for_node("aggregator") == "aggregate"
+
+    def test_weather_stays_same(self):
+        """weather 노드는 그대로 weather stage."""
+        assert get_stage_for_node("weather") == "weather"
+
+    def test_location_stays_same(self):
+        """location 노드는 그대로 location stage."""
+        assert get_stage_for_node("location") == "location"
+
+    def test_character_stays_same(self):
+        """character 노드는 그대로 character stage."""
+        assert get_stage_for_node("character") == "character"
+
+    def test_unknown_node_returns_itself(self):
+        """알 수 없는 노드는 그대로 반환."""
+        assert get_stage_for_node("unknown_node") == "unknown_node"
+
+
+class TestGetNodeMessage:
+    """get_node_message 함수 테스트."""
+
+    def test_weather_started_message(self):
+        """weather 노드 started 메시지."""
+        msg = get_node_message("weather", "started")
+        assert "날씨" in msg
+
+    def test_weather_completed_message(self):
+        """weather 노드 completed 메시지."""
+        msg = get_node_message("weather", "completed")
+        assert "완료" in msg
+
+    def test_general_started_message(self):
+        """general 노드 started 메시지."""
+        msg = get_node_message("general", "started")
+        assert "응답" in msg
+
+    def test_kakao_place_started_message(self):
+        """kakao_place 노드 started 메시지."""
+        msg = get_node_message("kakao_place", "started")
+        assert "장소" in msg
+
+    def test_unknown_node_fallback(self):
+        """알 수 없는 노드는 기본 포맷 반환."""
+        msg = get_node_message("unknown_node", "started")
+        assert msg == "unknown_node started"

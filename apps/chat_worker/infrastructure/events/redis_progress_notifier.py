@@ -123,12 +123,13 @@ STAGE_ORDER = {
     "collection_point": 10,  # collection_point intent
     "web_search": 11,  # web_search intent
     "image_generation": 12,  # image intent
+    "general": 13,  # general intent (fallback)
     # Aggregation & Answer
-    "aggregate": 13,  # 서브에이전트 결과 병합
-    "feedback": 14,  # 품질 평가
-    "answer": 15,  # 최종 답변 생성
-    "done": 16,  # 완료
-    "needs_input": 17,  # Human-in-the-Loop
+    "aggregate": 14,  # 서브에이전트 결과 병합
+    "feedback": 15,  # 품질 평가
+    "answer": 16,  # 최종 답변 생성
+    "done": 17,  # 완료
+    "needs_input": 18,  # Human-in-the-Loop
 }
 
 # Token seq 시작값 (Stage seq와 충돌 방지)
