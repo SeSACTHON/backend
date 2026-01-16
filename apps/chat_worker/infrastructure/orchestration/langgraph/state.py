@@ -66,6 +66,7 @@ class ChatState(TypedDict, total=False):
         context: 현재 턴 LLM 입력 컨텍스트 (summary + recent)
         query: 현재 사용자 질문
         intent: 분류된 의도 (waste, character, location, web_search, general)
+        intent_history: 이전 intent 히스토리 (Chain-of-Intent)
         evidence: RAG 검색 결과 리스트
         character: Character Subagent 응답
         location: Location Subagent 응답
@@ -93,6 +94,7 @@ class ChatState(TypedDict, total=False):
 
     # 파이프라인 중간 결과
     intent: str
+    intent_history: list[str]  # Chain-of-Intent: 이전 intent 히스토리
     evidence: list[dict[str, Any]]
     character: dict[str, Any] | None
     location: dict[str, Any] | None
