@@ -2,9 +2,11 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-from . import character_pb2 as character__pb2
+from chat_worker.infrastructure.integrations.character.proto import (
+    character_pb2 as character__pb2,
+)
 
-GRPC_GENERATED_VERSION = "1.76.0"
+GRPC_GENERATED_VERSION = "1.68.1"
 GRPC_VERSION = grpc.__version__
 _version_not_supported = False
 
