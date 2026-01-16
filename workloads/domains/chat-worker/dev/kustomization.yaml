@@ -12,5 +12,9 @@ patches:
     kind: Deployment
     name: chat-worker
 
+images:
+- name: docker.io/mng990/eco2
+  newTag: chat-worker-dev-latest
+
 commonLabels:
   environment: dev

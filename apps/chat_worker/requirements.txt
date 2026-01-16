@@ -5,6 +5,10 @@
 taskiq>=0.11.0
 taskiq-aio-pika>=0.4.0
 
+# gRPC (Character, Location 서비스 연동)
+grpcio>=1.60.0
+grpcio-tools>=1.60.0
+
 # LLM Clients (chat 패키지 의존성)
 openai>=1.58.0
 anthropic>=0.40.0
@@ -16,7 +20,7 @@ tiktoken>=0.8.0
 langgraph>=1.0.6,<2.0.0
 langchain-core>=1.0.0,<2.0.0  # LangGraph 1.0과 호환
 langgraph-checkpoint-postgres>=2.0.0  # PostgreSQL 체크포인터
-langgraph-checkpoint-redis>=1.0.0  # Redis 체크포인터 (Fallback)
+langgraph-checkpoint-redis>=0.3.0  # Redis 체크포인터 (Fallback)
 
 # LangSmith + OpenTelemetry 통합
 # >= 0.4.25 권장 (OTEL export 안정성 개선)

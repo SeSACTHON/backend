@@ -104,9 +104,7 @@ class MockProgressNotifier:
     async def notify_token(self, task_id: str, content: str) -> str:
         return "event-id"
 
-    async def notify_token_v2(
-        self, task_id: str, content: str, node: str | None = None
-    ) -> str:
+    async def notify_token_v2(self, task_id: str, content: str, node: str | None = None) -> str:
         self.tokens.append({"task_id": task_id, "content": content, "node": node})
         return "event-id"
 

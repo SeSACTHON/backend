@@ -1,7 +1,5 @@
 """WeatherService Unit Tests."""
 
-import pytest
-
 from chat_worker.application.ports.weather_client import (
     CurrentWeatherDTO,
     PrecipitationType,

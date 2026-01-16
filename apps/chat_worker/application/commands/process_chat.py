@@ -380,9 +380,7 @@ class ProcessChatCommand:
         """
         final_result: dict[str, Any] = {}
 
-        async for event in self._pipeline.astream_events(
-            state, config=config, version="v2"
-        ):
+        async for event in self._pipeline.astream_events(state, config=config, version="v2"):
             event_type = event.get("event")
 
             if event_type == "on_chain_start":

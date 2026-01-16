@@ -423,9 +423,7 @@ def get_kakao_local_client() -> KakaoLocalClientPort | None:
             )
             logger.info("Kakao Local HTTP client created")
         else:
-            logger.warning(
-                "KAKAO_REST_API_KEY not set, Kakao Local search disabled"
-            )
+            logger.warning("KAKAO_REST_API_KEY not set, Kakao Local search disabled")
             return None
 
     return _kakao_local_client
@@ -463,9 +461,7 @@ def get_weather_client() -> WeatherClientPort | None:
             )
             logger.info("KMA Weather HTTP client created")
         else:
-            logger.warning(
-                "KMA_API_KEY not set, weather feature disabled"
-            )
+            logger.warning("KMA_API_KEY not set, weather feature disabled")
             return None
 
     return _weather_client
@@ -503,9 +499,7 @@ def get_bulk_waste_client() -> BulkWasteClientPort | None:
             )
             logger.info("MOIS Bulk Waste HTTP client created")
         else:
-            logger.warning(
-                "MOIS_WASTE_API_KEY not set, bulk waste feature disabled"
-            )
+            logger.warning("MOIS_WASTE_API_KEY not set, bulk waste feature disabled")
             return None
 
     return _bulk_waste_client
@@ -573,9 +567,7 @@ def get_collection_point_client() -> CollectionPointClientPort | None:
             )
             logger.info("KECO Collection Point HTTP client created")
         else:
-            logger.warning(
-                "KECO_API_KEY not set, collection point feature disabled"
-            )
+            logger.warning("KECO_API_KEY not set, collection point feature disabled")
             return None
 
     return _collection_point_client

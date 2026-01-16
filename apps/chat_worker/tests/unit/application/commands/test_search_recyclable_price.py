@@ -81,9 +81,7 @@ class TestSearchRecyclablePriceCommand:
         return MockRecyclablePriceClient()
 
     @pytest.fixture
-    def command(
-        self, mock_client: MockRecyclablePriceClient
-    ) -> SearchRecyclablePriceCommand:
+    def command(self, mock_client: MockRecyclablePriceClient) -> SearchRecyclablePriceCommand:
         """테스트용 Command."""
         return SearchRecyclablePriceCommand(price_client=mock_client)
 

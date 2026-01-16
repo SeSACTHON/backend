@@ -552,7 +552,17 @@ def create_chat_graph(
         else:
             graph.add_edge("waste_rag", aggregator_target)
 
-        for node_name in ["character", "location", "web_search", "bulk_waste", "recyclable_price", "weather", "collection_point", "image_generation", "general"]:
+        for node_name in [
+            "character",
+            "location",
+            "web_search",
+            "bulk_waste",
+            "recyclable_price",
+            "weather",
+            "collection_point",
+            "image_generation",
+            "general",
+        ]:
             graph.add_edge(node_name, aggregator_target)
 
         # aggregator → [summarize?] → answer
@@ -591,7 +601,17 @@ def create_chat_graph(
         else:
             graph.add_edge("waste_rag", final_before_answer)
 
-        for node_name in ["character", "location", "web_search", "bulk_waste", "recyclable_price", "weather", "collection_point", "image_generation", "general"]:
+        for node_name in [
+            "character",
+            "location",
+            "web_search",
+            "bulk_waste",
+            "recyclable_price",
+            "weather",
+            "collection_point",
+            "image_generation",
+            "general",
+        ]:
             graph.add_edge(node_name, final_before_answer)
 
     # Summarization → Answer (활성화된 경우에만)

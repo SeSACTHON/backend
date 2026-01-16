@@ -59,11 +59,7 @@ class KakaoPlaceService:
             return None, None
 
         # 다양한 키 형식 지원
-        lat = (
-            user_location.get("latitude")
-            or user_location.get("lat")
-            or user_location.get("y")
-        )
+        lat = user_location.get("latitude") or user_location.get("lat") or user_location.get("y")
         lon = (
             user_location.get("longitude")
             or user_location.get("lon")
@@ -131,9 +127,7 @@ class KakaoPlaceService:
         }
 
         if places:
-            context["places"] = [
-                KakaoPlaceService._place_to_dict(place) for place in places
-            ]
+            context["places"] = [KakaoPlaceService._place_to_dict(place) for place in places]
 
         return context
 
@@ -245,11 +239,7 @@ class KakaoPlaceService:
         if not allowed_categories:
             return places
 
-        return [
-            place
-            for place in places
-            if place.category_group_code in allowed_categories
-        ]
+        return [place for place in places if place.category_group_code in allowed_categories]
 
     @staticmethod
     def sort_by_distance(places: list["KakaoPlaceDTO"]) -> list["KakaoPlaceDTO"]:

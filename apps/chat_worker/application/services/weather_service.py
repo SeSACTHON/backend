@@ -29,6 +29,7 @@ from chat_worker.application.ports.weather_client import (
 # LCC (Lambert Conformal Conic) 투영 파라미터
 # 기상청 제공 표준 값
 
+
 @dataclass(frozen=True)
 class LccParameters:
     """LCC 투영 파라미터."""
@@ -81,9 +82,7 @@ class WeatherService:
         olat = LCC.olat * degrad
 
         # LCC 투영 계산
-        sn = math.tan(math.pi * 0.25 + slat2 * 0.5) / math.tan(
-            math.pi * 0.25 + slat1 * 0.5
-        )
+        sn = math.tan(math.pi * 0.25 + slat2 * 0.5) / math.tan(math.pi * 0.25 + slat1 * 0.5)
         sn = math.log(math.cos(slat1) / math.cos(slat2)) / math.log(sn)
 
         sf = math.tan(math.pi * 0.25 + slat1 * 0.5)
@@ -127,9 +126,7 @@ class WeatherService:
         olon = LCC.olon * degrad
         olat = LCC.olat * degrad
 
-        sn = math.tan(math.pi * 0.25 + slat2 * 0.5) / math.tan(
-            math.pi * 0.25 + slat1 * 0.5
-        )
+        sn = math.tan(math.pi * 0.25 + slat2 * 0.5) / math.tan(math.pi * 0.25 + slat1 * 0.5)
         sn = math.log(math.cos(slat1) / math.cos(slat2)) / math.log(sn)
 
         sf = math.tan(math.pi * 0.25 + slat1 * 0.5)
@@ -200,19 +197,16 @@ class WeatherService:
         # 기온 체크
         if weather.temperature >= 30:
             tips.append(
-                f"기온이 {weather.temperature:.0f}°C로 높아요. "
-                "음식물 쓰레기는 빨리 버리세요!"
+                f"기온이 {weather.temperature:.0f}°C로 높아요. " "음식물 쓰레기는 빨리 버리세요!"
             )
         elif weather.temperature >= 25:
             if waste_category and "음식물" in waste_category:
                 tips.append(
-                    f"기온이 {weather.temperature:.0f}°C예요. "
-                    "음식물은 오래 두지 마세요."
+                    f"기온이 {weather.temperature:.0f}°C예요. " "음식물은 오래 두지 마세요."
                 )
         elif weather.temperature <= 0:
             tips.append(
-                f"기온이 {weather.temperature:.0f}°C로 영하예요. "
-                "액체류 동결에 주의하세요."
+                f"기온이 {weather.temperature:.0f}°C로 영하예요. " "액체류 동결에 주의하세요."
             )
 
         # 습도 체크

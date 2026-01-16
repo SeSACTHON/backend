@@ -89,9 +89,7 @@ class SearchRecyclablePriceCommand:
         """
         self._price_client = price_client
 
-    async def execute(
-        self, input_dto: SearchRecyclablePriceInput
-    ) -> SearchRecyclablePriceOutput:
+    async def execute(self, input_dto: SearchRecyclablePriceInput) -> SearchRecyclablePriceOutput:
         """Command 실행.
 
         Args:
@@ -105,9 +103,7 @@ class SearchRecyclablePriceCommand:
         # 1. 품목명 추출 (Service - 순수 로직)
         item_name = input_dto.item_name
         if not item_name and input_dto.message:
-            item_name = RecyclablePriceService.extract_item_name_from_query(
-                input_dto.message
-            )
+            item_name = RecyclablePriceService.extract_item_name_from_query(input_dto.message)
             if item_name:
                 events.append("item_extracted_from_message")
 
@@ -119,8 +115,7 @@ class SearchRecyclablePriceCommand:
                 price_context={
                     "type": "guide",
                     "message": (
-                        "어떤 재활용품의 시세를 알려드릴까요?\n"
-                        "예: 캔, 페트병, 신문지, 유리병 등"
+                        "어떤 재활용품의 시세를 알려드릴까요?\n" "예: 캔, 페트병, 신문지, 유리병 등"
                     ),
                 },
                 events=events,
@@ -180,9 +175,7 @@ class SearchRecyclablePriceCommand:
             events.append("no_results")
             return SearchRecyclablePriceOutput(
                 success=True,
-                price_context=RecyclablePriceService.build_not_found_context(
-                    item_name or ""
-                ),
+                price_context=RecyclablePriceService.build_not_found_context(item_name or ""),
                 events=events,
             )
 

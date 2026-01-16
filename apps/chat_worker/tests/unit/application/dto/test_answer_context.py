@@ -1,7 +1,5 @@
 """AnswerContext and AnswerResult DTO Unit Tests."""
 
-import pytest
-
 from chat_worker.application.dto.answer_context import AnswerContext, AnswerResult
 
 
@@ -66,9 +64,7 @@ class TestAnswerContext:
 
     def test_has_context_with_conversation_history(self) -> None:
         """conversation_history 있으면 True."""
-        context = AnswerContext(
-            conversation_history=[{"role": "user", "content": "hi"}]
-        )
+        context = AnswerContext(conversation_history=[{"role": "user", "content": "hi"}])
 
         assert context.has_context() is True
 
@@ -91,9 +87,7 @@ class TestAnswerContext:
 
     def test_to_prompt_context_with_classification(self) -> None:
         """classification 포함된 프롬프트."""
-        context = AnswerContext(
-            classification={"category": "plastic", "confidence": 0.95}
-        )
+        context = AnswerContext(classification={"category": "plastic", "confidence": 0.95})
 
         result = context.to_prompt_context()
 
@@ -102,9 +96,7 @@ class TestAnswerContext:
 
     def test_to_prompt_context_with_conversation_summary(self) -> None:
         """conversation_summary 포함된 프롬프트."""
-        context = AnswerContext(
-            conversation_summary="사용자가 플라스틱 분류에 관심 있음"
-        )
+        context = AnswerContext(conversation_summary="사용자가 플라스틱 분류에 관심 있음")
 
         result = context.to_prompt_context()
 

@@ -80,9 +80,7 @@ class TestLocalRecyclablePriceClient:
     # ==========================================================
 
     @pytest.mark.anyio
-    async def test_search_price_exact_match(
-        self, client: LocalRecyclablePriceClient
-    ):
+    async def test_search_price_exact_match(self, client: LocalRecyclablePriceClient):
         """정확한 품목명 검색."""
         response = await client.search_price("알루미늄캔")
 
@@ -91,9 +89,7 @@ class TestLocalRecyclablePriceClient:
         assert any("알루미늄" in item.item_name for item in response.items)
 
     @pytest.mark.anyio
-    async def test_search_price_synonym_match(
-        self, client: LocalRecyclablePriceClient
-    ):
+    async def test_search_price_synonym_match(self, client: LocalRecyclablePriceClient):
         """동의어 검색 (캔 → 철캔, 알루미늄캔)."""
         response = await client.search_price("캔")
 
@@ -103,9 +99,7 @@ class TestLocalRecyclablePriceClient:
         assert "철캔" in item_names or "알루미늄캔" in item_names
 
     @pytest.mark.anyio
-    async def test_search_price_synonym_pet(
-        self, client: LocalRecyclablePriceClient
-    ):
+    async def test_search_price_synonym_pet(self, client: LocalRecyclablePriceClient):
         """동의어 검색 (페트 → PET)."""
         response = await client.search_price("페트")
 
@@ -113,9 +107,7 @@ class TestLocalRecyclablePriceClient:
         assert any("PET" in item.item_name for item in response.items)
 
     @pytest.mark.anyio
-    async def test_search_price_synonym_styrofoam(
-        self, client: LocalRecyclablePriceClient
-    ):
+    async def test_search_price_synonym_styrofoam(self, client: LocalRecyclablePriceClient):
         """동의어 검색 (스티로폼 → EPS)."""
         response = await client.search_price("스티로폼")
 
@@ -123,9 +115,7 @@ class TestLocalRecyclablePriceClient:
         assert any("EPS" in item.item_name for item in response.items)
 
     @pytest.mark.anyio
-    async def test_search_price_not_found(
-        self, client: LocalRecyclablePriceClient
-    ):
+    async def test_search_price_not_found(self, client: LocalRecyclablePriceClient):
         """존재하지 않는 품목 검색."""
         response = await client.search_price("없는품목12345")
 
@@ -133,9 +123,7 @@ class TestLocalRecyclablePriceClient:
         assert response.total_count == 0
 
     @pytest.mark.anyio
-    async def test_search_price_partial_match(
-        self, client: LocalRecyclablePriceClient
-    ):
+    async def test_search_price_partial_match(self, client: LocalRecyclablePriceClient):
         """부분 매칭 검색."""
         response = await client.search_price("플라스틱")
 
@@ -148,18 +136,14 @@ class TestLocalRecyclablePriceClient:
     # ==========================================================
 
     @pytest.mark.anyio
-    async def test_search_price_with_region(
-        self, client: LocalRecyclablePriceClient
-    ):
+    async def test_search_price_with_region(self, client: LocalRecyclablePriceClient):
         """권역별 가격 조회."""
         # 전국 평균
         response_national = await client.search_price(
             "알루미늄캔", region=RecyclableRegion.NATIONAL
         )
         # 수도권
-        response_capital = await client.search_price(
-            "알루미늄캔", region=RecyclableRegion.CAPITAL
-        )
+        response_capital = await client.search_price("알루미늄캔", region=RecyclableRegion.CAPITAL)
 
         assert response_national.has_results
         assert response_capital.has_results
@@ -170,9 +154,7 @@ class TestLocalRecyclablePriceClient:
         assert capital_price >= national_price
 
     @pytest.mark.anyio
-    async def test_search_price_different_regions(
-        self, client: LocalRecyclablePriceClient
-    ):
+    async def test_search_price_different_regions(self, client: LocalRecyclablePriceClient):
         """여러 권역 가격 비교."""
         regions = [
             RecyclableRegion.NATIONAL,
@@ -195,9 +177,7 @@ class TestLocalRecyclablePriceClient:
     # ==========================================================
 
     @pytest.mark.anyio
-    async def test_get_category_prices_metal(
-        self, client: LocalRecyclablePriceClient
-    ):
+    async def test_get_category_prices_metal(self, client: LocalRecyclablePriceClient):
         """폐금속류 카테고리 조회."""
         response = await client.get_category_prices(RecyclableCategory.METAL)
 
@@ -206,9 +186,7 @@ class TestLocalRecyclablePriceClient:
         assert all(item.category == RecyclableCategory.METAL for item in response.items)
 
     @pytest.mark.anyio
-    async def test_get_category_prices_plastic(
-        self, client: LocalRecyclablePriceClient
-    ):
+    async def test_get_category_prices_plastic(self, client: LocalRecyclablePriceClient):
         """폐플라스틱류 카테고리 조회."""
         response = await client.get_category_prices(RecyclableCategory.PLASTIC)
 
@@ -217,9 +195,7 @@ class TestLocalRecyclablePriceClient:
         assert all(item.category == RecyclableCategory.PLASTIC for item in response.items)
 
     @pytest.mark.anyio
-    async def test_get_category_prices_paper(
-        self, client: LocalRecyclablePriceClient
-    ):
+    async def test_get_category_prices_paper(self, client: LocalRecyclablePriceClient):
         """폐지류 카테고리 조회."""
         response = await client.get_category_prices(RecyclableCategory.PAPER)
 
@@ -227,9 +203,7 @@ class TestLocalRecyclablePriceClient:
         assert response.total_count >= 2  # 신문지, 골판지
 
     @pytest.mark.anyio
-    async def test_get_category_prices_glass(
-        self, client: LocalRecyclablePriceClient
-    ):
+    async def test_get_category_prices_glass(self, client: LocalRecyclablePriceClient):
         """폐유리병류 카테고리 조회."""
         response = await client.get_category_prices(RecyclableCategory.GLASS)
 
@@ -254,9 +228,7 @@ class TestLocalRecyclablePriceClient:
     # ==========================================================
 
     @pytest.mark.anyio
-    async def test_build_context_with_results(
-        self, client: LocalRecyclablePriceClient
-    ):
+    async def test_build_context_with_results(self, client: LocalRecyclablePriceClient):
         """검색 결과로 context 문자열 생성."""
         response = await client.search_price("캔")
         context = client.build_context(response)
@@ -267,9 +239,7 @@ class TestLocalRecyclablePriceClient:
         assert "한국환경공단" in context
 
     @pytest.mark.anyio
-    async def test_build_context_empty_results(
-        self, client: LocalRecyclablePriceClient
-    ):
+    async def test_build_context_empty_results(self, client: LocalRecyclablePriceClient):
         """빈 결과로 context 생성 시 빈 문자열."""
         response = await client.search_price("없는품목12345")
         context = client.build_context(response)
@@ -277,9 +247,7 @@ class TestLocalRecyclablePriceClient:
         assert context == ""
 
     @pytest.mark.anyio
-    async def test_build_context_with_all_regions(
-        self, client: LocalRecyclablePriceClient
-    ):
+    async def test_build_context_with_all_regions(self, client: LocalRecyclablePriceClient):
         """모든 권역 포함 context 생성."""
         response = await client.search_price("알루미늄캔")
         context = client.build_context(response, include_all_regions=True)
@@ -307,9 +275,7 @@ class TestLocalRecyclablePriceClient:
         assert item.region  # RecyclableRegion
 
     @pytest.mark.anyio
-    async def test_survey_date_in_response(
-        self, client: LocalRecyclablePriceClient
-    ):
+    async def test_survey_date_in_response(self, client: LocalRecyclablePriceClient):
         """응답에 조사일 포함 확인."""
         response = await client.search_price("캔")
 

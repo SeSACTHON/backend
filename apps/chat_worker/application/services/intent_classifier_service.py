@@ -423,9 +423,7 @@ class IntentClassifierService:
         message: str,
     ) -> tuple[Intent, float]:
         """Intent 파싱 및 신뢰도 계산 (레거시, 호환성 유지)."""
-        intent, llm_conf, length_pen = self._parse_intent_with_signals(
-            intent_str, message
-        )
+        intent, llm_conf, length_pen = self._parse_intent_with_signals(intent_str, message)
         keyword_boost = self._calculate_keyword_boost(message, intent)
         confidence = llm_conf + keyword_boost + length_pen
         return intent, max(0.0, min(1.0, confidence))
@@ -513,9 +511,7 @@ class IntentClassifierService:
                 confidence=0.5,
             )
 
-    def parse_decompose_response(
-        self, llm_response: str, original: str
-    ) -> DecomposedQuery:
+    def parse_decompose_response(self, llm_response: str, original: str) -> DecomposedQuery:
         """Query Decomposition LLM 응답 파싱."""
         try:
             data = json.loads(llm_response)

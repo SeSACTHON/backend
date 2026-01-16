@@ -158,9 +158,7 @@ class TestFeedbackEvaluatorService:
         assert result.score >= 0.5
         assert result.quality in (FeedbackQuality.GOOD, FeedbackQuality.PARTIAL)
 
-    def test_evaluate_keyword_matching(
-        self, service: FeedbackEvaluatorService
-    ) -> None:
+    def test_evaluate_keyword_matching(self, service: FeedbackEvaluatorService) -> None:
         """키워드 매칭 점수."""
         result = service.evaluate_by_rules(
             query="페트병 분리수거",
@@ -175,9 +173,7 @@ class TestFeedbackEvaluatorService:
         # 키워드 매칭으로 점수 확인 (keyword_match_ratio 사용)
         assert result.metadata.get("keyword_match_ratio", 0) > 0
 
-    def test_should_use_fallback_waste_intent(
-        self, service: FeedbackEvaluatorService
-    ) -> None:
+    def test_should_use_fallback_waste_intent(self, service: FeedbackEvaluatorService) -> None:
         """waste intent에서 Fallback 필요 여부."""
         feedback = FeedbackResult.from_score(0.2)
         needs, reason = service.should_use_fallback(feedback, "waste")
@@ -185,9 +181,7 @@ class TestFeedbackEvaluatorService:
         assert needs is True
         assert reason == FallbackReason.RAG_LOW_QUALITY
 
-    def test_should_not_fallback_good_result(
-        self, service: FeedbackEvaluatorService
-    ) -> None:
+    def test_should_not_fallback_good_result(self, service: FeedbackEvaluatorService) -> None:
         """좋은 결과는 Fallback 불필요."""
         feedback = FeedbackResult.from_score(0.8)
         needs, reason = service.should_use_fallback(feedback, "waste")
@@ -195,23 +189,17 @@ class TestFeedbackEvaluatorService:
         assert needs is False
         assert reason is None
 
-    def test_needs_llm_evaluation_for_partial(
-        self, service: FeedbackEvaluatorService
-    ) -> None:
+    def test_needs_llm_evaluation_for_partial(self, service: FeedbackEvaluatorService) -> None:
         """PARTIAL 결과는 LLM 평가 필요."""
         result = FeedbackResult.from_score(0.5)  # PARTIAL
         assert service.needs_llm_evaluation(result) is True
 
-    def test_no_llm_evaluation_for_good(
-        self, service: FeedbackEvaluatorService
-    ) -> None:
+    def test_no_llm_evaluation_for_good(self, service: FeedbackEvaluatorService) -> None:
         """GOOD 결과는 LLM 평가 불필요."""
         result = FeedbackResult.from_score(0.8)  # GOOD
         assert service.needs_llm_evaluation(result) is False
 
-    def test_no_llm_evaluation_for_excellent(
-        self, service: FeedbackEvaluatorService
-    ) -> None:
+    def test_no_llm_evaluation_for_excellent(self, service: FeedbackEvaluatorService) -> None:
         """EXCELLENT 결과는 LLM 평가 불필요."""
         result = FeedbackResult.from_score(0.95)  # EXCELLENT
         assert service.needs_llm_evaluation(result) is False

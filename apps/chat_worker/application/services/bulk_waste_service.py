@@ -164,8 +164,7 @@ class BulkWasteService:
         return {
             "type": "location_required",
             "message": (
-                "대형폐기물 수거 신청 방법은 지역마다 달라요. "
-                "어느 지역(구)에서 버리실 건가요?"
+                "대형폐기물 수거 신청 방법은 지역마다 달라요. " "어느 지역(구)에서 버리실 건가요?"
             ),
         }
 
@@ -213,14 +212,10 @@ class BulkWasteService:
             ]
 
         if collection_info:
-            context["collection"] = BulkWasteService.format_bulk_waste_collection(
-                collection_info
-            )
+            context["collection"] = BulkWasteService.format_bulk_waste_collection(collection_info)
 
         if fee_items:
-            context["fees"] = BulkWasteService.format_bulk_waste_fees(
-                fee_items, sigungu or ""
-            )
+            context["fees"] = BulkWasteService.format_bulk_waste_fees(fee_items, sigungu or "")
 
         # context 문자열 생성 (LLM 프롬프트용)
         context["context"] = BulkWasteService.build_context_string(
