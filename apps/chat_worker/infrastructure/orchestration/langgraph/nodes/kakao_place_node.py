@@ -79,7 +79,7 @@ def create_kakao_place_node(
             stage="kakao_place",
             status="started",
             progress=45,
-            message="📍 주변 장소를 검색 중...",
+            message="주변 장소 검색 중",
         )
 
         # 1. state → input DTO 변환
@@ -108,7 +108,7 @@ def create_kakao_place_node(
             await event_publisher.notify_needs_input(
                 task_id=job_id,
                 input_type="location",
-                message="📍 주변 장소를 찾으려면 위치 정보가 필요해요.\n위치 권한을 허용해주세요!",
+                message="주변 장소를 찾으려면 위치 정보가 필요합니다. 위치 권한을 허용해주세요.",
                 timeout=60,
             )
             await event_publisher.notify_stage(
@@ -149,7 +149,7 @@ def create_kakao_place_node(
                 "found": found,
                 "count": count,
             },
-            message=f"✅ {count}개 장소를 찾았어요!" if found else "검색 결과가 없어요.",
+            message=f"{count}개 장소 검색 완료" if found else "검색 결과 없음",
         )
 
         return {

@@ -28,16 +28,27 @@ spec:
           limits:
             memory: 1Gi
             cpu: 500m
+        env:
+        # OpenTelemetry (분산 추적)
+        - name: OTEL_SERVICE_NAME
+          value: chat-worker
+        - name: OTEL_ENABLED
+          value: 'true'
+        - name: OTEL_TRACES_EXPORTER
+          value: otlp
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://jaeger-collector-clusterip.istio-system.svc.cluster.local:4317
+        - name: OTEL_METRICS_EXPORTER
+          value: none
+        - name: OTEL_LOGS_EXPORTER
+          value: none
+        - name: OTEL_PROPAGATORS
+          value: b3,tracecontext,baggage
         envFrom:
         - configMapRef:
             name: chat-worker-config
         - secretRef:
             name: chat-worker-secret
-        env:
-        - name: CHAT_WORKER_ENVIRONMENT
-          valueFrom:
-            fieldRef:
-              fieldPath: metadata.namespace
         livenessProbe:
           exec:
             command:

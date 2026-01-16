@@ -84,7 +84,7 @@ def create_image_generation_node(
             stage="image_generation",
             status="processing",
             progress=50,
-            message="🎨 이미지 생성 중...",
+            message="이미지 생성 중",
         )
 
         # 1. state → input DTO 변환 (state에서 override 가능)
@@ -105,7 +105,7 @@ def create_image_generation_node(
                 stage="image_generation",
                 status="failed",
                 result={"error": output.error_message},
-                message="⚠️ 이미지 생성 실패",
+                message="이미지 생성 실패",
             )
             return {
                 **state,
@@ -126,7 +126,7 @@ def create_image_generation_node(
             status="completed",
             progress=80,
             result={"image_url": output.image_url},
-            message="✅ 이미지 생성 완료",
+            message="이미지 생성 완료",
         )
 
         return {

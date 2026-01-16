@@ -76,7 +76,7 @@ def create_vision_node(
             stage="vision",
             status="processing",
             progress=15,
-            message="🔍 이미지 분석 중...",
+            message="이미지 분석 중",
         )
 
         # 1. state → input DTO 변환
@@ -100,7 +100,7 @@ def create_vision_node(
                 stage="vision",
                 status="failed",
                 result={"error": output.error_message},
-                message="⚠️ 이미지 분석 실패",
+                message="이미지 분석 실패",
             )
             return {
                 **state,
@@ -121,7 +121,7 @@ def create_vision_node(
             status="completed",
             progress=25,
             result={"major_category": major_category},
-            message=f"✅ 분류 완료: {major_category}",
+            message=f"분류 완료: {major_category}",
         )
 
         return {

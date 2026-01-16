@@ -55,6 +55,9 @@ class AnswerGeneratorService:
                 "has_bulk_waste": context.bulk_waste_context is not None,
                 "has_weather": context.weather_context is not None,
                 "has_collection_point": context.collection_point_context is not None,
+                "has_conversation_history": context.conversation_history is not None,
+                "has_conversation_summary": context.conversation_summary is not None,
+                "conversation_turns": len(context.conversation_history) if context.conversation_history else 0,
                 "prompt_length": len(prompt),
             },
         )
@@ -73,6 +76,8 @@ class AnswerGeneratorService:
         weather_context: str | None = None,
         collection_point_context: str | None = None,
         user_input: str = "",
+        conversation_history: list[dict[str, str]] | None = None,
+        conversation_summary: str | None = None,
     ) -> AnswerContext:
         """AnswerContext 팩토리 메서드.
 
@@ -87,6 +92,8 @@ class AnswerGeneratorService:
             weather_context: 날씨 기반 분리배출 팁 (문자열)
             collection_point_context: 수거함 위치 정보 (문자열)
             user_input: 사용자 입력
+            conversation_history: 최근 대화 히스토리 (Multi-turn)
+            conversation_summary: 압축된 이전 대화 요약 (Multi-turn)
 
         Returns:
             AnswerContext 인스턴스
@@ -102,6 +109,8 @@ class AnswerGeneratorService:
             weather_context=weather_context,
             collection_point_context=collection_point_context,
             user_input=user_input,
+            conversation_history=conversation_history,
+            conversation_summary=conversation_summary,
         )
 
     def validate_context(self, context: AnswerContext) -> bool:

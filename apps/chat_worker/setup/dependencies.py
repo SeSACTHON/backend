@@ -734,6 +734,8 @@ async def get_chat_graph(
     web_search_client = get_web_search_client()
     bulk_waste_client = get_bulk_waste_client()  # 대형폐기물 정보
     recyclable_price_client = get_recyclable_price_client()  # 재활용자원 시세
+    weather_client = get_weather_client()  # 날씨 정보 (기상청 API)
+    collection_point_client = get_collection_point_client()  # 수거함 위치 (KECO API)
     image_generator = get_image_generator()  # 이미지 생성 (Responses API)
     input_requester = await get_input_requester()
     checkpointer = await get_checkpointer()
@@ -750,12 +752,19 @@ async def get_chat_graph(
         web_search_client=web_search_client,
         bulk_waste_client=bulk_waste_client,  # 대형폐기물 정보 (행정안전부 API)
         recyclable_price_client=recyclable_price_client,  # 재활용자원 시세 (한국환경공단)
+        weather_client=weather_client,  # 날씨 정보 (기상청 API)
+        collection_point_client=collection_point_client,  # 수거함 위치 (KECO API)
         image_generator=image_generator,  # 이미지 생성 (Responses API)
         image_default_size=settings.image_generation_default_size,
         image_default_quality=settings.image_generation_default_quality,
         cache=cache,  # P2: Intent 캐싱 (CachePort)
         input_requester=input_requester,
         checkpointer=checkpointer,
+        enable_summarization=settings.enable_summarization,  # Multi-turn 컨텍스트 압축
+        summarization_model=settings.openai_default_model,  # 동적 설정: context-output 트리거
+        max_tokens_before_summary=settings.max_tokens_before_summary,  # None이면 동적 계산
+        max_summary_tokens=settings.max_summary_tokens,  # None이면 동적 계산
+        keep_recent_messages=settings.keep_recent_messages,  # None이면 동적 계산
     )
 
 

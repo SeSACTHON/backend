@@ -196,7 +196,10 @@ def create_chat_graph(
     fallback_orchestrator: "FallbackOrchestrator | None" = None,  # Fallback 체인
     llm_evaluator: "LLMFeedbackEvaluatorPort | None" = None,  # LLM 기반 정밀 평가
     enable_summarization: bool = False,  # LangGraph 1.0+ 컨텍스트 압축
-    max_tokens_before_summary: int = 3072,  # 요약 트리거 임계값
+    summarization_model: str | None = None,  # 동적 설정용 모델명 (예: "gpt-5.2")
+    max_tokens_before_summary: int | None = None,  # None이면 context-output 동적 계산
+    max_summary_tokens: int | None = None,  # None이면 15% 동적 계산
+    keep_recent_messages: int | None = None,  # None이면 PRUNE_PROTECT 기반 계산
     enable_dynamic_routing: bool = True,  # Send API 동적 라우팅
     enable_multi_intent: bool = True,  # Multi-intent fanout
     enable_enrichment: bool = True,  # Intent 기반 enrichment
@@ -221,7 +224,10 @@ def create_chat_graph(
         fallback_orchestrator: Fallback 체인 오케스트레이터 (선택)
         llm_evaluator: LLM 기반 품질 평가기 (선택, 정밀 평가용)
         enable_summarization: 컨텍스트 압축 활성화 (멀티턴 대화용)
-        max_tokens_before_summary: 요약 트리거 임계값 (기본 3072)
+        summarization_model: 동적 설정용 모델명 (예: "gpt-5.2", context-output 트리거 자동 계산)
+        max_tokens_before_summary: 요약 트리거 임계값 (None이면 context-output 동적 계산)
+        max_summary_tokens: 구조화된 요약 최대 토큰 (None이면 15% 동적 계산, min 20K)
+        keep_recent_messages: 유지할 최근 메시지 수 (None이면 PRUNE_PROTECT 기반 계산)
         enable_dynamic_routing: Send API 동적 라우팅 활성화 (기본 True)
         enable_multi_intent: Multi-intent fanout 활성화 (기본 True)
         enable_enrichment: Intent 기반 enrichment 활성화 (기본 True)
@@ -244,13 +250,25 @@ def create_chat_graph(
     if enable_summarization:
         summarization_node = SummarizationNode(
             llm=llm,
-            max_tokens_before_summary=max_tokens_before_summary,
+            model_name=summarization_model,  # 동적 설정: context-output 트리거
+            max_tokens_before_summary=max_tokens_before_summary,  # None이면 동적 계산
+            max_summary_tokens=max_summary_tokens,  # None이면 동적 계산
+            keep_recent_messages=keep_recent_messages,  # None이면 동적 계산
             prompt_loader=prompt_loader,
         )
-        logger.info(
-            "Summarization enabled (threshold=%d tokens)",
-            max_tokens_before_summary,
-        )
+        # 로깅은 SummarizationNode 내부에서 처리됨
+        if summarization_model:
+            logger.info(
+                "Summarization enabled with dynamic config (model=%s)",
+                summarization_model,
+            )
+        else:
+            logger.info(
+                "Summarization enabled with static config (threshold=%s, max_summary=%s, keep_recent=%s)",
+                max_tokens_before_summary or "default",
+                max_summary_tokens or "default",
+                keep_recent_messages or "default",
+            )
     else:
         summarization_node = None
 

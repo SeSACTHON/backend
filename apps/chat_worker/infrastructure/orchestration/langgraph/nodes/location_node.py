@@ -77,7 +77,7 @@ def create_location_subagent_node(
             stage="location",
             status="processing",
             progress=50,
-            message="📍 위치 정보 확인 중...",
+            message="위치 정보 확인 중",
         )
 
         # 1. state → input DTO 변환
@@ -98,7 +98,7 @@ def create_location_subagent_node(
             await event_publisher.notify_needs_input(
                 task_id=job_id,
                 input_type="location",
-                message="📍 주변 센터를 찾으려면 위치 정보가 필요해요.\n위치 권한을 허용해주세요!",
+                message="주변 센터를 찾으려면 위치 정보가 필요합니다. 위치 권한을 허용해주세요.",
                 timeout=60,
             )
             await event_publisher.notify_stage(
@@ -122,12 +122,14 @@ def create_location_subagent_node(
             }
 
         # Progress: 완료 (UX)
+        found = output.location_context.get("found", False)
         await event_publisher.notify_stage(
             task_id=job_id,
             stage="location",
             status="completed",
             progress=60,
-            result={"found": output.location_context.get("found", False)},
+            result={"found": found},
+            message="위치 정보 조회 완료" if found else "위치 정보 조회 완료 (결과 없음)",
         )
 
         return {

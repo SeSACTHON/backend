@@ -80,7 +80,7 @@ def create_answer_node(
             stage="answer",
             status="started",
             progress=70,
-            message="💭 답변 고민 중...",
+            message="답변 생성 중",
         )
 
         try:
@@ -101,6 +101,21 @@ def create_answer_node(
             collection_ctx = state.get("collection_point_context")
             collection_context_str = collection_ctx.get("context") if isinstance(collection_ctx, dict) else None
 
+            # 대화 히스토리 추출 (Multi-turn 지원)
+            messages = state.get("messages", [])
+            conversation_history = None
+            if messages:
+                # LangChain 메시지 → 간단한 dict 형식으로 변환
+                # 최근 10개 메시지만 사용 (토큰 효율성)
+                recent_messages = messages[-10:] if len(messages) > 10 else messages
+                conversation_history = [
+                    {"role": getattr(msg, "type", "user"), "content": getattr(msg, "content", str(msg))}
+                    for msg in recent_messages
+                ]
+
+            # 대화 요약 추출 (컨텍스트 압축 시)
+            conversation_summary = state.get("summary")
+
             input_dto = GenerateAnswerInput(
                 job_id=job_id,
                 message=state.get("message", ""),
@@ -116,6 +131,8 @@ def create_answer_node(
                 bulk_waste_context=waste_context_str,
                 weather_context=weather_context_str,
                 collection_point_context=collection_context_str,
+                conversation_history=conversation_history,
+                conversation_summary=conversation_summary,
             )
 
             # 2. Command 실행 (스트리밍)
@@ -141,6 +158,7 @@ def create_answer_node(
                 stage="answer",
                 status="completed",
                 progress=100,
+                message="답변 생성 완료",
             )
 
             # 3. output → state 변환
@@ -159,7 +177,7 @@ def create_answer_node(
             )
             return {
                 **state,
-                "answer": "죄송해요, 답변 생성 중 오류가 발생했어요. 다시 시도해주세요! 🙏",
+                "answer": "답변 생성 중 오류가 발생했습니다. 다시 시도해주세요.",
             }
 
     return answer_node

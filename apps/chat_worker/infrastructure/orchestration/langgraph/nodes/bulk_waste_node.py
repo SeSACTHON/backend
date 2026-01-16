@@ -82,7 +82,7 @@ def create_bulk_waste_node(
             stage="bulk_waste",
             status="started",
             progress=45,
-            message="🗑️ 대형폐기물 정보를 조회 중...",
+            message="대형폐기물 정보 조회 중",
         )
 
         # 1. state → input DTO 변환
@@ -112,7 +112,7 @@ def create_bulk_waste_node(
             await event_publisher.notify_needs_input(
                 task_id=job_id,
                 input_type="location",
-                message="🗑️ 대형폐기물 수거 정보는 지역마다 달라요.\n어느 지역(구)인지 알려주세요!",
+                message="대형폐기물 수거 정보는 지역마다 다릅니다. 지역(구)을 알려주세요.",
                 timeout=60,
             )
             await event_publisher.notify_stage(
@@ -145,14 +145,14 @@ def create_bulk_waste_node(
         has_collection = "collection" in context
         has_fees = "fees" in context
 
-        result_message = "✅ 대형폐기물 정보를 찾았어요!"
+        result_message = "대형폐기물 정보 조회 완료"
         if has_collection and has_fees:
-            result_message = "✅ 수거 방법과 수수료 정보를 찾았어요!"
+            result_message = "수거 방법 및 수수료 정보 조회 완료"
         elif has_collection:
-            result_message = "✅ 대형폐기물 수거 방법을 찾았어요!"
+            result_message = "대형폐기물 수거 방법 조회 완료"
         elif has_fees:
             fee_count = context.get("fees", {}).get("item_count", 0)
-            result_message = f"✅ {fee_count}개 품목의 수수료를 찾았어요!"
+            result_message = f"{fee_count}개 품목 수수료 조회 완료"
 
         await event_publisher.notify_stage(
             task_id=job_id,

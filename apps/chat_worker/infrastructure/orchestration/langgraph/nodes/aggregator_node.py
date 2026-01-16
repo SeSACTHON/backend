@@ -70,7 +70,7 @@ def create_aggregator_node(
             stage="aggregate",
             status="started",
             progress=60,
-            message="📊 정보 취합 중...",
+            message="정보 취합 중",
         )
 
         # 수집된 컨텍스트 필드들
@@ -156,6 +156,7 @@ def create_aggregator_node(
                 "collected": collected,
                 "needs_fallback": needs_fallback,
             },
+            message=f"정보 취합 완료: {len(collected)}건",
         )
 
         # state 반환 (검증 결과 포함)

@@ -83,7 +83,7 @@ def create_intent_node(
             stage="intent",
             status="started",
             progress=10,
-            message="🧠 의도 파악 중...",
+            message="의도 파악 중",
         )
 
         # 1. state → input DTO 변환
@@ -123,6 +123,7 @@ def create_intent_node(
                 "has_multi_intent": output.has_multi_intent,
                 "additional_intents": output.additional_intents,
             },
+            message=f"의도 분류 완료: {output.intent}",
         )
 
         # 3. output → state 변환

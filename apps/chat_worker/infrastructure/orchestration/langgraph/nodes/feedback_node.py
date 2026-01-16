@@ -86,7 +86,7 @@ def create_feedback_node(
             stage="feedback",
             status="started",
             progress=55,
-            message="🔍 결과 품질 확인 중...",
+            message="결과 품질 확인 중",
         )
 
         try:
@@ -108,7 +108,7 @@ def create_feedback_node(
                     stage="feedback",
                     status="fallback",
                     progress=57,
-                    message="🌐 추가 정보 검색 중...",
+                    message="추가 정보 검색 중",
                 )
 
             # 4. output → state 변환
@@ -124,15 +124,17 @@ def create_feedback_node(
                     state_update["fallback_message"] = output.fallback_result.message
 
             # Progress: 완료 (UX)
+            quality = output.feedback.quality.value
             await event_publisher.notify_stage(
                 task_id=job_id,
                 stage="feedback",
                 status="completed",
                 progress=60,
                 result={
-                    "quality": output.feedback.quality.value,
+                    "quality": quality,
                     "fallback_used": output.fallback_executed,
                 },
+                message=f"품질 확인 완료: {quality}",
             )
 
             return state_update

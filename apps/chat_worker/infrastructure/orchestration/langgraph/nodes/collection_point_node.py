@@ -86,7 +86,7 @@ def create_collection_point_node(
             stage="collection_point",
             status="started",
             progress=45,
-            message="🗑️ 수거함 위치를 검색 중...",
+            message="수거함 위치 검색 중",
         )
 
         # 1. state → input DTO 변환
@@ -112,7 +112,7 @@ def create_collection_point_node(
             await event_publisher.notify_needs_input(
                 task_id=job_id,
                 input_type="location",
-                message="🗑️ 수거함 위치를 찾으려면 지역 정보가 필요해요.\n어느 지역(구)에서 찾으시나요?",
+                message="수거함 위치를 찾으려면 지역 정보가 필요합니다. 지역(구)을 알려주세요.",
                 timeout=60,
             )
             await event_publisher.notify_stage(
@@ -145,11 +145,11 @@ def create_collection_point_node(
         found = context.get("found", False)
         count = context.get("count", 0)
 
-        result_message = "수거함 정보를 준비했어요!"
+        result_message = "수거함 정보 조회 완료"
         if found:
-            result_message = f"✅ {count}곳의 수거함을 찾았어요!"
+            result_message = f"{count}곳 수거함 검색 완료"
         elif context.get("type") == "guide":
-            result_message = "지역을 알려주세요!"
+            result_message = "지역 정보 필요"
 
         await event_publisher.notify_stage(
             task_id=job_id,

@@ -87,7 +87,7 @@ def create_character_subagent_node(
             stage="character",
             status="processing",
             progress=50,
-            message="🎭 캐릭터 정보를 찾고 있어요...",
+            message="캐릭터 정보 조회 중",
         )
 
         # 1. state → input DTO 변환
@@ -101,11 +101,27 @@ def create_character_subagent_node(
 
         # 3. output → state 변환
         if not output.success:
+            await event_publisher.notify_stage(
+                task_id=job_id,
+                stage="character",
+                status="failed",
+                result={"error": output.error_message},
+                message="캐릭터 정보 조회 실패",
+            )
             return {
                 **state,
                 "character_context": None,
                 "subagent_error": output.error_message,
             }
+
+        # Progress: 완료 (UX)
+        await event_publisher.notify_stage(
+            task_id=job_id,
+            stage="character",
+            status="completed",
+            progress=55,
+            message="캐릭터 정보 조회 완료",
+        )
 
         return {
             **state,

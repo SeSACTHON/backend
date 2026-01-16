@@ -84,7 +84,7 @@ def create_recyclable_price_node(
             stage="recyclable_price",
             status="started",
             progress=45,
-            message="♻️ 재활용자원 시세를 조회 중...",
+            message="재활용자원 시세 조회 중",
         )
 
         # 1. state → input DTO 변환
@@ -122,11 +122,11 @@ def create_recyclable_price_node(
         found = context.get("found", False)
         count = context.get("count", 0)
 
-        result_message = "재활용자원 시세 정보를 준비했어요!"
+        result_message = "재활용자원 시세 조회 완료"
         if found:
-            result_message = f"✅ {count}개 품목의 시세를 찾았어요!"
+            result_message = f"{count}개 품목 시세 조회 완료"
         elif context.get("type") == "guide":
-            result_message = "품목을 알려주세요!"
+            result_message = "품목 정보 필요"
 
         await event_publisher.notify_stage(
             task_id=job_id,

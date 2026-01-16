@@ -87,6 +87,17 @@ class Settings(BaseSettings):
     keco_api_key: str | None = None
     keco_api_timeout: float = 15.0
 
+    # Multi-turn 대화 컨텍스트 압축 (OpenCode 스타일)
+    # 동적 설정: context_window - max_output 초과 시 압축 트리거
+    enable_summarization: bool = True  # 기본 활성화
+    # summarization_model이 설정되면 동적 계산 (권장)
+    # - GPT-5.2: 400K - 128K = 272K 트리거, 400K * 15% = 60K 요약
+    # - gemini-3-flash-preview: 1M - 64K = 936K 트리거, 1M * 15% = 65K 요약 (max)
+    # None이면 아래 수동 설정 사용
+    max_tokens_before_summary: int | None = None  # 동적 계산 (None 권장)
+    max_summary_tokens: int | None = None  # 동적 계산 (None 권장)
+    keep_recent_messages: int | None = None  # 동적 계산 (None 권장)
+
     # Logging
     log_level: str = "INFO"
 

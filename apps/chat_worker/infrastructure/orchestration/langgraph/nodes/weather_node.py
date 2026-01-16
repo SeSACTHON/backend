@@ -86,7 +86,7 @@ def create_weather_node(
             stage="weather",
             status="started",
             progress=40,
-            message="🌤️ 날씨 정보 확인 중...",
+            message="날씨 정보 확인 중",
         )
 
         # 1. state → input DTO 변환
@@ -156,16 +156,17 @@ def create_weather_node(
         context = output.weather_context or {}
         has_tip = bool(context.get("tip"))
 
+        temp = context.get("temperature")
         await event_publisher.notify_stage(
             task_id=job_id,
             stage="weather",
             status="completed",
             progress=45,
             result={
-                "temperature": context.get("temperature"),
+                "temperature": temp,
                 "has_tip": has_tip,
             },
-            message=f"{context.get('emoji', '')} 날씨 확인 완료",
+            message=f"날씨 확인 완료: {temp}도" if temp else "날씨 확인 완료",
         )
 
         return {

@@ -73,7 +73,7 @@ def create_rag_node(
             stage="rag",
             status="started",
             progress=40,
-            message="📚 규정 검색 중...",
+            message="규정 검색 중",
         )
 
         try:
@@ -103,6 +103,7 @@ def create_rag_node(
                     "found": output.found,
                     "method": output.search_method,
                 },
+                message="규정 검색 완료" if output.found else "규정 검색 완료 (결과 없음)",
             )
 
             return state_update

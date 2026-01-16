@@ -78,7 +78,7 @@ def create_web_search_node(
             stage="web_search",
             status="started",
             progress=40,
-            message="🔍 웹에서 최신 정보를 검색 중...",
+            message="웹 검색 중",
         )
 
         # 1. state → input DTO 변환
@@ -122,6 +122,7 @@ def create_web_search_node(
                 "query": output.search_query,
                 "results_count": results_count,
             },
+            message=f"웹 검색 완료: {results_count}건",
         )
 
         return {

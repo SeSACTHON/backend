@@ -31,10 +31,28 @@ class AnswerContext:
     weather_context: str | None = None  # 날씨 기반 분리배출 팁
     collection_point_context: str | None = None  # 수거함 위치 정보
     user_input: str = ""
+    # Multi-turn 대화 컨텍스트
+    conversation_history: list[dict[str, str]] | None = None  # 최근 대화 히스토리
+    conversation_summary: str | None = None  # 압축된 이전 대화 요약
 
     def to_prompt_context(self) -> str:
         """프롬프트용 컨텍스트 문자열 생성."""
         parts = []
+
+        # Multi-turn: 대화 요약이 있으면 먼저 추가
+        if self.conversation_summary:
+            parts.append(f"## Previous Conversation Summary\n{self.conversation_summary}")
+
+        # Multi-turn: 최근 대화 히스토리
+        if self.conversation_history:
+            history_lines = []
+            for msg in self.conversation_history:
+                role = msg.get("role", "user")
+                content = msg.get("content", "")
+                role_label = "User" if role == "user" else "Assistant"
+                history_lines.append(f"- {role_label}: {content}")
+            if history_lines:
+                parts.append(f"## Recent Conversation\n" + "\n".join(history_lines))
 
         if self.classification:
             parts.append(
@@ -89,6 +107,8 @@ class AnswerContext:
                 self.bulk_waste_context,
                 self.weather_context,
                 self.collection_point_context,
+                self.conversation_history,
+                self.conversation_summary,
             ]
         )
 
