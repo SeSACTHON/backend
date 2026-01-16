@@ -1,6 +1,7 @@
 """CharacterService 단위 테스트.
 
 CharacterService는 순수 로직만 담당 (Port 의존 없음):
+- to_cdn_code: 캐릭터 코드 → CDN 코드 변환
 - to_answer_context: 컨텍스트 변환
 - validate_character: 캐릭터 검증
 - build_not_found_context: 캐릭터 없음 컨텍스트
@@ -26,7 +27,31 @@ class TestCharacterService:
             type_label="재활용",
             dialog="재활용해줘서 고마워!",
             match_label="플라스틱",
+            code="char-pet",
         )
+
+    # ==========================================================
+    # to_cdn_code Tests
+    # ==========================================================
+
+    def test_to_cdn_code_with_prefix(self):
+        """char- 접두사가 있는 코드 변환."""
+        assert CharacterService.to_cdn_code("char-pet") == "pet"
+        assert CharacterService.to_cdn_code("char-battery") == "battery"
+        assert CharacterService.to_cdn_code("char-eco") == "eco"
+
+    def test_to_cdn_code_without_prefix(self):
+        """char- 접두사가 없는 코드 (이미 CDN 코드)."""
+        assert CharacterService.to_cdn_code("pet") == "pet"
+        assert CharacterService.to_cdn_code("battery") == "battery"
+
+    def test_to_cdn_code_none(self):
+        """None 코드."""
+        assert CharacterService.to_cdn_code(None) is None
+
+    def test_to_cdn_code_empty(self):
+        """빈 문자열 코드."""
+        assert CharacterService.to_cdn_code("") is None
 
     # ==========================================================
     # to_answer_context Tests
@@ -58,7 +83,7 @@ class TestCharacterService:
         """컨텍스트 구조 확인."""
         context = CharacterService.to_answer_context(sample_character)
 
-        expected_keys = {"name", "type", "dialog", "match_reason"}
+        expected_keys = {"name", "type", "dialog", "match_reason", "code"}
         assert set(context.keys()) == expected_keys
 
     # ==========================================================

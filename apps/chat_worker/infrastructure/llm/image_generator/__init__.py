@@ -47,10 +47,10 @@ def create_image_generator(
         >>> gen = create_image_generator(model_id="openai/gpt-5.2")
         >>> # OpenAIResponsesImageGenerator (gpt-image-1.5)
 
-        >>> gen = create_image_generator(model_id="gemini/gemini-3.0-preview")
+        >>> gen = create_image_generator(model_id="google/gemini-3.0-preview")
         >>> # GeminiNativeImageGenerator (gemini-3-pro-image-preview)
 
-        >>> gen = create_image_generator(provider=Provider.GEMINI)
+        >>> gen = create_image_generator(provider=Provider.GOOGLE)
         >>> # GeminiNativeImageGenerator
     """
     # 모델 설정 조회
@@ -66,7 +66,7 @@ def create_image_generator(
         provider = Provider.OPENAI
 
     # Provider별 생성기 반환
-    if provider == Provider.GEMINI:
+    if provider == Provider.GOOGLE:
         gemini_model = (
             config.image_model if config and config.image_model else "gemini-3-pro-image-preview"
         )

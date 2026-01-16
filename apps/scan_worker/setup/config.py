@@ -20,21 +20,21 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 MODEL_PROVIDER_MAP: dict[str, str] = {
     # === GPT 계열 (OpenAI) ===
-    "gpt-5.2": "gpt",
-    "gpt-5.2-pro": "gpt",
-    "gpt-5.1": "gpt",
-    "gpt-5": "gpt",
-    "gpt-5-pro": "gpt",
-    "gpt-5-mini": "gpt",
+    "gpt-5.2": "openai",
+    "gpt-5.2-pro": "openai",
+    "gpt-5.1": "openai",
+    "gpt-5": "openai",
+    "gpt-5-pro": "openai",
+    "gpt-5-mini": "openai",
     # === Gemini 계열 (Google) ===
     # https://ai.google.dev/gemini-api/docs/gemini-3
-    "gemini-3-pro-preview": "gemini",
-    "gemini-3-flash-preview": "gemini",
-    "gemini-2.5-pro": "gemini",
-    "gemini-2.5-flash": "gemini",
-    "gemini-2.5-flash-lite": "gemini",
-    "gemini-2.0-flash": "gemini",
-    "gemini-2.0-flash-lite": "gemini",
+    "gemini-3-pro-preview": "google",
+    "gemini-3-flash-preview": "google",
+    "gemini-2.5-pro": "google",
+    "gemini-2.5-flash": "google",
+    "gemini-2.5-flash-lite": "google",
+    "gemini-2.0-flash": "google",
+    "gemini-2.0-flash-lite": "google",
 }
 
 
@@ -124,7 +124,7 @@ class Settings(BaseSettings):
             model: LLM 모델명
 
         Returns:
-            provider (gpt, gemini)
+            provider (openai, google)
 
         Raises:
             KeyError: 지원하지 않는 모델
@@ -163,16 +163,16 @@ class Settings(BaseSettings):
         """Provider별 API Key 반환 (SecretStr unwrap).
 
         Args:
-            provider: LLM provider (gpt, gemini 등)
+            provider: LLM provider (openai, google)
 
         Returns:
             API Key 문자열 또는 None
         """
-        if provider == "gemini":
+        if provider == "google":
             if self.gemini_api_key:
                 return self.gemini_api_key.get_secret_value()
             return None
-        # gpt, o1 등 OpenAI 계열
+        # OpenAI 계열
         return self.openai_api_key.get_secret_value()
 
 

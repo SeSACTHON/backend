@@ -12,8 +12,8 @@ class LLMProvider(str, Enum):
     """지원하는 LLM Provider.
 
     - OPENAI: OpenAI API (GPT 시리즈)
-    - GEMINI: Google Gemini API
+    - GOOGLE: Google Gemini API
     """
 
     OPENAI = "openai"
-    GEMINI = "gemini"
+    GOOGLE = "google"

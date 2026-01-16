@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
 
     # LLM
-    default_provider: Literal["openai", "gemini"] = "openai"
+    default_provider: Literal["openai", "google"] = "openai"
     default_model: str = "gpt-5.2-turbo"
 
     # CORS

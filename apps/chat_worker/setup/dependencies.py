@@ -204,13 +204,13 @@ def get_metrics() -> MetricsPort:
 
 
 def create_llm_client(
-    provider: Literal["openai", "gemini"] = "openai",
+    provider: Literal["openai", "google"] = "openai",
     model: str | None = None,
 ) -> LLMClientPort:
     """LLM 클라이언트 팩토리."""
     settings = get_settings()
 
-    if provider == "gemini":
+    if provider == "google":
         return GeminiLLMClient(
             model=model or settings.gemini_default_model,
             api_key=settings.google_api_key,
@@ -223,13 +223,13 @@ def create_llm_client(
 
 
 def create_vision_client(
-    provider: Literal["openai", "gemini"] = "openai",
+    provider: Literal["openai", "google"] = "openai",
     model: str | None = None,
 ) -> VisionModelPort:
     """Vision 모델 클라이언트 팩토리."""
     settings = get_settings()
 
-    if provider == "gemini":
+    if provider == "google":
         # Gemini: 멀티모달 모델
         return GeminiVisionClient(
             model=model or settings.gemini_default_model,
@@ -699,7 +699,7 @@ async def get_checkpointer():
 
 
 async def get_chat_graph(
-    provider: Literal["openai", "gemini"] = "openai",
+    provider: Literal["openai", "google"] = "openai",
     model: str | None = None,
 ):
     """Chat LangGraph 파이프라인 생성.
@@ -774,7 +774,7 @@ async def get_chat_graph(
 
 
 async def get_process_chat_command(
-    provider: Literal["openai", "gemini"] = "openai",
+    provider: Literal["openai", "google"] = "openai",
     model: str | None = None,
 ) -> ProcessChatCommand:
     """ProcessChatCommand 생성 (CQRS - Command).

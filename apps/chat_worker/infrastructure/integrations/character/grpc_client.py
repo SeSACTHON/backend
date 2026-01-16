@@ -121,6 +121,7 @@ class CharacterGrpcClient(CharacterClientPort):
                 type_label=response.character_type,
                 dialog=response.character_dialog,
                 match_label=response.match_label,
+                code=response.character_code or None,
             )
 
         except grpc.aio.AioRpcError as e:

@@ -21,6 +21,7 @@ class CharacterDTO:
     type_label: str
     dialog: str
     match_label: str | None
+    code: str | None = None  # 캐릭터 코드 (CDN 에셋 조회용)
 
 
 class CharacterClientPort(ABC):

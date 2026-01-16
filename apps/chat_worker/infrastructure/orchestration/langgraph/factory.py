@@ -116,6 +116,7 @@ if TYPE_CHECKING:
 
     from chat_worker.application.ports.bulk_waste_client import BulkWasteClientPort
     from chat_worker.application.ports.cache import CachePort
+    from chat_worker.application.ports.character_asset import CharacterAssetPort
     from chat_worker.application.ports.collection_point_client import (
         CollectionPointClientPort,
     )
@@ -180,6 +181,7 @@ def create_chat_graph(
     prompt_loader: "PromptLoaderPort",
     vision_model: "VisionModelPort | None" = None,
     character_client: "CharacterClientPort | None" = None,
+    character_asset_loader: "CharacterAssetPort | None" = None,  # 캐릭터 에셋 로더 (이미지 생성 참조용)
     location_client: "LocationClientPort | None" = None,
     kakao_client: "KakaoLocalClientPort | None" = None,  # 카카오 장소 검색 (HTTP)
     web_search_client: "WebSearchPort | None" = None,
@@ -213,6 +215,7 @@ def create_chat_graph(
         prompt_loader: 프롬프트 로더 (필수)
         vision_model: Vision 모델 클라이언트 (선택, 이미지 분류)
         character_client: Character gRPC 클라이언트 (선택)
+        character_asset_loader: 캐릭터 에셋 로더 (선택, 이미지 생성 참조용)
         location_client: Location gRPC 클라이언트 (선택, Eco² 내부 DB)
         kakao_client: 카카오 로컬 클라이언트 (선택, 일반 장소 검색)
         web_search_client: 웹 검색 클라이언트 (선택, DuckDuckGo/Tavily/Fallback)
@@ -332,8 +335,12 @@ def create_chat_graph(
             character_client=character_client,
             event_publisher=event_publisher,
             prompt_loader=prompt_loader,
+            character_asset_loader=character_asset_loader,
         )
-        logger.info("Character subagent node created (gRPC)")
+        logger.info(
+            "Character subagent node created (gRPC, asset_loader=%s)",
+            "enabled" if character_asset_loader else "disabled",
+        )
     else:
         # Fallback: passthrough
         async def character_node(state: dict[str, Any]) -> dict[str, Any]:

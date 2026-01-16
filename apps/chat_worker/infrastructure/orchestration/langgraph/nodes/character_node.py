@@ -27,6 +27,7 @@ from chat_worker.infrastructure.orchestration.langgraph.nodes.node_executor impo
 )
 
 if TYPE_CHECKING:
+    from chat_worker.application.ports.character_asset import CharacterAssetPort
     from chat_worker.application.ports.character_client import CharacterClientPort
     from chat_worker.application.ports.events import ProgressNotifierPort
     from chat_worker.application.ports.llm import LLMClientPort
@@ -40,6 +41,7 @@ def create_character_subagent_node(
     character_client: "CharacterClientPort",
     event_publisher: "ProgressNotifierPort",
     prompt_loader: "PromptLoaderPort",
+    character_asset_loader: "CharacterAssetPort | None" = None,
 ):
     """Character Subagent 노드 생성.
 
@@ -54,6 +56,7 @@ def create_character_subagent_node(
         character_client: Character gRPC 클라이언트
         event_publisher: 이벤트 발행자 (SSE 진행 상황)
         prompt_loader: 프롬프트 로더
+        character_asset_loader: 캐릭터 에셋 로더 (이미지 생성 참조용)
 
     Returns:
         LangGraph 노드 함수
@@ -63,6 +66,7 @@ def create_character_subagent_node(
         llm=llm,
         character_client=character_client,
         prompt_loader=prompt_loader,
+        character_asset_loader=character_asset_loader,
     )
 
     async def _character_subagent_inner(state: dict[str, Any]) -> dict[str, Any]:
