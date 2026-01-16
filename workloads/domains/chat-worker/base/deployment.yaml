@@ -58,7 +58,7 @@ spec:
             command:
             - /bin/sh
             - -c
-            - pgrep -f 'taskiq worker' || exit 1
+            - cat /proc/1/cmdline | grep -q taskiq || exit 1
           initialDelaySeconds: 30
           periodSeconds: 30
           timeoutSeconds: 10
@@ -67,7 +67,7 @@ spec:
             command:
             - /bin/sh
             - -c
-            - pgrep -f 'taskiq worker' || exit 1
+            - cat /proc/1/cmdline | grep -q taskiq || exit 1
           initialDelaySeconds: 10
           periodSeconds: 10
           timeoutSeconds: 5
