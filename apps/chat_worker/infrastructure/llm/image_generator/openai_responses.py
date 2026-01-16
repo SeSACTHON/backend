@@ -13,6 +13,10 @@ Responses API의 네이티브 image_generation tool을 사용한 이미지 생�
 3. 같은 OpenAI API 키로 Chat Completions와 혼용 가능
 4. 기존 LangGraph 파이프라인 구조 유지
 
+캐릭터 참조:
+- Responses API input에 이미지 URL 포함하여 스타일 참조 가능
+- Gemini만큼 강력하지 않지만 기본적인 스타일 가이드 제공
+
 비용 (gpt-image-1.5, 1024x1024 기준):
 - low: ~$0.02
 - medium: ~$0.07
@@ -22,6 +26,7 @@ Responses API의 네이티브 image_generation tool을 사용한 이미지 생�
 
 from __future__ import annotations
 
+import base64
 import logging
 import os
 
@@ -32,6 +37,7 @@ from chat_worker.application.ports.image_generator import (
     ImageGenerationError,
     ImageGenerationResult,
     ImageGeneratorPort,
+    ReferenceImage,
 )
 
 logger = logging.getLogger(__name__)
@@ -174,6 +180,113 @@ class OpenAIResponsesImageGenerator(ImageGeneratorPort):
                 cause=e,
             ) from e
 
+    @property
+    def supports_reference_images(self) -> bool:
+        """참조 이미지 지원 여부."""
+        return True
+
+    @property
+    def max_reference_images(self) -> int:
+        """지원되는 최대 참조 이미지 개수.
+
+        OpenAI Responses API는 입력에 이미지를 포함할 수 있지만,
+        Gemini처럼 네이티브 참조는 아님. 1개만 권장.
+        """
+        return 1
+
+    async def generate_with_reference(
+        self,
+        prompt: str,
+        reference_images: list[ReferenceImage],
+        size: str = "1024x1024",
+        quality: str = "medium",
+    ) -> ImageGenerationResult:
+        """참조 이미지를 기반으로 이미지 생성.
+
+        OpenAI Responses API는 입력에 이미지를 포함하여
+        모델이 스타일을 참고하도록 할 수 있습니다.
+
+        Args:
+            prompt: 생성할 이미지 설명
+            reference_images: 참조 이미지 목록 (첫 번째만 사용)
+            size: 이미지 크기
+            quality: 품질
+
+        Returns:
+            ImageGenerationResult: 생성 결과
+        """
+        size = size or self._default_size
+        quality = quality or self._default_quality
+
+        # 첫 번째 참조 이미지만 사용
+        reference = reference_images[0] if reference_images else None
+
+        logger.info(
+            "Generating image with reference (model=%s, size=%s, has_ref=%s)",
+            self._model,
+            size,
+            reference is not None,
+        )
+
+        try:
+            # 참조 이미지가 있으면 멀티모달 입력 구성
+            if reference:
+                input_content = self._build_multimodal_input(prompt, reference)
+            else:
+                input_content = self._build_input_prompt(prompt)
+
+            response = await self._client.responses.create(
+                model=self._model,
+                input=input_content,
+                tools=[
+                    {
+                        "type": "image_generation",
+                        "image_generation": {
+                            "size": size,
+                            "quality": quality,
+                        },
+                    }
+                ],
+            )
+
+            # 응답 파싱
+            image_url = None
+            description = None
+            revised_prompt = None
+
+            for item in response.output:
+                if item.type == "image_generation_call":
+                    image_url = item.result
+                    revised_prompt = getattr(item, "revised_prompt", None)
+                elif item.type == "message":
+                    if item.content and len(item.content) > 0:
+                        description = item.content[0].text
+
+            if not image_url:
+                raise ImageGenerationError("No image generated in response")
+
+            logger.info(
+                "Image generated with reference (url=%s...)",
+                image_url[:50] if image_url else "None",
+            )
+
+            return ImageGenerationResult(
+                image_url=image_url,
+                description=description,
+                revised_prompt=revised_prompt,
+                provider="openai",
+                model=self._model,
+            )
+
+        except ImageGenerationError:
+            raise
+        except Exception as e:
+            logger.error("Image generation with reference failed: %s", e)
+            raise ImageGenerationError(
+                f"Failed to generate image: {e}",
+                cause=e,
+            ) from e
+
     def _build_input_prompt(self, user_prompt: str) -> str:
         """Responses API 입력 프롬프트 구성.
 
@@ -189,3 +302,41 @@ class OpenAIResponsesImageGenerator(ImageGeneratorPort):
 
 이미지 생성 후, 생성된 이미지에 대한 간단한 설명도 함께 제공해주세요.
 설명은 한국어로 작성해주세요."""
+
+    def _build_multimodal_input(
+        self,
+        user_prompt: str,
+        reference: ReferenceImage,
+    ) -> list[dict]:
+        """참조 이미지를 포함한 멀티모달 입력 구성.
+
+        Args:
+            user_prompt: 사용자 프롬프트
+            reference: 참조 이미지
+
+        Returns:
+            멀티모달 입력 (텍스트 + 이미지)
+        """
+        # Base64 인코딩
+        image_b64 = base64.b64encode(reference.image_bytes).decode("utf-8")
+        data_url = f"data:{reference.mime_type};base64,{image_b64}"
+
+        return [
+            {
+                "type": "input_text",
+                "text": f"""다음 캐릭터 이미지의 스타일을 참고하여 새로운 이미지를 생성해주세요.
+
+캐릭터 스타일:
+- 이 캐릭터의 색상, 형태, 분위기를 유지해주세요
+- 친근하고 귀여운 느낌을 살려주세요
+
+요청: {user_prompt}
+
+이미지 생성 후, 생성된 이미지에 대한 간단한 설명도 함께 제공해주세요.
+설명은 한국어로 작성해주세요.""",
+            },
+            {
+                "type": "input_image",
+                "image_url": data_url,
+            },
+        ]

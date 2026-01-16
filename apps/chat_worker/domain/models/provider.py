@@ -94,7 +94,7 @@ MODEL_REGISTRY: dict[str, ModelConfig] = {
             supports_tools=True,
             supports_vision=True,
             supports_image_generation=True,
-            max_reference_images=0,  # OpenAI는 reference 미지원
+            max_reference_images=1,  # OpenAI: 멀티모달 입력으로 1개 지원
             supports_audio=True,
         ),
         context_window=400000,
