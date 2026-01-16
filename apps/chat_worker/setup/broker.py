@@ -10,7 +10,8 @@ declare_exchange=False로 설정하여 기존 리소스를 재사용합니다.
 
 분산 트레이싱 통합:
 - aio-pika Instrumentation으로 MQ 메시지 추적
-- Jaeger/Kiali에서 API → MQ → Worker 흐름 추적 가능
+- OpenAI Instrumentation으로 LLM API 호출 추적
+- Jaeger/Kiali에서 API → MQ → Worker → LLM 흐름 추적 가능
 """
 
 from __future__ import annotations
@@ -89,12 +90,74 @@ def _setup_aio_pika_tracing() -> None:
         logger.error(f"Failed to setup aio-pika tracing: {e}")
 
 
+def _setup_openai_tracing() -> None:
+    """OpenAI LLM API 분산 추적 설정.
+
+    OpenAI API 호출을 Jaeger에서 추적할 수 있도록 합니다.
+    - Chat Completions (streaming 포함)
+    - Embeddings
+    - 토큰 사용량 메트릭
+
+    환경변수:
+    - OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=true: 프롬프트/응답 내용 캡처
+    """
+    if not OTEL_ENABLED:
+        logger.info("OpenAI tracing disabled (OTEL_ENABLED=false)")
+        return
+
+    try:
+        from opentelemetry.instrumentation.openai_v2 import OpenAIInstrumentor
+
+        OpenAIInstrumentor().instrument()
+        logger.info("OpenAI instrumentation enabled (LLM API calls will be traced)")
+
+    except ImportError:
+        logger.warning(
+            "OpenAI instrumentation not available. "
+            "Install: pip install opentelemetry-instrumentation-openai-v2"
+        )
+    except Exception as e:
+        logger.error(f"Failed to setup OpenAI tracing: {e}")
+
+
+def _setup_gemini_tracing() -> None:
+    """Gemini (Google Generative AI) 분산 추적 설정.
+
+    Gemini API 호출을 Jaeger에서 추적할 수 있도록 합니다.
+    - generateContent (streaming 포함)
+    - 토큰 사용량 메트릭
+    """
+    if not OTEL_ENABLED:
+        logger.info("Gemini tracing disabled (OTEL_ENABLED=false)")
+        return
+
+    try:
+        from opentelemetry.instrumentation.google_generativeai import (
+            GoogleGenerativeAiInstrumentor,
+        )
+
+        GoogleGenerativeAiInstrumentor().instrument()
+        logger.info("Gemini instrumentation enabled (LLM API calls will be traced)")
+
+    except ImportError:
+        logger.warning(
+            "Gemini instrumentation not available. "
+            "Install: pip install opentelemetry-instrumentation-google-generativeai"
+        )
+    except Exception as e:
+        logger.error(f"Failed to setup Gemini tracing: {e}")
+
+
 async def startup():
     """브로커 시작."""
-    # 1. OpenTelemetry aio-pika 트레이싱 설정
+    # 1. OpenTelemetry aio-pika 트레이싱 설정 (MQ 메시지)
     _setup_aio_pika_tracing()
 
-    # 2. 브로커 시작
+    # 2. OpenTelemetry LLM 트레이싱 설정 (LLM API 호출)
+    _setup_openai_tracing()
+    _setup_gemini_tracing()
+
+    # 3. 브로커 시작
     await broker.startup()
     logger.info("Taskiq broker started")
 
