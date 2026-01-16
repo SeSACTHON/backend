@@ -97,14 +97,6 @@ NODE_TO_PHASE: dict[str, str] = {
     "answer": "answer",
 }
 
-# 노드명 → Stage 매핑 (이벤트 발행용)
-# LangGraph 노드명과 STAGE_ORDER 키가 다른 경우 매핑
-NODE_TO_STAGE: dict[str, str] = {
-    "waste_rag": "rag",  # waste_rag 노드 → rag stage
-    "aggregator": "aggregate",  # aggregator 노드 → aggregate stage
-    # 나머지는 노드명 = stage명
-}
-
 # 노드별 UI 메시지 (i18n: 추후 YAML 파일로 외부화 가능)
 NODE_MESSAGES: dict[str, dict[str, str]] = {
     "intent": {
@@ -191,16 +183,15 @@ def get_node_message(node: str, status: str) -> str:
 def get_stage_for_node(node: str) -> str:
     """노드명에서 Stage명 반환 (이벤트 발행용).
 
-    LangGraph 노드명과 STAGE_ORDER 키가 다른 경우 매핑.
-    예: waste_rag → rag, aggregator → aggregate
+    노드명 = Stage명 (1:1 매핑).
 
     Args:
         node: LangGraph 노드명
 
     Returns:
-        이벤트 stage명
+        이벤트 stage명 (노드명과 동일)
     """
-    return NODE_TO_STAGE.get(node, node)
+    return node
 
 
 @dataclass
@@ -363,7 +354,6 @@ __all__ = [
     "PHASE_PROGRESS",
     "SUBAGENT_NODES",
     "NODE_TO_PHASE",
-    "NODE_TO_STAGE",
     "NODE_MESSAGES",
     "get_node_message",
     "get_stage_for_node",

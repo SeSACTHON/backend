@@ -222,31 +222,34 @@ class TestDynamicProgressTracker:
 
 
 class TestGetStageForNode:
-    """get_stage_for_node 함수 테스트."""
+    """get_stage_for_node 함수 테스트.
 
-    def test_waste_rag_maps_to_rag(self):
-        """waste_rag 노드는 rag stage로 매핑."""
-        assert get_stage_for_node("waste_rag") == "rag"
+    노드명 = Stage명 (1:1 매핑).
+    """
 
-    def test_aggregator_maps_to_aggregate(self):
-        """aggregator 노드는 aggregate stage로 매핑."""
-        assert get_stage_for_node("aggregator") == "aggregate"
+    def test_waste_rag_same_as_stage(self):
+        """waste_rag 노드는 그대로 waste_rag stage."""
+        assert get_stage_for_node("waste_rag") == "waste_rag"
 
-    def test_weather_stays_same(self):
+    def test_aggregator_same_as_stage(self):
+        """aggregator 노드는 그대로 aggregator stage."""
+        assert get_stage_for_node("aggregator") == "aggregator"
+
+    def test_weather_same_as_stage(self):
         """weather 노드는 그대로 weather stage."""
         assert get_stage_for_node("weather") == "weather"
 
-    def test_location_stays_same(self):
+    def test_location_same_as_stage(self):
         """location 노드는 그대로 location stage."""
         assert get_stage_for_node("location") == "location"
 
-    def test_character_stays_same(self):
+    def test_character_same_as_stage(self):
         """character 노드는 그대로 character stage."""
         assert get_stage_for_node("character") == "character"
 
-    def test_unknown_node_returns_itself(self):
-        """알 수 없는 노드는 그대로 반환."""
-        assert get_stage_for_node("unknown_node") == "unknown_node"
+    def test_any_node_returns_itself(self):
+        """모든 노드는 그대로 반환."""
+        assert get_stage_for_node("any_node") == "any_node"
 
 
 class TestGetNodeMessage:
