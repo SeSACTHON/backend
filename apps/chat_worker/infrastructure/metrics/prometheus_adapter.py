@@ -3,7 +3,7 @@
 Infrastructure Layer에서 MetricsPort를 Prometheus로 구현합니다.
 Application Layer는 Prometheus를 직접 알지 않고 MetricsPort만 사용.
 
-기존 prometheus.py의 메트릭을 활용하며,
+metrics.py의 Prometheus 메트릭을 활용하며,
 MetricsPort 인터페이스를 통해 Application Layer에서 사용 가능하게 합니다.
 """
 
@@ -12,7 +12,7 @@ from __future__ import annotations
 import logging
 
 from chat_worker.application.ports.metrics import MetricsPort
-from chat_worker.infrastructure.metrics.prometheus import (
+from chat_worker.infrastructure.metrics.metrics import (
     CHAT_REQUESTS_TOTAL,
     CHAT_REQUEST_DURATION,
     CHAT_ERRORS_TOTAL,

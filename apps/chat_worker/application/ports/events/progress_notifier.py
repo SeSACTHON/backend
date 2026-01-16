@@ -90,3 +90,47 @@ class ProgressNotifierPort(ABC):
             이벤트 ID
         """
         pass
+
+    @abstractmethod
+    async def notify_token_v2(
+        self,
+        task_id: str,
+        content: str,
+        node: str | None = None,
+    ) -> str:
+        """토큰 스트리밍 이벤트 발행 (복구 가능).
+
+        LangGraph 네이티브 스트리밍과 통합.
+        Token Stream + Token State 저장으로 재연결 시 복구 지원.
+
+        Args:
+            task_id: 작업 ID
+            content: 토큰 내용
+            node: 토큰 발생 노드명 (answer, summarize 등)
+
+        Returns:
+            이벤트 ID
+        """
+        pass
+
+    @abstractmethod
+    async def finalize_token_stream(self, task_id: str) -> None:
+        """토큰 스트림 완료 처리.
+
+        토큰 스트리밍 완료 시 최종 State 저장 및 메모리 정리.
+
+        Args:
+            task_id: 작업 ID
+        """
+        pass
+
+    @abstractmethod
+    def clear_token_counter(self, task_id: str) -> None:
+        """토큰 카운터 정리.
+
+        작업 완료 시 메모리 정리.
+
+        Args:
+            task_id: 작업 ID
+        """
+        pass

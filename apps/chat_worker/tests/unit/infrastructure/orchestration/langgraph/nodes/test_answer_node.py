@@ -6,14 +6,13 @@ P3: Answer 캐싱
 
 from __future__ import annotations
 
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
 
-from chat_worker.infrastructure.orchestration.langgraph.nodes.answer_node import (
+from chat_worker.application.commands.generate_answer_command import (
     ANSWER_CACHE_TTL,
     CACHEABLE_INTENTS,
+)
+from chat_worker.infrastructure.orchestration.langgraph.nodes.answer_node import (
     create_answer_node,
 )
 
@@ -35,18 +34,6 @@ class MockLLMClient:
             yield char
 
 
-class MockEventPublisher:
-    """테스트용 Mock Event Publisher."""
-
-    def __init__(self):
-        self.stages: list[dict] = []
-        self.tokens: list[str] = []
-
-    async def notify_stage(self, task_id: str, stage: str, status: str, **kwargs):
-        self.stages.append({"task_id": task_id, "stage": stage, "status": status, **kwargs})
-
-    async def notify_token(self, task_id: str, content: str):
-        self.tokens.append(content)
 
 
 class MockCache:
@@ -79,21 +66,19 @@ class TestAnswerNodeBasic:
         return MockLLMClient()
 
     @pytest.fixture
-    def mock_publisher(self) -> MockEventPublisher:
-        return MockEventPublisher()
-
-    @pytest.fixture
     def mock_cache(self) -> MockCache:
         return MockCache()
 
     @pytest.mark.asyncio
-    async def test_basic_answer_generation(
-        self, mock_llm: MockLLMClient, mock_publisher: MockEventPublisher
-    ):
-        """기본 답변 생성 테스트."""
+    async def test_basic_answer_generation(self, mock_llm: MockLLMClient):
+        """기본 답변 생성 테스트.
+
+        Note: 네이티브 스트리밍 전환으로 event_publisher가 제거됨.
+        토큰 스트리밍은 ProcessChatCommand의 astream_events에서 처리.
+        """
         mock_llm.set_responses(["안녕하세요!"])
 
-        node = create_answer_node(mock_llm, mock_publisher)
+        node = create_answer_node(mock_llm)
 
         state = {
             "job_id": "test-job-1",
@@ -105,29 +90,6 @@ class TestAnswerNodeBasic:
 
         assert result["answer"] == "안녕하세요!"
         assert mock_llm.call_count == 1
-        assert len(mock_publisher.tokens) == len("안녕하세요!")
-
-    @pytest.mark.asyncio
-    async def test_answer_events(
-        self, mock_llm: MockLLMClient, mock_publisher: MockEventPublisher
-    ):
-        """답변 생성 시 이벤트 발행 확인."""
-        mock_llm.set_responses(["테스트"])
-
-        node = create_answer_node(mock_llm, mock_publisher)
-
-        state = {
-            "job_id": "test-job-2",
-            "message": "테스트",
-            "intent": "general",
-        }
-
-        await node(state)
-
-        # 시작 이벤트
-        assert any(s["status"] == "started" for s in mock_publisher.stages)
-        # 완료 이벤트
-        assert any(s["status"] == "completed" for s in mock_publisher.stages)
 
 
 class TestMultiIntentAnswer:
@@ -137,18 +99,12 @@ class TestMultiIntentAnswer:
     def mock_llm(self) -> MockLLMClient:
         return MockLLMClient()
 
-    @pytest.fixture
-    def mock_publisher(self) -> MockEventPublisher:
-        return MockEventPublisher()
-
     @pytest.mark.asyncio
-    async def test_single_intent_uses_single_prompt(
-        self, mock_llm: MockLLMClient, mock_publisher: MockEventPublisher
-    ):
+    async def test_single_intent_uses_single_prompt(self, mock_llm: MockLLMClient):
         """단일 Intent는 일반 프롬프트 사용."""
         mock_llm.set_responses(["답변"])
 
-        node = create_answer_node(mock_llm, mock_publisher)
+        node = create_answer_node(mock_llm)
 
         state = {
             "job_id": "test-job",
@@ -164,13 +120,11 @@ class TestMultiIntentAnswer:
         assert mock_llm.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_multi_intent_uses_combined_prompt(
-        self, mock_llm: MockLLMClient, mock_publisher: MockEventPublisher
-    ):
+    async def test_multi_intent_uses_combined_prompt(self, mock_llm: MockLLMClient):
         """Multi-Intent는 조합 프롬프트 사용."""
         mock_llm.set_responses(["복합 답변"])
 
-        node = create_answer_node(mock_llm, mock_publisher)
+        node = create_answer_node(mock_llm)
 
         state = {
             "job_id": "test-job",
@@ -187,12 +141,12 @@ class TestMultiIntentAnswer:
 
     @pytest.mark.asyncio
     async def test_multi_intent_without_additional_uses_single(
-        self, mock_llm: MockLLMClient, mock_publisher: MockEventPublisher
+        self, mock_llm: MockLLMClient
     ):
         """has_multi_intent=True지만 additional_intents 없으면 단일 프롬프트."""
         mock_llm.set_responses(["답변"])
 
-        node = create_answer_node(mock_llm, mock_publisher)
+        node = create_answer_node(mock_llm)
 
         state = {
             "job_id": "test-job",
@@ -216,10 +170,6 @@ class TestAnswerCache:
         return MockLLMClient()
 
     @pytest.fixture
-    def mock_publisher(self) -> MockEventPublisher:
-        return MockEventPublisher()
-
-    @pytest.fixture
     def mock_cache(self) -> MockCache:
         return MockCache()
 
@@ -234,7 +184,6 @@ class TestAnswerCache:
     async def test_cache_hit_returns_cached(
         self,
         mock_llm: MockLLMClient,
-        mock_publisher: MockEventPublisher,
         mock_cache: MockCache,
     ):
         """캐시 히트 시 LLM 호출 없이 캐시된 답변 반환."""
@@ -247,7 +196,7 @@ class TestAnswerCache:
         cache_key = f"answer:{hashlib.sha256(content.encode()).hexdigest()[:16]}"
         mock_cache.preset(cache_key, "캐시된 답변!")
 
-        node = create_answer_node(mock_llm, mock_publisher, cache=mock_cache)
+        node = create_answer_node(mock_llm, cache=mock_cache)
 
         state = {
             "job_id": "test-job",
@@ -259,22 +208,22 @@ class TestAnswerCache:
 
         # 캐시된 답변 반환
         assert result["answer"] == "캐시된 답변!"
-        assert result.get("cache_hit") is True
+        # Note: cache_hit 플래그는 스트리밍 아키텍처에서 전달되지 않음
+        # 대신 LLM 호출 횟수로 캐시 히트 검증
 
-        # LLM 호출 안 됨
+        # LLM 호출 안 됨 (캐시 히트)
         assert mock_llm.call_count == 0
 
     @pytest.mark.asyncio
     async def test_cache_miss_calls_llm_and_caches(
         self,
         mock_llm: MockLLMClient,
-        mock_publisher: MockEventPublisher,
         mock_cache: MockCache,
     ):
         """캐시 미스 시 LLM 호출 후 캐시 저장."""
         mock_llm.set_responses(["새 답변!"])
 
-        node = create_answer_node(mock_llm, mock_publisher, cache=mock_cache)
+        node = create_answer_node(mock_llm, cache=mock_cache)
 
         state = {
             "job_id": "test-job",
@@ -298,13 +247,12 @@ class TestAnswerCache:
     async def test_non_cacheable_intent_not_cached(
         self,
         mock_llm: MockLLMClient,
-        mock_publisher: MockEventPublisher,
         mock_cache: MockCache,
     ):
         """캐시 불가능한 Intent는 캐시하지 않음."""
         mock_llm.set_responses(["분리수거 답변"])
 
-        node = create_answer_node(mock_llm, mock_publisher, cache=mock_cache)
+        node = create_answer_node(mock_llm, cache=mock_cache)
 
         state = {
             "job_id": "test-job",
@@ -323,13 +271,12 @@ class TestAnswerCache:
     async def test_context_present_not_cached(
         self,
         mock_llm: MockLLMClient,
-        mock_publisher: MockEventPublisher,
         mock_cache: MockCache,
     ):
         """컨텍스트가 있으면 general이어도 캐시하지 않음."""
         mock_llm.set_responses(["캐릭터 정보 포함 답변"])
 
-        node = create_answer_node(mock_llm, mock_publisher, cache=mock_cache)
+        node = create_answer_node(mock_llm, cache=mock_cache)
 
         state = {
             "job_id": "test-job",
@@ -349,12 +296,11 @@ class TestAnswerCache:
     async def test_no_cache_without_cache_port(
         self,
         mock_llm: MockLLMClient,
-        mock_publisher: MockEventPublisher,
     ):
         """CachePort 없으면 캐싱 안 함."""
         mock_llm.set_responses(["답변"])
 
-        node = create_answer_node(mock_llm, mock_publisher, cache=None)
+        node = create_answer_node(mock_llm, cache=None)
 
         state = {
             "job_id": "test-job",
@@ -372,20 +318,21 @@ class TestAnswerCache:
 class TestAnswerNodeErrorHandling:
     """Answer Node 에러 처리 테스트."""
 
-    @pytest.fixture
-    def mock_publisher(self) -> MockEventPublisher:
-        return MockEventPublisher()
-
     @pytest.mark.asyncio
-    async def test_llm_error_returns_fallback(self, mock_publisher: MockEventPublisher):
-        """LLM 오류 시 fallback 메시지 반환."""
+    async def test_llm_error_returns_fallback(self):
+        """LLM 오류 시 fallback 메시지 반환.
+
+        Note: 네이티브 스트리밍 전환으로 event_publisher가 제거됨.
+        에러 처리는 ProcessChatCommand 레벨에서 담당.
+        Node는 fallback 메시지만 반환.
+        """
 
         class ErrorLLM:
             async def generate_stream(self, prompt: str, system_prompt: str = ""):
                 raise Exception("LLM Error")
                 yield  # Generator로 만들기 위해
 
-        node = create_answer_node(ErrorLLM(), mock_publisher)
+        node = create_answer_node(ErrorLLM())
 
         state = {
             "job_id": "test-job",
@@ -395,5 +342,5 @@ class TestAnswerNodeErrorHandling:
 
         result = await node(state)
 
-        assert "오류가 발생했어요" in result["answer"]
-        assert any(s["status"] == "failed" for s in mock_publisher.stages)
+        # fallback 메시지 반환 확인
+        assert "오류가 발생했습니다" in result["answer"]

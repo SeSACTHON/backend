@@ -6,17 +6,16 @@ Application/Node에서 테스트 가능하도록 합니다.
 Clean Architecture:
 - Port: 이 파일 (추상화)
 - Adapter: infrastructure/resilience/circuit_breaker.py (구현체)
+
+Note:
+    get_from_policy()는 Infrastructure 레이어에서 NodePolicy를 사용하여
+    CircuitBreaker를 조회하는 편의 메서드로, Port에서는 정의하지 않습니다.
+    (Application → Infrastructure 의존 방지)
 """
 
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from chat_worker.infrastructure.orchestration.langgraph.policies.node_policy import (
-        NodePolicy,
-    )
 
 
 class CircuitBreakerPort(ABC):
@@ -72,18 +71,6 @@ class CircuitBreakerRegistryPort(ABC):
         Args:
             name: Circuit Breaker 이름
             threshold: 실패 임계값
-
-        Returns:
-            CircuitBreaker 인스턴스
-        """
-        ...
-
-    @abstractmethod
-    def get_from_policy(self, policy: "NodePolicy") -> CircuitBreakerPort:
-        """NodePolicy에서 CircuitBreaker 조회/생성.
-
-        Args:
-            policy: 노드 정책
 
         Returns:
             CircuitBreaker 인스턴스

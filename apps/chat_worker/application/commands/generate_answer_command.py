@@ -91,6 +91,7 @@ class GenerateAnswerCommand:
         llm: "LLMClientPort",
         prompt_builder: "PromptBuilderPort",
         cache: "CachePort | None" = None,
+        service: AnswerGeneratorService | None = None,
     ) -> None:
         """Command 초기화.
 
@@ -98,11 +99,12 @@ class GenerateAnswerCommand:
             llm: LLM 클라이언트
             prompt_builder: 프롬프트 빌더 Port
             cache: 캐시 Port (선택)
+            service: 답변 생성 서비스 (선택, 테스트 주입용)
         """
         self._llm = llm
         self._prompt_builder = prompt_builder
         self._cache = cache
-        self._service = AnswerGeneratorService()
+        self._service = service or AnswerGeneratorService()
 
     def _generate_cache_key(self, message: str, intent: str) -> str:
         """Answer 캐시 키 생성."""

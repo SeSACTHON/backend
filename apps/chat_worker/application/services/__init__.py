@@ -81,6 +81,13 @@ from chat_worker.application.services.recyclable_price_service import (
     RecyclablePriceService,
 )
 
+# Progress Tracker (동적 라우팅용)
+from chat_worker.application.services.progress_tracker import (
+    DynamicProgressTracker,
+    PHASE_PROGRESS,
+    SUBAGENT_NODES,
+)
+
 __all__ = [
     # Intent (순수 로직)
     "IntentClassifierService",
@@ -111,4 +118,8 @@ __all__ = [
     "BulkWasteService",
     # RecyclablePrice
     "RecyclablePriceService",
+    # Progress Tracker
+    "DynamicProgressTracker",
+    "PHASE_PROGRESS",
+    "SUBAGENT_NODES",
 ]

@@ -1,6 +1,7 @@
-"""Prometheus Metrics for Chat Worker."""
+"""Chat Worker Metrics - Prometheus 메트릭 및 어댑터."""
 
-from chat_worker.infrastructure.metrics.prometheus import (
+from chat_worker.infrastructure.metrics.metrics import (
+    # Request metrics
     CHAT_REQUESTS_TOTAL,
     CHAT_REQUEST_DURATION,
     CHAT_ERRORS_TOTAL,
@@ -9,12 +10,26 @@ from chat_worker.infrastructure.metrics.prometheus import (
     CHAT_VISION_REQUESTS,
     CHAT_SUBAGENT_CALLS,
     CHAT_TOKEN_USAGE,
+    # Token streaming metrics (Load Test용)
+    CHAT_STREAM_TOKENS_TOTAL,
+    CHAT_STREAM_REQUESTS_TOTAL,
+    CHAT_STREAM_TOKEN_LATENCY,
+    CHAT_STREAM_TOKEN_INTERVAL,
+    CHAT_STREAM_DURATION,
+    CHAT_STREAM_TOKEN_COUNT,
+    CHAT_STREAM_RECOVERY_TOTAL,
+    CHAT_STREAM_ACTIVE,
+    # Helper functions
     track_request,
     track_intent,
     track_vision,
     track_subagent,
     track_tokens,
     track_error,
+    track_stream_token,
+    track_stream_recovery,
+    # Classes
+    StreamMetricsTracker,
 )
 from chat_worker.infrastructure.metrics.prometheus_adapter import (
     PrometheusMetricsAdapter,
@@ -22,7 +37,7 @@ from chat_worker.infrastructure.metrics.prometheus_adapter import (
 )
 
 __all__ = [
-    # Raw Prometheus metrics (legacy)
+    # Request metrics
     "CHAT_REQUESTS_TOTAL",
     "CHAT_REQUEST_DURATION",
     "CHAT_ERRORS_TOTAL",
@@ -31,14 +46,27 @@ __all__ = [
     "CHAT_VISION_REQUESTS",
     "CHAT_SUBAGENT_CALLS",
     "CHAT_TOKEN_USAGE",
-    # Legacy helper functions
+    # Token streaming metrics (Load Test용)
+    "CHAT_STREAM_TOKENS_TOTAL",
+    "CHAT_STREAM_REQUESTS_TOTAL",
+    "CHAT_STREAM_TOKEN_LATENCY",
+    "CHAT_STREAM_TOKEN_INTERVAL",
+    "CHAT_STREAM_DURATION",
+    "CHAT_STREAM_TOKEN_COUNT",
+    "CHAT_STREAM_RECOVERY_TOTAL",
+    "CHAT_STREAM_ACTIVE",
+    # Helper functions
     "track_request",
     "track_intent",
     "track_vision",
     "track_subagent",
     "track_tokens",
     "track_error",
-    # Clean Architecture adapters (recommended)
+    "track_stream_token",
+    "track_stream_recovery",
+    # Classes
+    "StreamMetricsTracker",
+    # Clean Architecture adapters
     "PrometheusMetricsAdapter",
     "NoOpMetricsAdapter",
 ]

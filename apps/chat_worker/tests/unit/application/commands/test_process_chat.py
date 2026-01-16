@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -26,12 +27,58 @@ class MockPipeline:
         }
         self.ainvoke = AsyncMock(return_value=self._result)
 
+    async def astream_events(
+        self,
+        state: dict[str, Any],
+        config: dict[str, Any] | None = None,
+        version: str = "v2",
+        **kwargs: Any,
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Mock astream_events for native streaming."""
+        # Simulate intent node start/end
+        yield {
+            "event": "on_chain_start",
+            "metadata": {"langgraph_node": "intent"},
+        }
+        yield {
+            "event": "on_chain_end",
+            "metadata": {"langgraph_node": "intent"},
+            "data": {"output": {"intent": self._result.get("intent", "unknown")}},
+        }
+
+        # Simulate answer node with LLM streaming
+        yield {
+            "event": "on_chain_start",
+            "metadata": {"langgraph_node": "answer"},
+        }
+        # Simulate on_llm_stream tokens
+        answer = self._result.get("answer", "")
+        for char in answer[:5]:  # Simulate first 5 chars as tokens
+            yield {
+                "event": "on_llm_stream",
+                "metadata": {"langgraph_node": "answer"},
+                "data": {"chunk": MockChunk(char)},
+            }
+        yield {
+            "event": "on_chain_end",
+            "metadata": {"langgraph_node": "answer"},
+            "data": {"output": {"answer": answer}},
+        }
+
+
+class MockChunk:
+    """Mock AIMessageChunk for token streaming."""
+
+    def __init__(self, content: str):
+        self.content = content
+
 
 class MockProgressNotifier:
     """Mock ProgressNotifier."""
 
     def __init__(self):
         self.events: list[dict] = []
+        self.tokens: list[dict] = []
 
     async def notify_stage(
         self,
@@ -56,6 +103,18 @@ class MockProgressNotifier:
 
     async def notify_token(self, task_id: str, content: str) -> str:
         return "event-id"
+
+    async def notify_token_v2(
+        self, task_id: str, content: str, node: str | None = None
+    ) -> str:
+        self.tokens.append({"task_id": task_id, "content": content, "node": node})
+        return "event-id"
+
+    async def finalize_token_stream(self, task_id: str) -> None:
+        pass
+
+    def clear_token_counter(self, task_id: str) -> None:
+        pass
 
     async def notify_needs_input(
         self,
@@ -86,10 +145,24 @@ class TestProcessChatCommand:
         mock_pipeline: MockPipeline,
         mock_notifier: MockProgressNotifier,
     ) -> ProcessChatCommand:
-        """테스트용 Command."""
+        """테스트용 Command (레거시 ainvoke 모드)."""
         return ProcessChatCommand(
             pipeline=mock_pipeline,
             progress_notifier=mock_notifier,
+            enable_native_streaming=False,  # 기존 테스트는 ainvoke 모드
+        )
+
+    @pytest.fixture
+    def streaming_command(
+        self,
+        mock_pipeline: MockPipeline,
+        mock_notifier: MockProgressNotifier,
+    ) -> ProcessChatCommand:
+        """테스트용 Command (네이티브 스트리밍 모드)."""
+        return ProcessChatCommand(
+            pipeline=mock_pipeline,
+            progress_notifier=mock_notifier,
+            enable_native_streaming=True,
         )
 
     @pytest.fixture
@@ -106,7 +179,7 @@ class TestProcessChatCommand:
     # Basic Execution Tests
     # ==========================================================
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_execute_success(
         self,
         command: ProcessChatCommand,
@@ -121,7 +194,7 @@ class TestProcessChatCommand:
         assert result.status == "completed"
         mock_pipeline.ainvoke.assert_called_once()
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_execute_passes_initial_state(
         self,
         command: ProcessChatCommand,
@@ -144,7 +217,7 @@ class TestProcessChatCommand:
         assert call_args["message"] == "테스트 메시지"
         assert call_args["user_location"]["latitude"] == 37.5
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_execute_uses_thread_id_for_checkpointing(
         self,
         command: ProcessChatCommand,
@@ -162,7 +235,7 @@ class TestProcessChatCommand:
     # Event Publishing Tests
     # ==========================================================
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_execute_publishes_started_event(
         self,
         command: ProcessChatCommand,
@@ -175,7 +248,7 @@ class TestProcessChatCommand:
         started_events = [e for e in mock_notifier.events if e["status"] == "started"]
         assert len(started_events) >= 1
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_execute_publishes_completed_event(
         self,
         command: ProcessChatCommand,
@@ -188,7 +261,7 @@ class TestProcessChatCommand:
         completed_events = [e for e in mock_notifier.events if e["status"] == "completed"]
         assert len(completed_events) >= 1
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_execute_publishes_failed_event_on_error(
         self,
         mock_notifier: MockProgressNotifier,
@@ -199,6 +272,7 @@ class TestProcessChatCommand:
         command = ProcessChatCommand(
             pipeline=mock_pipeline,
             progress_notifier=mock_notifier,
+            enable_native_streaming=False,  # ainvoke 모드로 테스트
         )
 
         request = ProcessChatRequest(
@@ -219,7 +293,7 @@ class TestProcessChatCommand:
     # Result Handling Tests
     # ==========================================================
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_execute_returns_result(
         self,
         mock_notifier: MockProgressNotifier,
@@ -235,6 +309,7 @@ class TestProcessChatCommand:
         command = ProcessChatCommand(
             pipeline=mock_pipeline,
             progress_notifier=mock_notifier,
+            enable_native_streaming=False,  # ainvoke 모드로 테스트
         )
 
         request = ProcessChatRequest(
@@ -253,7 +328,7 @@ class TestProcessChatCommand:
     # Input Handling Tests
     # ==========================================================
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_execute_without_location(
         self,
         command: ProcessChatCommand,
@@ -272,7 +347,7 @@ class TestProcessChatCommand:
         call_args = mock_pipeline.ainvoke.call_args[0][0]
         assert call_args.get("user_location") is None
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_execute_with_location(
         self,
         command: ProcessChatCommand,
@@ -292,7 +367,7 @@ class TestProcessChatCommand:
         call_args = mock_pipeline.ainvoke.call_args[0][0]
         assert call_args["user_location"]["latitude"] == 37.5665
 
-    @pytest.mark.asyncio
+    @pytest.mark.anyio
     async def test_execute_with_image(
         self,
         command: ProcessChatCommand,
@@ -311,3 +386,78 @@ class TestProcessChatCommand:
 
         call_args = mock_pipeline.ainvoke.call_args[0][0]
         assert call_args["image_url"] == "https://example.com/image.jpg"
+
+    # ==========================================================
+    # Native Streaming Tests
+    # ==========================================================
+
+    @pytest.mark.anyio
+    async def test_streaming_execute_success(
+        self,
+        streaming_command: ProcessChatCommand,
+        sample_request: ProcessChatRequest,
+    ):
+        """네이티브 스트리밍 성공 실행."""
+        result = await streaming_command.execute(sample_request)
+
+        assert result is not None
+        assert isinstance(result, ProcessChatResponse)
+        assert result.status == "completed"
+        assert result.answer == "페트병은 라벨을 제거해주세요."
+
+    @pytest.mark.anyio
+    async def test_streaming_collects_intent_from_events(
+        self,
+        streaming_command: ProcessChatCommand,
+        sample_request: ProcessChatRequest,
+    ):
+        """스트리밍에서 intent 수집."""
+        result = await streaming_command.execute(sample_request)
+
+        assert result.intent == "waste"
+
+    @pytest.mark.anyio
+    async def test_streaming_notifies_tokens(
+        self,
+        streaming_command: ProcessChatCommand,
+        mock_notifier: MockProgressNotifier,
+        sample_request: ProcessChatRequest,
+    ):
+        """스트리밍에서 토큰 알림."""
+        await streaming_command.execute(sample_request)
+
+        # Mock은 첫 5자를 토큰으로 전송
+        assert len(mock_notifier.tokens) == 5
+        assert all(t["node"] == "answer" for t in mock_notifier.tokens)
+
+    @pytest.mark.anyio
+    async def test_streaming_notifies_stage_events(
+        self,
+        streaming_command: ProcessChatCommand,
+        mock_notifier: MockProgressNotifier,
+        sample_request: ProcessChatRequest,
+    ):
+        """스트리밍에서 단계 이벤트 알림."""
+        await streaming_command.execute(sample_request)
+
+        # queued, intent started/completed, answer started/completed, done
+        stages = [e["stage"] for e in mock_notifier.events]
+        assert "queued" in stages
+        assert "intent" in stages
+        assert "answer" in stages
+        assert "done" in stages
+
+    @pytest.mark.anyio
+    async def test_streaming_calculates_progress(
+        self,
+        streaming_command: ProcessChatCommand,
+        mock_notifier: MockProgressNotifier,
+        sample_request: ProcessChatRequest,
+    ):
+        """스트리밍에서 진행률 계산."""
+        await streaming_command.execute(sample_request)
+
+        # 진행률이 0에서 시작해서 100으로 끝나야 함
+        progresses = [e["progress"] for e in mock_notifier.events if e["progress"] is not None]
+        assert 0 in progresses
+        assert 100 in progresses

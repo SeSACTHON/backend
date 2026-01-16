@@ -132,7 +132,7 @@ class NodeExecutor:
             업데이트된 상태 (+ node_results 추가)
         """
         policy = get_node_policy(node_name)
-        cb = self._cb_registry.get_from_policy(policy)
+        cb = self._cb_registry.get(policy.name, threshold=policy.cb_threshold)
 
         job_id = state.get("job_id", "")
         start_time = time.time()

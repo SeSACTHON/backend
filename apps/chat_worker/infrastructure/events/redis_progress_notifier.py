@@ -22,6 +22,11 @@ chat_worker → Redis Streams (chat:events:{shard})
              Chat API (SSE Gateway)
 ```
 
+분산 트레이싱 통합:
+- XADD 시 trace context 포함 (trace_id, span_id, traceparent)
+- Event Router가 trace context를 Pub/Sub에 전파
+- Jaeger/Kiali에서 전체 파이프라인 시각화 가능
+
 Port: application/ports/events/progress_notifier.py
 """
 
@@ -35,11 +40,54 @@ import time
 from typing import TYPE_CHECKING, Any
 
 from chat_worker.application.ports.events.progress_notifier import ProgressNotifierPort
+from chat_worker.infrastructure.metrics.metrics import (
+    CHAT_STREAM_ACTIVE,
+    CHAT_STREAM_DURATION,
+    CHAT_STREAM_REQUESTS_TOTAL,
+    CHAT_STREAM_TOKEN_COUNT,
+    track_stream_token,
+)
 
 if TYPE_CHECKING:
     from redis.asyncio import Redis
 
 logger = logging.getLogger(__name__)
+
+# OpenTelemetry 활성화 여부
+OTEL_ENABLED = os.getenv("OTEL_ENABLED", "true").lower() == "true"
+
+
+def _get_current_trace_context() -> tuple[str, str, str]:
+    """현재 OpenTelemetry span에서 trace context 추출.
+
+    Returns:
+        (trace_id, span_id, traceparent) 튜플. OTEL 비활성화 시 빈 문자열.
+    """
+    if not OTEL_ENABLED:
+        return "", "", ""
+
+    try:
+        from opentelemetry import trace
+        from opentelemetry.trace import format_trace_id, format_span_id
+
+        current_span = trace.get_current_span()
+        span_context = current_span.get_span_context()
+
+        if not span_context.is_valid:
+            return "", "", ""
+
+        trace_id = format_trace_id(span_context.trace_id)
+        span_id = format_span_id(span_context.span_id)
+        trace_flags = f"{span_context.trace_flags:02x}"
+        traceparent = f"00-{trace_id}-{span_id}-{trace_flags}"
+
+        return trace_id, span_id, traceparent
+    except ImportError:
+        return "", "", ""
+    except Exception as e:
+        logger.debug(f"Failed to extract trace context: {e}")
+        return "", "", ""
+
 
 # ─────────────────────────────────────────────────────────────────
 # 설정 (scan_worker와 동일한 패턴)
@@ -91,6 +139,15 @@ TOKEN_SEQ_START = 1000
 # 샤딩 설정 (event_router/config.py와 일치)
 DEFAULT_SHARD_COUNT = int(os.environ.get("CHAT_SHARD_COUNT", "4"))
 
+# ─────────────────────────────────────────────────────────────────
+# Token v2 설정 (복구 가능한 토큰 스트리밍)
+# ─────────────────────────────────────────────────────────────────
+
+TOKEN_STREAM_PREFIX = "chat:tokens"  # job별 전용 Token Stream
+TOKEN_STATE_PREFIX = "chat:token_state"  # 주기적 누적 텍스트 스냅샷
+TOKEN_STREAM_TTL = 3600  # 1시간
+TOKEN_STATE_SAVE_INTERVAL = 10  # 10 토큰마다 State 저장
+
 
 # ─────────────────────────────────────────────────────────────────
 # 멱등성 Lua Script (scan_worker와 동일)
@@ -107,6 +164,7 @@ if redis.call('EXISTS', publish_key) == 1 then
 end
 
 -- XADD 실행 (MAXLEN ~ 로 효율적 trim)
+-- ARGV[11]: trace_id, ARGV[12]: span_id, ARGV[13]: traceparent
 local msg_id = redis.call('XADD', stream_key, 'MAXLEN', '~', ARGV[1],
     '*',
     'job_id', ARGV[2],
@@ -116,7 +174,10 @@ local msg_id = redis.call('XADD', stream_key, 'MAXLEN', '~', ARGV[1],
     'ts', ARGV[6],
     'progress', ARGV[7],
     'result', ARGV[8],
-    'message', ARGV[9]
+    'message', ARGV[9],
+    'trace_id', ARGV[11],
+    'span_id', ARGV[12],
+    'traceparent', ARGV[13]
 )
 
 -- 발행 마킹 (TTL: 2시간)
@@ -126,6 +187,7 @@ return {1, msg_id}  -- 새로 발행됨
 """
 
 # Token 스트리밍용 Script (멱등성 없음 - 순서대로 발행)
+# ARGV[6]: trace_id, ARGV[7]: span_id, ARGV[8]: traceparent
 TOKEN_XADD_SCRIPT = """
 local stream_key = KEYS[1]   -- chat:events:{shard}
 
@@ -136,10 +198,77 @@ local msg_id = redis.call('XADD', stream_key, 'MAXLEN', '~', ARGV[1],
     'status', 'streaming',
     'seq', ARGV[3],
     'ts', ARGV[4],
-    'content', ARGV[5]
+    'content', ARGV[5],
+    'trace_id', ARGV[6],
+    'span_id', ARGV[7],
+    'traceparent', ARGV[8]
 )
 
 return msg_id
+"""
+
+# Token v2 스트리밍용 Script (복구 가능 - Token Stream + State)
+# ARGV[10]: trace_id, ARGV[11]: span_id, ARGV[12]: traceparent
+TOKEN_XADD_V2_SCRIPT = """
+local token_stream = KEYS[1]   -- chat:tokens:{job_id}
+local token_state = KEYS[2]    -- chat:token_state:{job_id}
+local stage_stream = KEYS[3]   -- chat:events:{shard}
+
+local job_id = ARGV[1]
+local seq = ARGV[2]
+local delta = ARGV[3]
+local ts = ARGV[4]
+local accumulated = ARGV[5]
+local save_state = tonumber(ARGV[6])  -- 1이면 State 저장
+local ttl = tonumber(ARGV[7])
+local maxlen = ARGV[8]
+local node = ARGV[9]
+local trace_id = ARGV[10]
+local span_id = ARGV[11]
+local traceparent = ARGV[12]
+
+-- 1. Token Stream에 추가 (job별 전용)
+local token_msg_id = redis.call('XADD', token_stream, 'MAXLEN', '~', 10000, '*',
+    'seq', seq,
+    'delta', delta,
+    'node', node,
+    'ts', ts
+)
+
+-- 2. Token Stream TTL 설정 (첫 메시지일 때만)
+local stream_len = redis.call('XLEN', token_stream)
+if stream_len == 1 then
+    redis.call('EXPIRE', token_stream, ttl)
+end
+
+-- 3. 주기적으로 State 저장 (accumulated 복구용)
+if save_state == 1 then
+    local state = cjson.encode({
+        last_seq = tonumber(seq),
+        accumulated = accumulated,
+        accumulated_len = string.len(accumulated),
+        node = node,
+        updated_at = tonumber(ts)
+    })
+    redis.call('SETEX', token_state, ttl, state)
+end
+
+-- 4. Stage Stream에도 발행 (기존 호환성 유지, trace context 포함)
+local stage_msg_id = redis.call('XADD', stage_stream, 'MAXLEN', '~', maxlen,
+    '*',
+    'job_id', job_id,
+    'stage', 'token',
+    'status', 'streaming',
+    'seq', seq,
+    'ts', ts,
+    'content', delta,
+    'node', node,
+    'trace_id', trace_id,
+    'span_id', span_id,
+    'traceparent', traceparent
+)
+
+return {token_msg_id, stage_msg_id}
 """
 
 
@@ -188,7 +317,14 @@ class RedisProgressNotifier(ProgressNotifierPort):
         self._maxlen = maxlen
         self._stage_script = None
         self._token_script = None
+        self._token_v2_script = None
         self._token_seq: dict[str, int] = {}  # job_id → token seq counter
+        # Token v2: 누적 텍스트 추적
+        self._accumulated: dict[str, str] = {}  # job_id → 누적 텍스트
+        self._token_count: dict[str, int] = {}  # job_id → 토큰 카운트
+        # Token v2: 스트림 시작 시간 (부하테스트 메트릭)
+        self._stream_start_time: dict[str, float] = {}  # job_id → start time
+        self._stream_node: dict[str, str] = {}  # job_id → 마지막 노드명
         logger.info(
             "RedisProgressNotifier initialized",
             extra={"shards": self._shard_count, "maxlen": maxlen},
@@ -200,6 +336,8 @@ class RedisProgressNotifier(ProgressNotifierPort):
             self._stage_script = self._redis.register_script(IDEMPOTENT_XADD_SCRIPT)
         if self._token_script is None:
             self._token_script = self._redis.register_script(TOKEN_XADD_SCRIPT)
+        if self._token_v2_script is None:
+            self._token_v2_script = self._redis.register_script(TOKEN_XADD_V2_SCRIPT)
 
     async def notify_stage(
         self,
@@ -241,6 +379,9 @@ class RedisProgressNotifier(ProgressNotifierPort):
         result_str = json.dumps(result, ensure_ascii=False) if result else ""
         message_str = message or ""
 
+        # Trace context 추출
+        trace_id, span_id, traceparent = _get_current_trace_context()
+
         # Lua Script 실행
         result_tuple = await self._stage_script(
             keys=[publish_key, stream_key],
@@ -255,6 +396,9 @@ class RedisProgressNotifier(ProgressNotifierPort):
                 result_str,  # ARGV[8]
                 message_str,  # ARGV[9]
                 str(PUBLISHED_TTL),  # ARGV[10]
+                trace_id,  # ARGV[11]
+                span_id,  # ARGV[12]
+                traceparent,  # ARGV[13]
             ],
         )
 
@@ -317,6 +461,9 @@ class RedisProgressNotifier(ProgressNotifierPort):
 
         ts = str(time.time())
 
+        # Trace context 추출
+        trace_id, span_id, traceparent = _get_current_trace_context()
+
         msg_id = await self._token_script(
             keys=[stream_key],
             args=[
@@ -325,6 +472,9 @@ class RedisProgressNotifier(ProgressNotifierPort):
                 str(seq),  # ARGV[3]
                 ts,  # ARGV[4]
                 content,  # ARGV[5]
+                trace_id,  # ARGV[6]
+                span_id,  # ARGV[7]
+                traceparent,  # ARGV[8]
             ],
         )
 
@@ -371,6 +521,198 @@ class RedisProgressNotifier(ProgressNotifierPort):
         )
 
     def clear_token_counter(self, task_id: str) -> None:
-        """토큰 카운터 정리 (작업 완료 시 호출)."""
+        """토큰 관련 메모리 정리 (작업 완료 시 호출).
+
+        모든 job 관련 in-memory 상태를 정리합니다.
+        예외 상황이나 timeout 시에도 finally에서 호출되어
+        메모리 누수를 방지합니다.
+
+        Args:
+            task_id: 작업 ID (job_id)
+        """
+        # Token sequence counter 정리
         if task_id in self._token_seq:
             del self._token_seq[task_id]
+        # Token v2: 누적 텍스트 정리
+        if task_id in self._accumulated:
+            del self._accumulated[task_id]
+        # Token v2: 토큰 카운트 정리
+        if task_id in self._token_count:
+            del self._token_count[task_id]
+        # Token v2: 스트림 시작 시간 정리
+        if task_id in self._stream_start_time:
+            del self._stream_start_time[task_id]
+        # Token v2: 노드 추적 정리
+        if task_id in self._stream_node:
+            del self._stream_node[task_id]
+
+    async def notify_token_v2(
+        self,
+        task_id: str,
+        content: str,
+        node: str | None = None,
+    ) -> str:
+        """토큰 스트리밍 이벤트 발행 (복구 가능).
+
+        Token Stream + Token State 저장으로 재연결 시 복구 지원.
+
+        아키텍처:
+        - Token Stream (chat:tokens:{job_id}): 모든 토큰 저장, catch-up 지원
+        - Token State (chat:token_state:{job_id}): 주기적 누적 텍스트 스냅샷
+        - Stage Stream (chat:events:{shard}): 기존 호환성 유지
+
+        Args:
+            task_id: 작업 ID (job_id)
+            content: 토큰 내용
+            node: 토큰 발생 노드명 (answer, summarize 등)
+
+        Returns:
+            발행된 메시지 ID (Token Stream)
+        """
+        await self._ensure_scripts()
+
+        # 누적 텍스트 계산
+        is_first_token = task_id not in self._accumulated
+        if is_first_token:
+            self._accumulated[task_id] = ""
+            self._token_count[task_id] = 0
+            self._stream_start_time[task_id] = time.perf_counter()
+            # Metrics: Active stream started
+            CHAT_STREAM_ACTIVE.inc()
+
+        self._accumulated[task_id] += content
+        self._token_count[task_id] += 1
+        # 노드 추적 (마지막 노드)
+        if node:
+            self._stream_node[task_id] = node
+        accumulated = self._accumulated[task_id]
+
+        # seq 계산 (Stage seq와 충돌 방지를 위해 1000+부터 시작)
+        if task_id not in self._token_seq:
+            self._token_seq[task_id] = TOKEN_SEQ_START
+        self._token_seq[task_id] += 1
+        seq = self._token_seq[task_id]
+
+        # State 저장 여부 (10 토큰마다)
+        save_state = 1 if self._token_count[task_id] % TOKEN_STATE_SAVE_INTERVAL == 0 else 0
+
+        ts = str(time.time())
+        node_str = node or ""
+
+        # Trace context 추출
+        trace_id, span_id, traceparent = _get_current_trace_context()
+
+        # Redis keys
+        token_stream_key = f"{TOKEN_STREAM_PREFIX}:{task_id}"
+        token_state_key = f"{TOKEN_STATE_PREFIX}:{task_id}"
+        stage_stream_key = _get_stream_key(task_id, self._shard_count)
+
+        # Lua Script 실행 (with latency tracking)
+        xadd_start = time.perf_counter()
+        result = await self._token_v2_script(
+            keys=[token_stream_key, token_state_key, stage_stream_key],
+            args=[
+                task_id,  # ARGV[1] - job_id
+                str(seq),  # ARGV[2] - seq
+                content,  # ARGV[3] - delta
+                ts,  # ARGV[4] - ts
+                accumulated,  # ARGV[5] - accumulated
+                str(save_state),  # ARGV[6] - save_state
+                str(TOKEN_STREAM_TTL),  # ARGV[7] - ttl
+                str(self._maxlen),  # ARGV[8] - maxlen
+                node_str,  # ARGV[9] - node
+                trace_id,  # ARGV[10]
+                span_id,  # ARGV[11]
+                traceparent,  # ARGV[12]
+            ],
+        )
+        xadd_latency = time.perf_counter() - xadd_start
+
+        # Metrics: Token count + Redis XADD latency (track_stream_token이 latency 기록 포함)
+        track_stream_token(node=node_str or "answer", status="success", latency=xadd_latency)
+
+        token_msg_id, stage_msg_id = result
+        if isinstance(token_msg_id, bytes):
+            token_msg_id = token_msg_id.decode()
+        if isinstance(stage_msg_id, bytes):
+            stage_msg_id = stage_msg_id.decode()
+
+        logger.debug(
+            "token_v2_published",
+            extra={
+                "job_id": task_id,
+                "seq": seq,
+                "node": node_str,
+                "token_msg_id": token_msg_id,
+                "stage_msg_id": stage_msg_id,
+                "save_state": bool(save_state),
+            },
+        )
+
+        return token_msg_id
+
+    async def finalize_token_stream(self, task_id: str) -> None:
+        """토큰 스트림 완료 처리.
+
+        토큰 스트리밍 완료 시 최종 State 저장 및 메모리 정리.
+
+        Args:
+            task_id: 작업 ID
+        """
+        if task_id not in self._accumulated:
+            return
+
+        accumulated = self._accumulated[task_id]
+        seq = self._token_seq.get(task_id, TOKEN_SEQ_START)
+        token_count = self._token_count.get(task_id, 0)
+        stream_node = self._stream_node.get(task_id, "answer")
+        start_time = self._stream_start_time.get(task_id)
+
+        # Metrics: Active stream finished
+        CHAT_STREAM_ACTIVE.dec()
+
+        # Metrics: Stream duration
+        if start_time is not None:
+            duration = time.perf_counter() - start_time
+            CHAT_STREAM_DURATION.labels(node=stream_node, status="success").observe(
+                duration
+            )
+
+        # Metrics: Token count per stream
+        CHAT_STREAM_TOKEN_COUNT.labels(node=stream_node).observe(token_count)
+
+        # Metrics: Stream request completed
+        CHAT_STREAM_REQUESTS_TOTAL.labels(status="success").inc()
+
+        # 최종 State 저장 (completed 플래그 추가)
+        token_state_key = f"{TOKEN_STATE_PREFIX}:{task_id}"
+        state = {
+            "last_seq": seq,
+            "accumulated": accumulated,
+            "accumulated_len": len(accumulated),
+            "completed": True,
+            "updated_at": time.time(),
+        }
+
+        try:
+            await self._redis.setex(
+                token_state_key,
+                TOKEN_STREAM_TTL,
+                json.dumps(state, ensure_ascii=False),
+            )
+            logger.info(
+                "token_stream_finalized",
+                extra={
+                    "job_id": task_id,
+                    "last_seq": seq,
+                    "accumulated_len": len(accumulated),
+                },
+            )
+        except Exception as e:
+            logger.error(
+                "token_stream_finalize_error",
+                extra={"job_id": task_id, "error": str(e)},
+            )
+        finally:
+            # 메모리 정리 (clear_token_counter가 모든 상태 정리)
+            self.clear_token_counter(task_id)

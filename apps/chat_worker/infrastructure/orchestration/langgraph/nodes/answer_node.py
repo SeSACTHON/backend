@@ -1,12 +1,16 @@
 """Answer Generation Node - LangGraph 어댑터.
 
-얇은 어댑터: state 변환 + Command 호출 + progress notify (UX).
+얇은 어댑터: state 변환 + Command 호출.
 정책/흐름은 GenerateAnswerCommand(Application)에서 처리.
 
 Clean Architecture:
 - Node(Adapter): 이 파일 - LangGraph glue code
 - Command(UseCase): GenerateAnswerCommand - 정책/흐름
 - Service: AnswerGeneratorService - 순수 비즈니스 로직
+
+네이티브 스트리밍:
+- Progress/Token 이벤트는 ProcessChatCommand에서 astream_events로 처리
+- Node는 순수 비즈니스 로직만 담당
 """
 
 from __future__ import annotations
@@ -22,7 +26,6 @@ from chat_worker.infrastructure.assets.prompt_loader import PromptBuilder
 
 if TYPE_CHECKING:
     from chat_worker.application.ports.cache import CachePort
-    from chat_worker.application.ports.events import ProgressNotifierPort
     from chat_worker.application.ports.llm import LLMClientPort
 
 logger = logging.getLogger(__name__)
@@ -30,7 +33,6 @@ logger = logging.getLogger(__name__)
 
 def create_answer_node(
     llm: "LLMClientPort",
-    event_publisher: "ProgressNotifierPort",
     cache: "CachePort | None" = None,
 ):
     """답변 생성 노드 팩토리.
@@ -38,12 +40,13 @@ def create_answer_node(
     Node는 LangGraph 어댑터:
     - state → input DTO 변환
     - Command(UseCase) 호출
-    - 토큰 스트리밍 → SSE 발행
     - output → state 변환
+
+    네이티브 스트리밍 환경에서는 Progress/Token 이벤트를
+    ProcessChatCommand가 astream_events로 처리합니다.
 
     Args:
         llm: LLM 클라이언트
-        event_publisher: 이벤트 발행자 (SSE)
         cache: 캐시 클라이언트 (선택, Answer 캐싱용)
 
     Returns:
@@ -63,8 +66,12 @@ def create_answer_node(
         역할:
         1. state에서 값 추출 (LangGraph glue)
         2. Command 호출 (정책/흐름 위임)
-        3. 토큰 스트리밍 → SSE (UX)
-        4. output → state 변환
+        3. output → state 변환
+
+        Note:
+            네이티브 스트리밍: Progress/Token은 ProcessChatCommand가 처리
+            - on_chain_start/end → notify_stage
+            - on_llm_stream → notify_token_v2
 
         Args:
             state: 현재 LangGraph 상태
@@ -73,15 +80,6 @@ def create_answer_node(
             업데이트된 상태
         """
         job_id = state["job_id"]
-
-        # Progress: 시작 (UX)
-        await event_publisher.notify_stage(
-            task_id=job_id,
-            stage="answer",
-            status="started",
-            progress=70,
-            message="답변 생성 중",
-        )
 
         try:
             # 1. state → input DTO 변환
@@ -135,14 +133,11 @@ def create_answer_node(
                 conversation_summary=conversation_summary,
             )
 
-            # 2. Command 실행 (스트리밍)
+            # 2. Command 실행 (토큰 수집)
+            # 네이티브 스트리밍: on_llm_stream이 토큰을 ProcessChatCommand에 전달
+            # Node는 최종 answer만 수집
             answer_parts = []
             async for token in command.execute(input_dto):
-                # 토큰 이벤트 발행 (SSE 스트리밍)
-                await event_publisher.notify_token(
-                    task_id=job_id,
-                    content=token,
-                )
                 answer_parts.append(token)
 
             answer = "".join(answer_parts)
@@ -152,15 +147,6 @@ def create_answer_node(
                 extra={"job_id": job_id, "length": len(answer)},
             )
 
-            # Progress: 완료 (UX)
-            await event_publisher.notify_stage(
-                task_id=job_id,
-                stage="answer",
-                status="completed",
-                progress=100,
-                message="답변 생성 완료",
-            )
-
             # 3. output → state 변환
             return {**state, "answer": answer}
 
@@ -168,12 +154,6 @@ def create_answer_node(
             logger.error(
                 "Answer generation failed",
                 extra={"job_id": job_id, "error": str(e)},
-            )
-            await event_publisher.notify_stage(
-                task_id=job_id,
-                stage="answer",
-                status="failed",
-                result={"error": str(e)},
             )
             return {
                 **state,
