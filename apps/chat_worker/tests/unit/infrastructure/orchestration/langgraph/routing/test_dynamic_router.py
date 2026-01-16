@@ -165,17 +165,18 @@ class TestDynamicRouter:
             enable_conditional=True,
         )
 
+        # waste는 조건부 enrichment 제외 대상이 아님
         state = {
-            "intent": "character",  # weather enrichment 없는 intent
+            "intent": "waste",  # weather enrichment 허용 intent
             "user_location": {"lat": 37.5665, "lon": 126.9780},
             "job_id": "test-123",
         }
         sends = router(state)
 
-        # character + weather (조건부 enrichment)
+        # waste_rag + weather (조건부 enrichment)
         assert len(sends) == 2
         nodes = {s.node for s in sends}
-        assert nodes == {"character", "weather"}
+        assert nodes == {"waste_rag", "weather"}
 
     def test_conditional_enrichment_excluded_intent(self):
         """제외 intent면 조건부 enrichment 안 됨."""

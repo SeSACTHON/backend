@@ -329,7 +329,7 @@ class TestRecyclablePriceNode:
         await node(state)
 
         completed = [e for e in mock_publisher.stages if e["status"] == "completed"][0]
-        assert "품목의 시세를 찾았어요" in completed["message"]
+        assert "품목 시세 조회 완료" in completed["message"]
 
     # ==========================================================
     # Error Handling Tests
