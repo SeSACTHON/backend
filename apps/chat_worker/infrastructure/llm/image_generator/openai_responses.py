@@ -25,6 +25,7 @@ from __future__ import annotations
 import logging
 import os
 
+import httpx
 from openai import AsyncOpenAI
 
 from chat_worker.application.ports.image_generator import (
@@ -34,6 +35,10 @@ from chat_worker.application.ports.image_generator import (
 )
 
 logger = logging.getLogger(__name__)
+
+# 이미지 생성 타임아웃 (초) - DALL-E는 10-30초 소요
+# connect: 연결 대기, read: 응답 대기, write: 요청 전송, pool: 커넥션 풀 대기
+DEFAULT_IMAGE_TIMEOUT = httpx.Timeout(connect=5.0, read=60.0, write=5.0, pool=5.0)
 
 
 class OpenAIResponsesImageGenerator(ImageGeneratorPort):
@@ -76,7 +81,8 @@ class OpenAIResponsesImageGenerator(ImageGeneratorPort):
         """
         self._model = model
         self._client = AsyncOpenAI(
-            api_key=api_key or os.environ.get("OPENAI_API_KEY")
+            api_key=api_key or os.environ.get("OPENAI_API_KEY"),
+            timeout=DEFAULT_IMAGE_TIMEOUT,
         )
         self._default_size = default_size
         self._default_quality = default_quality

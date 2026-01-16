@@ -34,6 +34,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# gRPC 타임아웃 (초) - 서비스 SLA 기반
+# Character API는 LocalCache로 ~1-3ms 응답, 3초면 충분
+DEFAULT_GRPC_TIMEOUT = 3.0
+
 
 class CharacterGrpcClient(CharacterClientPort):
     """Character gRPC 클라이언트.
@@ -93,7 +97,9 @@ class CharacterGrpcClient(CharacterClientPort):
         request = character_pb2.GetByMatchRequest(match_label=waste_category)
 
         try:
-            response = await stub.GetCharacterByMatch(request)
+            response = await stub.GetCharacterByMatch(
+                request, timeout=DEFAULT_GRPC_TIMEOUT
+            )
 
             if not response.found:
                 logger.info(

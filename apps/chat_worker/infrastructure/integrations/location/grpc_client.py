@@ -34,6 +34,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+# gRPC 타임아웃 (초) - 서비스 SLA 기반
+# Location API는 PostGIS 쿼리로 ~100ms 응답, 3초면 충분
+DEFAULT_GRPC_TIMEOUT = 3.0
+
 
 class LocationGrpcClient(LocationClientPort):
     """Location gRPC 클라이언트.
@@ -107,7 +111,7 @@ class LocationGrpcClient(LocationClientPort):
         )
 
         try:
-            response = await stub.SearchNearby(request)
+            response = await stub.SearchNearby(request, timeout=DEFAULT_GRPC_TIMEOUT)
 
             logger.info(
                 "Location SearchNearby completed",
