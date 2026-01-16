@@ -153,3 +153,143 @@ class OGImageExtractor:
         )
 
         return enriched
+
+
+# ============================================================
+# Sync Version (for gevent/Celery worker)
+# ============================================================
+class OGImageExtractorSync:
+    """Open Graph 이미지 추출기 (동기 버전).
+
+    gevent 몽키패칭 호환을 위한 동기 HTTP 클라이언트 사용.
+    gevent.pool.Pool로 동시성 제어.
+    """
+
+    def __init__(
+        self,
+        http_client: httpx.Client,
+        timeout: float = 5.0,
+        max_concurrent: int = 10,
+    ):
+        """초기화.
+
+        Args:
+            http_client: 동기 HTTP 클라이언트
+            timeout: 요청 타임아웃 (초)
+            max_concurrent: 동시 요청 수 제한
+        """
+        self._client = http_client
+        self._timeout = timeout
+        self._max_concurrent = max_concurrent
+
+    def extract_image_url(self, url: str) -> str | None:
+        """URL에서 og:image 추출 (동기).
+
+        Args:
+            url: 기사 URL
+
+        Returns:
+            og:image URL 또는 None
+        """
+        try:
+            response = self._client.get(
+                url,
+                timeout=self._timeout,
+                follow_redirects=True,
+                headers={
+                    "User-Agent": "Mozilla/5.0 (compatible; Eco2Bot/1.0)",
+                },
+            )
+
+            if response.status_code != 200:
+                return None
+
+            # HTML 앞부분만 파싱 (head 태그 내 메타태그)
+            html = response.text[:10000]
+
+            # og:image 추출
+            match = OG_IMAGE_PATTERN.search(html)
+            if not match:
+                match = OG_IMAGE_PATTERN_ALT.search(html)
+
+            if match:
+                image_url = match.group(1)
+                # 상대 경로 처리
+                if image_url.startswith("//"):
+                    image_url = f"https:{image_url}"
+                elif image_url.startswith("/"):
+                    from urllib.parse import urlparse
+
+                    parsed = urlparse(url)
+                    image_url = f"{parsed.scheme}://{parsed.netloc}{image_url}"
+
+                logger.debug("Extracted og:image", extra={"url": url, "image": image_url})
+                return image_url
+
+            return None
+
+        except httpx.TimeoutException:
+            logger.debug("Timeout extracting og:image", extra={"url": url})
+            return None
+        except Exception as e:
+            logger.debug("Failed to extract og:image: %s", e, extra={"url": url})
+            return None
+
+    def enrich_articles_with_images(
+        self,
+        articles: list[NewsArticle],
+    ) -> list[NewsArticle]:
+        """이미지가 없는 기사들에 og:image 추가 (동기).
+
+        gevent.pool.Pool을 사용하여 동시 요청 처리.
+        gevent 몽키패칭이 적용되면 자동으로 협력적 멀티태스킹.
+
+        Args:
+            articles: 뉴스 기사 목록
+
+        Returns:
+            이미지가 보강된 기사 목록
+        """
+        from dataclasses import replace
+
+        # 이미지가 없는 기사만 추출
+        articles_without_image = [(i, a) for i, a in enumerate(articles) if not a.thumbnail_url]
+
+        if not articles_without_image:
+            return articles
+
+        logger.info(
+            "Enriching articles with og:image (sync)",
+            extra={"count": len(articles_without_image)},
+        )
+
+        # gevent Pool로 동시 요청
+        try:
+            from gevent.pool import Pool
+
+            pool = Pool(self._max_concurrent)
+            urls = [article.url for _, article in articles_without_image]
+            results = pool.map(self.extract_image_url, urls)
+        except ImportError:
+            # gevent 없으면 순차 처리 (테스트 환경)
+            logger.warning("gevent not available, falling back to sequential processing")
+            results = [self.extract_image_url(article.url) for _, article in articles_without_image]
+
+        # 결과 병합
+        enriched = list(articles)
+        enriched_count = 0
+
+        for (idx, article), image_url in zip(articles_without_image, results):
+            if image_url:
+                enriched[idx] = replace(article, thumbnail_url=image_url)
+                enriched_count += 1
+
+        logger.info(
+            "Enriched articles with og:image (sync)",
+            extra={
+                "total": len(articles_without_image),
+                "enriched": enriched_count,
+            },
+        )
+
+        return enriched

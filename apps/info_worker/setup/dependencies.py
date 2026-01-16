@@ -1,7 +1,10 @@
 """Dependency Injection for Info Worker.
 
 Celery Task에서 사용할 의존성 팩토리.
-리소스 풀링으로 메모리 누수 방지.
+gevent 호환을 위해 동기 드라이버 사용:
+- psycopg2: PostgreSQL
+- redis (sync): Cache
+- httpx (sync): HTTP clients
 """
 
 from __future__ import annotations
@@ -9,15 +12,16 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-import asyncpg
 import httpx
-from redis.asyncio import Redis
+import psycopg2
+from psycopg2.pool import ThreadedConnectionPool
+from redis import Redis
 
 from info.application.services.news_aggregator import NewsAggregatorService
-from info.infrastructure.cache.redis_news_cache import RedisNewsCache
-from info.infrastructure.integrations.naver.naver_news_client import NaverNewsClient
-from info.infrastructure.integrations.newsdata.newsdata_client import NewsDataClient
-from info.infrastructure.integrations.og.og_image_extractor import OGImageExtractor
+from info.infrastructure.cache.redis_news_cache import RedisNewsCacheSync
+from info.infrastructure.integrations.naver.naver_news_client import NaverNewsClientSync
+from info.infrastructure.integrations.newsdata.newsdata_client import NewsDataClientSync
+from info.infrastructure.integrations.og.og_image_extractor import OGImageExtractorSync
 from info_worker.application.commands.collect_news_command import CollectNewsCommand
 from info_worker.infrastructure.persistence.postgres_news_repository import (
     PostgresNewsRepository,
@@ -33,36 +37,35 @@ logger = logging.getLogger(__name__)
 # ============================================================
 # Singleton Resources (Worker Lifecycle)
 # ============================================================
-_pg_pool: asyncpg.Pool | None = None
+_pg_pool: ThreadedConnectionPool | None = None
 _redis: Redis | None = None
-_http_client: httpx.AsyncClient | None = None
+_http_client: httpx.Client | None = None
 
 
-async def get_pg_pool() -> asyncpg.Pool:
+def get_pg_pool() -> ThreadedConnectionPool:
     """PostgreSQL connection pool (싱글톤).
 
+    psycopg2 ThreadedConnectionPool - gevent 몽키패칭 호환.
     Worker lifecycle 동안 유지.
     """
     global _pg_pool
     if _pg_pool is None:
         settings = get_settings()
-        # asyncpg는 순수 postgresql:// 스킴만 지원
-        # SQLAlchemy 스타일(postgresql+asyncpg://) → postgresql://로 변환
+        # SQLAlchemy 스타일 DSN → psycopg2 스타일로 변환
         dsn = settings.database_url.replace("postgresql+asyncpg://", "postgresql://")
-        _pg_pool = await asyncpg.create_pool(
-            dsn,
-            min_size=2,
-            max_size=10,
-            command_timeout=30,
-            max_inactive_connection_lifetime=300,
+        _pg_pool = ThreadedConnectionPool(
+            minconn=2,
+            maxconn=10,
+            dsn=dsn,
         )
-        logger.info("PostgreSQL pool created")
+        logger.info("PostgreSQL pool created (psycopg2)")
     return _pg_pool
 
 
-async def get_redis() -> Redis:
+def get_redis() -> Redis:
     """Redis client (싱글톤).
 
+    동기 redis-py - gevent 몽키패칭 호환.
     Worker lifecycle 동안 유지.
     """
     global _redis
@@ -74,19 +77,20 @@ async def get_redis() -> Redis:
             socket_connect_timeout=5,
             socket_timeout=10,
         )
-        logger.info("Redis client created")
+        logger.info("Redis client created (sync)")
     return _redis
 
 
-async def get_http_client() -> httpx.AsyncClient:
+def get_http_client() -> httpx.Client:
     """HTTP client (싱글톤).
 
+    동기 httpx - gevent 몽키패칭 호환.
     Worker lifecycle 동안 유지. 리소스 누수 방지.
     """
     global _http_client
     if _http_client is None:
         settings = get_settings()
-        _http_client = httpx.AsyncClient(
+        _http_client = httpx.Client(
             timeout=httpx.Timeout(
                 connect=5.0,
                 read=settings.naver_api_timeout,
@@ -98,7 +102,7 @@ async def get_http_client() -> httpx.AsyncClient:
                 max_keepalive_connections=20,
             ),
         )
-        logger.info("HTTP client created")
+        logger.info("HTTP client created (sync)")
     return _http_client
 
 
@@ -110,8 +114,8 @@ def get_news_aggregator() -> NewsAggregatorService:
     return NewsAggregatorService()
 
 
-async def get_naver_client() -> NaverNewsClient | None:
-    """NaverNewsClient 팩토리.
+def get_naver_client() -> NaverNewsClientSync | None:
+    """NaverNewsClient 팩토리 (동기).
 
     싱글톤 HTTP 클라이언트 사용.
     """
@@ -119,16 +123,16 @@ async def get_naver_client() -> NaverNewsClient | None:
     if not settings.naver_client_id or not settings.naver_client_secret:
         return None
 
-    http_client = await get_http_client()
-    return NaverNewsClient(
+    http_client = get_http_client()
+    return NaverNewsClientSync(
         client_id=settings.naver_client_id,
         client_secret=settings.naver_client_secret,
         http_client=http_client,
     )
 
 
-async def get_newsdata_client() -> NewsDataClient | None:
-    """NewsDataClient 팩토리.
+def get_newsdata_client() -> NewsDataClientSync | None:
+    """NewsDataClient 팩토리 (동기).
 
     싱글톤 HTTP 클라이언트 사용.
     """
@@ -136,20 +140,20 @@ async def get_newsdata_client() -> NewsDataClient | None:
     if not settings.newsdata_api_key:
         return None
 
-    http_client = await get_http_client()
-    return NewsDataClient(
+    http_client = get_http_client()
+    return NewsDataClientSync(
         api_key=settings.newsdata_api_key,
         http_client=http_client,
     )
 
 
-async def get_og_extractor() -> OGImageExtractor:
-    """OGImageExtractor 팩토리.
+def get_og_extractor() -> OGImageExtractorSync:
+    """OGImageExtractor 팩토리 (동기).
 
     싱글톤 HTTP 클라이언트 사용.
     """
-    http_client = await get_http_client()
-    return OGImageExtractor(
+    http_client = get_http_client()
+    return OGImageExtractorSync(
         http_client=http_client,
         timeout=5.0,
         max_concurrent=10,
@@ -159,7 +163,7 @@ async def get_og_extractor() -> OGImageExtractor:
 # ============================================================
 # Command Factory
 # ============================================================
-async def create_collect_news_command(
+def create_collect_news_command(
     sources: list[NewsSourcePort] | None = None,
 ) -> CollectNewsCommand:
     """CollectNewsCommand 팩토리.
@@ -173,26 +177,26 @@ async def create_collect_news_command(
     settings = get_settings()
 
     # DB & Cache (싱글톤)
-    pg_pool = await get_pg_pool()
-    redis = await get_redis()
+    pg_pool = get_pg_pool()
+    redis = get_redis()
 
     # Repository & Cache
     news_repository = PostgresNewsRepository(pool=pg_pool)
-    news_cache = RedisNewsCache(redis=redis, ttl=settings.news_cache_ttl)
+    news_cache = RedisNewsCacheSync(redis=redis, ttl=settings.news_cache_ttl)
 
     # Sources
     if sources is None:
         sources = []
-        naver = await get_naver_client()
+        naver = get_naver_client()
         if naver:
             sources.append(naver)
-        newsdata = await get_newsdata_client()
+        newsdata = get_newsdata_client()
         if newsdata:
             sources.append(newsdata)
 
     # Aggregator & OG Extractor
     aggregator = get_news_aggregator()
-    og_extractor = await get_og_extractor()
+    og_extractor = get_og_extractor()
 
     return CollectNewsCommand(
         news_sources=sources,
@@ -205,21 +209,21 @@ async def create_collect_news_command(
     )
 
 
-async def create_collect_news_command_newsdata_only() -> CollectNewsCommand:
+def create_collect_news_command_newsdata_only() -> CollectNewsCommand:
     """NewsData 전용 CollectNewsCommand 팩토리.
 
     NewsData.io는 30분 주기로 별도 스케줄링 (Rate Limit 대응).
     """
-    newsdata = await get_newsdata_client()
+    newsdata = get_newsdata_client()
     sources = [newsdata] if newsdata else []
 
-    return await create_collect_news_command(sources=sources)
+    return create_collect_news_command(sources=sources)
 
 
 # ============================================================
 # Lifecycle Management
 # ============================================================
-async def cleanup() -> None:
+def cleanup() -> None:
     """리소스 정리.
 
     Worker 종료 시 호출.
@@ -227,16 +231,16 @@ async def cleanup() -> None:
     global _pg_pool, _redis, _http_client
 
     if _http_client:
-        await _http_client.aclose()
+        _http_client.close()
         _http_client = None
         logger.info("HTTP client closed")
 
     if _pg_pool:
-        await _pg_pool.close()
+        _pg_pool.closeall()
         _pg_pool = None
         logger.info("PostgreSQL pool closed")
 
     if _redis:
-        await _redis.aclose()
+        _redis.close()
         _redis = None
         logger.info("Redis client closed")
