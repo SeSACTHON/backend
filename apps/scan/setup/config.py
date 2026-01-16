@@ -19,20 +19,20 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 MODEL_PROVIDER_MAP: dict[str, str] = {
     # === GPT 계열 (OpenAI) ===
-    "gpt-5.2": "gpt",
-    "gpt-5.2-pro": "gpt",
-    "gpt-5.1": "gpt",
-    "gpt-5": "gpt",
-    "gpt-5-pro": "gpt",
-    "gpt-5-mini": "gpt",
+    "gpt-5.2": "openai",
+    "gpt-5.2-pro": "openai",
+    "gpt-5.1": "openai",
+    "gpt-5": "openai",
+    "gpt-5-pro": "openai",
+    "gpt-5-mini": "openai",
     # === Gemini 계열 (Google) ===
-    "gemini-3-pro-preview": "gemini",
-    "gemini-3-flash-preview": "gemini",
-    "gemini-2.5-pro": "gemini",
-    "gemini-2.5-flash": "gemini",
-    "gemini-2.5-flash-lite": "gemini",
-    "gemini-2.0-flash": "gemini",
-    "gemini-2.0-flash-lite": "gemini",
+    "gemini-3-pro-preview": "google",
+    "gemini-3-flash-preview": "google",
+    "gemini-2.5-pro": "google",
+    "gemini-2.5-flash": "google",
+    "gemini-2.5-flash-lite": "google",
+    "gemini-2.0-flash": "google",
+    "gemini-2.0-flash-lite": "google",
 }
 
 DEFAULT_CORS_ORIGINS = (
@@ -173,7 +173,7 @@ class Settings(BaseSettings):
             model: LLM 모델명
 
         Returns:
-            provider (gpt, gemini)
+            provider (openai, google)
 
         Raises:
             KeyError: 지원하지 않는 모델

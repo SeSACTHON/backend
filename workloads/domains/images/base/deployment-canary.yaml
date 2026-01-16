@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: images-api-canary
+  namespace: images
+  labels:
+    app: images-api
+    version: v2
+    tier: business-logic
+    domain: image
+    release: canary
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: images-api
+      version: v2
+  template:
+    metadata:
+      labels:
+        app: images-api
+        version: v2
+        tier: business-logic
+        domain: image
+        release: canary
+    spec:
+      containers:
+      - name: images-api
+        image: docker.io/mng990/eco2:images-api-dev-canary
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8000
+          name: http
+        env:
+        - name: OTEL_SERVICE_NAME
+          value: images-api-canary
+        - name: OTEL_TRACES_EXPORTER
+          value: otlp
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://jaeger-collector-clusterip.istio-system.svc.cluster.local:4317
+        - name: OTEL_METRICS_EXPORTER
+          value: none
+        - name: OTEL_LOGS_EXPORTER
+          value: none
+        - name: OTEL_PROPAGATORS
+          value: b3,tracecontext,baggage
+        - name: RELEASE_TYPE
+          value: canary
+        envFrom:
+        - configMapRef:
+            name: image-config
+        - secretRef:
+            name: images-secret
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+      imagePullSecrets:
+      - name: dockerhub-secret
+      nodeSelector:
+        domain: image
+      tolerations:
+      - key: domain
+        operator: Equal
+        value: image
+        effect: NoSchedule

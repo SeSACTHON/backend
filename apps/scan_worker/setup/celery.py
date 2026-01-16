@@ -1,6 +1,9 @@
 """Celery App Configuration.
 
-⚠️ domains 의존성 제거 - apps 내부에서 라우팅 정의
+⚠️ 큐 생성은 RabbitMQ Topology CR에 위임
+   (workloads/rabbitmq/base/topology/queues.yaml)
+   Python에서는 task routing만 정의
+⚠️ task_queues는 이름만 정의 (arguments 없음 → 기존 큐 그대로 사용)
 """
 
 import logging
@@ -9,71 +12,35 @@ from typing import Any
 
 from celery import Celery
 from celery.signals import worker_ready, worker_shutdown
-from kombu import Exchange, Queue
+from kombu import Queue
 
 from scan_worker.setup.config import get_settings
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
-# RabbitMQ Exchange 설정 (기존 설정과 동일하게 topic 타입)
-CELERY_EXCHANGE = Exchange("celery", type="topic")
-
-# RabbitMQ 큐 설정 (기존 큐와 동일하게 설정)
-DLX_EXCHANGE = "dlx"  # Dead Letter Exchange
-
-# 큐별 TTL 설정 (기존 RabbitMQ와 동일)
-QUEUE_TTL_MAP = {
-    "scan.vision": 3600000,  # 1시간
-    "scan.rule": 300000,  # 5분 (규정 조회는 빠름)
-    "scan.answer": 3600000,  # 1시간
-    "scan.reward": 3600000,  # 1시간
-}
-
-
-def _queue_args(queue_name: str) -> dict:
-    """큐별 arguments 생성 (TTL + DLX + DLQ 라우팅키)."""
-    return {
-        "x-message-ttl": QUEUE_TTL_MAP.get(queue_name, 3600000),
-        "x-dead-letter-exchange": DLX_EXCHANGE,
-        "x-dead-letter-routing-key": f"dlq.{queue_name}",
-    }
-
-
-SCAN_TASK_QUEUES = (
-    Queue(
-        "scan.vision",
-        exchange=CELERY_EXCHANGE,
-        routing_key="scan.vision",
-        queue_arguments=_queue_args("scan.vision"),
-    ),
-    Queue(
-        "scan.rule",
-        exchange=CELERY_EXCHANGE,
-        routing_key="scan.rule",
-        queue_arguments=_queue_args("scan.rule"),
-    ),
-    Queue(
-        "scan.answer",
-        exchange=CELERY_EXCHANGE,
-        routing_key="scan.answer",
-        queue_arguments=_queue_args("scan.answer"),
-    ),
-    Queue(
-        "scan.reward",
-        exchange=CELERY_EXCHANGE,
-        routing_key="scan.reward",
-        queue_arguments=_queue_args("scan.reward"),
-    ),
-)
-
 # Scan Worker Task Routes (태스크 = 큐 1:1)
+# ⚠️ 큐 이름은 Topology CR과 일치해야 함
 SCAN_TASK_ROUTES = {
     "scan.vision": {"queue": "scan.vision"},
     "scan.rule": {"queue": "scan.rule"},
     "scan.answer": {"queue": "scan.answer"},
     "scan.reward": {"queue": "scan.reward"},
 }
+
+# 소비할 큐 정의 (이름만, arguments 없음 → Topology CR 정의 사용)
+# task_create_missing_queues=False 시 -Q 옵션 사용을 위해 필요
+# no_declare=True: Celery가 큐를 선언하지 않음 (Topology CR이 생성)
+# ⚠️ exchange="", routing_key=<queue_name> 명시 → AMQP Default Exchange 사용
+SCAN_TASK_QUEUES = [
+    Queue("celery", exchange="", routing_key="celery", no_declare=True),
+    Queue("scan.vision", exchange="", routing_key="scan.vision", no_declare=True),
+    Queue("scan.rule", exchange="", routing_key="scan.rule", no_declare=True),
+    Queue("scan.answer", exchange="", routing_key="scan.answer", no_declare=True),
+    Queue("scan.reward", exchange="", routing_key="scan.reward", no_declare=True),
+    # Cross-domain 큐 (발행용, 소비하지 않음)
+    Queue("character.match", exchange="", routing_key="character.match", no_declare=True),
+]
 
 # Celery 앱 생성
 celery_app = Celery(
@@ -89,16 +56,16 @@ celery_app.autodiscover_tasks(
     ]
 )
 
-# Task 라우팅 및 큐 설정
-celery_app.conf.task_routes = SCAN_TASK_ROUTES
-celery_app.conf.task_queues = SCAN_TASK_QUEUES
-
 # Celery 설정
 celery_app.conf.update(
-    # Exchange 설정 (기존 RabbitMQ와 동일하게 topic 타입)
-    task_default_exchange="celery",
-    task_default_exchange_type="topic",
+    # Task routing (큐 생성은 Topology CR에 위임)
+    task_routes=SCAN_TASK_ROUTES,
+    task_queues=SCAN_TASK_QUEUES,  # -Q 옵션 사용을 위해 필요
+    task_default_queue="celery",
+    task_default_exchange="",  # AMQP default exchange (direct routing)
     task_default_routing_key="celery",
+    # 큐 생성을 Topology CR에 위임 (TTL, DLX 등 인자 충돌 방지)
+    task_create_missing_queues=False,
     # 일반 설정
     task_track_started=True,
     task_serializer="json",
@@ -106,6 +73,8 @@ celery_app.conf.update(
     accept_content=["json"],
     timezone="Asia/Seoul",
     enable_utc=True,
+    task_acks_late=True,
+    task_reject_on_worker_lost=True,
     worker_send_task_events=True,
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=100,
@@ -171,6 +140,20 @@ def _setup_celery_tracing() -> None:
             logger.info("OpenAI tracing enabled")
         except ImportError:
             logger.warning("OpenAI instrumentor not available")
+
+        # Gemini (Google Generative AI) Instrumentation
+        try:
+            from opentelemetry.instrumentation.google_generativeai import (
+                GoogleGenerativeAiInstrumentor,
+            )
+
+            GoogleGenerativeAiInstrumentor().instrument()
+            logger.info("Gemini tracing enabled")
+        except ImportError:
+            logger.warning(
+                "Gemini instrumentor not available. "
+                "Install: pip install opentelemetry-instrumentation-google-generativeai"
+            )
 
     except ImportError as e:
         logger.warning(f"Celery/Redis tracing not available: {e}")

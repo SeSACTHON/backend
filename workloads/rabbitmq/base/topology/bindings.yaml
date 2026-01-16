@@ -87,18 +87,38 @@ spec:
     namespace: rabbitmq
 ---
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Character Reward Binding (fire & forget)
+# Reward Events → Character Save Ownership (Fanout 브로드캐스트)
+# Fanout Exchange: routing_key 무시, 모든 바인딩 큐에 복제
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 apiVersion: rabbitmq.com/v1beta1
 kind: Binding
 metadata:
-  name: character-save-ownership-binding
+  name: reward-to-character-ownership
   namespace: rabbitmq
 spec:
-  source: character.direct
+  source: reward.events
   destination: character.save_ownership
   destinationType: queue
-  routingKey: character.save_ownership
+  routingKey: ''  # Fanout은 routing_key 무시
+  vhost: eco2
+  rabbitmqClusterReference:
+    name: eco2-rabbitmq
+    namespace: rabbitmq
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Reward Events → Users Save Character (Fanout 브로드캐스트)
+# 동일한 이벤트가 이 큐에도 복제됨
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: reward-to-users-save-character
+  namespace: rabbitmq
+spec:
+  source: reward.events
+  destination: users.save_character
+  destinationType: queue
+  routingKey: ''  # Fanout은 routing_key 무시
   vhost: eco2
   rabbitmqClusterReference:
     name: eco2-rabbitmq
@@ -117,24 +137,6 @@ spec:
   destination: character.grant_default
   destinationType: queue
   routingKey: character.grant_default
-  vhost: eco2
-  rabbitmqClusterReference:
-    name: eco2-rabbitmq
-    namespace: rabbitmq
----
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# Users Save Character Binding
-# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-apiVersion: rabbitmq.com/v1beta1
-kind: Binding
-metadata:
-  name: users-save-character-binding
-  namespace: rabbitmq
-spec:
-  source: users.direct
-  destination: users.save_character
-  destinationType: queue
-  routingKey: users.save_character
   vhost: eco2
   rabbitmqClusterReference:
     name: eco2-rabbitmq
@@ -291,6 +293,39 @@ spec:
   destination: dlq.auth.blacklist
   destinationType: queue
   routingKey: dlq.auth.blacklist
+  vhost: eco2
+  rabbitmqClusterReference:
+    name: eco2-rabbitmq
+    namespace: rabbitmq
+---
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Chat Process Bindings (Taskiq)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: chat-process-binding
+  namespace: rabbitmq
+spec:
+  source: chat_tasks
+  destination: chat.process
+  destinationType: queue
+  routingKey: chat.process
+  vhost: eco2
+  rabbitmqClusterReference:
+    name: eco2-rabbitmq
+    namespace: rabbitmq
+---
+apiVersion: rabbitmq.com/v1beta1
+kind: Binding
+metadata:
+  name: dlq-chat-process-binding
+  namespace: rabbitmq
+spec:
+  source: dlx
+  destination: dlq.chat.process
+  destinationType: queue
+  routingKey: dlq.chat.process
   vhost: eco2
   rabbitmqClusterReference:
     name: eco2-rabbitmq

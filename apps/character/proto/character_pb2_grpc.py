@@ -2,7 +2,7 @@
 """Client and server classes corresponding to protobuf-defined services."""
 import grpc
 
-from . import character_pb2 as character__pb2
+from character.proto import character_pb2 as character__pb2
 
 GRPC_GENERATED_VERSION = "1.68.1"
 GRPC_VERSION = grpc.__version__
@@ -46,6 +46,12 @@ class CharacterServiceStub(object):
             response_deserializer=character__pb2.GetDefaultCharacterResponse.FromString,
             _registered_method=True,
         )
+        self.GetCharacterByMatch = channel.unary_unary(
+            "/character.v1.CharacterService/GetCharacterByMatch",
+            request_serializer=character__pb2.GetByMatchRequest.SerializeToString,
+            response_deserializer=character__pb2.GetByMatchResponse.FromString,
+            _registered_method=True,
+        )
 
 
 class CharacterServiceServicer(object):
@@ -63,6 +69,12 @@ class CharacterServiceServicer(object):
         context.set_details("Method not implemented!")
         raise NotImplementedError("Method not implemented!")
 
+    def GetCharacterByMatch(self, request, context):
+        """Chat Worker용: 매칭 라벨로 캐릭터 조회"""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details("Method not implemented!")
+        raise NotImplementedError("Method not implemented!")
+
 
 def add_CharacterServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -75,6 +87,11 @@ def add_CharacterServiceServicer_to_server(servicer, server):
             servicer.GetDefaultCharacter,
             request_deserializer=character__pb2.GetDefaultCharacterRequest.FromString,
             response_serializer=character__pb2.GetDefaultCharacterResponse.SerializeToString,
+        ),
+        "GetCharacterByMatch": grpc.unary_unary_rpc_method_handler(
+            servicer.GetCharacterByMatch,
+            request_deserializer=character__pb2.GetByMatchRequest.FromString,
+            response_serializer=character__pb2.GetByMatchResponse.SerializeToString,
         ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -137,6 +154,36 @@ class CharacterService(object):
             "/character.v1.CharacterService/GetDefaultCharacter",
             character__pb2.GetDefaultCharacterRequest.SerializeToString,
             character__pb2.GetDefaultCharacterResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True,
+        )
+
+    @staticmethod
+    def GetCharacterByMatch(
+        request,
+        target,
+        options=(),
+        channel_credentials=None,
+        call_credentials=None,
+        insecure=False,
+        compression=None,
+        wait_for_ready=None,
+        timeout=None,
+        metadata=None,
+    ):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            "/character.v1.CharacterService/GetCharacterByMatch",
+            character__pb2.GetByMatchRequest.SerializeToString,
+            character__pb2.GetByMatchResponse.FromString,
             options,
             channel_credentials,
             insecure,

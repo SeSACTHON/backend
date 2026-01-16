@@ -178,10 +178,8 @@ class RewardStep(Step):
 
         Fallback: 타임아웃/에러 시 None 반환 (SSE 완료 보장).
 
-        ⚠️ Exchange 명시 필수:
-        - character-worker는 character.direct (direct) exchange 사용
-        - scan-worker는 celery (topic) exchange를 기본 사용
-        - 명시적으로 exchange를 지정해야 메시지 전달됨
+        ⚠️ queue= 사용: task_queues에 cross-domain 큐가 정의되어 있어야 함.
+           (celery.py의 CROSS_DOMAIN_QUEUES 참조)
         """
         try:
             async_result = self._celery.send_task(
@@ -192,8 +190,6 @@ class RewardStep(Step):
                     "disposal_rules_present": bool(ctx.disposal_rules),
                 },
                 queue="character.match",
-                exchange="character.direct",
-                routing_key="character.match",
             )
 
             result = async_result.get(
@@ -226,52 +222,61 @@ class RewardStep(Step):
             return None
 
     def _dispatch_save_tasks(self, user_id: str, reward: dict[str, Any]) -> None:
-        """DB 저장 Task 발행 (Fire & Forget).
+        """DB 저장 이벤트 발행 (Fire & Forget, Fanout 브로드캐스트).
 
-        - character.save_ownership: character DB 저장
-        - users.save_character: users DB 저장 (Clean Architecture)
+        reward.events (Fanout) Exchange로 1번 publish → 모든 바인딩 큐로 복제:
+        - character.save_ownership 큐 → character-worker
+        - users.save_character 큐 → users-worker
 
-        ⚠️ my.save_character 제거됨 (domains 폐기)
-        ⚠️ Exchange 명시 필수: RabbitMQ Topology CR과 일치해야 함
-           - character.* → character.direct exchange
-           - users.* → users.direct exchange
+        Fanout은 routing_key 무시, 바인딩된 모든 큐에 브로드캐스트.
+
+        ⚠️ Celery send_task는 exchange 파라미터를 무시하므로
+           kombu Producer로 Celery Protocol 형식 메시지를 직접 발행
         """
-        # character.save_ownership (Topology CR: character.direct exchange)
+        import uuid
+
+        from kombu import Exchange
+
         try:
-            self._celery.send_task(
-                "character.save_ownership",
-                kwargs={
+            # Celery Protocol 형식 메시지 구성
+            task_id = str(uuid.uuid4())
+            message_body = {
+                "task": "reward.character",
+                "id": task_id,
+                "args": [],
+                "kwargs": {
                     "user_id": user_id,
                     "character_id": reward["character_id"],
                     "character_code": reward.get("character_code", ""),
-                    "source": "scan",
-                },
-                queue="character.save_ownership",
-                exchange="character.direct",
-                routing_key="character.save_ownership",
-            )
-            logger.info("save_ownership_task dispatched")
-        except Exception:
-            logger.exception("Failed to dispatch save_ownership_task")
-
-        # users.save_character (Topology CR: users.direct exchange)
-        try:
-            self._celery.send_task(
-                "users.save_character",
-                args=[
-                    user_id,
-                    reward["character_id"],
-                    reward.get("character_code", ""),
-                ],
-                kwargs={
                     "character_name": reward.get("name", ""),
                     "character_type": reward.get("character_type"),
                     "source": "scan",
                 },
-                queue="users.save_character",
-                exchange="users.direct",
-                routing_key="users.save_character",
+                "retries": 0,
+            }
+
+            # Fanout Exchange 정의
+            fanout_exchange = Exchange("reward.events", type="fanout")
+
+            # kombu Producer로 직접 발행
+            with self._celery.connection_or_acquire() as conn:
+                producer = conn.Producer()
+                producer.publish(
+                    message_body,
+                    exchange=fanout_exchange,
+                    routing_key="",
+                    serializer="json",
+                )
+
+            logger.info(
+                "reward_character_event_dispatched",
+                extra={
+                    "user_id": user_id,
+                    "character_id": reward["character_id"],
+                    "task_id": task_id,
+                    "exchange": "reward.events",
+                    "pattern": "fanout",
+                },
             )
-            logger.info("save_users_character_task dispatched")
         except Exception:
-            logger.exception("Failed to dispatch save_users_character_task")
+            logger.exception("Failed to dispatch reward.character event")

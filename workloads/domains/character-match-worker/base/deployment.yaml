@@ -32,7 +32,7 @@ spec:
         command: [celery]
         args:
         - -A
-        - domains.character.celery_app
+        - character_worker.main:app
         - worker
         - --loglevel=info
         - -E  # Events 활성화
@@ -67,9 +67,7 @@ spec:
           value: b3,tracecontext,baggage
         # Database (캐시 fallback용)
         - name: POSTGRES_HOST
-          value: postgresql.postgres.svc.cluster.local
-        - name: REDIS_HOST
-          value: redis.redis.svc.cluster.local
+          value: dev-postgresql.postgres.svc.cluster.local
         envFrom:
         - configMapRef:
             name: character-match-worker-config
@@ -87,7 +85,7 @@ spec:
             command:
             - celery
             - -A
-            - domains.character.celery_app
+            - character_worker.main:app
             - inspect
             - ping
             - -t
@@ -101,7 +99,7 @@ spec:
             command:
             - celery
             - -A
-            - domains.character.celery_app
+            - character_worker.main:app
             - inspect
             - ping
             - -t

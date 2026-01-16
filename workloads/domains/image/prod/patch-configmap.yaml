@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: image-config
-  namespace: image
-data:
-  ENVIRONMENT: prod
-  DEBUG: 'false'
