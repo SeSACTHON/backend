@@ -41,7 +41,9 @@ class TestEventProcessor:
 
     def test_processor_initialization(self, processor):
         """프로세서 초기화 확인."""
-        assert processor._state_key_prefix == "scan:state"
+        # 동적 state prefix 계산 확인
+        assert processor._get_state_prefix("scan:events:0") == "scan:state"
+        assert processor._get_state_prefix("chat:events:1") == "chat:state"
         assert processor._published_key_prefix == "router:published"
         assert processor._pubsub_channel_prefix == "sse:events"
         assert processor._state_ttl == 3600
