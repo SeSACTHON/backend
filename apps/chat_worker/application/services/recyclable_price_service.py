@@ -59,10 +59,7 @@ class RecyclablePriceService:
         Returns:
             LLM 응답 생성용 컨텍스트 딕셔너리
         """
-        items = [
-            RecyclablePriceService.format_price_result(item)
-            for item in response.items
-        ]
+        items = [RecyclablePriceService.format_price_result(item) for item in response.items]
 
         # context 문자열 생성 (LLM 프롬프트용)
         context_str = RecyclablePriceService.build_context_string(response)
@@ -158,9 +155,21 @@ class RecyclablePriceService:
         """
         # 간단한 키워드 매칭
         keywords = [
-            "캔", "페트", "페트병", "신문지", "박스", "골판지",
-            "유리", "플라스틱", "비닐", "스티로폼", "알루미늄",
-            "철", "종이", "타이어", "고무",
+            "캔",
+            "페트",
+            "페트병",
+            "신문지",
+            "박스",
+            "골판지",
+            "유리",
+            "플라스틱",
+            "비닐",
+            "스티로폼",
+            "알루미늄",
+            "철",
+            "종이",
+            "타이어",
+            "고무",
         ]
 
         message_lower = message.lower()

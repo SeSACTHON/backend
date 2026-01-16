@@ -169,6 +169,5 @@ class WebSearchService:
             return []
 
         return [
-            {"title": r["title"], "url": r["url"]}
-            for r in formatted_results.get("results", [])
+            {"title": r["title"], "url": r["url"]} for r in formatted_results.get("results", [])
         ]

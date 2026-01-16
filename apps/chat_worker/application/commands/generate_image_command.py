@@ -172,7 +172,8 @@ class GenerateImageCommand:
                 extra={
                     "job_id": input_dto.job_id,
                     "has_description": result.description is not None,
-                    "used_reference": has_reference and self._image_generator.supports_reference_images,
+                    "used_reference": has_reference
+                    and self._image_generator.supports_reference_images,
                 },
             )
 

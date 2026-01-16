@@ -1,7 +1,5 @@
 """QueryComplexity Enum Unit Tests."""
 
-import pytest
-
 from chat_worker.domain.enums.query_complexity import QueryComplexity
 
 

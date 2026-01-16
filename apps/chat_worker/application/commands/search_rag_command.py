@@ -112,12 +112,14 @@ class SearchRAGCommand:
             )
             if disposal_rules:
                 events.append("classification_search_success")
-                evidence.append({
-                    "chunk_id": disposal_rules.get("key", ""),
-                    "relevance": "high",
-                    "quoted_text": "",
-                    "method": "classification",
-                })
+                evidence.append(
+                    {
+                        "chunk_id": disposal_rules.get("key", ""),
+                        "relevance": "high",
+                        "quoted_text": "",
+                        "method": "classification",
+                    }
+                )
             else:
                 events.append("classification_search_no_result")
                 # Fallback: 컨텍스트 검색으로
@@ -129,9 +131,7 @@ class SearchRAGCommand:
                     params = {"keywords": keywords}
 
         # 2.1 태그 기반 컨텍스트 검색 (Anthropic Contextual Retrieval)
-        if strategy == "contextual" or (
-            strategy == "none" and input_dto.enable_contextual_search
-        ):
+        if strategy == "contextual" or (strategy == "none" and input_dto.enable_contextual_search):
             contextual_results = self._retriever.search_with_context(input_dto.message)
 
             if contextual_results:
@@ -147,13 +147,15 @@ class SearchRAGCommand:
 
                 # Evidence 생성
                 for result in contextual_results[:3]:  # 상위 3개
-                    evidence.append({
-                        "chunk_id": result.chunk_id,
-                        "relevance": result.relevance,
-                        "quoted_text": result.quoted_text,
-                        "matched_tags": result.matched_tags,
-                        "method": "contextual",
-                    })
+                    evidence.append(
+                        {
+                            "chunk_id": result.chunk_id,
+                            "relevance": result.relevance,
+                            "quoted_text": result.quoted_text,
+                            "matched_tags": result.matched_tags,
+                            "method": "contextual",
+                        }
+                    )
             else:
                 events.append("contextual_search_no_result")
                 # Fallback: 키워드 검색으로
@@ -169,12 +171,14 @@ class SearchRAGCommand:
                     disposal_rules = results[0]
                     matched_keyword = keyword
                     events.append(f"keyword_search_success:{keyword}")
-                    evidence.append({
-                        "chunk_id": results[0].get("key", ""),
-                        "relevance": "medium",
-                        "quoted_text": "",
-                        "method": "keyword",
-                    })
+                    evidence.append(
+                        {
+                            "chunk_id": results[0].get("key", ""),
+                            "relevance": "medium",
+                            "quoted_text": "",
+                            "method": "keyword",
+                        }
+                    )
                     break
 
             if not disposal_rules:

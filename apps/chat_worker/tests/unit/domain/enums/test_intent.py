@@ -1,7 +1,5 @@
 """Intent Enum Unit Tests."""
 
-import pytest
-
 from chat_worker.domain.enums.intent import Intent
 
 

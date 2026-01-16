@@ -13,7 +13,7 @@ import pytest
 # langgraph가 없으면 테스트 건너뛰기
 pytest.importorskip("langgraph", reason="langgraph not installed")
 
-from chat_worker.infrastructure.orchestration.langgraph.routing.dynamic_router import (
+from chat_worker.infrastructure.orchestration.langgraph.routing.dynamic_router import (  # noqa: E402
     ConditionalEnrichment,
     EnrichmentRule,
     INTENT_TO_NODE,

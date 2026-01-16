@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 
-import pytest
 
 from chat_worker.application.services.bulk_waste_service import BulkWasteService
 
@@ -53,9 +52,7 @@ class TestBulkWasteServiceExtractSigungu:
 
     def test_extract_sigungu_from_address(self) -> None:
         """address 딕셔너리에서 추출."""
-        location = {
-            "address": {"sigungu": "강남구", "city": "서울시"}
-        }
+        location = {"address": {"sigungu": "강남구", "city": "서울시"}}
 
         result = BulkWasteService.extract_sigungu(location)
 
@@ -63,9 +60,7 @@ class TestBulkWasteServiceExtractSigungu:
 
     def test_extract_sigungu_from_address_구(self) -> None:
         """address 딕셔너리의 '구' 키에서 추출."""
-        location = {
-            "address": {"구": "서초구", "city": "서울시"}
-        }
+        location = {"address": {"구": "서초구", "city": "서울시"}}
 
         result = BulkWasteService.extract_sigungu(location)
 
@@ -227,8 +222,7 @@ class TestBulkWasteServiceBuildContextString:
     def test_build_context_string_with_many_fees(self) -> None:
         """많은 수수료 항목 (10개 초과)."""
         items = [
-            MockBulkWasteItemDTO(item_name=f"품목{i}", fee_text=f"{i}000원")
-            for i in range(15)
+            MockBulkWasteItemDTO(item_name=f"품목{i}", fee_text=f"{i}000원") for i in range(15)
         ]
 
         result = BulkWasteService.build_context_string(

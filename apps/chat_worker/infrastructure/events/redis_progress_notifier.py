@@ -674,9 +674,7 @@ class RedisProgressNotifier(ProgressNotifierPort):
         # Metrics: Stream duration
         if start_time is not None:
             duration = time.perf_counter() - start_time
-            CHAT_STREAM_DURATION.labels(node=stream_node, status="success").observe(
-                duration
-            )
+            CHAT_STREAM_DURATION.labels(node=stream_node, status="success").observe(duration)
 
         # Metrics: Token count per stream
         CHAT_STREAM_TOKEN_COUNT.labels(node=stream_node).observe(token_count)

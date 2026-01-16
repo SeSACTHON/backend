@@ -60,9 +60,7 @@ class CircuitBreakerOpen(Exception):
     def __init__(self, name: str, retry_after: float):
         self.name = name
         self.retry_after = retry_after
-        super().__init__(
-            f"Circuit breaker '{name}' is open. Retry after {retry_after:.1f}s"
-        )
+        super().__init__(f"Circuit breaker '{name}' is open. Retry after {retry_after:.1f}s")
 
 
 class CircuitBreaker(CircuitBreakerPort):

@@ -92,9 +92,7 @@ class KmaWeatherHttpClient(WeatherClientPort):
 
         return base_date, base_time
 
-    def _get_forecast_base_datetime(
-        self, now: datetime | None = None
-    ) -> tuple[str, str]:
+    def _get_forecast_base_datetime(self, now: datetime | None = None) -> tuple[str, str]:
         """단기예보용 base_date, base_time 계산.
 
         단기예보는 02, 05, 08, 11, 14, 17, 20, 23시 발표.
@@ -127,9 +125,7 @@ class KmaWeatherHttpClient(WeatherClientPort):
 
         return base_date.strftime("%Y%m%d"), f"{base_hour:02d}00"
 
-    def _parse_current_weather(
-        self, data: dict[str, Any], nx: int, ny: int
-    ) -> WeatherResponse:
+    def _parse_current_weather(self, data: dict[str, Any], nx: int, ny: int) -> WeatherResponse:
         """초단기실황 응답 파싱.
 
         Args:
@@ -171,9 +167,7 @@ class KmaWeatherHttpClient(WeatherClientPort):
             current = CurrentWeatherDTO(
                 temperature=float(values.get("T1H", "0")),
                 precipitation=float(values.get("RN1", "0")),
-                precipitation_type=PrecipitationType(
-                    int(values.get("PTY", "0"))
-                ),
+                precipitation_type=PrecipitationType(int(values.get("PTY", "0"))),
                 humidity=int(float(values.get("REH", "0"))),
                 sky_status=SkyStatus(int(values.get("SKY", "1"))),
                 wind_speed=float(values.get("WSD", "0")),
@@ -263,9 +257,7 @@ class KmaWeatherHttpClient(WeatherClientPort):
 
                 # 시간 범위 체크
                 try:
-                    fcst_dt = datetime.strptime(
-                        f"{fcst_date}{fcst_time}", "%Y%m%d%H%M"
-                    )
+                    fcst_dt = datetime.strptime(f"{fcst_date}{fcst_time}", "%Y%m%d%H%M")
                     if fcst_dt > cutoff:
                         continue
                 except ValueError:
@@ -274,13 +266,9 @@ class KmaWeatherHttpClient(WeatherClientPort):
                 forecast = WeatherForecastDTO(
                     date=fcst_date,
                     time=fcst_time,
-                    temperature=(
-                        float(values["TMP"]) if "TMP" in values else None
-                    ),
+                    temperature=(float(values["TMP"]) if "TMP" in values else None),
                     precipitation_prob=int(float(values.get("POP", "0"))),
-                    precipitation_type=PrecipitationType(
-                        int(values.get("PTY", "0"))
-                    ),
+                    precipitation_type=PrecipitationType(int(values.get("PTY", "0"))),
                     sky_status=SkyStatus(int(values.get("SKY", "1"))),
                 )
                 forecasts.append(forecast)
@@ -372,9 +360,7 @@ class KmaWeatherHttpClient(WeatherClientPort):
                 ny=ny,
             )
 
-    async def get_forecast(
-        self, nx: int, ny: int, hours: int = 24
-    ) -> WeatherResponse:
+    async def get_forecast(self, nx: int, ny: int, hours: int = 24) -> WeatherResponse:
         """단기예보 조회.
 
         Args:

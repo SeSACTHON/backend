@@ -248,7 +248,7 @@ class TestGenerateAnswerCommand:
             has_multi_intent=True,
         )
 
-        result = await command.execute_full(input_dto)
+        await command.execute_full(input_dto)
 
         mock_prompt_builder.build_multi.assert_called_with(["waste", "character"])
 

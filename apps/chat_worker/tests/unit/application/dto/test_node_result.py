@@ -2,7 +2,6 @@
 
 from datetime import datetime
 
-import pytest
 
 from chat_worker.application.dto.node_result import NodeResult, NodeStatus
 

@@ -185,9 +185,7 @@ class GetWeatherCommand:
             "temperature": response.current.temperature if response.current else None,
             "humidity": response.current.humidity if response.current else None,
             "precipitation_type": (
-                response.current.precipitation_type.name
-                if response.current
-                else None
+                response.current.precipitation_type.name if response.current else None
             ),
             "tip": tip,
             "emoji": emoji,
