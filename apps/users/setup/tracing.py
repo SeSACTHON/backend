@@ -1,37 +1,54 @@
-"""OpenTelemetry Tracing - Character Service.
+"""OpenTelemetry Distributed Tracing Configuration for Users API.
 
-domains 의존성 제거 - 내부 모듈.
+분산 트레이싱 설정:
+- FastAPI 자동 계측 (HTTP 요청/응답)
+- HTTPX 자동 계측 (외부 API 호출)
+- Redis 자동 계측 (캐시)
+
+Architecture:
+  Users API (OTel SDK) -> OTLP/HTTP (4318) -> Jaeger Collector
 """
 
 import logging
 import os
+from typing import Optional
+
+from fastapi import FastAPI
 
 logger = logging.getLogger(__name__)
 
+# Environment variables
 OTEL_EXPORTER_ENDPOINT = os.getenv(
     "OTEL_EXPORTER_OTLP_ENDPOINT",
-    "jaeger-collector.istio-system.svc.cluster.local:4317",
+    "http://jaeger-collector-clusterip.istio-system.svc.cluster.local:4318",
 )
 OTEL_SAMPLING_RATE = float(os.getenv("OTEL_SAMPLING_RATE", "1.0"))
 OTEL_ENABLED = os.getenv("OTEL_ENABLED", "true").lower() == "true"
 
+# Service constants
+SERVICE_NAME = "users-api"
+SERVICE_VERSION = os.getenv("SERVICE_VERSION", "1.0.0")
+ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
 
-def setup_tracing(service_name: str) -> bool:
+# Lazy initialization
+_tracer_provider = None
+
+
+def configure_tracing() -> bool:
     """OpenTelemetry 트레이싱 설정.
 
-    Args:
-        service_name: 서비스 이름
-
     Returns:
-        설정 성공 여부
+        bool: 설정 성공 여부
     """
+    global _tracer_provider
+
     if not OTEL_ENABLED:
         logger.info("OpenTelemetry tracing disabled (OTEL_ENABLED=false)")
         return False
 
     try:
         from opentelemetry import trace
-        from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import (
+        from opentelemetry.exporter.otlp.proto.http.trace_exporter import (
             OTLPSpanExporter,
         )
         from opentelemetry.sdk.resources import Resource
@@ -39,23 +56,33 @@ def setup_tracing(service_name: str) -> bool:
         from opentelemetry.sdk.trace.export import BatchSpanProcessor
         from opentelemetry.sdk.trace.sampling import TraceIdRatioBased
 
+        # Resource attributes
         resource = Resource.create(
             {
-                "service.name": service_name,
-                "service.version": os.getenv("SERVICE_VERSION", "1.0.0"),
-                "deployment.environment": os.getenv("ENVIRONMENT", "dev"),
+                "service.name": SERVICE_NAME,
+                "service.version": SERVICE_VERSION,
+                "deployment.environment": ENVIRONMENT,
+                "telemetry.sdk.name": "opentelemetry",
+                "telemetry.sdk.language": "python",
             }
         )
 
+        # Sampler
         sampler = TraceIdRatioBased(OTEL_SAMPLING_RATE)
-        provider = TracerProvider(resource=resource, sampler=sampler)
 
-        exporter = OTLPSpanExporter(
-            endpoint=OTEL_EXPORTER_ENDPOINT,
-            insecure=True,
+        # TracerProvider
+        _tracer_provider = TracerProvider(
+            resource=resource,
+            sampler=sampler,
         )
 
-        provider.add_span_processor(
+        # OTLP HTTP Exporter
+        exporter = OTLPSpanExporter(
+            endpoint=f"{OTEL_EXPORTER_ENDPOINT}/v1/traces",
+        )
+
+        # BatchSpanProcessor
+        _tracer_provider.add_span_processor(
             BatchSpanProcessor(
                 exporter,
                 max_queue_size=2048,
@@ -64,12 +91,12 @@ def setup_tracing(service_name: str) -> bool:
             )
         )
 
-        trace.set_tracer_provider(provider)
+        trace.set_tracer_provider(_tracer_provider)
 
         logger.info(
             "OpenTelemetry tracing configured",
             extra={
-                "service": service_name,
+                "service": SERVICE_NAME,
                 "endpoint": OTEL_EXPORTER_ENDPOINT,
                 "sampling_rate": OTEL_SAMPLING_RATE,
             },
@@ -84,7 +111,7 @@ def setup_tracing(service_name: str) -> bool:
         return False
 
 
-def instrument_fastapi(app) -> None:
+def instrument_fastapi(app: FastAPI) -> None:
     """FastAPI 자동 계측."""
     if not OTEL_ENABLED:
         return
@@ -94,7 +121,7 @@ def instrument_fastapi(app) -> None:
 
         FastAPIInstrumentor.instrument_app(
             app,
-            excluded_urls="health,ready,metrics",
+            excluded_urls="health,ready,metrics,ping",
         )
         logger.info("FastAPI instrumentation enabled")
 
@@ -122,7 +149,7 @@ def instrument_httpx() -> None:
 
 
 def instrument_redis() -> None:
-    """Redis 자동 계측 (캐시 추적)."""
+    """Redis 자동 계측."""
     if not OTEL_ENABLED:
         return
 
@@ -140,6 +167,24 @@ def instrument_redis() -> None:
 
 def shutdown_tracing() -> None:
     """트레이싱 종료."""
-    # TracerProvider는 global이므로 shutdown은 필요하지 않음
-    # 향후 _tracer_provider를 저장하여 shutdown 구현 가능
-    pass
+    global _tracer_provider
+
+    if _tracer_provider is not None:
+        try:
+            _tracer_provider.shutdown()
+            logger.info("OpenTelemetry tracing shutdown complete")
+        except Exception as e:
+            logger.error(f"Error shutting down tracing: {e}")
+
+
+def get_tracer(name: str = SERVICE_NAME):
+    """Tracer 인스턴스 반환."""
+    if not OTEL_ENABLED:
+        return None
+
+    try:
+        from opentelemetry import trace
+
+        return trace.get_tracer(name)
+    except ImportError:
+        return None

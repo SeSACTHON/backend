@@ -1,6 +1,11 @@
 """Chat Service Main Application.
 
 FastAPI 앱 팩토리 및 라이프사이클 관리.
+
+분산 트레이싱 통합:
+- FastAPI 자동 계측 (HTTP 요청/응답)
+- HTTPX 자동 계측 (LLM API 호출)
+- Redis 자동 계측 (Pub/Sub)
 """
 
 from __future__ import annotations
@@ -15,6 +20,13 @@ from chat.infrastructure.persistence_postgres.mappings import start_mappers
 from chat.presentation.http.controllers import chat_router
 from chat.setup.config import get_settings
 from chat.setup.dependencies import get_container
+from chat.setup.tracing import (
+    configure_tracing,
+    instrument_fastapi,
+    instrument_httpx,
+    instrument_redis,
+    shutdown_tracing,
+)
 
 # 로깅 설정
 logging.basicConfig(
@@ -22,6 +34,11 @@ logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
+
+# OpenTelemetry 분산 트레이싱 설정
+configure_tracing()
+instrument_httpx()
+instrument_redis()
 
 
 @asynccontextmanager
@@ -55,6 +72,7 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("Chat service shutting down...")
     await container.close()
+    shutdown_tracing()
 
 
 def create_app() -> FastAPI:
@@ -82,6 +100,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # OpenTelemetry FastAPI instrumentation
+    instrument_fastapi(app)
 
     # 라우터 등록
     # Note: SSE는 별도 SSE Gateway에서 처리 (/api/v1/chat/{job_id}/events)
