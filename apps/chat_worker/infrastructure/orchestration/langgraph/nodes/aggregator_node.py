@@ -14,7 +14,7 @@ LangGraph의 Send API 특성:
 4. answer_node를 위한 최종 state 정리
 
 Production Architecture:
-- NodePolicy에서 is_required 플래그로 필수/선택 결정
+- contracts.py의 INTENT_REQUIRED_FIELDS가 Single Source of Truth
 - 필수 컨텍스트 실패 시 needs_fallback=True로 fallback 라우팅
 """
 
@@ -23,25 +23,15 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
+from chat_worker.infrastructure.orchestration.langgraph.contracts import (
+    get_required_fields,
+    validate_missing_fields,
+)
+
 if TYPE_CHECKING:
     from chat_worker.application.ports.events import ProgressNotifierPort
 
 logger = logging.getLogger(__name__)
-
-# Intent → 필수 컨텍스트 필드 매핑
-# 각 intent에서 활성화되는 노드 중 필수 노드만 포함
-INTENT_REQUIRED_CONTEXT_FIELDS: dict[str, frozenset[str]] = {
-    "waste": frozenset({"disposal_rules"}),  # waste_rag 필수
-    "bulk_waste": frozenset({"bulk_waste_context"}),  # bulk_waste 필수
-    "location": frozenset({"location_context"}),  # location 필수
-    "general": frozenset(),  # general은 LLM 직접 응답이라 별도 컨텍스트 불필요
-    # 선택 intent는 필수 컨텍스트 없음 (FAIL_OPEN)
-    "character": frozenset(),
-    "collection_point": frozenset(),
-    "web_search": frozenset(),
-    "image_generation": frozenset(),
-    "recyclable_price": frozenset(),
-}
 
 
 def create_aggregator_node(
@@ -116,9 +106,11 @@ def create_aggregator_node(
                     collected_fields.add(field)
             # None인 것은 해당 노드가 실행되지 않았거나 결과 없음
 
-        # 필수 컨텍스트 검증 (intent별)
-        required_fields = INTENT_REQUIRED_CONTEXT_FIELDS.get(intent, frozenset())
-        missing_required = required_fields - collected_fields
+        # 필수 컨텍스트 검증 (contracts.py Single Source of Truth)
+        missing_required, missing_optional = validate_missing_fields(
+            intent=intent,
+            collected_fields=collected_fields,
+        )
         needs_fallback = len(missing_required) > 0
 
         logger.info(
@@ -128,8 +120,9 @@ def create_aggregator_node(
                 "intent": intent,
                 "collected_count": len(collected),
                 "collected": collected,
-                "required_fields": list(required_fields),
+                "required_fields": list(get_required_fields(intent)),
                 "missing_required": list(missing_required),
+                "missing_optional": list(missing_optional),
                 "needs_fallback": needs_fallback,
             },
         )
