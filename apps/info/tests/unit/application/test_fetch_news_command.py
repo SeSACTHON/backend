@@ -1,9 +1,14 @@
-"""FetchNewsCommand Unit Tests."""
+"""FetchNewsCommand Unit Tests.
+
+FetchNewsCommand는 Read-Only UseCase:
+- Redis 캐시 조회 (Primary)
+- Postgres Fallback (캐시 미스 시)
+"""
 
 from __future__ import annotations
 
 from datetime import datetime
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -19,29 +24,41 @@ class TestFetchNewsCommand:
     def command(
         self,
         mock_news_cache: AsyncMock,
-        mock_news_source: AsyncMock,
-        mock_aggregator: MagicMock,
-        mock_og_extractor: AsyncMock,
     ) -> FetchNewsCommand:
-        """FetchNewsCommand 인스턴스."""
+        """FetchNewsCommand 인스턴스 (캐시만)."""
         return FetchNewsCommand(
-            news_sources=[mock_news_source],
             news_cache=mock_news_cache,
-            aggregator=mock_aggregator,
-            cache_ttl=3600,
-            og_extractor=mock_og_extractor,
         )
 
+    @pytest.fixture
+    def command_with_fallback(
+        self,
+        mock_news_cache: AsyncMock,
+        mock_news_repository: AsyncMock,
+    ) -> FetchNewsCommand:
+        """FetchNewsCommand 인스턴스 (캐시 + Postgres Fallback)."""
+        return FetchNewsCommand(
+            news_cache=mock_news_cache,
+            news_repository=mock_news_repository,
+        )
+
+    @pytest.fixture
+    def mock_news_repository(self) -> AsyncMock:
+        """Mock NewsRepositoryPort."""
+        mock = AsyncMock()
+        mock.get_articles = AsyncMock()
+        mock.get_total_count = AsyncMock(return_value=0)
+        return mock
+
     @pytest.mark.asyncio
-    async def test_returns_cached_articles_when_fresh(
+    async def test_returns_cached_articles(
         self,
         command: FetchNewsCommand,
         mock_news_cache: AsyncMock,
         sample_article: NewsArticle,
     ) -> None:
-        """캐시가 fresh일 때 캐시된 기사 반환."""
+        """캐시에서 기사 반환."""
         # Arrange
-        mock_news_cache.is_fresh.return_value = True
         mock_news_cache.get_articles.return_value = ([sample_article], None, False)
         mock_news_cache.get_total_count.return_value = 1
         mock_news_cache.get_ttl.return_value = 3500
@@ -54,58 +71,41 @@ class TestFetchNewsCommand:
         # Assert
         assert len(result.articles) == 1
         assert result.articles[0].id == sample_article.id
-        mock_news_cache.is_fresh.assert_called_once_with("all")
+        assert result.meta.source == "redis"
 
     @pytest.mark.asyncio
-    async def test_refreshes_cache_when_stale(
+    async def test_fallback_to_postgres_on_cache_miss(
         self,
-        command: FetchNewsCommand,
+        command_with_fallback: FetchNewsCommand,
         mock_news_cache: AsyncMock,
-        mock_news_source: AsyncMock,
-        mock_aggregator: MagicMock,
+        mock_news_repository: AsyncMock,
         sample_article: NewsArticle,
-        now: datetime,
     ) -> None:
-        """캐시가 stale일 때 외부 API 호출."""
-        # Arrange
-        mock_news_cache.is_fresh.return_value = False
-        mock_news_cache.get_articles.return_value = ([sample_article], None, False)
-        mock_news_cache.get_total_count.return_value = 1
-        mock_news_cache.get_ttl.return_value = 3600
+        """캐시 미스 시 Postgres Fallback."""
+        from info.application.ports.news_repository import PaginatedResult
 
-        # 외부 API 응답 설정
-        fetched_article = NewsArticle(
-            id="fetched_001",
-            title="Fetched Article",
-            url="https://example.com/fetched",
-            snippet="Fetched content",
-            source="mock_source",
-            source_name="Test",
-            published_at=now,
+        # Arrange - 캐시 비어있음
+        mock_news_cache.get_articles.return_value = ([], None, False)
+
+        # Postgres 결과
+        mock_news_repository.get_articles.return_value = PaginatedResult(
+            articles=[sample_article],
+            next_cursor=None,
+            has_more=False,
+            total_count=1,
+            source="postgres",
         )
-        mock_news_source.fetch_news.return_value = [fetched_article]
-
-        # Aggregator 설정
-        mock_aggregator.get_search_queries.return_value = ["test query"]
-        mock_aggregator.merge_and_deduplicate.return_value = [fetched_article]
-        mock_aggregator.classify_articles.return_value = [
-            fetched_article.with_category("environment")
-        ]
-        mock_aggregator.prioritize_with_images.return_value = [
-            fetched_article.with_category("environment")
-        ]
-        mock_aggregator.filter_by_category.return_value = [
-            fetched_article.with_category("environment")
-        ]
+        mock_news_repository.get_total_count.return_value = 1
 
         request = NewsListRequest(category="all", limit=10)
 
         # Act
-        await command.execute(request)
+        result = await command_with_fallback.execute(request)
 
         # Assert
-        mock_news_source.fetch_news.assert_called()
-        mock_news_cache.set_articles.assert_called()
+        assert len(result.articles) == 1
+        mock_news_repository.get_articles.assert_called_once()
+        assert result.meta.source == "postgres"
 
     @pytest.mark.asyncio
     async def test_filters_by_source(
@@ -137,7 +137,6 @@ class TestFetchNewsCommand:
             ),
         ]
 
-        mock_news_cache.is_fresh.return_value = True
         mock_news_cache.get_articles.return_value = (articles, None, False)
         mock_news_cache.get_total_count.return_value = 2
         mock_news_cache.get_ttl.return_value = 3500
@@ -183,7 +182,6 @@ class TestFetchNewsCommand:
             ),
         ]
 
-        mock_news_cache.is_fresh.return_value = True
         mock_news_cache.get_articles.return_value = (articles, None, False)
         mock_news_cache.get_total_count.return_value = 2
         mock_news_cache.get_ttl.return_value = 3500
@@ -206,7 +204,6 @@ class TestFetchNewsCommand:
     ) -> None:
         """페이지네이션 커서 테스트."""
         # Arrange
-        mock_news_cache.is_fresh.return_value = True
         mock_news_cache.get_articles.return_value = (
             [sample_article],
             1234567890000,  # next_cursor
@@ -238,7 +235,6 @@ class TestFetchNewsCommand:
     ) -> None:
         """메타 정보 반환 테스트."""
         # Arrange
-        mock_news_cache.is_fresh.return_value = True
         mock_news_cache.get_articles.return_value = ([sample_article], None, False)
         mock_news_cache.get_total_count.return_value = 150
         mock_news_cache.get_ttl.return_value = 2847
@@ -251,54 +247,19 @@ class TestFetchNewsCommand:
         # Assert
         assert result.meta.total_cached == 150
         assert result.meta.cache_expires_in == 2847
+        assert result.meta.source == "redis"
 
     @pytest.mark.asyncio
-    async def test_handles_api_failure_gracefully(
+    async def test_empty_cache_without_fallback(
         self,
         command: FetchNewsCommand,
         mock_news_cache: AsyncMock,
-        mock_news_source: AsyncMock,
-        mock_aggregator: MagicMock,
     ) -> None:
-        """외부 API 실패 시 graceful 처리."""
+        """캐시 비어있고 Fallback 없을 때 빈 결과."""
         # Arrange
-        mock_news_cache.is_fresh.return_value = False
         mock_news_cache.get_articles.return_value = ([], None, False)
         mock_news_cache.get_total_count.return_value = 0
         mock_news_cache.get_ttl.return_value = 0
-
-        # API 실패 시뮬레이션
-        mock_news_source.fetch_news.side_effect = Exception("API Error")
-        mock_aggregator.get_search_queries.return_value = ["test query"]
-
-        request = NewsListRequest(category="all", limit=10)
-
-        # Act
-        result = await command.execute(request)
-
-        # Assert - 예외 없이 빈 결과 반환
-        assert len(result.articles) == 0
-
-    @pytest.mark.asyncio
-    async def test_no_news_sources_configured(
-        self,
-        mock_news_cache: AsyncMock,
-        mock_aggregator: MagicMock,
-    ) -> None:
-        """뉴스 소스가 없을 때 테스트."""
-        # Arrange
-        command = FetchNewsCommand(
-            news_sources=[],  # 빈 소스 목록
-            news_cache=mock_news_cache,
-            aggregator=mock_aggregator,
-            cache_ttl=3600,
-        )
-
-        mock_news_cache.is_fresh.return_value = False
-        mock_news_cache.get_articles.return_value = ([], None, False)
-        mock_news_cache.get_total_count.return_value = 0
-        mock_news_cache.get_ttl.return_value = 0
-        mock_aggregator.get_search_queries.return_value = ["test"]
 
         request = NewsListRequest(category="all", limit=10)
 
@@ -307,3 +268,4 @@ class TestFetchNewsCommand:
 
         # Assert
         assert len(result.articles) == 0
+        assert result.meta.source == "redis"

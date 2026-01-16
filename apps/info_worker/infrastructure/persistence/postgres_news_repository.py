@@ -7,7 +7,7 @@ asyncpg를 사용하여 비동기 I/O 지원.
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from datetime import timezone
 from typing import TYPE_CHECKING
 
 from info_worker.application.ports.news_repository import (
