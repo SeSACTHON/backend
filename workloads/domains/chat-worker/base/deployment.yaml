@@ -19,7 +19,7 @@ spec:
       serviceAccountName: default
       containers:
       - name: chat-worker
-        image: mng990/eco2:chat-worker-latest
+        image: docker.io/mng990/eco2:chat-worker-dev-latest
         imagePullPolicy: Always
         resources:
           requests:
