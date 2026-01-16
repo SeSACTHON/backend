@@ -49,6 +49,11 @@ from chat_worker.infrastructure.orchestration.langgraph.policies.node_policy imp
 from chat_worker.infrastructure.resilience.circuit_breaker import (
     CircuitBreakerRegistry,
 )
+from chat_worker.infrastructure.telemetry import (
+    get_tracer,
+    set_span_attributes,
+    OTEL_ENABLED,
+)
 
 if TYPE_CHECKING:
     from chat_worker.infrastructure.orchestration.langgraph.policies.node_policy import (
@@ -115,6 +120,8 @@ class NodeExecutor:
     ) -> dict[str, Any]:
         """Policy를 적용하여 노드 실행.
 
+        ADR P2: OpenTelemetry span으로 추적 속성 기록.
+
         Args:
             node_name: 노드 이름 (policy 조회용)
             node_func: 실행할 노드 함수
@@ -130,6 +137,23 @@ class NodeExecutor:
         job_id = state.get("job_id", "")
         start_time = time.time()
 
+        # OpenTelemetry: span 시작 (활성화 시)
+        span = None
+        if OTEL_ENABLED:
+            tracer = get_tracer()
+            span = tracer.start_span(f"node:{node_name}")
+            set_span_attributes(
+                span,
+                {
+                    "node.name": node_name,
+                    "node.policy.timeout_ms": policy.timeout_ms,
+                    "node.policy.fail_mode": policy.fail_mode.value,
+                    "job_id": job_id,
+                    "intent": state.get("intent"),
+                    "user_id": state.get("user_id"),
+                },
+            )
+
         # 1. Circuit Breaker 확인
         if not await cb.allow_request():
             logger.warning(
@@ -141,6 +165,17 @@ class NodeExecutor:
                     "retry_after": cb.retry_after(),
                 },
             )
+            # OpenTelemetry: circuit open 기록
+            if span:
+                set_span_attributes(
+                    span,
+                    {
+                        "node.status": "circuit_open",
+                        "node.latency_ms": (time.time() - start_time) * 1000,
+                    },
+                )
+                span.end()
+
             return await self._handle_failure(
                 state=state,
                 node_name=node_name,
@@ -183,6 +218,19 @@ class NodeExecutor:
                     latency_ms=latency_ms,
                     retry_count=retry_count,
                 )
+
+                # OpenTelemetry: 성공 기록
+                if span:
+                    set_span_attributes(
+                        span,
+                        {
+                            "node.status": "success",
+                            "node.latency_ms": latency_ms,
+                            "node.retry_count": retry_count,
+                        },
+                    )
+                    span.end()
+
                 return self._append_node_result(result_state, node_result)
 
             except asyncio.TimeoutError:
@@ -229,6 +277,7 @@ class NodeExecutor:
                 latency_ms=latency_ms,
                 retry_count=retry_count,
             )
+            status = "timeout"
         else:
             node_result = NodeResult.failed(
                 node_name=node_name,
@@ -236,6 +285,20 @@ class NodeExecutor:
                 latency_ms=latency_ms,
                 retry_count=retry_count,
             )
+            status = "failed"
+
+        # OpenTelemetry: 실패 기록
+        if span:
+            set_span_attributes(
+                span,
+                {
+                    "node.status": status,
+                    "node.latency_ms": latency_ms,
+                    "node.retry_count": retry_count,
+                    "node.error": str(last_error) if last_error else None,
+                },
+            )
+            span.end()
 
         return await self._handle_failure(
             state=state,

@@ -26,6 +26,7 @@ from dataclasses import dataclass
 
 from pydantic import BaseModel, Field
 
+from chat_worker.application.dto.intent_signals import IntentSignals
 from chat_worker.domain import ChatIntent, Intent, QueryComplexity
 
 logger = logging.getLogger(__name__)
@@ -68,6 +69,12 @@ SINGLE_INTENT_PATTERNS = [
 
 # 신뢰도 임계값
 CONFIDENCE_THRESHOLD = 0.6
+
+# Chain-of-Intent 부스트 상한 (ADR P2 명시)
+MAX_TRANSITION_BOOST = 0.15
+
+# Chain-of-Intent 부스트 적용 조건: 이전 신뢰도가 이 값 이상이어야 부스트 적용
+MIN_CONFIDENCE_FOR_BOOST = 0.7
 
 # 캐시 TTL (초)
 INTENT_CACHE_TTL = 3600  # 1시간
@@ -138,6 +145,7 @@ class IntentClassificationResult:
     intent: Intent
     confidence: float
     is_complex: bool
+    signals: IntentSignals | None = None
 
     def to_chat_intent(self) -> ChatIntent:
         """Domain Value Object로 변환."""
@@ -238,28 +246,57 @@ class IntentClassifierService:
     ) -> IntentClassificationResult:
         """LLM 응답을 파싱하여 Intent 분류 결과 생성.
 
+        ADR P2: IntentSignals로 신호별 기여도 분리 저장.
+
         Args:
             llm_response: LLM 응답
             message: 원본 메시지
             context: 대화 맥락
 
         Returns:
-            IntentClassificationResult
+            IntentClassificationResult (signals 포함)
         """
         intent_str = llm_response.strip().lower()
-        intent, confidence = self._parse_intent_with_confidence(intent_str, message)
 
-        # Intent Transition Boost (Chain-of-Intent 적용)
+        # 1. LLM 기본 신뢰도 계산
+        intent, llm_confidence, length_penalty = self._parse_intent_with_signals(
+            intent_str, message
+        )
+
+        # 2. 키워드 부스트 계산
+        keyword_boost = self._calculate_keyword_boost(message, intent)
+
+        # 3. Chain-of-Intent 전이 부스트 계산
+        transition_boost = 0.0
         if context:
             previous_intents = context.get("previous_intents", [])
-            boost = self._adjust_confidence_by_transition(intent, previous_intents)
-            confidence = min(1.0, confidence + boost)
+            last_confidence = context.get("last_confidence")  # P2: 이전 신뢰도 체크
+            transition_boost = self._adjust_confidence_by_transition(
+                intent, previous_intents, last_confidence
+            )
+
+        # 4. IntentSignals 생성
+        signals = IntentSignals(
+            llm_confidence=llm_confidence,
+            keyword_boost=keyword_boost,
+            transition_boost=transition_boost,
+            length_penalty=length_penalty,
+        )
+
+        # 최종 신뢰도 (IntentSignals에서 계산)
+        final_confidence = signals.final_confidence
 
         # 신뢰도 기반 Fallback
-        if confidence < CONFIDENCE_THRESHOLD:
+        if final_confidence < CONFIDENCE_THRESHOLD:
             logger.warning(
-                f"Low confidence ({confidence:.2f}) for intent={intent_str}, "
-                f"falling back to general"
+                "Low confidence (%.2f) for intent=%s, falling back to general. "
+                "Signals: llm=%.2f, keyword=%.2f, transition=%.2f, length=%.2f",
+                final_confidence,
+                intent_str,
+                llm_confidence,
+                keyword_boost,
+                transition_boost,
+                length_penalty,
             )
             intent = Intent.GENERAL
 
@@ -268,45 +305,56 @@ class IntentClassifierService:
 
         return IntentClassificationResult(
             intent=intent,
-            confidence=confidence,
+            confidence=final_confidence,
             is_complex=is_complex,
+            signals=signals,
         )
 
-    def _parse_intent_with_confidence(
+    def _parse_intent_with_signals(
         self,
         intent_str: str,
         message: str,
-    ) -> tuple[Intent, float]:
-        """Intent 파싱 및 신뢰도 계산."""
+    ) -> tuple[Intent, float, float]:
+        """Intent 파싱 및 개별 신호 계산.
+
+        Args:
+            intent_str: LLM 응답 문자열
+            message: 사용자 메시지
+
+        Returns:
+            (intent, llm_confidence, length_penalty) 튜플
+        """
         intent = Intent.from_string(intent_str)
-        confidence = 1.0
+        llm_confidence = 1.0
+        length_penalty = 0.0
 
         # 규칙 1: LLM 응답이 정확히 매칭되지 않으면 감점
         if intent_str not in [i.value for i in Intent]:
-            confidence -= 0.3
+            llm_confidence -= 0.3
 
-        # 규칙 2: 메시지가 너무 짧으면 감점
+        # 규칙 2: 메시지가 너무 짧으면 페널티
         if len(message) < 5:
-            confidence -= 0.2
+            length_penalty = -0.2
 
-        # 규칙 3: 키워드 매칭으로 보정
-        confidence = self._adjust_confidence_by_keywords(message, intent, confidence)
+        return intent, max(0.0, min(1.0, llm_confidence)), length_penalty
 
-        return intent, max(0.0, min(1.0, confidence))
-
-    def _adjust_confidence_by_keywords(
+    def _calculate_keyword_boost(
         self,
         message: str,
         intent: Intent,
-        base_confidence: float,
     ) -> float:
-        """키워드 기반 신뢰도 보정."""
-        confidence = base_confidence
+        """키워드 매칭 기반 부스트 계산.
 
+        Args:
+            message: 사용자 메시지
+            intent: 분류된 의도
+
+        Returns:
+            키워드 부스트 값 (0.0 ~ 0.2, 또는 음수 페널티)
+        """
         keyword_map = {
             Intent.WASTE: ["버려", "버리", "분리", "재활용", "쓰레기", "폐기"],
             Intent.CHARACTER: ["캐릭터", "얻", "모아", "컬렉션"],
-            # LOCATION: 장소 검색 (카카오맵)
             Intent.LOCATION: [
                 "어디",
                 "근처",
@@ -316,7 +364,6 @@ class IntentClassifierService:
                 "제로웨이스트",
                 "재활용센터",
             ],
-            # BULK_WASTE: 대형폐기물 (행정안전부 API)
             Intent.BULK_WASTE: [
                 "대형폐기물",
                 "대형",
@@ -330,7 +377,6 @@ class IntentClassifierService:
                 "매트리스",
                 "침대",
             ],
-            # RECYCLABLE_PRICE: 재활용자원 시세 (한국환경공단 API)
             Intent.RECYCLABLE_PRICE: [
                 "시세",
                 "가격",
@@ -341,7 +387,6 @@ class IntentClassifierService:
                 "kg",
                 "킬로",
             ],
-            # COLLECTION_POINT: 수거함 위치 (KECO API)
             Intent.COLLECTION_POINT: [
                 "수거함",
                 "의류수거",
@@ -352,7 +397,6 @@ class IntentClassifierService:
                 "의류",
             ],
             Intent.WEB_SEARCH: ["최신", "최근", "뉴스", "정책", "규제", "발표", "공지"],
-            # IMAGE_GENERATION: 이미지 생성 (Responses API)
             Intent.IMAGE_GENERATION: [
                 "이미지",
                 "그림",
@@ -368,19 +412,64 @@ class IntentClassifierService:
         matches = sum(1 for k in keywords if k in message)
 
         if matches > 0:
-            confidence += min(0.2, matches * 0.1)
+            return min(0.2, matches * 0.1)  # 최대 0.2
         elif intent != Intent.GENERAL:
-            confidence -= 0.1
+            return -0.1  # 페널티
+        return 0.0
 
-        return confidence
+    def _parse_intent_with_confidence(
+        self,
+        intent_str: str,
+        message: str,
+    ) -> tuple[Intent, float]:
+        """Intent 파싱 및 신뢰도 계산 (레거시, 호환성 유지)."""
+        intent, llm_conf, length_pen = self._parse_intent_with_signals(
+            intent_str, message
+        )
+        keyword_boost = self._calculate_keyword_boost(message, intent)
+        confidence = llm_conf + keyword_boost + length_pen
+        return intent, max(0.0, min(1.0, confidence))
+
+    def _adjust_confidence_by_keywords(
+        self,
+        message: str,
+        intent: Intent,
+        base_confidence: float,
+    ) -> float:
+        """키워드 기반 신뢰도 보정 (레거시, _calculate_keyword_boost 위임)."""
+        boost = self._calculate_keyword_boost(message, intent)
+        return base_confidence + boost
 
     def _adjust_confidence_by_transition(
         self,
         intent: Intent,
         previous_intents: list[str],
+        last_confidence: float | None = None,
     ) -> float:
-        """Intent 전이 확률 기반 신뢰도 부스트."""
+        """Intent 전이 확률 기반 신뢰도 부스트.
+
+        ADR P2 요구사항:
+        - MAX_TRANSITION_BOOST = 0.15 상한
+        - last_confidence < MIN_CONFIDENCE_FOR_BOOST이면 부스트 미적용
+
+        Args:
+            intent: 현재 분류된 의도
+            previous_intents: 이전 의도 문자열 리스트
+            last_confidence: 이전 의도의 신뢰도 (None이면 체크 스킵)
+
+        Returns:
+            적용할 부스트 값 (0.0 ~ MAX_TRANSITION_BOOST)
+        """
         if not previous_intents:
+            return 0.0
+
+        # 이전 신뢰도가 낮으면 부스트 미적용 (ADR P2)
+        if last_confidence is not None and last_confidence < MIN_CONFIDENCE_FOR_BOOST:
+            logger.debug(
+                "Transition boost skipped: last_confidence=%.2f < %.2f",
+                last_confidence,
+                MIN_CONFIDENCE_FOR_BOOST,
+            )
             return 0.0
 
         try:
@@ -388,9 +477,15 @@ class IntentClassifierService:
             transitions = INTENT_TRANSITION_BOOST.get(last_intent, {})
             boost = transitions.get(intent, 0.0)
 
+            # 명시적 상한 적용 (ADR P2)
+            boost = min(MAX_TRANSITION_BOOST, boost)
+
             if boost > 0:
                 logger.debug(
-                    f"Transition boost: {last_intent.value} → {intent.value} = +{boost}"
+                    "Transition boost: %s → %s = +%.2f",
+                    last_intent.value,
+                    intent.value,
+                    boost,
                 )
 
             return boost
@@ -487,4 +582,6 @@ __all__ = [
     "QueryDecompositionSchema",
     "CONFIDENCE_THRESHOLD",
     "INTENT_CACHE_TTL",
+    "MAX_TRANSITION_BOOST",
+    "MIN_CONFIDENCE_FOR_BOOST",
 ]
