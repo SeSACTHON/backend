@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
-import pytest
 
 from info.application.services.news_aggregator import NewsAggregatorService
 from info.domain.entities import NewsArticle

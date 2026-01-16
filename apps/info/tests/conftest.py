@@ -12,10 +12,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
+from info.domain.entities import NewsArticle
+
 # pytest-asyncio 자동 모드 설정
 pytest_plugins = ("pytest_asyncio",)
-
-from info.domain.entities import NewsArticle
 
 
 # ============================================================

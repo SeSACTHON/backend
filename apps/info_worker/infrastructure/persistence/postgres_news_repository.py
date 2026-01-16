@@ -192,9 +192,7 @@ class PostgresNewsRepository(NewsRepositoryPort):
             next_cursor = None
             if articles and has_more:
                 last = articles[-1]
-                next_cursor = NewsCursor(
-                    published_at=last.published_at, article_id=last.id
-                )
+                next_cursor = NewsCursor(published_at=last.published_at, article_id=last.id)
 
             # 총 개수 (첫 페이지에서만 조회, 이후는 -1로 반환)
             # 성능 최적화: COUNT(*)는 비용이 높으므로 첫 페이지에서만

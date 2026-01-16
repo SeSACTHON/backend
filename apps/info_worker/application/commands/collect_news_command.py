@@ -94,7 +94,9 @@ class CollectNewsCommand:
         all_articles = []
 
         for query in queries:
-            tasks = [source.fetch_news(query=query, max_results=30) for source in self._news_sources]
+            tasks = [
+                source.fetch_news(query=query, max_results=30) for source in self._news_sources
+            ]
             results = await asyncio.gather(*tasks, return_exceptions=True)
 
             for result in results:
