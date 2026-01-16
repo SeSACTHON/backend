@@ -14,7 +14,7 @@ config = get_model_config("openai/gpt-5.2")
 image_model = config.image_model  # "gpt-image-1.5"
 
 # Provider별 이미지 모델 직접 조회
-image_model = get_image_model(Provider.GEMINI)  # "gemini-3-pro-image-preview"
+image_model = get_image_model(Provider.GOOGLE)  # "gemini-3-pro-image-preview"
 ```
 """
 
@@ -28,7 +28,7 @@ class Provider(str, Enum):
     """LLM Provider."""
 
     OPENAI = "openai"
-    GEMINI = "gemini"
+    GOOGLE = "google"
 
 
 @dataclass(frozen=True)
@@ -101,11 +101,11 @@ MODEL_REGISTRY: dict[str, ModelConfig] = {
         max_output_tokens=128000,
     ),
     # -------------------------------------------------------------------------
-    # Google Gemini: 3.0 Preview 세트
+    # Google: Gemini 3.0 Preview 세트
     # -------------------------------------------------------------------------
-    "gemini/gemini-3.0-preview": ModelConfig(
-        id="gemini/gemini-3.0-preview",
-        provider=Provider.GEMINI,
+    "google/gemini-3.0-preview": ModelConfig(
+        id="google/gemini-3.0-preview",
+        provider=Provider.GOOGLE,
         model_name="gemini-3.0-preview",
         display_name="Gemini 3.0 Preview",
         image_model="gemini-3-pro-image-preview",
@@ -124,7 +124,7 @@ MODEL_REGISTRY: dict[str, ModelConfig] = {
 # Provider별 기본 이미지 모델
 DEFAULT_IMAGE_MODELS: dict[Provider, str] = {
     Provider.OPENAI: "gpt-image-1.5",
-    Provider.GEMINI: "gemini-3-pro-image-preview",
+    Provider.GOOGLE: "gemini-3-pro-image-preview",
 }
 
 

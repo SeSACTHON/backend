@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     postgres_url: str | None = None
 
     # LLM Provider
-    default_provider: Literal["openai", "gemini"] = "openai"
+    default_provider: Literal["openai", "google"] = "openai"
 
     # OpenAI
     openai_api_key: str | None = None

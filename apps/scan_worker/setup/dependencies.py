@@ -141,7 +141,7 @@ def get_vision_model(model: str | None = None) -> VisionModelPort:
     provider = settings.resolve_provider(model)
     api_key = settings.get_api_key(provider)
 
-    if provider == "gemini":
+    if provider == "google":
         return GeminiVisionAdapter(model=model, api_key=api_key)
     # 기본: GPT
     return GPTVisionAdapter(model=model, api_key=api_key)
@@ -170,7 +170,7 @@ def get_llm(model: str | None = None) -> LLMPort:
     provider = settings.resolve_provider(model)
     api_key = settings.get_api_key(provider)
 
-    if provider == "gemini":
+    if provider == "google":
         return GeminiLLMAdapter(model=model, api_key=api_key)
     # 기본: GPT
     return GPTLLMAdapter(model=model, api_key=api_key)

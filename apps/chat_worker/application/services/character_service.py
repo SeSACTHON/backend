@@ -3,6 +3,7 @@
 Port 의존 없이 순수 로직만 담당:
 - 컨텍스트 변환 (to_answer_context)
 - 결과 검증
+- 캐릭터 코드 변환
 
 Port 호출(API)은 Command에서 담당.
 
@@ -29,9 +30,35 @@ class CharacterService:
     Port 의존 없이 순수 비즈니스 로직만 담당:
     - 컨텍스트 변환 (to_answer_context)
     - 결과 검증
+    - 캐릭터 코드 변환
 
     API 호출은 Command에서 담당.
     """
+
+    # 캐릭터 코드 접두사 (DB: "char-pet" → CDN: "pet")
+    CHARACTER_CODE_PREFIX = "char-"
+
+    @staticmethod
+    def to_cdn_code(character_code: str | None) -> str | None:
+        """캐릭터 코드를 CDN 코드로 변환.
+
+        DB의 캐릭터 코드는 "char-pet" 형식이고,
+        CDN의 에셋 코드는 "pet" 형식입니다.
+
+        Args:
+            character_code: DB의 캐릭터 코드 (예: "char-pet")
+
+        Returns:
+            CDN 에셋 코드 (예: "pet") 또는 None
+        """
+        if not character_code:
+            return None
+
+        if character_code.startswith(CharacterService.CHARACTER_CODE_PREFIX):
+            return character_code[len(CharacterService.CHARACTER_CODE_PREFIX) :]
+
+        # 접두사가 없으면 그대로 반환 (이미 CDN 코드일 수 있음)
+        return character_code
 
     @staticmethod
     def to_answer_context(character: "CharacterDTO") -> dict[str, Any]:
@@ -48,6 +75,7 @@ class CharacterService:
             "type": character.type_label,
             "dialog": character.dialog,
             "match_reason": character.match_label,
+            "code": character.code,  # CDN 에셋 조회용
         }
 
     @staticmethod

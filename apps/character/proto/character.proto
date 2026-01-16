@@ -21,6 +21,7 @@ message GetByMatchResponse {
   string character_type = 3;
   string character_dialog = 4;
   string match_label = 5;
+  string character_code = 6;  // 캐릭터 코드 (CDN 에셋 조회용)
 }
 
 message GetDefaultCharacterRequest {}

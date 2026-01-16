@@ -14,24 +14,24 @@ TEST_ENV = {
 class TestSettingsResolveProvider:
     """Settings.resolve_provider() 테스트."""
 
-    def test_resolve_provider_gpt(self):
-        """GPT 모델 → gpt provider."""
+    def test_resolve_provider_openai(self):
+        """GPT 모델 → openai provider."""
         with patch.dict(os.environ, TEST_ENV, clear=False):
             from scan.setup.config import Settings
 
             settings = Settings()
-            assert settings.resolve_provider("gpt-5.2") == "gpt"
-            assert settings.resolve_provider("gpt-5.1") == "gpt"
-            assert settings.resolve_provider("gpt-5-mini") == "gpt"
+            assert settings.resolve_provider("gpt-5.2") == "openai"
+            assert settings.resolve_provider("gpt-5.1") == "openai"
+            assert settings.resolve_provider("gpt-5-mini") == "openai"
 
-    def test_resolve_provider_gemini(self):
-        """Gemini 모델 → gemini provider."""
+    def test_resolve_provider_google(self):
+        """Gemini 모델 → google provider."""
         with patch.dict(os.environ, TEST_ENV, clear=False):
             from scan.setup.config import Settings
 
             settings = Settings()
-            assert settings.resolve_provider("gemini-2.5-pro") == "gemini"
-            assert settings.resolve_provider("gemini-2.5-flash") == "gemini"
+            assert settings.resolve_provider("gemini-2.5-pro") == "google"
+            assert settings.resolve_provider("gemini-2.5-flash") == "google"
 
     def test_resolve_provider_unknown_raises(self):
         """알 수 없는 모델은 KeyError."""

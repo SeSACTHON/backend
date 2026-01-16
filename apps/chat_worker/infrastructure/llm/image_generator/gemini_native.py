@@ -84,9 +84,17 @@ class GeminiNativeImageGenerator(ImageGeneratorPort):
         Args:
             model: Gemini 이미지 모델 (기본 gemini-3-pro-image-preview)
             api_key: API 키 (None이면 환경변수 GOOGLE_API_KEY)
+
+        Raises:
+            ValueError: API 키가 없는 경우
         """
         self._model = model
         self._api_key = api_key or os.environ.get("GOOGLE_API_KEY")
+        if not self._api_key:
+            raise ValueError(
+                "Google API key required. Set GOOGLE_API_KEY environment variable "
+                "or pass api_key parameter."
+            )
         self._client = genai.Client(api_key=self._api_key)
         self._max_reference = MODEL_REFERENCE_LIMITS.get(model, 3)
 
@@ -242,7 +250,7 @@ class GeminiNativeImageGenerator(ImageGeneratorPort):
                 image_url=image_url,
                 image_bytes=image_bytes,
                 description=description,
-                provider="gemini",
+                provider="google",
                 model=self._model,
             )
 
