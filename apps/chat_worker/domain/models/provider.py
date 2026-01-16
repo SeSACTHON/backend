@@ -29,7 +29,6 @@ class Provider(str, Enum):
 
     OPENAI = "openai"
     GEMINI = "gemini"
-    ANTHROPIC = "anthropic"  # 이미지 생성 미지원, 향후 확장용
 
 
 @dataclass(frozen=True)
@@ -79,12 +78,11 @@ class ModelConfig:
 # ============================================================================
 # Model Registry
 # ============================================================================
-# OpenCode 스타일: 모든 지원 모델을 레지스트리에 등록
-# 새 모델 추가 시 여기에 등록
+# 지원 모델 등록 (필요 시 확장)
 
 MODEL_REGISTRY: dict[str, ModelConfig] = {
     # -------------------------------------------------------------------------
-    # OpenAI Models
+    # OpenAI: GPT-5.2 세트
     # -------------------------------------------------------------------------
     "openai/gpt-5.2": ModelConfig(
         id="openai/gpt-5.2",
@@ -102,38 +100,8 @@ MODEL_REGISTRY: dict[str, ModelConfig] = {
         context_window=400000,
         max_output_tokens=128000,
     ),
-    "openai/gpt-4.1": ModelConfig(
-        id="openai/gpt-4.1",
-        provider=Provider.OPENAI,
-        model_name="gpt-4.1",
-        display_name="GPT-4.1",
-        image_model="gpt-image-1.5",
-        capabilities=ModelCapabilities(
-            supports_tools=True,
-            supports_vision=True,
-            supports_image_generation=True,
-            max_reference_images=0,
-        ),
-        context_window=1047576,
-        max_output_tokens=32768,
-    ),
-    "openai/gpt-4.1-mini": ModelConfig(
-        id="openai/gpt-4.1-mini",
-        provider=Provider.OPENAI,
-        model_name="gpt-4.1-mini",
-        display_name="GPT-4.1 Mini",
-        image_model="gpt-image-1.5",
-        capabilities=ModelCapabilities(
-            supports_tools=True,
-            supports_vision=True,
-            supports_image_generation=True,
-            max_reference_images=0,
-        ),
-        context_window=1047576,
-        max_output_tokens=32768,
-    ),
     # -------------------------------------------------------------------------
-    # Google Gemini Models
+    # Google Gemini: 3.0 Preview 세트
     # -------------------------------------------------------------------------
     "gemini/gemini-3.0-preview": ModelConfig(
         id="gemini/gemini-3.0-preview",
@@ -150,70 +118,6 @@ MODEL_REGISTRY: dict[str, ModelConfig] = {
         ),
         context_window=2000000,
         max_output_tokens=65536,
-    ),
-    "gemini/gemini-3-flash-preview": ModelConfig(
-        id="gemini/gemini-3-flash-preview",
-        provider=Provider.GEMINI,
-        model_name="gemini-3-flash-preview",
-        display_name="Gemini 3 Flash",
-        image_model="gemini-2.5-flash-image",
-        capabilities=ModelCapabilities(
-            supports_tools=True,
-            supports_vision=True,
-            supports_image_generation=True,
-            max_reference_images=3,  # Flash는 최대 3개
-            supports_audio=True,
-        ),
-        context_window=1000000,
-        max_output_tokens=65536,
-    ),
-    "gemini/gemini-2.5-pro": ModelConfig(
-        id="gemini/gemini-2.5-pro",
-        provider=Provider.GEMINI,
-        model_name="gemini-2.5-pro",
-        display_name="Gemini 2.5 Pro",
-        image_model="gemini-2.5-flash-image",
-        capabilities=ModelCapabilities(
-            supports_tools=True,
-            supports_vision=True,
-            supports_image_generation=True,
-            max_reference_images=3,
-        ),
-        context_window=1000000,
-        max_output_tokens=65536,
-    ),
-    # -------------------------------------------------------------------------
-    # Anthropic Models (이미지 생성 미지원)
-    # -------------------------------------------------------------------------
-    "anthropic/claude-opus-4": ModelConfig(
-        id="anthropic/claude-opus-4",
-        provider=Provider.ANTHROPIC,
-        model_name="claude-opus-4-20250514",
-        display_name="Claude Opus 4",
-        image_model=None,  # 이미지 생성 미지원
-        capabilities=ModelCapabilities(
-            supports_tools=True,
-            supports_vision=True,
-            supports_image_generation=False,
-            max_reference_images=0,
-        ),
-        context_window=200000,
-        max_output_tokens=32000,
-    ),
-    "anthropic/claude-sonnet-4": ModelConfig(
-        id="anthropic/claude-sonnet-4",
-        provider=Provider.ANTHROPIC,
-        model_name="claude-sonnet-4-20250514",
-        display_name="Claude Sonnet 4",
-        image_model=None,
-        capabilities=ModelCapabilities(
-            supports_tools=True,
-            supports_vision=True,
-            supports_image_generation=False,
-            max_reference_images=0,
-        ),
-        context_window=200000,
-        max_output_tokens=64000,
     ),
 }
 
