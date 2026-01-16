@@ -139,9 +139,7 @@ class RedisNewsCache(NewsCachePort):
         pipe.delete(feed_key)
 
         # Sorted Set에 추가
-        feed_data = {
-            article.id: article.published_at_ms for article in articles
-        }
+        feed_data = {article.id: article.published_at_ms for article in articles}
         if feed_data:
             pipe.zadd(feed_key, feed_data)
             pipe.expire(feed_key, ttl)

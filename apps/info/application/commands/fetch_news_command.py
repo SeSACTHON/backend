@@ -92,9 +92,7 @@ class FetchNewsCommand:
                     # 레거시 cursor (timestamp만) - ID 없이 조회
                     from datetime import datetime, timezone
 
-                    ts = datetime.fromtimestamp(
-                        int(request.cursor) / 1000, tz=timezone.utc
-                    )
+                    ts = datetime.fromtimestamp(int(request.cursor) / 1000, tz=timezone.utc)
                     cursor = NewsCursor(published_at=ts, article_id="")
 
             result = await self._news_repository.get_articles(

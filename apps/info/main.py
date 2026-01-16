@@ -25,7 +25,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info(
         "Info service starting",
         extra={
-            "redis_url": settings.redis_url.split("@")[-1] if "@" in settings.redis_url else settings.redis_url,
+            "redis_url": (
+                settings.redis_url.split("@")[-1]
+                if "@" in settings.redis_url
+                else settings.redis_url
+            ),
             "cache_ttl": settings.news_cache_ttl,
             "naver_enabled": bool(settings.naver_client_id),
             "newsdata_enabled": bool(settings.newsdata_api_key),

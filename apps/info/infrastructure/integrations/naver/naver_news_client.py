@@ -192,6 +192,7 @@ class NaverNewsClient(NewsSourcePort):
         except Exception:
             logger.debug("Failed to parse date: %s, using current time", date_str)
             from datetime import timezone
+
             return datetime.now(timezone.utc)
 
     def _extract_source_name(self, url: str) -> str:

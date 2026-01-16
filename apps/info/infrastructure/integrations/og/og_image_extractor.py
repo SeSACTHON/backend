@@ -90,6 +90,7 @@ class OGImageExtractor:
                         image_url = f"https:{image_url}"
                     elif image_url.startswith("/"):
                         from urllib.parse import urlparse
+
                         parsed = urlparse(url)
                         image_url = f"{parsed.scheme}://{parsed.netloc}{image_url}"
 
@@ -120,9 +121,7 @@ class OGImageExtractor:
         from dataclasses import replace
 
         # 이미지가 없는 기사만 추출
-        articles_without_image = [
-            (i, a) for i, a in enumerate(articles) if not a.thumbnail_url
-        ]
+        articles_without_image = [(i, a) for i, a in enumerate(articles) if not a.thumbnail_url]
 
         if not articles_without_image:
             return articles
@@ -133,10 +132,7 @@ class OGImageExtractor:
         )
 
         # 병렬로 og:image 추출
-        tasks = [
-            self.extract_image_url(article.url)
-            for _, article in articles_without_image
-        ]
+        tasks = [self.extract_image_url(article.url) for _, article in articles_without_image]
         results = await asyncio.gather(*tasks)
 
         # 결과 병합
