@@ -251,15 +251,11 @@ async def summarize_messages(
 
     # 메시지 텍스트 구성
     messages_text = "\n".join(
-        f"{msg.__class__.__name__}: {msg.content}"
-        for msg in messages
-        if hasattr(msg, "content")
+        f"{msg.__class__.__name__}: {msg.content}" for msg in messages if hasattr(msg, "content")
     )
 
     # 프롬프트 포맷팅
-    existing_summary_section = (
-        f"이전 요약:\n{existing_summary}\n\n" if existing_summary else ""
-    )
+    existing_summary_section = f"이전 요약:\n{existing_summary}\n\n" if existing_summary else ""
     summary_prompt = template.format(
         max_summary_tokens=max_summary_tokens,
         existing_summary_section=existing_summary_section,
@@ -375,9 +371,7 @@ def create_summarization_hook(
         # 요약을 SystemMessage로 변환
         summarized_messages = []
         if new_summary:
-            summarized_messages.append(
-                SystemMessage(content=f"[이전 대화 요약]\n{new_summary}")
-            )
+            summarized_messages.append(SystemMessage(content=f"[이전 대화 요약]\n{new_summary}"))
         summarized_messages.extend(recent_messages)
 
         # 압축 후 토큰 확인
@@ -474,7 +468,9 @@ class SummarizationNode:
             )
         else:
             # 레거시: 수동 설정 또는 기본값
-            self.max_tokens_before_summary = max_tokens_before_summary or DEFAULT_MAX_TOKENS_BEFORE_SUMMARY
+            self.max_tokens_before_summary = (
+                max_tokens_before_summary or DEFAULT_MAX_TOKENS_BEFORE_SUMMARY
+            )
             self.max_summary_tokens = max_summary_tokens or DEFAULT_MAX_SUMMARY_TOKENS
             self.keep_recent_messages = keep_recent_messages or DEFAULT_KEEP_RECENT_MESSAGES
 

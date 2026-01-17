@@ -109,9 +109,7 @@ class WeatherClientPort(ABC):
         pass
 
     @abstractmethod
-    async def get_forecast(
-        self, nx: int, ny: int, hours: int = 24
-    ) -> WeatherResponse:
+    async def get_forecast(self, nx: int, ny: int, hours: int = 24) -> WeatherResponse:
         """단기예보 조회.
 
         Args:

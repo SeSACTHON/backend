@@ -59,9 +59,7 @@ def create_collection_point_node(
         collection_point_node 함수
     """
     # Command(UseCase) 인스턴스 생성 - Port 조립
-    command = SearchCollectionPointCommand(
-        collection_point_client=collection_point_client
-    )
+    command = SearchCollectionPointCommand(collection_point_client=collection_point_client)
 
     async def _collection_point_node_inner(state: dict[str, Any]) -> dict[str, Any]:
         """실제 노드 로직 (NodeExecutor가 래핑).

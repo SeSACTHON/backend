@@ -42,8 +42,7 @@ class TestContractValidation:
             for field in required_fields:
                 producers = get_producing_nodes(field)
                 assert len(producers) > 0, (
-                    f"Intent '{intent}' requires field '{field}' "
-                    f"but no node produces it"
+                    f"Intent '{intent}' requires field '{field}' " f"but no node produces it"
                 )
 
     def test_all_optional_fields_have_producers(self) -> None:
@@ -52,8 +51,7 @@ class TestContractValidation:
             for field in optional_fields:
                 producers = get_producing_nodes(field)
                 assert len(producers) > 0, (
-                    f"Intent '{intent}' optionally uses field '{field}' "
-                    f"but no node produces it"
+                    f"Intent '{intent}' optionally uses field '{field}' " f"but no node produces it"
                 )
 
 

@@ -40,6 +40,7 @@ from chat_worker.application.services.progress_tracker import (
     DynamicProgressTracker,
     SUBAGENT_NODES,
     get_node_message,
+    get_stage_for_node,
 )
 
 if TYPE_CHECKING:
@@ -380,9 +381,7 @@ class ProcessChatCommand:
         """
         final_result: dict[str, Any] = {}
 
-        async for event in self._pipeline.astream_events(
-            state, config=config, version="v2"
-        ):
+        async for event in self._pipeline.astream_events(state, config=config, version="v2"):
             event_type = event.get("event")
 
             if event_type == "on_chain_start":
@@ -426,12 +425,15 @@ class ProcessChatCommand:
         phase = progress_tracker.get_phase_for_node(node)
         progress = progress_tracker.calculate_progress(phase, "started")
 
+        # Stage 결정 (서브에이전트는 개별 stage명 사용)
+        stage = get_stage_for_node(node)
+
         # UI 메시지 생성
         message = get_node_message(node, "started")
 
         await self._progress_notifier.notify_stage(
             task_id=job_id,
-            stage=phase,
+            stage=stage,
             status="started",
             progress=progress,
             message=message,
@@ -477,12 +479,15 @@ class ProcessChatCommand:
         phase = progress_tracker.get_phase_for_node(node)
         progress = progress_tracker.calculate_progress(phase, "completed")
 
+        # Stage 결정 (서브에이전트는 개별 stage명 사용)
+        stage = get_stage_for_node(node)
+
         # UI 메시지 생성
         message = get_node_message(node, "completed")
 
         await self._progress_notifier.notify_stage(
             task_id=job_id,
-            stage=phase,
+            stage=stage,
             status="completed",
             progress=progress,
             message=message,

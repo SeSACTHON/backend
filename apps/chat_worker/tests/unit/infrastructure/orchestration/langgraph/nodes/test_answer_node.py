@@ -34,8 +34,6 @@ class MockLLMClient:
             yield char
 
 
-
-
 class MockCache:
     """테스트용 Mock Cache."""
 
@@ -140,9 +138,7 @@ class TestMultiIntentAnswer:
         assert mock_llm.call_count == 1
 
     @pytest.mark.asyncio
-    async def test_multi_intent_without_additional_uses_single(
-        self, mock_llm: MockLLMClient
-    ):
+    async def test_multi_intent_without_additional_uses_single(self, mock_llm: MockLLMClient):
         """has_multi_intent=True지만 additional_intents 없으면 단일 프롬프트."""
         mock_llm.set_responses(["답변"])
 

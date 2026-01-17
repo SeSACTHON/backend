@@ -92,9 +92,7 @@ class SearchCollectionPointCommand:
         """
         self._client = collection_point_client
 
-    async def execute(
-        self, input_dto: SearchCollectionPointInput
-    ) -> SearchCollectionPointOutput:
+    async def execute(self, input_dto: SearchCollectionPointInput) -> SearchCollectionPointOutput:
         """Command 실행.
 
         Args:
@@ -261,13 +259,15 @@ class SearchCollectionPointCommand:
         """검색 결과 컨텍스트."""
         items = []
         for point in results:
-            items.append({
-                "name": point.name,
-                "address": point.address,
-                "collection_types": point.collection_types_text,
-                "is_free": point.is_free,
-                "place_category": point.place_category,
-            })
+            items.append(
+                {
+                    "name": point.name,
+                    "address": point.address,
+                    "collection_types": point.collection_types_text,
+                    "is_free": point.is_free,
+                    "place_category": point.place_category,
+                }
+            )
 
         # Answer에 주입할 컨텍스트 문자열 생성
         context_lines = [

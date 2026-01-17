@@ -55,9 +55,7 @@ class TestIntentClassifierService:
         prompt = service.get_multi_detect_system_prompt()
         assert prompt == "Multi-Intent 감지 프롬프트"
 
-    def test_build_prompt_with_context_no_context(
-        self, service: IntentClassifierService
-    ):
+    def test_build_prompt_with_context_no_context(self, service: IntentClassifierService):
         """맥락 없이 프롬프트 구성."""
         prompt = service.build_prompt_with_context("페트병 어떻게 버려?", None)
         assert prompt == "페트병 어떻게 버려?"
@@ -113,9 +111,7 @@ class TestIntentClassifierService:
 
         assert result.intent == Intent.LOCATION
 
-    def test_parse_intent_response_strips_whitespace(
-        self, service: IntentClassifierService
-    ):
+    def test_parse_intent_response_strips_whitespace(self, service: IntentClassifierService):
         """공백 제거."""
         result = service.parse_intent_response(
             llm_response="  waste  \n",
@@ -124,9 +120,7 @@ class TestIntentClassifierService:
 
         assert result.intent == Intent.WASTE
 
-    def test_parse_intent_response_case_insensitive(
-        self, service: IntentClassifierService
-    ):
+    def test_parse_intent_response_case_insensitive(self, service: IntentClassifierService):
         """대소문자 무관."""
         result = service.parse_intent_response(
             llm_response="WASTE",
@@ -135,9 +129,7 @@ class TestIntentClassifierService:
 
         assert result.intent == Intent.WASTE
 
-    def test_parse_intent_response_unknown_fallback(
-        self, service: IntentClassifierService
-    ):
+    def test_parse_intent_response_unknown_fallback(self, service: IntentClassifierService):
         """알 수 없는 응답은 general로."""
         result = service.parse_intent_response(
             llm_response="unknown_xyz",
@@ -146,9 +138,7 @@ class TestIntentClassifierService:
 
         assert result.intent == Intent.GENERAL
 
-    def test_parse_intent_response_low_confidence_fallback(
-        self, service: IntentClassifierService
-    ):
+    def test_parse_intent_response_low_confidence_fallback(self, service: IntentClassifierService):
         """낮은 신뢰도는 general로."""
         # 유효하지 않은 응답(-0.3) + 짧은 메시지(-0.2) + 키워드 없음(-0.1)
         result = service.parse_intent_response(
@@ -172,9 +162,7 @@ class TestIntentClassifierService:
 
         assert result.confidence == 1.0  # max clamp
 
-    def test_confidence_reduced_for_short_message(
-        self, service: IntentClassifierService
-    ):
+    def test_confidence_reduced_for_short_message(self, service: IntentClassifierService):
         """짧은 메시지는 신뢰도 감소."""
         result = service.parse_intent_response(
             llm_response="waste",
@@ -183,9 +171,7 @@ class TestIntentClassifierService:
 
         assert result.confidence < 1.0
 
-    def test_confidence_reduced_for_invalid_response(
-        self, service: IntentClassifierService
-    ):
+    def test_confidence_reduced_for_invalid_response(self, service: IntentClassifierService):
         """유효하지 않은 응답은 신뢰도 감소."""
         result = service.parse_intent_response(
             llm_response="invalid_response",
@@ -248,9 +234,7 @@ class TestIntentClassifierService:
         assert service.is_definitely_single_intent("페트병 버려") is True
         assert service.is_definitely_single_intent("안녕") is True
 
-    def test_is_definitely_single_intent_simple_question(
-        self, service: IntentClassifierService
-    ):
+    def test_is_definitely_single_intent_simple_question(self, service: IntentClassifierService):
         """단순 의문사는 확실히 단일 Intent."""
         assert service.is_definitely_single_intent("뭐야?") is True
         assert service.is_definitely_single_intent("어디") is True
@@ -281,9 +265,7 @@ class TestIntentClassifierService:
         assert result.detected_categories == ["waste", "character"]
         assert result.confidence == 0.9
 
-    def test_parse_multi_detect_response_invalid_json(
-        self, service: IntentClassifierService
-    ):
+    def test_parse_multi_detect_response_invalid_json(self, service: IntentClassifierService):
         """잘못된 JSON."""
         result = service.parse_multi_detect_response("invalid json")
 
@@ -300,9 +282,7 @@ class TestIntentClassifierService:
         assert result.queries == ["페트병 버려", "캐릭터 알려줘"]
         assert result.original == "원본"
 
-    def test_parse_decompose_response_invalid_json(
-        self, service: IntentClassifierService
-    ):
+    def test_parse_decompose_response_invalid_json(self, service: IntentClassifierService):
         """잘못된 JSON."""
         result = service.parse_decompose_response("invalid", "원본")
 
@@ -323,9 +303,7 @@ class TestIntentClassifierService:
         assert key1 != key3  # 다른 메시지 = 다른 키
         assert key1.startswith("intent:")
 
-    def test_generate_cache_key_case_insensitive(
-        self, service: IntentClassifierService
-    ):
+    def test_generate_cache_key_case_insensitive(self, service: IntentClassifierService):
         """대소문자 무관."""
         key1 = service.generate_cache_key("TEST")
         key2 = service.generate_cache_key("test")

@@ -125,9 +125,7 @@ class GetCharacterCommand:
             )
 
         # 3. 결과 파싱 (Service - 순수 로직)
-        extraction_result = self._category_extractor.parse_extraction_result(
-            llm_response
-        )
+        extraction_result = self._category_extractor.parse_extraction_result(llm_response)
         events.append("category_extraction_completed")
 
         if not extraction_result.success:
@@ -146,9 +144,7 @@ class GetCharacterCommand:
 
         # 4. Character API 호출 (Command에서 Port 호출)
         try:
-            character = await self._character_client.get_character_by_waste_category(
-                waste_category
-            )
+            character = await self._character_client.get_character_by_waste_category(waste_category)
             events.append("character_api_called")
         except Exception as e:
             logger.error(
@@ -167,9 +163,7 @@ class GetCharacterCommand:
             events.append("character_not_found")
             return GetCharacterOutput(
                 success=True,
-                character_context=CharacterService.build_not_found_context(
-                    waste_category
-                ),
+                character_context=CharacterService.build_not_found_context(waste_category),
                 events=events,
             )
 

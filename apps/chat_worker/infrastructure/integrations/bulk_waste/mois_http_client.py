@@ -191,25 +191,19 @@ class MoisWasteInfoHttpClient(BulkWasteClientPort):
                 },
             )
             # 빈 응답 반환 (graceful degradation)
-            return WasteInfoSearchResponse(
-                query={"sido": sido, "sigungu": sigungu}
-            )
+            return WasteInfoSearchResponse(query={"sido": sido, "sigungu": sigungu})
         except httpx.TimeoutException:
             logger.error(
                 "MOIS API timeout",
                 extra={"sigungu": sigungu, "timeout": self._timeout},
             )
-            return WasteInfoSearchResponse(
-                query={"sido": sido, "sigungu": sigungu}
-            )
+            return WasteInfoSearchResponse(query={"sido": sido, "sigungu": sigungu})
         except Exception as e:
             logger.error(
                 "MOIS disposal info search failed",
                 extra={"sigungu": sigungu, "error": str(e)},
             )
-            return WasteInfoSearchResponse(
-                query={"sido": sido, "sigungu": sigungu}
-            )
+            return WasteInfoSearchResponse(query={"sido": sido, "sigungu": sigungu})
 
     def _parse_disposal_response(
         self,

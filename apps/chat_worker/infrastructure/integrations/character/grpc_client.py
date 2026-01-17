@@ -97,9 +97,7 @@ class CharacterGrpcClient(CharacterClientPort):
         request = character_pb2.GetByMatchRequest(match_label=waste_category)
 
         try:
-            response = await stub.GetCharacterByMatch(
-                request, timeout=DEFAULT_GRPC_TIMEOUT
-            )
+            response = await stub.GetCharacterByMatch(request, timeout=DEFAULT_GRPC_TIMEOUT)
 
             if not response.found:
                 logger.info(
