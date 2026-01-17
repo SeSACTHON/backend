@@ -173,7 +173,7 @@ spec:
             command:
             - /bin/sh
             - -c
-            - ps aux | grep -v grep | grep -q 'celery.*beat'
+            - cat /proc/1/cmdline 2>/dev/null | tr '\0' ' ' | grep -q celery
           initialDelaySeconds: 10
           periodSeconds: 30
           failureThreshold: 3
