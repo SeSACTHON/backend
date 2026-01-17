@@ -166,9 +166,9 @@ spec:
         livenessProbe:
           exec:
             command:
-            - pgrep
-            - -f
-            - celery.*beat
+            - /bin/sh
+            - -c
+            - ps aux | grep -v grep | grep -q 'celery.*beat'
           initialDelaySeconds: 10
           periodSeconds: 30
           failureThreshold: 3
