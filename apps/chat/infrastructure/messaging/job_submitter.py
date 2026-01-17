@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 
+from aio_pika import ExchangeType
 from taskiq.message import BrokerMessage
 from taskiq_aio_pika import AioPikaBroker
 
@@ -36,6 +37,8 @@ class TaskiqJobSubmitter(JobSubmitterPort):
                 url=self._settings.rabbitmq_url,
                 declare_exchange=True,
                 exchange_name="chat_tasks",
+                exchange_type=ExchangeType.DIRECT,
+                routing_key="chat.process",
             )
             await self._broker.startup()
             logger.info("TaskiqJobSubmitter broker started")
