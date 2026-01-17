@@ -5,6 +5,8 @@ namespace: rabbitmq
 
 resources:
 - vhost.yaml
+- users.yaml
+- permissions.yaml
 - exchanges.yaml
 - queues.yaml
 - bindings.yaml
