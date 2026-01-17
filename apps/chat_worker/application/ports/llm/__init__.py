@@ -15,9 +15,11 @@ LLMPort가 커지면 비대해지기 쉬움:
 """
 
 from .llm_client import LLMClientPort
-from .llm_policy import LLMPolicyPort
+from .llm_policy import LLMPolicyPort, ModelTier, TaskType
 
 __all__ = [
     "LLMClientPort",
     "LLMPolicyPort",
+    "ModelTier",
+    "TaskType",
 ]
