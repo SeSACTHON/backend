@@ -78,8 +78,7 @@ async def startup() -> None:
 
     # 멀티 도메인 스트림 설정: [(prefix, shard_count), ...]
     stream_configs = [
-        (prefix, settings.get_shard_count(prefix))
-        for prefix in settings.stream_prefixes
+        (prefix, settings.get_shard_count(prefix)) for prefix in settings.stream_prefixes
     ]
 
     logger.info(
@@ -249,7 +248,7 @@ async def ready() -> JSONResponse:
             {"status": "not_ready", "reason": "consumer_not_running"}, status_code=503
         )
 
-    if reclaimer_task is None or reclaimer_task.done():
+    if not reclaimer_tasks or any(t.done() for t in reclaimer_tasks):
         return JSONResponse(
             {"status": "not_ready", "reason": "reclaimer_not_running"}, status_code=503
         )
