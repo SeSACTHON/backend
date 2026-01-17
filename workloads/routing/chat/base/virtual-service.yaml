@@ -9,6 +9,51 @@ spec:
   gateways:
   - istio-system/eco2-gateway
   http:
+  # ======= SSE Events → sse-gateway (Canary) =======
+  # /api/v1/chat/{job_id}/events 요청을 sse-gateway로 라우팅
+  # 이 규칙이 prefix /api/v1/chat 보다 먼저 매칭되어야 함
+  - name: chat-sse-events-canary
+    match:
+    - headers:
+        x-canary:
+          exact: 'true'
+      uri:
+        regex: /api/v1/chat/[^/]+/events
+      method:
+        exact: GET
+    route:
+    - destination:
+        host: sse-gateway.sse-consumer.svc.cluster.local
+        port:
+          number: 8000
+        subset: canary
+    timeout: 86400s
+    retries:
+      attempts: 0
+    headers:
+      request:
+        set:
+          x-sse-gateway: 'true'
+  # ======= SSE Events → sse-gateway (Stable) =======
+  - name: chat-sse-events
+    match:
+    - uri:
+        regex: /api/v1/chat/[^/]+/events
+      method:
+        exact: GET
+    route:
+    - destination:
+        host: sse-gateway.sse-consumer.svc.cluster.local
+        port:
+          number: 8000
+        subset: stable
+    timeout: 86400s
+    retries:
+      attempts: 0
+    headers:
+      request:
+        set:
+          x-sse-gateway: 'true'
   # ======= Canary 라우팅 (X-Canary: true 헤더) =======
   - match:
     - headers:
