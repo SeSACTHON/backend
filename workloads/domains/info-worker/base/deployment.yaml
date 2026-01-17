@@ -147,6 +147,8 @@ spec:
         - info_worker.setup.celery:celery_app
         - beat
         - --loglevel=info
+        - -s
+        - /tmp/celerybeat-schedule
         env:
         - name: CELERY_BROKER_URL
           valueFrom:
@@ -163,6 +165,9 @@ spec:
           limits:
             cpu: 100m
             memory: 128Mi
+        volumeMounts:
+        - name: beat-schedule
+          mountPath: /tmp
         livenessProbe:
           exec:
             command:
@@ -172,6 +177,9 @@ spec:
           initialDelaySeconds: 10
           periodSeconds: 30
           failureThreshold: 3
+      volumes:
+      - name: beat-schedule
+        emptyDir: {}
       imagePullSecrets:
       - name: dockerhub-secret
       nodeSelector:
