@@ -133,7 +133,6 @@ def create_intent_node(
         updated_intent_history = intent_history + [output.intent]
 
         return {
-            **state,
             "intent": output.intent,
             "is_complex": output.is_complex,
             "intent_confidence": output.confidence,

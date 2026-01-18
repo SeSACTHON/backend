@@ -23,6 +23,7 @@ from chat_worker.application.commands.generate_answer_command import (
     GenerateAnswerInput,
 )
 from chat_worker.infrastructure.assets.prompt_loader import PromptBuilder
+from chat_worker.infrastructure.orchestration.langgraph.sequence import cleanup_sequence
 
 if TYPE_CHECKING:
     from chat_worker.application.ports.cache import CachePort
@@ -154,16 +155,21 @@ def create_answer_node(
                 extra={"job_id": job_id, "length": len(answer)},
             )
 
-            # 3. output → state 변환
-            return {**state, "answer": answer}
+            # 3. Lamport Clock 정리 (메모리 관리)
+            # answer_node는 파이프라인의 마지막 노드이므로 여기서 정리
+            cleanup_sequence(job_id)
+
+            # 4. output → state 변환
+            return {"answer": answer}
 
         except Exception as e:
             logger.error(
                 "Answer generation failed",
                 extra={"job_id": job_id, "error": str(e)},
             )
+            # 에러 발생 시에도 Lamport Clock 정리
+            cleanup_sequence(job_id)
             return {
-                **state,
                 "answer": "답변 생성 중 오류가 발생했습니다. 다시 시도해주세요.",
             }
 

@@ -365,9 +365,10 @@ class TestRecyclablePriceNode:
 
         result = await node(state)
 
-        # 에러 상태 반환
-        assert result.get("recyclable_price_error") is not None
-        assert result["recyclable_price_context"]["type"] == "error"
+        # 에러 상태 반환 (Channel Separation: context 내부에 에러 정보)
+        context = result["recyclable_price_context"]
+        assert context.get("success") is False
+        assert context.get("error") is not None
 
         # 실패 이벤트 발행
         failed_events = [e for e in mock_publisher.stages if e["status"] == "failed"]
@@ -424,11 +425,14 @@ class TestRecyclablePriceNode:
     # ==========================================================
 
     @pytest.mark.anyio
-    async def test_node_preserves_existing_state(
+    async def test_node_returns_only_context_channel(
         self,
         node,
     ):
-        """기존 state 보존."""
+        """Channel Separation: 노드는 자신의 채널만 반환.
+
+        LangGraph의 state reducer가 기존 state와 병합 처리.
+        """
         state = {
             "job_id": "job-preserve",
             "message": "캔 시세",
@@ -440,10 +444,10 @@ class TestRecyclablePriceNode:
 
         result = await node(state)
 
-        # 기존 키들 보존
-        assert result["job_id"] == "job-preserve"
-        assert result["intent"] == "recyclable_price"
-        assert result["session_id"] == "session-1"
-        assert result["existing_key"] == "should_be_preserved"
-        # 새 키 추가
+        # Channel Separation: 노드는 자신의 채널만 반환
         assert "recyclable_price_context" in result
+        # 기존 state 키들은 반환하지 않음 (LangGraph reducer가 병합)
+        assert "job_id" not in result
+        assert "intent" not in result
+        assert "session_id" not in result
+        assert "existing_key" not in result

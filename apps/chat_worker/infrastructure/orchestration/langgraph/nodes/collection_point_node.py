@@ -8,6 +8,11 @@ Clean Architecture:
 - Command(UseCase): SearchCollectionPointCommand - 정책/흐름
 - Port: CollectionPointClientPort - HTTP API 호출
 
+Channel Separation:
+- 출력 채널: collection_point_context
+- Reducer: priority_preemptive_reducer
+- spread 금지: {"collection_point_context": create_context(...)} 형태로 반환
+
 사용 시나리오:
 1. "폐휴대폰 어디서 버려?" → 근처 수거함 위치 안내
 2. "폐건전지 수거함" → 수거함 검색
@@ -25,6 +30,10 @@ from typing import TYPE_CHECKING, Any
 from chat_worker.application.commands.search_collection_point_command import (
     SearchCollectionPointCommand,
     SearchCollectionPointInput,
+)
+from chat_worker.infrastructure.orchestration.langgraph.context_helper import (
+    create_context,
+    create_error_context,
 )
 from chat_worker.infrastructure.orchestration.langgraph.nodes.node_executor import (
     NodeExecutor,
@@ -120,9 +129,11 @@ def create_collection_point_node(
                 message="지역 정보 대기 중...",
             )
             return {
-                **state,
-                "collection_point_context": output.collection_point_context,
-                "needs_location": True,
+                "collection_point_context": create_context(
+                    data=output.collection_point_context or {"needs_location": True},
+                    producer="collection_point",
+                    job_id=job_id,
+                ),
             }
 
         if not output.success:
@@ -133,9 +144,11 @@ def create_collection_point_node(
                 result={"error": output.error_message},
             )
             return {
-                **state,
-                "collection_point_context": output.collection_point_context,
-                "collection_point_error": output.error_message,
+                "collection_point_context": create_error_context(
+                    producer="collection_point",
+                    job_id=job_id,
+                    error=output.error_message or "수거함 검색 실패",
+                ),
             }
 
         # Progress: 완료 (UX)
@@ -162,8 +175,11 @@ def create_collection_point_node(
         )
 
         return {
-            **state,
-            "collection_point_context": output.collection_point_context,
+            "collection_point_context": create_context(
+                data=output.collection_point_context or {},
+                producer="collection_point",
+                job_id=job_id,
+            ),
         }
 
     # NodeExecutor로 래핑 (Policy 적용: timeout, retry, circuit breaker)

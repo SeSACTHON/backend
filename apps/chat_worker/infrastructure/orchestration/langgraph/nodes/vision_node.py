@@ -68,7 +68,7 @@ def create_vision_node(
         # 이미지 없으면 빠른 스킵 (Progress 없이)
         if not image_url:
             logger.debug("No image_url, skipping vision node (job=%s)", job_id)
-            return state
+            return {}  # 빈 딕셔너리: 상태 변경 없음
 
         # Progress: 시작 (UX)
         await event_publisher.notify_stage(
@@ -92,7 +92,7 @@ def create_vision_node(
         # 3. output → state 변환
         if output.skipped:
             # 이미지 없어서 스킵됨 (이 케이스는 위에서 처리되지만 안전장치)
-            return state
+            return {}  # 빈 딕셔너리: 상태 변경 없음
 
         if not output.success:
             await event_publisher.notify_stage(
@@ -103,7 +103,6 @@ def create_vision_node(
                 message="이미지 분석 실패",
             )
             return {
-                **state,
                 "classification_result": output.classification_result,
                 "has_image": output.has_image,
                 "vision_error": output.error_message,
@@ -125,7 +124,6 @@ def create_vision_node(
         )
 
         return {
-            **state,
             "classification_result": output.classification_result,
             "has_image": output.has_image,
         }

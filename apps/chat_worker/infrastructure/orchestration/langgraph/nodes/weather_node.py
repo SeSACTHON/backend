@@ -12,6 +12,11 @@ Production Architecture:
 - NodeExecutor로 Policy 적용 (timeout, retry, circuit breaker)
 - weather 노드는 FAIL_OPEN (보조 정보, 없어도 답변 가능)
 
+Channel Separation:
+- 출력 채널: weather_context
+- Reducer: priority_preemptive_reducer
+- spread 금지: {"weather_context": create_context(...)} 형태로 반환
+
 사용 시나리오:
 1. 분리배출 답변에 날씨 기반 팁 추가
 2. 비/눈 예보 시 종이류 실내보관 권장
@@ -29,6 +34,10 @@ from typing import TYPE_CHECKING, Any
 from chat_worker.application.commands.get_weather_command import (
     GetWeatherCommand,
     GetWeatherInput,
+)
+from chat_worker.infrastructure.orchestration.langgraph.context_helper import (
+    create_context,
+    create_error_context,
 )
 from chat_worker.infrastructure.orchestration.langgraph.nodes.node_executor import (
     NodeExecutor,
@@ -129,8 +138,11 @@ def create_weather_node(
                 message="위치 정보 없음",
             )
             return {
-                **state,
-                "weather_context": None,
+                "weather_context": create_error_context(
+                    producer="weather",
+                    job_id=job_id,
+                    error="위치 정보 없음",
+                ),
             }
 
         if not output.success:
@@ -148,8 +160,11 @@ def create_weather_node(
                 result={"error": output.error_message},
             )
             return {
-                **state,
-                "weather_context": None,
+                "weather_context": create_error_context(
+                    producer="weather",
+                    job_id=job_id,
+                    error=output.error_message or "날씨 조회 실패",
+                ),
             }
 
         # Progress: 완료 (UX)
@@ -170,8 +185,11 @@ def create_weather_node(
         )
 
         return {
-            **state,
-            "weather_context": output.weather_context,
+            "weather_context": create_context(
+                data=output.weather_context or {},
+                producer="weather",
+                job_id=job_id,
+            ),
         }
 
     # NodeExecutor로 래핑 (Policy 적용: timeout, retry, circuit breaker)

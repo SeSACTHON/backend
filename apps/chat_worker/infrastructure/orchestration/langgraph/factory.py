@@ -105,6 +105,7 @@ from chat_worker.infrastructure.orchestration.langgraph.nodes.kakao_place_node i
 from chat_worker.infrastructure.orchestration.langgraph.nodes.web_search_node import (
     create_web_search_node,
 )
+from chat_worker.infrastructure.orchestration.langgraph.state import ChatState
 from chat_worker.infrastructure.orchestration.langgraph.summarization import (
     SummarizationNode,
 )
@@ -316,7 +317,7 @@ def create_chat_graph(
     async def router_node(state: dict[str, Any]) -> dict[str, Any]:
         return state
 
-    graph = StateGraph(dict)
+    graph = StateGraph(ChatState)
 
     # 핵심 노드 등록
     graph.add_node("intent", intent_node)
