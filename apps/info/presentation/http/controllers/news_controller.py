@@ -81,13 +81,14 @@ async def get_news(
 
     # cursor 변환 (두 가지 형식 지원)
     # 1. 순수 숫자: Redis 캐시에서 온 cursor (예: "1768584028000")
-    # 2. timestamp_id: Postgres fallback에서 온 cursor (예: "1768584028000_abc123")
+    # 2. timestamp_id: Postgres fallback에서 온 cursor (예: "1768584028000_naver_abc123")
+    #    article_id에 언더스코어가 포함될 수 있으므로 split으로 첫 번째 부분만 추출
     cursor_int = None
     if cursor:
         try:
-            # Postgres 형식 (timestamp_id)인 경우 timestamp만 추출
+            # Postgres 형식 (timestamp_id)인 경우 첫 번째 부분(timestamp)만 추출
             if "_" in cursor:
-                cursor_int = int(cursor.rsplit("_", 1)[0])
+                cursor_int = int(cursor.split("_", 1)[0])
             else:
                 cursor_int = int(cursor)
         except ValueError:
