@@ -55,9 +55,10 @@ tfplan
 *~
 .DS_Store
 
-# AI Coding Assistants (local skills)
+# AI Coding Assistants
 .cursor/
-.claude/
+.claude/settings.local.json
+.claude/plans/
 
 # Logs
 *.log
