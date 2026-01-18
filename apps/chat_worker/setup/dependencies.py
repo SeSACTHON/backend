@@ -750,9 +750,9 @@ async def get_chat_graph(
         max_tokens_before_summary=settings.max_tokens_before_summary,  # None이면 동적 계산
         max_summary_tokens=settings.max_summary_tokens,  # None이면 동적 계산
         keep_recent_messages=settings.keep_recent_messages,  # None이면 동적 계산
-        # TODO: Dynamic routing 비활성화 (StateGraph(dict)와 Send API 병렬 실행 충돌)
-        # 수정 필요: ChatState에 subagent context 채널 추가 후 재활성화
-        enable_dynamic_routing=False,
+        # Dynamic routing 활성화 (Channel Separation + Priority Scheduling 적용됨)
+        # ChatState Annotated Reducer로 Send API 병렬 실행 안전
+        enable_dynamic_routing=True,
     )
 
 

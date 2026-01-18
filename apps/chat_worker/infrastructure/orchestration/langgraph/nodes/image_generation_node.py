@@ -23,6 +23,10 @@ from chat_worker.application.commands.generate_image_command import (
     GenerateImageCommand,
     GenerateImageInput,
 )
+from chat_worker.infrastructure.orchestration.langgraph.context_helper import (
+    create_context,
+    create_error_context,
+)
 from chat_worker.infrastructure.orchestration.langgraph.nodes.node_executor import (
     NodeExecutor,
 )
@@ -124,15 +128,11 @@ def create_image_generation_node(
                 message="이미지 생성 실패",
             )
             return {
-                **state,
-                "generated_image_url": None,
-                "image_description": None,
-                "image_generation_error": output.error_message,
-                # answer는 answer_node에서 생성하도록 컨텍스트 전달
-                "image_generation_context": {
-                    "success": False,
-                    "error": output.error_message,
-                },
+                "image_generation_context": create_error_context(
+                    producer="image_generation",
+                    job_id=job_id,
+                    error=output.error_message or "이미지 생성 실패",
+                ),
             }
 
         # Progress: 완료 (UX)
@@ -146,18 +146,17 @@ def create_image_generation_node(
         )
 
         return {
-            **state,
-            "generated_image_url": output.image_url,
-            "image_description": output.description,
-            # answer_node에서 사용할 컨텍스트
-            "image_generation_context": {
-                "success": True,
-                "image_url": output.image_url,
-                "description": output.description,
-                "revised_prompt": output.revised_prompt,
-                "used_reference": reference_bytes is not None,
-                "character_code": character_asset.get("code") if character_asset else None,
-            },
+            "image_generation_context": create_context(
+                data={
+                    "image_url": output.image_url,
+                    "description": output.description,
+                    "revised_prompt": output.revised_prompt,
+                    "used_reference": reference_bytes is not None,
+                    "character_code": character_asset.get("code") if character_asset else None,
+                },
+                producer="image_generation",
+                job_id=job_id,
+            ),
         }
 
     # NodeExecutor로 래핑 (Policy 적용: timeout, retry, circuit breaker)

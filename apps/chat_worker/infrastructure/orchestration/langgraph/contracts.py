@@ -33,7 +33,7 @@ NODE_OUTPUT_FIELDS: dict[str, frozenset[str]] = {
     "collection_point": frozenset({"collection_point_context"}),
     "web_search": frozenset({"web_search_results"}),
     "recyclable_price": frozenset({"recyclable_price_context"}),
-    "image_generation": frozenset({"image_url", "image_description"}),
+    "image_generation": frozenset({"image_generation_context"}),
 }
 """노드별 출력 필드.
 

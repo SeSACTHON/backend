@@ -26,6 +26,13 @@ from chat_worker.application.commands.search_web_command import (
     SearchWebCommand,
     SearchWebInput,
 )
+from chat_worker.infrastructure.orchestration.langgraph.context_helper import (
+    create_context,
+    create_error_context,
+)
+from chat_worker.infrastructure.orchestration.langgraph.nodes.node_executor import (
+    NodeExecutor,
+)
 
 if TYPE_CHECKING:
     from chat_worker.application.ports.events import ProgressNotifierPort
@@ -46,6 +53,15 @@ def create_web_search_node(
     - output → state 변환
     - progress notify (UX)
 
+    Production Architecture:
+    - NodeExecutor로 Policy 적용 (timeout, retry, circuit breaker)
+    - web_search 노드는 FAIL_OPEN (보조 정보, 없어도 답변 가능)
+
+    Channel Separation:
+    - 출력 채널: web_search_results
+    - Reducer: priority_preemptive_reducer
+    - spread 금지: {"web_search_results": create_context(...)} 형태로 반환
+
     Args:
         web_search_client: 웹 검색 클라이언트 (DuckDuckGo/Tavily)
         event_publisher: 이벤트 발행기
@@ -56,13 +72,14 @@ def create_web_search_node(
     # Command(UseCase) 인스턴스 생성 - Port 조립
     command = SearchWebCommand(web_search_client=web_search_client)
 
-    async def web_search_node(state: dict[str, Any]) -> dict[str, Any]:
-        """LangGraph 노드 (얇은 어댑터).
+    async def _web_search_node_inner(state: dict[str, Any]) -> dict[str, Any]:
+        """실제 노드 로직 (NodeExecutor가 래핑).
 
         역할:
         1. state에서 값 추출 (LangGraph glue)
         2. Command 호출 (정책/흐름 위임)
         3. output → state 변환
+        4. progress notify (UX)
 
         Args:
             state: 현재 LangGraph 상태
@@ -102,9 +119,11 @@ def create_web_search_node(
                 result={"error": output.error_message},
             )
             return {
-                **state,
-                "web_search_results": output.web_search_results,
-                "web_search_error": output.error_message,
+                "web_search_results": create_error_context(
+                    producer="web_search",
+                    job_id=job_id,
+                    error=output.error_message or "웹 검색 실패",
+                ),
             }
 
         # Progress: 완료 (UX)
@@ -126,9 +145,32 @@ def create_web_search_node(
         )
 
         return {
-            **state,
-            "web_search_results": output.web_search_results,
-            "web_search_query": output.search_query,
+            "web_search_results": create_context(
+                data={
+                    **(output.web_search_results or {}),
+                    "search_query": output.search_query,
+                },
+                producer="web_search",
+                job_id=job_id,
+            ),
         }
+
+    # NodeExecutor로 래핑 (Policy 적용: timeout, retry, circuit breaker)
+    executor = NodeExecutor.get_instance()
+
+    async def web_search_node(state: dict[str, Any]) -> dict[str, Any]:
+        """LangGraph 노드 (Policy 적용됨).
+
+        NodeExecutor가 다음을 처리:
+        - Circuit Breaker 확인
+        - Timeout 적용 (10000ms)
+        - Retry (1회)
+        - FAIL_OPEN 처리 (실패해도 진행)
+        """
+        return await executor.execute(
+            node_name="web_search",
+            node_func=_web_search_node_inner,
+            state=state,
+        )
 
     return web_search_node

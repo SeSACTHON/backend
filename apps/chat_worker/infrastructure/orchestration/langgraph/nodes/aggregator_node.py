@@ -161,7 +161,6 @@ def create_aggregator_node(
 
         # state 반환 (검증 결과 포함)
         return {
-            **state,
             "needs_fallback": needs_fallback,
             "missing_required_contexts": list(missing_required),
         }
