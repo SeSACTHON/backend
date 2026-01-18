@@ -1,6 +1,11 @@
+---
+name: chat-agent-flow
+description: Eco² Chat 서비스 E2E 테스트 및 디버깅 가이드. API 엔드포인트, SSE 이벤트 스트림, Redis Streams 파이프라인, Intent 분류 시스템. Use when: (1) Chat API E2E 테스트 시, (2) SSE 이벤트 수신 문제 해결 시, (3) Intent 분류/라우팅 확인 시, (4) Redis Streams 이벤트 파이프라인 디버깅 시.
+---
+
 # Chat Agent Flow Guide
 
-> Eco² Chat 서비스의 E2E 테스트 및 트러블슈팅 가이드
+> Chat 서비스 E2E 테스트 및 이벤트 파이프라인 가이드
 
 ## Quick Reference
 
@@ -9,12 +14,9 @@
 │                           Chat Agent E2E Flow                                │
 ├─────────────────────────────────────────────────────────────────────────────┤
 │                                                                              │
-│  [1] POST /api/v1/chat              →  Create chat session (chat_id)        │
-│  [2] POST /api/v1/chat/{id}/messages →  Send message (job_id, stream_url)   │
-│  [3] GET  /api/v1/chat/{job_id}/events  →  Subscribe to SSE stream          │
-│                                                                              │
-│  ⚠️ SSE는 /sse/ 경로 없이 /chat/{job_id}/events로 직접 접근                   │
-│     (chat-vs에서 regex 매칭으로 sse-gateway로 라우팅)                         │
+│  [1] POST /api/v1/chat              →  Create session (chat_id)             │
+│  [2] POST /api/v1/chat/{id}/messages →  Send message (job_id)               │
+│  [3] GET  /api/v1/chat/{job_id}/events →  Subscribe SSE (via chat-vs)       │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -59,54 +61,29 @@
 
 ## E2E Test Commands
 
-### 1. Create Chat Session
-
 ```bash
 TOKEN="<JWT_TOKEN>"
 
-curl -X POST "https://api.dev.growbin.app/api/v1/chat" \
+# 1. Create chat session
+CHAT_RESPONSE=$(curl -s -X POST "https://api.dev.growbin.app/api/v1/chat" \
   -H "Content-Type: application/json" \
   -H "Cookie: s_access=$TOKEN" \
-  -d '{"title": "E2E Test"}'
+  -d '{"title": "E2E Test"}')
+CHAT_ID=$(echo $CHAT_RESPONSE | jq -r '.id')
 
-# Response: {"id": "chat_id", "title": "...", "created_at": "..."}
-```
-
-### 2. Send Message
-
-```bash
-CHAT_ID="<chat_id from step 1>"
-
-curl -X POST "https://api.dev.growbin.app/api/v1/chat/${CHAT_ID}/messages" \
+# 2. Send message
+MSG_RESPONSE=$(curl -s -X POST "https://api.dev.growbin.app/api/v1/chat/${CHAT_ID}/messages" \
   -H "Content-Type: application/json" \
   -H "Cookie: s_access=$TOKEN" \
-  -d '{"message": "플라스틱 페트병은 어떻게 버려?"}'
+  -d '{"message": "플라스틱 분리배출 방법 알려줘"}')
+JOB_ID=$(echo $MSG_RESPONSE | jq -r '.job_id')
 
-# Response: {"job_id": "...", "stream_url": "...", "status": "submitted"}
-```
-
-### 3. Subscribe to SSE
-
-```bash
-JOB_ID="<job_id from step 2>"
-
-# SSE 구독 (chat-vs가 sse-gateway로 라우팅)
-# ⚠️ 경로: /api/v1/chat/{job_id}/events (NOT /api/v1/sse/...)
+# 3. Subscribe SSE
 curl -sN --max-time 60 \
   "https://api.dev.growbin.app/api/v1/chat/${JOB_ID}/events" \
   -H "Accept: text/event-stream" \
   -H "Cookie: s_access=$TOKEN"
 ```
-
-## SSE Event Types
-
-| Event | Description | Example |
-|-------|-------------|---------|
-| `intent` | Intent 분류 완료 | `{"stage":"intent","status":"completed","progress":15}` |
-| `waste_rag` | RAG 노드 시작/완료 | `{"stage":"waste_rag","status":"started"}` |
-| `token` | 답변 토큰 스트리밍 | `{"stage":"token","content":"플라스틱","seq":1001}` |
-| `done` | 처리 완료 | `{"stage":"done","status":"success","progress":100}` |
-| `error` | 오류 발생 | `{"stage":"error","message":"..."}` |
 
 ## Intent Classification (10 types)
 
@@ -374,47 +351,40 @@ kubectl get pods -n chat -l app=chat-persistence-consumer
 
 ### Issue 7: SSE 이벤트 수신 불가 (Redis 불일치)
 
-**증상**: SSE 연결 성공, keepalive만 수신, 실제 이벤트 없음
+| Event | Description |
+|-------|-------------|
+| `intent` | Intent 분류 완료 |
+| `{node}` | 서브에이전트 시작/완료 |
+| `token` | 답변 토큰 스트리밍 |
+| `done` | 처리 완료 |
+| `error` | 오류 발생 |
 
-**원인**: chat-worker와 event-router가 다른 Redis를 바라봄
+## Redis Streams Pipeline
 
 ```
-chat-worker → rfr-pubsub-redis (잘못됨)
-event-router → rfr-streams-redis (올바름)
+chat-worker → XADD chat:events:{0-3} → event-router → PUBLISH sse:events:{job_id} → sse-gateway
 ```
 
-**진단**:
-```bash
-# chat-worker Redis 확인
-kubectl exec -n chat deploy/chat-worker -c chat-worker -- env | grep REDIS
-
-# event-router Redis 확인
-kubectl exec -n event-router deploy/event-router -- env | grep REDIS
-
-# Redis Streams 데이터 확인 (rfr-streams-redis에 데이터가 없으면 문제)
-kubectl exec -n redis rfr-streams-redis-0 -- redis-cli XLEN chat:events:0
-```
-
-**해결**:
-- `config.py`에 `redis_streams_url` 설정 추가
-- `dependencies.py`에서 RedisProgressNotifier가 `get_redis_streams()` 사용
-- ConfigMap에 `CHAT_WORKER_REDIS_STREAMS_URL` 설정 확인
+| Instance | Purpose |
+|----------|---------|
+| `rfr-streams-redis` | Event Streams (XADD/XREADGROUP) |
+| `rfr-pubsub-redis` | SSE Broadcast (PUBLISH/SUBSCRIBE) |
 
 ## Debug Commands
 
 ```bash
-# chat-worker 로그
+# Worker logs
 kubectl logs -n chat -l app=chat-worker -f --tail=100
 
-# event-router 로그
+# Event Router logs
 kubectl logs -n event-router -l app=event-router -f --tail=50
 
-# sse-gateway 로그
-kubectl logs -n sse-consumer -l app=sse-gateway -f --tail=50
+# Redis Streams check
+kubectl exec -n redis rfr-streams-redis-0 -c redis -- redis-cli XLEN chat:events:0
+kubectl exec -n redis rfr-streams-redis-0 -c redis -- redis-cli XINFO GROUPS chat:events:0
 
-# Redis Pub/Sub 모니터링
-kubectl exec -n redis rfr-pubsub-redis-0 -- \
-  redis-cli PSUBSCRIBE "sse:events:*"
+# Pub/Sub monitoring
+kubectl exec -n redis rfr-pubsub-redis-0 -c redis -- redis-cli PSUBSCRIBE "sse:events:*"
 ```
 
 ## Reference Files
@@ -428,7 +398,7 @@ kubectl exec -n redis rfr-pubsub-redis-0 -- \
 - **Dynamic Routing**: `docs/blogs/applied/30-langgraph-dynamic-routing-send-api.md`
 - **Native Streaming**: `docs/blogs/applied/32-langgraph-native-streaming.md`
 
-## Related PRs
+## Related Documents
 
 | PR | Title | Issue |
 |----|-------|-------|

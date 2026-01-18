@@ -230,6 +230,15 @@ async def create_cached_postgres_checkpointer(
     from psycopg_pool import AsyncConnectionPool
 
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+    from psycopg_pool import AsyncConnectionPool
+
+    # SQLAlchemy URL → psycopg URL 변환
+    # postgresql+asyncpg://user:pass@host:port/db → postgresql://user:pass@host:port/db
+    psycopg_conn_string = conn_string.replace("postgresql+asyncpg://", "postgresql://")
+
+    # Connection pool 직접 생성 (lifecycle 관리)
+    pool = AsyncConnectionPool(conninfo=psycopg_conn_string, open=False)
+    await pool.open()
 
     # asyncpg:// → postgresql:// 변환 (psycopg는 postgresql:// 사용)
     if conn_string.startswith("postgresql+asyncpg://"):
@@ -337,7 +346,7 @@ async def create_postgres_checkpointer(
     Redis 없는 환경에서 폴백으로 사용.
 
     Args:
-        conn_string: PostgreSQL 연결 문자열
+        conn_string: PostgreSQL 연결 문자열 (postgresql+asyncpg://...)
 
     Returns:
         AsyncPostgresSaver 인스턴스
@@ -345,6 +354,14 @@ async def create_postgres_checkpointer(
     from psycopg_pool import AsyncConnectionPool
 
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
+    from psycopg_pool import AsyncConnectionPool
+
+    # SQLAlchemy URL → psycopg URL 변환
+    psycopg_conn_string = conn_string.replace("postgresql+asyncpg://", "postgresql://")
+
+    # Connection pool 직접 생성
+    pool = AsyncConnectionPool(conninfo=psycopg_conn_string, open=False)
+    await pool.open()
 
     # asyncpg:// → postgresql:// 변환
     if conn_string.startswith("postgresql+asyncpg://"):
