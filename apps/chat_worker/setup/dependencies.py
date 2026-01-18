@@ -640,7 +640,7 @@ async def get_checkpointer():
 
         if settings.postgres_url:
             # Cache-Aside PostgreSQL 체크포인터 (Redis L1 + PostgreSQL L2)
-            from chat_worker.infrastructure.langgraph.checkpointer import (
+            from chat_worker.infrastructure.orchestration.langgraph.checkpointer import (
                 create_cached_postgres_checkpointer,
             )
 
@@ -655,7 +655,7 @@ async def get_checkpointer():
             except Exception as e:
                 logger.warning("CachedPostgresSaver failed, falling back to Redis only: %s", e)
                 # Redis 폴백
-                from chat_worker.infrastructure.langgraph.checkpointer import (
+                from chat_worker.infrastructure.orchestration.langgraph.checkpointer import (
                     create_redis_checkpointer,
                 )
 
@@ -665,7 +665,7 @@ async def get_checkpointer():
                 )
         else:
             # Redis 체크포인터 (단기 세션)
-            from chat_worker.infrastructure.langgraph.checkpointer import (
+            from chat_worker.infrastructure.orchestration.langgraph.checkpointer import (
                 create_redis_checkpointer,
             )
 
