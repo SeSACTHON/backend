@@ -27,6 +27,17 @@
 | 2 | `POST /api/v1/chat/{chat_id}/messages` | chat-api | `{job_id, stream_url, status}` |
 | 3 | `GET /api/v1/chat/{job_id}/events` | sse-gateway (via chat-vs) | SSE stream |
 
+### API Endpoint 역할 상세
+
+| Endpoint | 역할 | DB 영향 | Worker 제출 |
+|----------|------|---------|-------------|
+| `POST /chat` | 세션 생성 | `chat.conversations` INSERT | **NO** |
+| `POST /chat/{id}/messages` | 메시지 전송 | 없음 (Worker 완료 후 배치) | **YES** (RabbitMQ) |
+| `GET /chat/{job_id}/events` | SSE 구독 | 없음 | - |
+
+⚠️ **중요**: `POST /chat`만 호출하면 세션만 생성되고 메시지는 처리되지 않습니다.
+메시지를 Worker로 전송하려면 반드시 `POST /chat/{chat_id}/messages`를 호출해야 합니다.
+
 ## Istio VirtualService Routing
 
 ```
@@ -161,6 +172,65 @@ curl -sN --max-time 60 \
 | `rfr-streams-redis` | redis | Event Streams (XADD/XREADGROUP) | Redis Streams |
 | `rfr-pubsub-redis` | redis | SSE Broadcast (PUBLISH/SUBSCRIBE) | Redis Pub/Sub |
 
+## Message Persistence Architecture
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    Message Persistence Pipeline                              │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│  [1] chat-worker                                                             │
+│       │                                                                      │
+│       │ XADD chat:events:{shard} (done event 포함)                           │
+│       ▼                                                                      │
+│  [2] Redis Streams                                                           │
+│       │                                                                      │
+│       ├──► Consumer Group: eventrouter → event-router → SSE                 │
+│       │                                                                      │
+│       └──► Consumer Group: chat-persistence → chat-persistence-consumer                 │
+│                   │                                                          │
+│                   ▼                                                          │
+│  [3] chat-persistence-consumer (ChatPersistenceConsumer)                                │
+│       │                                                                      │
+│       │ INSERT INTO chat.messages                                            │
+│       ▼                                                                      │
+│  [4] PostgreSQL (chat.messages)                                             │
+│                                                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Persistence Components
+
+| Component | Namespace | Image | Entry Point |
+|-----------|-----------|-------|-------------|
+| chat-persistence-consumer | chat | chat-api-dev-latest | `python -m chat.persistence_consumer` |
+
+### Consumer Group 확인
+
+```bash
+# Consumer Group 목록 조회
+kubectl exec -n redis rfr-streams-redis-0 -c redis -- \
+  redis-cli XINFO GROUPS chat:events:0
+
+# Expected:
+# 1) name: eventrouter
+# 2) name: chat-persistence
+
+# 메시지 수 확인
+kubectl exec -n postgres deploy/postgresql -- \
+  psql -U sesacthon -d ecoeco -c "SELECT COUNT(*) FROM chat.messages;"
+```
+
+### Persistence 관련 테이블
+
+| Table | Schema | Purpose |
+|-------|--------|---------|
+| `chat.conversations` | chat | 대화 세션 |
+| `chat.messages` | chat | 메시지 내용 |
+| `checkpoints` | public | LangGraph 체크포인트 |
+| `checkpoint_blobs` | public | 체크포인트 Blob |
+| `checkpoint_writes` | public | 체크포인트 Write Log |
+
 ### Hop-by-Hop Address Reference
 
 | Hop | Component | Kube DNS | Pod DNS (Master) | Protocol | Port |
@@ -274,7 +344,35 @@ enable_dynamic_routing=False
 # 근본: StateGraph(ChatState) + Reducer
 ```
 
-### Issue 6: SSE 이벤트 수신 불가 (Redis 불일치)
+### Issue 6: Message Persistence 실패 (chat-persistence-consumer)
+
+**증상**: 대화는 정상 진행되지만 `chat.messages` 테이블에 메시지가 저장되지 않음
+
+**진단**:
+```bash
+# 1. chat.messages 레코드 수 확인
+kubectl exec -n postgres deploy/postgresql -- \
+  psql -U sesacthon -d ecoeco -c "SELECT COUNT(*) FROM chat.messages;"
+
+# 2. chat-persistence Consumer Group 확인
+kubectl exec -n redis rfr-streams-redis-0 -c redis -- \
+  redis-cli XINFO GROUPS chat:events:0 | grep -A5 chat-persistence
+
+# 3. chat-persistence-consumer Pod 상태 확인
+kubectl get pods -n chat -l app=chat-persistence-consumer
+```
+
+**가능한 원인**:
+
+| 원인 | 증상 | 해결 |
+|------|------|------|
+| chat-persistence-consumer 미배포 | Pod 없음 | `workloads/domains/chat/base/deployment-persistence-consumer.yaml` 배포 |
+| livenessProbe 실패 | CrashLoopBackOff | `/proc/1/cmdline` 패턴 사용 |
+| RabbitMQ 큐 불일치 | taskiq 큐에 메시지 쌓임 | `CHAT_RABBITMQ_QUEUE=chat.process` 설정 |
+
+**참조**: `docs/troubleshooting/chat-messages-not-persisted.md`
+
+### Issue 7: SSE 이벤트 수신 불가 (Redis 불일치)
 
 **증상**: SSE 연결 성공, keepalive만 수신, 실제 이벤트 없음
 
@@ -322,7 +420,8 @@ kubectl exec -n redis rfr-pubsub-redis-0 -- \
 ## Reference Files
 
 - **E2E Test Plan**: `docs/reports/e2e-intent-test-plan.md`
-- **Troubleshooting**: `docs/troubleshooting/chat-worker-e2e-infra-fixes.md`
+- **Troubleshooting (E2E)**: `docs/troubleshooting/chat-worker-e2e-infra-fixes.md`
+- **Troubleshooting (Persistence)**: `docs/troubleshooting/chat-messages-not-persisted.md`
 - **VirtualService (Chat)**: `workloads/routing/chat/base/virtual-service.yaml`
 - **VirtualService (SSE)**: `workloads/domains/sse-gateway/base/virtualservice.yaml`
 - **Frontend Spec**: `docs/specs/chat-agent-frontend-spec.md`
@@ -340,3 +439,5 @@ kubectl exec -n redis rfr-pubsub-redis-0 -- \
 | #412 | fix(chat-worker): Master pod DNS 사용 | READONLY 오류 |
 | #413 | fix(chat_worker): max_completion_tokens 사용 | OpenAI API 오류 |
 | #415 | feat(chat_worker): Channel Separation + Priority | Send API 병렬 충돌 |
+| #422-424 | feat(chat): ChatPersistenceConsumer 배포 | 메시지 영속화 |
+| #425 | fix(chat): CachedPostgresSaver 트랜잭션 | CREATE INDEX CONCURRENTLY 오류 |

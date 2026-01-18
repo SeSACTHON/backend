@@ -1,11 +1,13 @@
-"""Consumer Dependency Injection.
+"""Persistence Consumer Dependency Injection.
 
 Event-First Architecture: Redis Streams → PostgreSQL 저장 Consumer의 Composition Root.
+
+Entry Point: python -m chat.persistence_consumer
 
 Architecture:
     Redis Streams (chat:events:{shard})
         ↓ Consumer Group: chat-persistence
-    ChatPersistenceConsumer (Infrastructure)
+    ChatPersistenceConsumer (Infrastructure - Redis Streams Client)
         ↓ persistence dict
     RedisStreamsConsumerAdapter (Presentation)
         ↓ batch
