@@ -128,10 +128,7 @@ async def get_progress_notifier() -> ProgressNotifierPort:
     global _progress_notifier
     if _progress_notifier is None:
         redis = await get_redis()
-        _progress_notifier = RedisProgressNotifier(
-            redis=redis,
-            stream_prefix="chat:events",
-        )
+        _progress_notifier = RedisProgressNotifier(redis=redis)
     return _progress_notifier
 
 
@@ -608,12 +605,8 @@ async def get_input_requester() -> InputRequesterPort:
     """
     global _input_requester
     if _input_requester is None:
-        progress_notifier = await get_progress_notifier()
-        state_store = await get_interaction_state_store()
-        _input_requester = RedisInputRequester(
-            progress_notifier=progress_notifier,
-            state_store=state_store,
-        )
+        redis = await get_redis()
+        _input_requester = RedisInputRequester(redis=redis)
         logger.info("RedisInputRequester created (Human-in-the-Loop enabled)")
     return _input_requester
 
@@ -647,7 +640,7 @@ async def get_checkpointer():
 
         if settings.postgres_url:
             # Cache-Aside PostgreSQL 체크포인터 (Redis L1 + PostgreSQL L2)
-            from chat_worker.infrastructure.langgraph.checkpointer import (
+            from chat_worker.infrastructure.orchestration.langgraph.checkpointer import (
                 create_cached_postgres_checkpointer,
             )
 
@@ -662,7 +655,7 @@ async def get_checkpointer():
             except Exception as e:
                 logger.warning("CachedPostgresSaver failed, falling back to Redis only: %s", e)
                 # Redis 폴백
-                from chat_worker.infrastructure.langgraph.checkpointer import (
+                from chat_worker.infrastructure.orchestration.langgraph.checkpointer import (
                     create_redis_checkpointer,
                 )
 
@@ -672,7 +665,7 @@ async def get_checkpointer():
                 )
         else:
             # Redis 체크포인터 (단기 세션)
-            from chat_worker.infrastructure.langgraph.checkpointer import (
+            from chat_worker.infrastructure.orchestration.langgraph.checkpointer import (
                 create_redis_checkpointer,
             )
 
