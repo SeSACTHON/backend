@@ -50,12 +50,14 @@ fi
 
 echo ""
 echo "=== Step 3: Subscribe to SSE ==="
-echo "Subscribing to: $BASE_URL/api/v1/sse/chat/${JOB_ID}/events"
+# SSE 경로: /api/v1/chat/{job_id}/events (NOT /api/v1/sse/...)
+# chat-vs VirtualService가 regex로 매칭하여 sse-gateway로 라우팅
+echo "Subscribing to: $BASE_URL/api/v1/chat/${JOB_ID}/events"
 echo "Press Ctrl+C to stop..."
 echo ""
 
 curl -sN --max-time 60 \
-  "$BASE_URL/api/v1/sse/chat/${JOB_ID}/events" \
+  "$BASE_URL/api/v1/chat/${JOB_ID}/events" \
   -H "Accept: text/event-stream" \
   -H "Cookie: s_access=$TOKEN"
 ```

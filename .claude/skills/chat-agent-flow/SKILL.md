@@ -11,7 +11,10 @@
 │                                                                              │
 │  [1] POST /api/v1/chat              →  Create chat session (chat_id)        │
 │  [2] POST /api/v1/chat/{id}/messages →  Send message (job_id, stream_url)   │
-│  [3] GET  /api/v1/sse/chat/{job_id}/events  →  Subscribe to SSE stream      │
+│  [3] GET  /api/v1/chat/{job_id}/events  →  Subscribe to SSE stream          │
+│                                                                              │
+│  ⚠️ SSE는 /sse/ 경로 없이 /chat/{job_id}/events로 직접 접근                   │
+│     (chat-vs에서 regex 매칭으로 sse-gateway로 라우팅)                         │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
@@ -22,7 +25,7 @@
 |------|----------|---------|----------|
 | 1 | `POST /api/v1/chat` | chat-api | `{id, title, created_at}` |
 | 2 | `POST /api/v1/chat/{chat_id}/messages` | chat-api | `{job_id, stream_url, status}` |
-| 3 | `GET /api/v1/sse/chat/{job_id}/events` | sse-gateway | SSE stream |
+| 3 | `GET /api/v1/chat/{job_id}/events` | sse-gateway (via chat-vs) | SSE stream |
 
 ## Istio VirtualService Routing
 
@@ -76,9 +79,10 @@ curl -X POST "https://api.dev.growbin.app/api/v1/chat/${CHAT_ID}/messages" \
 ```bash
 JOB_ID="<job_id from step 2>"
 
-# SSE 구독 (sse-gateway 직접 연결)
+# SSE 구독 (chat-vs가 sse-gateway로 라우팅)
+# ⚠️ 경로: /api/v1/chat/{job_id}/events (NOT /api/v1/sse/...)
 curl -sN --max-time 60 \
-  "https://api.dev.growbin.app/api/v1/sse/chat/${JOB_ID}/events" \
+  "https://api.dev.growbin.app/api/v1/chat/${JOB_ID}/events" \
   -H "Accept: text/event-stream" \
   -H "Cookie: s_access=$TOKEN"
 ```
