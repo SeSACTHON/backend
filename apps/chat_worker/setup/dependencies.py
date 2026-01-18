@@ -90,6 +90,7 @@ logger = logging.getLogger(__name__)
 # ============================================================
 
 _redis: Redis | None = None
+_redis_streams: Redis | None = None  # 이벤트 스트리밍 전용 (event-router와 동일)
 _progress_notifier: ProgressNotifierPort | None = None
 _domain_event_bus: RedisStreamDomainEventBus | None = None
 _retriever: RetrieverPort | None = None
@@ -110,7 +111,7 @@ _image_generator: ImageGeneratorPort | None = None
 
 
 async def get_redis() -> Redis:
-    """Redis 클라이언트 싱글톤."""
+    """Redis 클라이언트 싱글톤 (기본 - 캐시, Pub/Sub 등)."""
     global _redis
     if _redis is None:
         settings = get_settings()
@@ -123,11 +124,35 @@ async def get_redis() -> Redis:
     return _redis
 
 
+async def get_redis_streams() -> Redis:
+    """Redis Streams 클라이언트 싱글톤 (이벤트 스트리밍 전용).
+
+    event-router와 동일한 Redis를 바라봐야 함.
+    설정되지 않으면 기본 redis_url 사용 (로컬 개발용).
+    """
+    global _redis_streams
+    if _redis_streams is None:
+        settings = get_settings()
+        # redis_streams_url이 설정되면 사용, 아니면 redis_url 폴백
+        streams_url = settings.redis_streams_url or settings.redis_url
+        _redis_streams = Redis.from_url(
+            streams_url,
+            encoding="utf-8",
+            decode_responses=True,
+        )
+        logger.info("Redis Streams connected: %s", streams_url)
+    return _redis_streams
+
+
 async def get_progress_notifier() -> ProgressNotifierPort:
-    """ProgressNotifier 싱글톤 (SSE/UI 이벤트)."""
+    """ProgressNotifier 싱글톤 (SSE/UI 이벤트).
+
+    Redis Streams로 이벤트 발행 → event-router가 소비.
+    """
     global _progress_notifier
     if _progress_notifier is None:
-        redis = await get_redis()
+        # Streams 전용 Redis 사용 (event-router와 동일)
+        redis = await get_redis_streams()
         _progress_notifier = RedisProgressNotifier(redis=redis)
     return _progress_notifier
 
@@ -829,7 +854,7 @@ async def get_process_chat_command(
 
 async def cleanup():
     """리소스 정리."""
-    global _redis, _character_client, _location_client, _kakao_local_client, _weather_client, _bulk_waste_client, _collection_point_client, _checkpointer
+    global _redis, _redis_streams, _character_client, _location_client, _kakao_local_client, _weather_client, _bulk_waste_client, _collection_point_client, _checkpointer
     global _progress_notifier, _domain_event_bus, _interaction_state_store, _input_requester, _image_generator
 
     # 체크포인터 종료
@@ -883,3 +908,9 @@ async def cleanup():
         await _redis.close()
         _redis = None
         logger.info("Redis disconnected")
+
+    # Redis Streams 종료
+    if _redis_streams:
+        await _redis_streams.close()
+        _redis_streams = None
+        logger.info("Redis Streams disconnected")
