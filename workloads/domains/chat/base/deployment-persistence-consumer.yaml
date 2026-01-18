@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chat-persistence-consumer
+  namespace: chat
+  labels:
+    app: chat-persistence-consumer
+    version: v1
+    tier: worker
+    domain: chat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chat-persistence-consumer
+  template:
+    metadata:
+      labels:
+        app: chat-persistence-consumer
+        version: v1
+        tier: worker
+        domain: chat
+    spec:
+      containers:
+      - name: chat-persistence-consumer
+        image: docker.io/mng990/eco2:chat-api-dev-latest
+        imagePullPolicy: Always
+        command: [python, -m, chat.persistence_consumer]
+        resources:
+          requests:
+            memory: 256Mi
+            cpu: 100m
+          limits:
+            memory: 512Mi
+            cpu: 250m
+        env:
+        # OpenTelemetry
+        - name: OTEL_SERVICE_NAME
+          value: chat-persistence-consumer
+        - name: OTEL_ENABLED
+          value: 'true'
+        - name: OTEL_TRACES_EXPORTER
+          value: otlp
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://jaeger-collector-clusterip.istio-system.svc.cluster.local:4317
+        - name: OTEL_METRICS_EXPORTER
+          value: none
+        - name: OTEL_LOGS_EXPORTER
+          value: none
+        - name: OTEL_PROPAGATORS
+          value: b3,tracecontext,baggage
+        envFrom:
+        - configMapRef:
+            name: chat-config
+        - secretRef:
+            name: chat-secret
+        # Liveness: 메인 프로세스(chat.persistence_consumer) 존재 확인
+        livenessProbe:
+          exec:
+            command:
+            - /bin/sh
+            - -c
+            - cat /proc/1/cmdline | grep -q chat.persistence_consumer || exit 1
+          initialDelaySeconds: 10
+          periodSeconds: 30
+          timeoutSeconds: 10
+        # Readiness: Istio sidecar ready 상태 확인
+        readinessProbe:
+          httpGet:
+            path: /healthz/ready
+            port: 15021
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+      imagePullSecrets:
+      - name: dockerhub-secret
+      nodeSelector:
+        domain: chat
+      tolerations:
+      - key: domain
+        operator: Equal
+        value: chat
+        effect: NoSchedule

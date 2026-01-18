@@ -216,7 +216,7 @@ async def create_cached_postgres_checkpointer(
     L2: PostgreSQL (영구)
 
     Args:
-        conn_string: PostgreSQL 연결 문자열 (postgresql+asyncpg://...)
+        conn_string: PostgreSQL 연결 문자열 (postgresql://... 형식)
         redis: Redis 클라이언트
         cache_ttl: 캐시 TTL 초 (기본 24시간)
 
@@ -224,9 +224,11 @@ async def create_cached_postgres_checkpointer(
         CachedPostgresSaver 인스턴스
 
     Note:
-        AsyncPostgresSaver.from_conn_string()은 async context manager를 반환하므로
-        직접 connection pool을 생성하여 lifecycle을 관리합니다.
+        setup()은 CREATE INDEX CONCURRENTLY를 실행하므로
+        autocommit 모드 connection이 필요함.
     """
+    from psycopg_pool import AsyncConnectionPool
+
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
     from psycopg_pool import AsyncConnectionPool
 
@@ -238,13 +240,28 @@ async def create_cached_postgres_checkpointer(
     pool = AsyncConnectionPool(conninfo=psycopg_conn_string, open=False)
     await pool.open()
 
-    # AsyncPostgresSaver에 pool 직접 전달
+    # asyncpg:// → postgresql:// 변환 (psycopg는 postgresql:// 사용)
+    if conn_string.startswith("postgresql+asyncpg://"):
+        conn_string = conn_string.replace("postgresql+asyncpg://", "postgresql://")
+
+    # Connection Pool 생성
+    pool = AsyncConnectionPool(conninfo=conn_string, open=False)
+    await pool.open()
+
+    # AsyncPostgresSaver 생성
     postgres_saver = AsyncPostgresSaver(pool)
-    await postgres_saver.setup()  # 체크포인트 테이블 생성
+
+    # setup()을 autocommit 모드로 실행 (CREATE INDEX CONCURRENTLY 지원)
+    # psycopg3 pool.connection()은 기본적으로 transaction block 시작
+    # autocommit connection으로 직접 setup 수행
+    async with pool.connection() as conn:
+        await conn.set_autocommit(True)
+        # setup() 대신 직접 테이블 생성 (CONCURRENTLY 없이)
+        await _ensure_tables_exist(conn)
 
     logger.info(
         "CachedPostgresSaver created (PostgreSQL + Redis cache)",
-        extra={"conn_string": conn_string[:20] + "...", "cache_ttl": cache_ttl},
+        extra={"conn_string": conn_string[:30] + "...", "cache_ttl": cache_ttl},
     )
 
     return CachedPostgresSaver(
@@ -252,6 +269,72 @@ async def create_cached_postgres_checkpointer(
         redis=redis,
         cache_ttl=cache_ttl,
     )
+
+
+async def _ensure_tables_exist(conn) -> None:
+    """LangGraph 체크포인트 테이블 생성 (IF NOT EXISTS).
+
+    CREATE INDEX CONCURRENTLY는 트랜잭션 내에서 실행 불가하므로
+    일반 CREATE INDEX로 대체.
+    """
+    # LangGraph checkpoint-postgres의 스키마 참조
+    # https://github.com/langchain-ai/langgraph/blob/main/libs/checkpoint-postgres
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS checkpoints (
+            thread_id TEXT NOT NULL,
+            checkpoint_ns TEXT NOT NULL DEFAULT '',
+            checkpoint_id TEXT NOT NULL,
+            parent_checkpoint_id TEXT,
+            type TEXT,
+            checkpoint JSONB NOT NULL,
+            metadata JSONB NOT NULL DEFAULT '{}',
+            PRIMARY KEY (thread_id, checkpoint_ns, checkpoint_id)
+        )
+    """)
+
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS checkpoint_blobs (
+            thread_id TEXT NOT NULL,
+            checkpoint_ns TEXT NOT NULL DEFAULT '',
+            channel TEXT NOT NULL,
+            version TEXT NOT NULL,
+            type TEXT NOT NULL,
+            blob BYTEA,
+            PRIMARY KEY (thread_id, checkpoint_ns, channel, version)
+        )
+    """)
+
+    await conn.execute("""
+        CREATE TABLE IF NOT EXISTS checkpoint_writes (
+            thread_id TEXT NOT NULL,
+            checkpoint_ns TEXT NOT NULL DEFAULT '',
+            checkpoint_id TEXT NOT NULL,
+            task_id TEXT NOT NULL,
+            idx INTEGER NOT NULL,
+            channel TEXT NOT NULL,
+            type TEXT,
+            blob BYTEA NOT NULL,
+            PRIMARY KEY (thread_id, checkpoint_ns, checkpoint_id, task_id, idx)
+        )
+    """)
+
+    # 인덱스 생성 (CONCURRENTLY 없이, IF NOT EXISTS 사용)
+    await conn.execute("""
+        CREATE INDEX IF NOT EXISTS checkpoints_thread_id_idx
+        ON checkpoints (thread_id)
+    """)
+
+    await conn.execute("""
+        CREATE INDEX IF NOT EXISTS checkpoint_blobs_thread_id_idx
+        ON checkpoint_blobs (thread_id)
+    """)
+
+    await conn.execute("""
+        CREATE INDEX IF NOT EXISTS checkpoint_writes_thread_id_idx
+        ON checkpoint_writes (thread_id)
+    """)
+
+    logger.info("LangGraph checkpoint tables ensured")
 
 
 async def create_postgres_checkpointer(
@@ -268,6 +351,8 @@ async def create_postgres_checkpointer(
     Returns:
         AsyncPostgresSaver 인스턴스
     """
+    from psycopg_pool import AsyncConnectionPool
+
     from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
     from psycopg_pool import AsyncConnectionPool
 
@@ -278,12 +363,25 @@ async def create_postgres_checkpointer(
     pool = AsyncConnectionPool(conninfo=psycopg_conn_string, open=False)
     await pool.open()
 
+    # asyncpg:// → postgresql:// 변환
+    if conn_string.startswith("postgresql+asyncpg://"):
+        conn_string = conn_string.replace("postgresql+asyncpg://", "postgresql://")
+
+    # Connection Pool 생성
+    pool = AsyncConnectionPool(conninfo=conn_string, open=False)
+    await pool.open()
+
+    # AsyncPostgresSaver 생성
     checkpointer = AsyncPostgresSaver(pool)
-    await checkpointer.setup()
+
+    # autocommit 모드로 테이블 생성
+    async with pool.connection() as conn:
+        await conn.set_autocommit(True)
+        await _ensure_tables_exist(conn)
 
     logger.info(
         "PostgreSQL checkpointer created (no cache)",
-        extra={"conn_string": conn_string[:20] + "..."},
+        extra={"conn_string": conn_string[:30] + "..."},
     )
 
     return checkpointer
