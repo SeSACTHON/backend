@@ -63,9 +63,7 @@ logger = logging.getLogger(__name__)
 LANGSMITH_ENABLED: bool = os.environ.get("LANGCHAIN_TRACING_V2", "").lower() == "true"
 LANGSMITH_API_KEY: str | None = os.environ.get("LANGCHAIN_API_KEY")
 LANGSMITH_PROJECT: str = os.environ.get("LANGCHAIN_PROJECT", "eco2-chat-worker")
-LANGSMITH_ENDPOINT: str = os.environ.get(
-    "LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com"
-)
+LANGSMITH_ENDPOINT: str = os.environ.get("LANGCHAIN_ENDPOINT", "https://api.smith.langchain.com")
 
 # OpenTelemetry 통합 설정
 # LANGSMITH_OTEL_ENABLED=true 시 LangGraph 트레이스가 OTEL로 전송됨
@@ -107,15 +105,11 @@ def configure_langsmith() -> bool:
         ```
     """
     if not LANGSMITH_ENABLED:
-        logger.info(
-            "LangSmith tracing disabled (LANGCHAIN_TRACING_V2 not set to 'true')"
-        )
+        logger.info("LangSmith tracing disabled (LANGCHAIN_TRACING_V2 not set to 'true')")
         return False
 
     if not LANGSMITH_API_KEY:
-        logger.warning(
-            "LangSmith tracing enabled but LANGCHAIN_API_KEY not set - traces will fail"
-        )
+        logger.warning("LangSmith tracing enabled but LANGCHAIN_API_KEY not set - traces will fail")
         return False
 
     # OTEL 통합 설정 로깅

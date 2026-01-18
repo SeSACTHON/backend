@@ -128,10 +128,7 @@ async def get_progress_notifier() -> ProgressNotifierPort:
     global _progress_notifier
     if _progress_notifier is None:
         redis = await get_redis()
-        _progress_notifier = RedisProgressNotifier(
-            redis=redis,
-            stream_prefix="chat:events",
-        )
+        _progress_notifier = RedisProgressNotifier(redis=redis)
     return _progress_notifier
 
 
@@ -204,13 +201,13 @@ def get_metrics() -> MetricsPort:
 
 
 def create_llm_client(
-    provider: Literal["openai", "gemini"] = "openai",
+    provider: Literal["openai", "google"] = "openai",
     model: str | None = None,
 ) -> LLMClientPort:
     """LLM 클라이언트 팩토리."""
     settings = get_settings()
 
-    if provider == "gemini":
+    if provider == "google":
         return GeminiLLMClient(
             model=model or settings.gemini_default_model,
             api_key=settings.google_api_key,
@@ -223,13 +220,13 @@ def create_llm_client(
 
 
 def create_vision_client(
-    provider: Literal["openai", "gemini"] = "openai",
+    provider: Literal["openai", "google"] = "openai",
     model: str | None = None,
 ) -> VisionModelPort:
     """Vision 모델 클라이언트 팩토리."""
     settings = get_settings()
 
-    if provider == "gemini":
+    if provider == "google":
         # Gemini: 멀티모달 모델
         return GeminiVisionClient(
             model=model or settings.gemini_default_model,
@@ -423,9 +420,7 @@ def get_kakao_local_client() -> KakaoLocalClientPort | None:
             )
             logger.info("Kakao Local HTTP client created")
         else:
-            logger.warning(
-                "KAKAO_REST_API_KEY not set, Kakao Local search disabled"
-            )
+            logger.warning("KAKAO_REST_API_KEY not set, Kakao Local search disabled")
             return None
 
     return _kakao_local_client
@@ -463,9 +458,7 @@ def get_weather_client() -> WeatherClientPort | None:
             )
             logger.info("KMA Weather HTTP client created")
         else:
-            logger.warning(
-                "KMA_API_KEY not set, weather feature disabled"
-            )
+            logger.warning("KMA_API_KEY not set, weather feature disabled")
             return None
 
     return _weather_client
@@ -503,9 +496,7 @@ def get_bulk_waste_client() -> BulkWasteClientPort | None:
             )
             logger.info("MOIS Bulk Waste HTTP client created")
         else:
-            logger.warning(
-                "MOIS_WASTE_API_KEY not set, bulk waste feature disabled"
-            )
+            logger.warning("MOIS_WASTE_API_KEY not set, bulk waste feature disabled")
             return None
 
     return _bulk_waste_client
@@ -573,9 +564,7 @@ def get_collection_point_client() -> CollectionPointClientPort | None:
             )
             logger.info("KECO Collection Point HTTP client created")
         else:
-            logger.warning(
-                "KECO_API_KEY not set, collection point feature disabled"
-            )
+            logger.warning("KECO_API_KEY not set, collection point feature disabled")
             return None
 
     return _collection_point_client
@@ -616,12 +605,8 @@ async def get_input_requester() -> InputRequesterPort:
     """
     global _input_requester
     if _input_requester is None:
-        progress_notifier = await get_progress_notifier()
-        state_store = await get_interaction_state_store()
-        _input_requester = RedisInputRequester(
-            progress_notifier=progress_notifier,
-            state_store=state_store,
-        )
+        redis = await get_redis()
+        _input_requester = RedisInputRequester(redis=redis)
         logger.info("RedisInputRequester created (Human-in-the-Loop enabled)")
     return _input_requester
 
@@ -655,7 +640,7 @@ async def get_checkpointer():
 
         if settings.postgres_url:
             # Cache-Aside PostgreSQL 체크포인터 (Redis L1 + PostgreSQL L2)
-            from chat_worker.infrastructure.langgraph.checkpointer import (
+            from chat_worker.infrastructure.orchestration.langgraph.checkpointer import (
                 create_cached_postgres_checkpointer,
             )
 
@@ -670,7 +655,7 @@ async def get_checkpointer():
             except Exception as e:
                 logger.warning("CachedPostgresSaver failed, falling back to Redis only: %s", e)
                 # Redis 폴백
-                from chat_worker.infrastructure.langgraph.checkpointer import (
+                from chat_worker.infrastructure.orchestration.langgraph.checkpointer import (
                     create_redis_checkpointer,
                 )
 
@@ -680,7 +665,7 @@ async def get_checkpointer():
                 )
         else:
             # Redis 체크포인터 (단기 세션)
-            from chat_worker.infrastructure.langgraph.checkpointer import (
+            from chat_worker.infrastructure.orchestration.langgraph.checkpointer import (
                 create_redis_checkpointer,
             )
 
@@ -699,7 +684,7 @@ async def get_checkpointer():
 
 
 async def get_chat_graph(
-    provider: Literal["openai", "gemini"] = "openai",
+    provider: Literal["openai", "google"] = "openai",
     model: str | None = None,
 ):
     """Chat LangGraph 파이프라인 생성.
@@ -774,7 +759,7 @@ async def get_chat_graph(
 
 
 async def get_process_chat_command(
-    provider: Literal["openai", "gemini"] = "openai",
+    provider: Literal["openai", "google"] = "openai",
     model: str | None = None,
 ) -> ProcessChatCommand:
     """ProcessChatCommand 생성 (CQRS - Command).

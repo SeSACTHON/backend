@@ -95,9 +95,7 @@ class ClassifyIntentCommand:
         self._service = IntentClassifierService(
             intent_prompt=prompt_loader.load("classification", "intent"),
             decompose_prompt=prompt_loader.load("classification", "decompose"),
-            multi_detect_prompt=prompt_loader.load(
-                "classification", "multi_intent_detect"
-            ),
+            multi_detect_prompt=prompt_loader.load("classification", "multi_intent_detect"),
         )
 
     async def execute(self, input_dto: ClassifyIntentInput) -> ClassifyIntentOutput:
@@ -113,9 +111,7 @@ class ClassifyIntentCommand:
         message = input_dto.message
         # Chain-of-Intent: previous_intents는 intent 문자열 배열 (예: ["waste", "location"])
         context = (
-            {"previous_intents": input_dto.previous_intents}
-            if input_dto.previous_intents
-            else None
+            {"previous_intents": input_dto.previous_intents} if input_dto.previous_intents else None
         )
 
         if self._enable_multi_intent:
@@ -271,9 +267,7 @@ class ClassifyIntentCommand:
             events.append("decompose_llm_called")
 
             # 파싱 (Service - 순수 로직)
-            decomposed = self._service.parse_decompose_response(
-                decompose_response, message
-            )
+            decomposed = self._service.parse_decompose_response(decompose_response, message)
             queries = decomposed.queries if decomposed.is_compound else [message]
 
         except Exception as e:

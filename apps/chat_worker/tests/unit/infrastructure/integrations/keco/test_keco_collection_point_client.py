@@ -106,9 +106,7 @@ class TestKecoCollectionPointClient:
         assert result.query.get("name") == "이마트"
 
     @pytest.mark.asyncio
-    async def test_search_collection_points_empty_result(
-        self, client: KecoCollectionPointClient
-    ):
+    async def test_search_collection_points_empty_result(self, client: KecoCollectionPointClient):
         """빈 결과 테스트."""
         empty_response = {
             "page": 1,
@@ -136,9 +134,7 @@ class TestKecoCollectionPointClient:
         assert result.has_next is False
 
     @pytest.mark.asyncio
-    async def test_search_collection_points_http_error(
-        self, client: KecoCollectionPointClient
-    ):
+    async def test_search_collection_points_http_error(self, client: KecoCollectionPointClient):
         """HTTP 에러 테스트."""
         mock_http_client = AsyncMock()
         mock_response = MagicMock()
@@ -159,9 +155,7 @@ class TestKecoCollectionPointClient:
         assert len(result.results) == 0
 
     @pytest.mark.asyncio
-    async def test_search_collection_points_timeout(
-        self, client: KecoCollectionPointClient
-    ):
+    async def test_search_collection_points_timeout(self, client: KecoCollectionPointClient):
         """타임아웃 테스트."""
         mock_http_client = AsyncMock()
         mock_http_client.get.side_effect = httpx.TimeoutException("Timeout")
@@ -189,9 +183,7 @@ class TestKecoCollectionPointClient:
         assert "coordinate-based search" in str(exc_info.value)
 
     @pytest.mark.asyncio
-    async def test_parse_collection_types(
-        self, client: KecoCollectionPointClient
-    ):
+    async def test_parse_collection_types(self, client: KecoCollectionPointClient):
         """수거종류 파싱 테스트."""
         response_data = {
             "page": 1,

@@ -49,12 +49,7 @@ class IntentSignals:
         Returns:
             개별 신호 합산 후 클램핑된 신뢰도
         """
-        raw = (
-            self.llm_confidence
-            + self.keyword_boost
-            + self.transition_boost
-            + self.length_penalty
-        )
+        raw = self.llm_confidence + self.keyword_boost + self.transition_boost + self.length_penalty
         return max(0.0, min(1.0, raw))
 
     def to_dict(self) -> dict:

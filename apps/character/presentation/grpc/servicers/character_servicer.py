@@ -184,6 +184,7 @@ class CharacterServicer(character_pb2_grpc.CharacterServiceServicer):
                 character_type=character.type_label or "",
                 character_dialog=character.dialog or "",
                 match_label=character.match_label or "",
+                character_code=character.code,
             )
 
         except Exception:

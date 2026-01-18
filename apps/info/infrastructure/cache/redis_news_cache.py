@@ -296,3 +296,87 @@ class RedisNewsCache(NewsCachePort):
         """리소스 정리."""
         # Redis 클라이언트는 외부에서 관리
         pass
+
+
+# ============================================================
+# Sync Version (for gevent/Celery worker)
+# ============================================================
+class RedisNewsCacheSync:
+    """Redis 뉴스 캐시 (동기 버전).
+
+    gevent 몽키패칭 호환을 위한 동기 Redis 사용.
+    """
+
+    def __init__(self, redis, ttl: int = 3600):
+        """초기화.
+
+        Args:
+            redis: 동기 Redis 클라이언트
+            ttl: 기본 캐시 TTL (초)
+        """
+        self._redis = redis
+        self._default_ttl = ttl
+
+    def _feed_key(self, category: str) -> str:
+        """피드 키 생성."""
+        return f"{FEED_KEY_PREFIX}{category}"
+
+    def _article_key(self, article_id: str) -> str:
+        """기사 키 생성."""
+        return f"{ARTICLE_KEY_PREFIX}{article_id}"
+
+    def set_articles(
+        self,
+        category: str,
+        articles: list[NewsArticle],
+        ttl: int = 3600,
+    ) -> None:
+        """캐시에 기사 저장."""
+        if not articles:
+            return
+
+        feed_key = self._feed_key(category)
+
+        # Pipeline으로 일괄 저장
+        pipe = self._redis.pipeline()
+
+        # 기존 피드 삭제 (전체 교체)
+        pipe.delete(feed_key)
+
+        # Sorted Set에 추가
+        feed_data = {article.id: article.published_at_ms for article in articles}
+        if feed_data:
+            pipe.zadd(feed_key, feed_data)
+            pipe.expire(feed_key, ttl)
+
+        # 기사 상세 저장
+        for article in articles:
+            article_key = self._article_key(article.id)
+            article_data = self._serialize_article(article)
+            pipe.hset(article_key, mapping=article_data)
+            pipe.expire(article_key, ttl)
+
+        pipe.execute()
+
+        logger.info(
+            "Cached news articles (sync)",
+            extra={"category": category, "count": len(articles), "ttl": ttl},
+        )
+
+    def _serialize_article(self, article: NewsArticle) -> dict[str, str]:
+        """NewsArticle을 Redis Hash로 직렬화."""
+        return {
+            "id": article.id,
+            "title": article.title,
+            "url": article.url,
+            "snippet": article.snippet,
+            "source": article.source,
+            "source_name": article.source_name,
+            "published_at": article.published_at.isoformat(),
+            "thumbnail_url": article.thumbnail_url or "",
+            "category": article.category or "",
+            "source_icon_url": article.source_icon_url or "",
+            "video_url": article.video_url or "",
+            "keywords": ",".join(article.keywords) if article.keywords else "",
+            "ai_tag": article.ai_tag or "",
+        }

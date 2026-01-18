@@ -101,10 +101,25 @@ class CDNCharacterAssetLoader(CharacterAssetPort):
         self._cache_enabled = cache_enabled
         self._cache: dict[str, bytes] = {}
         self._cache_lock = asyncio.Lock()
+        # HTTP 클라이언트 재사용 (커넥션 풀링)
+        self._http_client: httpx.AsyncClient | None = None
 
     def _build_url(self, code: str) -> str:
         """CDN URL 생성."""
         return f"{self._cdn_base_url}/{self._prefix}/{code}.png"
+
+    async def _get_http_client(self) -> httpx.AsyncClient:
+        """HTTP 클라이언트 가져오기 (lazy initialization)."""
+        if self._http_client is None:
+            self._http_client = httpx.AsyncClient(timeout=self._timeout)
+        return self._http_client
+
+    async def close(self) -> None:
+        """리소스 정리 (HTTP 클라이언트 종료)."""
+        if self._http_client is not None:
+            await self._http_client.aclose()
+            self._http_client = None
+            logger.debug("HTTP client closed")
 
     async def get_asset(self, character_code: str) -> CharacterAsset | None:
         """캐릭터 코드로 에셋 조회 (바이트 포함).
@@ -133,10 +148,10 @@ class CDNCharacterAssetLoader(CharacterAssetPort):
 
         # CDN에서 로드
         try:
-            async with httpx.AsyncClient(timeout=self._timeout) as client:
-                response = await client.get(url)
-                response.raise_for_status()
-                image_bytes = response.content
+            client = await self._get_http_client()
+            response = await client.get(url)
+            response.raise_for_status()
+            image_bytes = response.content
 
             # 캐시 저장
             if self._cache_enabled:

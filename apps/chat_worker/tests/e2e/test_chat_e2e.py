@@ -19,7 +19,6 @@ from __future__ import annotations
 import asyncio
 import json
 import uuid
-from typing import Any, AsyncGenerator
 
 import pytest
 
@@ -87,10 +86,7 @@ class TestChatE2EFlow:
 
         # 1. Shard 계산 (Worker와 동일한 로직)
         shard_count = 4
-        shard = (
-            int.from_bytes(hashlib.md5(job_id.encode()).digest()[:8], "big")
-            % shard_count
-        )
+        shard = int.from_bytes(hashlib.md5(job_id.encode()).digest()[:8], "big") % shard_count
         stream_key = f"chat:events:{shard}"
         pubsub_channel = f"sse:events:{job_id}"
 
@@ -153,10 +149,7 @@ class TestChatE2EFlow:
         import hashlib
 
         shard_count = 4
-        shard = (
-            int.from_bytes(hashlib.md5(job_id.encode()).digest()[:8], "big")
-            % shard_count
-        )
+        shard = int.from_bytes(hashlib.md5(job_id.encode()).digest()[:8], "big") % shard_count
         stream_key = f"chat:events:{shard}"
 
         # 여러 Stage 이벤트 발행
@@ -207,10 +200,7 @@ class TestChatE2EFlow:
         import hashlib
 
         shard_count = 4
-        shard = (
-            int.from_bytes(hashlib.md5(job_id.encode()).digest()[:8], "big")
-            % shard_count
-        )
+        shard = int.from_bytes(hashlib.md5(job_id.encode()).digest()[:8], "big") % shard_count
         stream_key = f"chat:events:{shard}"
 
         # Answer 시작
@@ -265,9 +255,7 @@ class TestChatE2EFlow:
 
         # 검증: Stream에 이벤트가 저장되었는지
         messages = await redis_client.xrange(stream_key, count=100)
-        job_messages = [
-            m for m in messages if m[1].get("job_id") == job_id
-        ]
+        job_messages = [m for m in messages if m[1].get("job_id") == job_id]
 
         # 최소 9개 이벤트 (answer start + 7 tokens + answer complete)
         assert len(job_messages) >= 9
@@ -292,19 +280,14 @@ class TestEventRouterIntegration:
         import hashlib
 
         shard_count = 4
-        shard = (
-            int.from_bytes(hashlib.md5(job_id.encode()).digest()[:8], "big")
-            % shard_count
-        )
+        shard = int.from_bytes(hashlib.md5(job_id.encode()).digest()[:8], "big") % shard_count
         stream_key = f"chat:events:{shard}"
         group_name = "test-group"
         consumer_name = "test-consumer"
 
         # Consumer Group 생성 (이미 있으면 무시)
         try:
-            await redis_client.xgroup_create(
-                stream_key, group_name, id="0", mkstream=True
-            )
+            await redis_client.xgroup_create(stream_key, group_name, id="0", mkstream=True)
         except Exception:
             pass
 

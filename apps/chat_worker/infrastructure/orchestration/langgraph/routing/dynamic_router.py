@@ -25,7 +25,7 @@ LangGraph의 Send API를 활용하여 런타임에 동적으로
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable
 
 from langgraph.types import Send
@@ -36,6 +36,7 @@ logger = logging.getLogger(__name__)
 # ============================================================
 # Enrichment 규칙 정의
 # ============================================================
+
 
 @dataclass(frozen=True)
 class EnrichmentRule:
@@ -48,6 +49,7 @@ class EnrichmentRule:
         enrichments: 자동 추가할 노드 목록
         description: 규칙 설명 (로깅용)
     """
+
     intent: str
     enrichments: tuple[str, ...]
     description: str = ""
@@ -65,6 +67,7 @@ class ConditionalEnrichment:
         exclude_intents: 이 intent들이 주 intent면 추가 안 함
         description: 규칙 설명 (로깅용)
     """
+
     node: str
     condition: Callable[[dict[str, Any]], bool]
     exclude_intents: tuple[str, ...] = ()
@@ -119,6 +122,7 @@ INTENT_TO_NODE: dict[str, str] = {
 # ============================================================
 # Dynamic Router 구현
 # ============================================================
+
 
 def create_dynamic_router(
     enable_multi_intent: bool = True,

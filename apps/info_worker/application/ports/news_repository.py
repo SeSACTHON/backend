@@ -54,10 +54,11 @@ class NewsRepositoryPort(ABC):
     """뉴스 저장소 포트 (Postgres).
 
     영구 저장소로서 UPSERT 및 커서 기반 페이지네이션 지원.
+    psycopg2 동기 드라이버 사용 (gevent 몽키패칭 호환).
     """
 
     @abstractmethod
-    async def upsert_articles(self, articles: list[NewsArticle]) -> int:
+    def upsert_articles(self, articles: list[NewsArticle]) -> int:
         """기사 일괄 저장 (UPSERT).
 
         URL 기반 중복 제거. 기존 기사는 updated_at만 갱신.
@@ -71,7 +72,7 @@ class NewsRepositoryPort(ABC):
         pass
 
     @abstractmethod
-    async def get_articles(
+    def get_articles(
         self,
         category: str,
         cursor: NewsCursor | None = None,
@@ -90,7 +91,7 @@ class NewsRepositoryPort(ABC):
         pass
 
     @abstractmethod
-    async def get_recent_articles(
+    def get_recent_articles(
         self,
         category: str,
         limit: int = 200,
@@ -107,7 +108,7 @@ class NewsRepositoryPort(ABC):
         pass
 
     @abstractmethod
-    async def get_total_count(self, category: str) -> int:
+    def get_total_count(self, category: str) -> int:
         """카테고리별 기사 총 개수.
 
         Args:
@@ -118,6 +119,6 @@ class NewsRepositoryPort(ABC):
         """
         pass
 
-    async def close(self) -> None:
+    def close(self) -> None:
         """리소스 정리 (optional)."""
         pass

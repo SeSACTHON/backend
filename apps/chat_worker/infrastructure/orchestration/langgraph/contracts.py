@@ -16,7 +16,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import FrozenSet
 
 # ============================================================
 # Node Output Contracts
@@ -88,6 +87,7 @@ INTENT_OPTIONAL_FIELDS: dict[str, frozenset[str]] = {
 # ============================================================
 # Derived Mappings (Computed at import time)
 # ============================================================
+
 
 def _build_field_to_nodes() -> dict[str, frozenset[str]]:
     """필드 → 생산 노드 역매핑 생성."""
@@ -205,6 +205,7 @@ def validate_missing_fields(
 @dataclass(frozen=True)
 class ContractValidationResult:
     """Contract 검증 결과."""
+
     is_valid: bool
     errors: tuple[str, ...]
 
@@ -226,8 +227,7 @@ def validate_contracts() -> ContractValidationResult:
         for field in required_fields:
             if field not in FIELD_TO_NODES:
                 errors.append(
-                    f"Intent '{intent}' requires field '{field}' "
-                    f"but no node produces it"
+                    f"Intent '{intent}' requires field '{field}' " f"but no node produces it"
                 )
 
     # 2. Optional fields 검증
@@ -235,8 +235,7 @@ def validate_contracts() -> ContractValidationResult:
         for field in optional_fields:
             if field not in FIELD_TO_NODES:
                 errors.append(
-                    f"Intent '{intent}' optionally uses field '{field}' "
-                    f"but no node produces it"
+                    f"Intent '{intent}' optionally uses field '{field}' " f"but no node produces it"
                 )
 
     return ContractValidationResult(
@@ -249,6 +248,7 @@ def validate_contracts() -> ContractValidationResult:
 _validation_result = validate_contracts()
 if not _validation_result.is_valid:
     import warnings
+
     for error in _validation_result.errors:
         warnings.warn(f"Contract validation error: {error}", stacklevel=2)
 

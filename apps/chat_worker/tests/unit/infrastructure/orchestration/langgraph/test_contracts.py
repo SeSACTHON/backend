@@ -18,9 +18,7 @@ from chat_worker.infrastructure.orchestration.langgraph.contracts import (
     FIELD_TO_NODES,
     INTENT_OPTIONAL_FIELDS,
     INTENT_REQUIRED_FIELDS,
-    NODE_OUTPUT_FIELDS,
     get_producing_nodes,
-    get_required_fields,
     get_required_nodes_for_intent,
     is_node_required_for_intent,
     validate_contracts,
@@ -44,8 +42,7 @@ class TestContractValidation:
             for field in required_fields:
                 producers = get_producing_nodes(field)
                 assert len(producers) > 0, (
-                    f"Intent '{intent}' requires field '{field}' "
-                    f"but no node produces it"
+                    f"Intent '{intent}' requires field '{field}' " f"but no node produces it"
                 )
 
     def test_all_optional_fields_have_producers(self) -> None:
@@ -54,8 +51,7 @@ class TestContractValidation:
             for field in optional_fields:
                 producers = get_producing_nodes(field)
                 assert len(producers) > 0, (
-                    f"Intent '{intent}' optionally uses field '{field}' "
-                    f"but no node produces it"
+                    f"Intent '{intent}' optionally uses field '{field}' " f"but no node produces it"
                 )
 
 

@@ -17,7 +17,7 @@ from chat_worker.application.commands.evaluate_feedback_command import (
 )
 from chat_worker.application.dto.feedback_result import FeedbackResult
 from chat_worker.application.dto.fallback_result import FallbackResult
-from chat_worker.domain.enums import FeedbackQuality, FallbackReason
+from chat_worker.domain.enums import FallbackReason
 
 
 @pytest.fixture
@@ -37,9 +37,7 @@ def mock_fallback_orchestrator():
 def mock_llm_evaluator():
     """Mock LLM 평가기."""
     evaluator = MagicMock()
-    evaluator.evaluate = AsyncMock(
-        return_value=FeedbackResult.excellent(score=0.95)
-    )
+    evaluator.evaluate = AsyncMock(return_value=FeedbackResult.excellent(score=0.95))
     return evaluator
 
 
@@ -76,9 +74,7 @@ class TestEvaluateFeedbackCommand:
             fallback_orchestrator=mock_fallback_orchestrator,
         )
 
-        output = asyncio.get_event_loop().run_until_complete(
-            command.execute(sample_input)
-        )
+        output = asyncio.get_event_loop().run_until_complete(command.execute(sample_input))
 
         assert isinstance(output, EvaluateFeedbackOutput)
         assert output.feedback is not None
@@ -108,9 +104,7 @@ class TestEvaluateFeedbackCommand:
             fallback_orchestrator=mock_fallback_orchestrator,
         )
 
-        output = asyncio.get_event_loop().run_until_complete(
-            command.execute(input_dto)
-        )
+        output = asyncio.get_event_loop().run_until_complete(command.execute(input_dto))
 
         assert output.fallback_executed is False
         assert output.fallback_result is None
@@ -132,9 +126,7 @@ class TestEvaluateFeedbackCommand:
             fallback_orchestrator=mock_fallback_orchestrator,
         )
 
-        output = asyncio.get_event_loop().run_until_complete(
-            command.execute(input_dto)
-        )
+        output = asyncio.get_event_loop().run_until_complete(command.execute(input_dto))
 
         assert output.fallback_executed is True
         assert output.fallback_result is not None
@@ -160,9 +152,7 @@ class TestEvaluateFeedbackCommand:
             llm_evaluator=mock_llm_evaluator,
         )
 
-        output = asyncio.get_event_loop().run_until_complete(
-            command.execute(input_dto)
-        )
+        output = asyncio.get_event_loop().run_until_complete(command.execute(input_dto))
 
         # LLM 평가가 호출됨
         mock_llm_evaluator.evaluate.assert_called_once()
@@ -188,9 +178,7 @@ class TestEvaluateFeedbackCommand:
             llm_evaluator=mock_llm_evaluator,
         )
 
-        output = asyncio.get_event_loop().run_until_complete(
-            command.execute(input_dto)
-        )
+        output = asyncio.get_event_loop().run_until_complete(command.execute(input_dto))
 
         assert "llm_evaluation_failed" in output.events
         # 에러가 발생해도 결과는 반환됨

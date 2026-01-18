@@ -11,7 +11,6 @@ Command(UseCase) 레이어 테스트.
 
 from __future__ import annotations
 
-from typing import Any
 from unittest.mock import AsyncMock
 
 import pytest
@@ -82,9 +81,7 @@ class TestSearchRecyclablePriceCommand:
         return MockRecyclablePriceClient()
 
     @pytest.fixture
-    def command(
-        self, mock_client: MockRecyclablePriceClient
-    ) -> SearchRecyclablePriceCommand:
+    def command(self, mock_client: MockRecyclablePriceClient) -> SearchRecyclablePriceCommand:
         """테스트용 Command."""
         return SearchRecyclablePriceCommand(price_client=mock_client)
 

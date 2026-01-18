@@ -97,9 +97,7 @@ class CharacterGrpcClient(CharacterClientPort):
         request = character_pb2.GetByMatchRequest(match_label=waste_category)
 
         try:
-            response = await stub.GetCharacterByMatch(
-                request, timeout=DEFAULT_GRPC_TIMEOUT
-            )
+            response = await stub.GetCharacterByMatch(request, timeout=DEFAULT_GRPC_TIMEOUT)
 
             if not response.found:
                 logger.info(
@@ -121,6 +119,7 @@ class CharacterGrpcClient(CharacterClientPort):
                 type_label=response.character_type,
                 dialog=response.character_dialog,
                 match_label=response.match_label,
+                code=response.character_code or None,
             )
 
         except grpc.aio.AioRpcError as e:

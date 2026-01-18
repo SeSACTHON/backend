@@ -74,10 +74,7 @@ class LocalRecyclablePriceClient:
         if data_path is None:
             # 기본 에셋 경로
             self._data_path = (
-                Path(__file__).parent.parent.parent
-                / "assets"
-                / "data"
-                / "recyclable_prices.yaml"
+                Path(__file__).parent.parent.parent / "assets" / "data" / "recyclable_prices.yaml"
             )
         else:
             self._data_path = Path(data_path)
@@ -299,10 +296,7 @@ class LocalRecyclablePriceClient:
         }
         target_category_id = category_id_map.get(category.value, "")
 
-        matched = [
-            item for item in self._items
-            if item.get("category_id") == target_category_id
-        ]
+        matched = [item for item in self._items if item.get("category_id") == target_category_id]
         items = [self._item_to_dto(item, region) for item in matched]
 
         survey_info = self._raw_data.get("survey_info", {}) if self._raw_data else {}
@@ -380,8 +374,7 @@ class LocalRecyclablePriceClient:
             RecyclablePriceTrendDTO or None
         """
         raise NotImplementedError(
-            "가격 추이 조회는 아직 지원하지 않습니다. "
-            "히스토리 데이터 추가 후 구현 예정입니다."
+            "가격 추이 조회는 아직 지원하지 않습니다. " "히스토리 데이터 추가 후 구현 예정입니다."
         )
 
     # ========== Context 생성 (프롬프트 주입용) ==========

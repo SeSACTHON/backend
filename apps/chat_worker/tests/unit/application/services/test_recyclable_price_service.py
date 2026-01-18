@@ -191,9 +191,7 @@ class TestRecyclablePriceService:
             ("알루미늄 캔 시세", "캔"),  # "캔"이 keywords 리스트에서 먼저 매칭
         ],
     )
-    def test_extract_item_name_from_query_success(
-        self, message: str, expected: str
-    ):
+    def test_extract_item_name_from_query_success(self, message: str, expected: str):
         """키워드 추출 성공."""
         result = RecyclablePriceService.extract_item_name_from_query(message)
         assert result == expected

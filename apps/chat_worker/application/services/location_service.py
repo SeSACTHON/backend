@@ -58,9 +58,7 @@ class LocationService:
             context["user_location"] = user_location.to_dict()
 
         if locations:
-            context["centers"] = [
-                LocationService._location_to_dict(loc) for loc in locations
-            ]
+            context["centers"] = [LocationService._location_to_dict(loc) for loc in locations]
         else:
             context["message"] = "주변에 재활용 센터를 찾지 못했어요."
 

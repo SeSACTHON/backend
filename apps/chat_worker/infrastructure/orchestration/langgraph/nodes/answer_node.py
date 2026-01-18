@@ -93,11 +93,15 @@ def create_answer_node(
 
             # weather_context에서 context 문자열 추출
             weather_ctx = state.get("weather_context")
-            weather_context_str = weather_ctx.get("context") if isinstance(weather_ctx, dict) else None
+            weather_context_str = (
+                weather_ctx.get("context") if isinstance(weather_ctx, dict) else None
+            )
 
             # collection_point_context에서 context 문자열 추출
             collection_ctx = state.get("collection_point_context")
-            collection_context_str = collection_ctx.get("context") if isinstance(collection_ctx, dict) else None
+            collection_context_str = (
+                collection_ctx.get("context") if isinstance(collection_ctx, dict) else None
+            )
 
             # 대화 히스토리 추출 (Multi-turn 지원)
             messages = state.get("messages", [])
@@ -107,7 +111,10 @@ def create_answer_node(
                 # 최근 10개 메시지만 사용 (토큰 효율성)
                 recent_messages = messages[-10:] if len(messages) > 10 else messages
                 conversation_history = [
-                    {"role": getattr(msg, "type", "user"), "content": getattr(msg, "content", str(msg))}
+                    {
+                        "role": getattr(msg, "type", "user"),
+                        "content": getattr(msg, "content", str(msg)),
+                    }
                     for msg in recent_messages
                 ]
 

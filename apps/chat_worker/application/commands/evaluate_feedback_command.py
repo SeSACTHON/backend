@@ -181,9 +181,8 @@ class EvaluateFeedbackCommand:
         Returns:
             LLM 평가 필요 여부
         """
-        return (
-            self._llm_evaluator is not None
-            and self._feedback_service.needs_llm_evaluation(feedback)
+        return self._llm_evaluator is not None and self._feedback_service.needs_llm_evaluation(
+            feedback
         )
 
     async def _evaluate_with_llm(

@@ -57,7 +57,9 @@ class AnswerGeneratorService:
                 "has_collection_point": context.collection_point_context is not None,
                 "has_conversation_history": context.conversation_history is not None,
                 "has_conversation_summary": context.conversation_summary is not None,
-                "conversation_turns": len(context.conversation_history) if context.conversation_history else 0,
+                "conversation_turns": (
+                    len(context.conversation_history) if context.conversation_history else 0
+                ),
                 "prompt_length": len(prompt),
             },
         )

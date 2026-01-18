@@ -11,6 +11,10 @@ Clean Architecture:
 - Chat Completions API: 기존 파이프라인 유지 (multi-intent 라우팅)
 - Responses API: 이미지 생성 서브에이전트에서만 사용
 - 같은 OpenAI API 키로 두 API 혼용 가능
+
+캐릭터 참조 이미지:
+- character_context.asset에서 캐릭터 참조 이미지 가져옴
+- generate_with_reference()로 캐릭터 스타일 반영
 """
 
 from __future__ import annotations
@@ -20,7 +24,9 @@ from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from chat_worker.application.ports.image_generator import ImageGeneratorPort
+    from chat_worker.application.ports.image_generator import (
+        ImageGeneratorPort,
+    )
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +43,8 @@ class GenerateImageInput:
     prompt: str
     size: str = "1024x1024"
     quality: str = "medium"
+    reference_image_bytes: bytes | None = None  # 캐릭터 참조 이미지
+    reference_image_mime: str = "image/png"  # 참조 이미지 MIME 타입
 
 
 @dataclass
@@ -121,6 +129,8 @@ class GenerateImageCommand:
         events.append("prompt_validated")
 
         # 2. 이미지 생성 API 호출
+        has_reference = input_dto.reference_image_bytes is not None
+
         try:
             logger.info(
                 "Generating image",
@@ -129,21 +139,41 @@ class GenerateImageCommand:
                     "prompt_length": len(input_dto.prompt),
                     "size": input_dto.size,
                     "quality": input_dto.quality,
+                    "has_reference": has_reference,
                 },
             )
 
-            result = await self._image_generator.generate(
-                prompt=input_dto.prompt,
-                size=input_dto.size,
-                quality=input_dto.quality,
-            )
-            events.append("image_generated")
+            if has_reference and self._image_generator.supports_reference_images:
+                # 참조 이미지가 있고 지원되면 generate_with_reference 사용
+                from chat_worker.application.ports.image_generator import ReferenceImage
+
+                reference = ReferenceImage(
+                    image_bytes=input_dto.reference_image_bytes,  # type: ignore
+                    mime_type=input_dto.reference_image_mime,
+                )
+                result = await self._image_generator.generate_with_reference(
+                    prompt=input_dto.prompt,
+                    reference_images=[reference],
+                    size=input_dto.size,
+                    quality=input_dto.quality,
+                )
+                events.append("image_generated_with_reference")
+            else:
+                # 참조 이미지 없거나 미지원 시 기본 생성
+                result = await self._image_generator.generate(
+                    prompt=input_dto.prompt,
+                    size=input_dto.size,
+                    quality=input_dto.quality,
+                )
+                events.append("image_generated")
 
             logger.info(
                 "Image generation completed",
                 extra={
                     "job_id": input_dto.job_id,
                     "has_description": result.description is not None,
+                    "used_reference": has_reference
+                    and self._image_generator.supports_reference_images,
                 },
             )
 

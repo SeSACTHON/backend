@@ -88,11 +88,27 @@ def create_image_generation_node(
         )
 
         # 1. state → input DTO 변환 (state에서 override 가능)
+        # 캐릭터 참조 이미지가 있으면 추출 (병렬 라우팅으로 character → image_generation)
+        character_context = state.get("character_context") or {}
+        character_asset = character_context.get("asset") if character_context else None
+        reference_bytes = character_asset.get("image_bytes") if character_asset else None
+
+        if reference_bytes:
+            logger.info(
+                "Using character reference image for generation",
+                extra={
+                    "job_id": job_id,
+                    "character_code": character_asset.get("code") if character_asset else None,
+                    "reference_size": len(reference_bytes),
+                },
+            )
+
         input_dto = GenerateImageInput(
             job_id=job_id,
             prompt=query,
             size=state.get("image_size") or default_size,
             quality=state.get("image_quality") or default_quality,
+            reference_image_bytes=reference_bytes,
         )
 
         # 2. Command 실행 (정책/흐름은 Command에서)
@@ -139,6 +155,8 @@ def create_image_generation_node(
                 "image_url": output.image_url,
                 "description": output.description,
                 "revised_prompt": output.revised_prompt,
+                "used_reference": reference_bytes is not None,
+                "character_code": character_asset.get("code") if character_asset else None,
             },
         }
 
