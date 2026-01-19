@@ -8,6 +8,10 @@ patches:
   target:
     kind: Deployment
     name: chat-worker
+- path: patch-configmap.yaml
+  target:
+    kind: ConfigMap
+    name: chat-worker-config
 images:
 - name: docker.io/mng990/eco2
   newTag: chat-worker-dev-latest

@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: chat-worker-config
+data:
+  CHAT_WORKER_ENVIRONMENT: dev
+  # Image Generation - enable for dev testing
+  CHAT_WORKER_ENABLE_IMAGE_GENERATION: 'true'
