@@ -107,7 +107,9 @@ def create_intent_node(
                 "intent": output.intent,
                 "confidence": output.confidence,
                 "has_multi_intent": output.has_multi_intent,
-                "detected_character": output.detected_character.code if output.detected_character else None,
+                "detected_character": (
+                    output.detected_character.code if output.detected_character else None
+                ),
             },
         )
 

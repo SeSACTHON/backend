@@ -59,9 +59,7 @@ class CharacterNameDetector:
             yaml_path: character_names.yaml 경로 (None이면 기본 경로)
         """
         if yaml_path is None:
-            yaml_path = (
-                Path(__file__).parent / "data" / "character_names.yaml"
-            )
+            yaml_path = Path(__file__).parent / "data" / "character_names.yaml"
         self._yaml_path = Path(yaml_path)
         self._characters: list[CharacterInfo] = []
         self._alias_map: dict[str, CharacterInfo] = {}  # 별칭 → 캐릭터
