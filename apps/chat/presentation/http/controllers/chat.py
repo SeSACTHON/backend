@@ -4,7 +4,8 @@ RESTful 엔드포인트:
 - GET    /chat              채팅 목록 (사이드바)
 - POST   /chat              새 채팅 생성
 - GET    /chat/{id}         채팅 상세 + 메시지
-- DELETE /chat/{id}         채팅 삭제 (soft delete)
+- PATCH  /chat/{id}         채팅 제목 수정 → 204 No Content
+- DELETE /chat/{id}         채팅 삭제 (soft delete) → 204 No Content
 - POST   /chat/{id}/messages  메시지 전송 → Worker
 - POST   /chat/{job_id}/input Human-in-the-Loop 입력
 
@@ -20,7 +21,7 @@ from datetime import datetime
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
 from pydantic import BaseModel, Field, HttpUrl
 
 from chat.application.chat.commands import SubmitChatRequest
@@ -83,6 +84,7 @@ class MessageResponse(BaseModel):
     id: str = Field(description="메시지 ID")
     role: str = Field(description="역할 (user/assistant)")
     content: str = Field(description="내용")
+    image_url: str | None = Field(default=None, description="첨부 이미지 URL")
     intent: str | None = Field(default=None, description="분류된 의도")
     metadata: dict[str, Any] | None = Field(default=None, description="메타데이터")
     created_at: datetime = Field(description="생성 시각")
@@ -93,6 +95,7 @@ class MessageResponse(BaseModel):
             id=str(message.id),
             role=message.role,
             content=message.content,
+            image_url=message.image_url,
             intent=message.intent,
             metadata=message.metadata,
             created_at=message.created_at,
@@ -106,6 +109,9 @@ class ChatDetailResponse(BaseModel):
     title: str | None = Field(default=None, description="채팅 제목")
     messages: list[MessageResponse] = Field(description="메시지 목록")
     has_more: bool = Field(default=False, description="더 많은 메시지 존재 여부")
+    next_cursor: str | None = Field(
+        default=None, description="다음 페이지 커서 (ISO 8601 타임스탬프)"
+    )
     created_at: datetime = Field(description="생성 시각")
 
 
@@ -113,6 +119,12 @@ class CreateChatRequest(BaseModel):
     """새 채팅 생성 요청."""
 
     title: str | None = Field(default=None, description="채팅 제목 (선택)")
+
+
+class UpdateChatRequest(BaseModel):
+    """채팅 제목 수정 요청."""
+
+    title: str = Field(description="새 채팅 제목")
 
 
 class CreateChatResponse(BaseModel):
@@ -168,12 +180,6 @@ class UserInputResponse(BaseModel):
 
     status: str = Field(default="received")
     job_id: str
-
-
-class DeleteChatResponse(BaseModel):
-    """채팅 삭제 응답."""
-
-    success: bool = Field(description="삭제 성공 여부")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -301,25 +307,32 @@ async def get_chat(
         before=before,
     )
 
+    # 다음 페이지 커서 계산 (마지막 메시지의 created_at을 커서로 사용)
+    next_cursor = None
+    if has_more and messages:
+        last_msg = messages[-1]
+        next_cursor = last_msg.created_at.isoformat()
+
     return ChatDetailResponse(
         id=str(chat.id),
         title=chat.title,
         messages=[MessageResponse.from_entity(m) for m in messages],
         has_more=has_more,
+        next_cursor=next_cursor,
         created_at=chat.created_at,
     )
 
 
 @router.delete(
     "/{chat_id}",
-    response_model=DeleteChatResponse,
+    status_code=204,
     summary="채팅 삭제",
 )
 async def delete_chat(
     chat_id: UUID,
     user: CurrentUser,
     repo: ChatRepositoryDep,
-) -> DeleteChatResponse:
+) -> Response:
     """채팅을 삭제합니다 (soft delete).
 
     사용자가 채팅을 삭제했을 때 호출됩니다.
@@ -333,14 +346,49 @@ async def delete_chat(
     if str(chat.user_id) != user.user_id:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    success = await repo.delete_chat(chat_id)
+    await repo.delete_chat(chat_id)
 
     logger.info(
         "chat_deleted",
-        extra={"chat_id": str(chat_id), "user_id": user.user_id, "success": success},
+        extra={"chat_id": str(chat_id), "user_id": user.user_id},
     )
 
-    return DeleteChatResponse(success=success)
+    return Response(status_code=204)
+
+
+@router.patch(
+    "/{chat_id}",
+    status_code=204,
+    summary="채팅 제목 수정",
+)
+async def update_chat(
+    chat_id: UUID,
+    payload: UpdateChatRequest,
+    user: CurrentUser,
+    repo: ChatRepositoryDep,
+) -> Response:
+    """채팅 제목을 수정합니다.
+
+    사용자가 채팅 제목을 편집했을 때 호출됩니다.
+    """
+    # 채팅 존재 확인 및 권한 검증
+    chat = await repo.get_chat_by_id(chat_id)
+    if not chat:
+        raise HTTPException(status_code=404, detail="Chat not found")
+
+    if str(chat.user_id) != user.user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # 제목 업데이트
+    chat.title = payload.title
+    await repo.update_chat(chat)
+
+    logger.info(
+        "chat_updated",
+        extra={"chat_id": str(chat_id), "user_id": user.user_id, "title": payload.title},
+    )
+
+    return Response(status_code=204)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
