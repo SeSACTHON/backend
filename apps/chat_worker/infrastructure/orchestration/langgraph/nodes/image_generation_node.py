@@ -105,12 +105,16 @@ def create_image_generation_node(
         # 2. character_context.asset (character 노드에서 전달 - gRPC 호출 필요)
         reference_url = None
         character_code = None
+        character_name = None
+        character_category = None
 
         # 먼저 detected_character 확인 (intent_node에서 바로 감지된 것)
         detected_character = state.get("detected_character")
         if detected_character:
             reference_url = detected_character.get("image_url")
             character_code = detected_character.get("cdn_code")
+            character_name = detected_character.get("name")
+            character_category = detected_character.get("match_label")
 
         # detected_character가 없으면 character_context 확인
         if not reference_url:
@@ -119,6 +123,8 @@ def create_image_generation_node(
             if character_asset:
                 reference_url = character_asset.get("image_url")
                 character_code = character_asset.get("code")
+                character_name = character_asset.get("name")
+                character_category = character_asset.get("category")
 
         if reference_url:
             logger.info(
@@ -126,6 +132,8 @@ def create_image_generation_node(
                 extra={
                     "job_id": job_id,
                     "character_code": character_code,
+                    "character_name": character_name,
+                    "character_category": character_category,
                     "reference_url": reference_url,
                     "source": "detected_character" if detected_character else "character_context",
                 },
@@ -137,6 +145,8 @@ def create_image_generation_node(
             size=state.get("image_size") or default_size,
             quality=state.get("image_quality") or default_quality,
             reference_image_url=reference_url,
+            character_name=character_name,
+            character_category=character_category,
         )
 
         # 2. Command 실행 (정책/흐름은 Command에서)

@@ -264,11 +264,20 @@ class GeminiNativeImageGenerator(ImageGeneratorPort):
 
             # 참조 이미지 추가
             if reference_images:
-                parts.append(
-                    types.Part.from_text(
-                        text="다음 참조 이미지의 캐릭터 스타일을 유지하면서 이미지를 생성해주세요:"
+                # 캐릭터 설명이 있으면 더 구체적인 프롬프트 사용
+                char_descriptions = [ref.description for ref in reference_images if ref.description]
+                if char_descriptions:
+                    char_info = ", ".join(char_descriptions)
+                    intro_text = (
+                        f"다음은 {char_info}의 참조 이미지입니다. "
+                        f"이 캐릭터의 디자인, 색상, 스타일을 정확하게 유지하면서 "
+                        f"사용자 요청에 맞는 이미지를 생성해주세요."
                     )
-                )
+                else:
+                    intro_text = "다음 참조 이미지의 캐릭터 스타일을 유지하면서 이미지를 생성해주세요:"
+
+                parts.append(types.Part.from_text(text=intro_text))
+
                 for ref in reference_images:
                     # URL이면 lazy fetch, bytes면 그대로 사용
                     image_data = await self._resolve_reference_bytes(ref)
@@ -278,7 +287,7 @@ class GeminiNativeImageGenerator(ImageGeneratorPort):
                             mime_type=ref.mime_type,
                         )
                     )
-                parts.append(types.Part.from_text(text=f"\n요청: {prompt}"))
+                parts.append(types.Part.from_text(text=f"\n사용자 요청: {prompt}"))
             else:
                 parts.append(types.Part.from_text(text=prompt))
 

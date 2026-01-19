@@ -29,6 +29,7 @@ class DetectedCharacter:
     code: str  # DB 코드 (char-petty)
     name: str  # 공식 이름 (페티)
     cdn_code: str  # CDN 코드 (pet)
+    match_label: str  # 폐기물 카테고리 (무색페트병)
     matched_alias: str  # 매칭된 별칭 (사용자가 입력한 것)
 
 
@@ -146,6 +147,7 @@ class CharacterNameDetector:
                     code=char_info.code,
                     name=char_info.name,
                     cdn_code=char_info.cdn_code,
+                    match_label=char_info.match_label,
                     matched_alias=alias,
                 )
 
@@ -179,6 +181,7 @@ class CharacterNameDetector:
                         code=char_info.code,
                         name=char_info.name,
                         cdn_code=char_info.cdn_code,
+                        match_label=char_info.match_label,
                         matched_alias=alias,
                     )
 

@@ -143,6 +143,7 @@ def create_intent_node(
                 "name": output.detected_character.name,
                 "cdn_code": output.detected_character.cdn_code,
                 "image_url": output.detected_character.image_url,
+                "match_label": output.detected_character.match_label,
             }
 
         return {

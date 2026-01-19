@@ -45,6 +45,9 @@ class GenerateImageInput:
     quality: str = "medium"
     reference_image_url: str | None = None  # 캐릭터 참조 이미지 CDN URL (lazy fetch)
     reference_image_mime: str = "image/png"  # 참조 이미지 MIME 타입
+    # 캐릭터 컨텍스트 (참조 이미지 사용 시 Gemini 프롬프트에 포함)
+    character_name: str | None = None  # 캐릭터 이름 (예: 페티)
+    character_category: str | None = None  # 폐기물 카테고리 (예: 무색페트병)
 
 
 @dataclass
@@ -145,6 +148,8 @@ class GenerateImageCommand:
                     "quality": input_dto.quality,
                     "has_reference": has_reference,
                     "reference_url": input_dto.reference_image_url,
+                    "character_name": input_dto.character_name,
+                    "character_category": input_dto.character_category,
                 },
             )
 
@@ -153,9 +158,17 @@ class GenerateImageCommand:
                 # URL만 전달 - Gemini generator에서 lazy fetch
                 from chat_worker.application.ports.image_generator import ReferenceImage
 
+                # 캐릭터 설명 생성 (Gemini 프롬프트에 포함됨)
+                char_description = None
+                if input_dto.character_name:
+                    char_description = f"'{input_dto.character_name}' 캐릭터"
+                    if input_dto.character_category:
+                        char_description += f" ({input_dto.character_category} 담당)"
+
                 reference = ReferenceImage(
                     image_url=input_dto.reference_image_url,
                     mime_type=input_dto.reference_image_mime,
+                    description=char_description,
                 )
                 result = await self._image_generator.generate_with_reference(
                     prompt=input_dto.prompt,
