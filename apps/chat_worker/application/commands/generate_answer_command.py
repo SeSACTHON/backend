@@ -38,11 +38,27 @@ ANSWER_CACHE_TTL = 3600  # 1시간
 CACHEABLE_INTENTS = frozenset({"general", "greeting"})
 
 # 웹 검색 트리거 키워드 (GENERAL intent에서 네이티브 검색 활성화)
-WEB_SEARCH_KEYWORDS = frozenset({
-    "최신", "최근", "뉴스", "정책", "규제", "발표", "공지",
-    "2024", "2025", "2026", "올해", "작년", "지난달",
-    "현재", "요즘", "트렌드", "업데이트",
-})
+WEB_SEARCH_KEYWORDS = frozenset(
+    {
+        "최신",
+        "최근",
+        "뉴스",
+        "정책",
+        "규제",
+        "발표",
+        "공지",
+        "2024",
+        "2025",
+        "2026",
+        "올해",
+        "작년",
+        "지난달",
+        "현재",
+        "요즘",
+        "트렌드",
+        "업데이트",
+    }
+)
 
 
 @dataclass(frozen=True)

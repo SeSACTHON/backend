@@ -220,10 +220,12 @@ class OpenAILLMClient(LLMClientPort):
         # 입력 메시지 구성
         input_messages = []
         if system_prompt:
-            input_messages.append({
-                "role": "developer",  # Responses API uses "developer" for system
-                "content": system_prompt,
-            })
+            input_messages.append(
+                {
+                    "role": "developer",  # Responses API uses "developer" for system
+                    "content": system_prompt,
+                }
+            )
 
         user_content = prompt
         if context:
@@ -236,10 +238,12 @@ class OpenAILLMClient(LLMClientPort):
         tool_configs = []
         for tool in tools:
             if tool == "web_search":
-                tool_configs.append({
-                    "type": "web_search",
-                    "search_context_size": "medium",  # low, medium, high
-                })
+                tool_configs.append(
+                    {
+                        "type": "web_search",
+                        "search_context_size": "medium",  # low, medium, high
+                    }
+                )
             # 추가 도구는 여기에 확장
 
         try:
@@ -271,9 +275,7 @@ class OpenAILLMClient(LLMClientPort):
 
         except AttributeError:
             # Responses API가 지원되지 않는 경우 fallback
-            logger.warning(
-                "Responses API not available, falling back to chat completions"
-            )
+            logger.warning("Responses API not available, falling back to chat completions")
             async for chunk in self.generate_stream(
                 prompt=prompt,
                 system_prompt=system_prompt,
