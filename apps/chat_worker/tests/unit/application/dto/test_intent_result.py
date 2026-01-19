@@ -184,7 +184,7 @@ class TestIntentResult:
             Intent.BULK_WASTE,
             Intent.RECYCLABLE_PRICE,
             Intent.COLLECTION_POINT,
-            Intent.WEB_SEARCH,
+            # WEB_SEARCH는 GENERAL로 통합됨 (PR #441)
             Intent.IMAGE_GENERATION,
             Intent.GENERAL,
         ]
