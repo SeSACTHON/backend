@@ -418,12 +418,15 @@ def create_chat_graph(
         logger.warning("Recyclable price subagent node using passthrough (no client)")
 
     # Subagent 노드: Weather (기상청 API) - 병렬 실행 가능
+    # kakao_client를 전달하여 geocoding 지원 (메시지에서 장소명 추출 → 좌표 변환)
     if weather_client is not None:
         weather_node = create_weather_node(
             weather_client=weather_client,
             event_publisher=event_publisher,
+            kakao_client=kakao_client,  # geocoding 지원
         )
-        logger.info("Weather subagent node created (KMA API)")
+        geocoding_status = "with geocoding" if kakao_client else "without geocoding"
+        logger.info(f"Weather subagent node created (KMA API, {geocoding_status})")
     else:
         # Fallback: passthrough (날씨는 보조 정보)
         async def weather_node(state: dict[str, Any]) -> dict[str, Any]:
