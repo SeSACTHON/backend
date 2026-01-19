@@ -11,6 +11,11 @@ Clean Architecture:
 LangGraph stream_mode="messages" 지원:
 - answer_node에서 LangChain LLM을 직접 호출하여 AIMessageChunk yield
 - LangGraph가 토큰 스트림을 캡처하여 stream_mode="messages"로 전달
+
+GENERAL Intent + Native Web Search:
+- GENERAL intent에서는 OpenAI Responses API의 네이티브 web_search tool 사용
+- generate_with_tools()로 스트리밍 생성 → notify_token_v2()로 직접 토큰 발행
+- LangGraph의 stream_mode="messages"는 LangChain만 캡처하므로 직접 발행 필요
 """
 
 from __future__ import annotations
@@ -23,12 +28,14 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from chat_worker.application.commands.generate_answer_command import (
     GenerateAnswerCommand,
     GenerateAnswerInput,
+    WEB_SEARCH_KEYWORDS,
 )
 from chat_worker.infrastructure.assets.prompt_loader import PromptBuilder
 from chat_worker.infrastructure.orchestration.langgraph.sequence import cleanup_sequence
 
 if TYPE_CHECKING:
     from chat_worker.application.ports.cache import CachePort
+    from chat_worker.application.ports.events import ProgressNotifierPort
     from chat_worker.application.ports.llm import LLMClientPort
 
 logger = logging.getLogger(__name__)
@@ -37,6 +44,7 @@ logger = logging.getLogger(__name__)
 def create_answer_node(
     llm: "LLMClientPort",
     cache: "CachePort | None" = None,
+    event_publisher: "ProgressNotifierPort | None" = None,
 ):
     """답변 생성 노드 팩토리.
 
@@ -48,9 +56,14 @@ def create_answer_node(
     네이티브 스트리밍 환경에서는 Progress/Token 이벤트를
     ProcessChatCommand가 astream_events로 처리합니다.
 
+    GENERAL intent + 웹 검색 키워드:
+    - OpenAI Responses API의 네이티브 web_search tool 사용
+    - LangGraph가 캡처하지 못하므로 event_publisher로 직접 토큰 발행
+
     Args:
         llm: LLM 클라이언트
         cache: 캐시 클라이언트 (선택, Answer 캐싱용)
+        event_publisher: 이벤트 발행자 (선택, 웹 검색 시 토큰 직접 발행용)
 
     Returns:
         answer_node 함수
@@ -155,22 +168,58 @@ def create_answer_node(
                 cleanup_sequence(job_id)
                 return {"answer": prepared.cached_answer}
 
-            # 4. LangChain LLM 직접 호출 (stream_mode="messages" 지원)
-            # 핵심: answer_node에서 직접 astream() 호출 → LangGraph가 AIMessageChunk 캡처
-            langchain_llm = llm.get_langchain_llm()
+            # 4. LLM 호출 - 웹 검색 필요 여부에 따라 분기
+            intent = state.get("intent", "general")
+            message = state.get("message", "")
+            message_lower = message.lower()
 
-            # LangChain 메시지 구성
-            langchain_messages = []
-            if prepared.system_prompt:
-                langchain_messages.append(SystemMessage(content=prepared.system_prompt))
-            langchain_messages.append(HumanMessage(content=prepared.prompt))
+            # GENERAL intent에서 웹 검색 키워드가 있으면 네이티브 web_search 사용
+            needs_web_search = (
+                intent == "general"
+                and any(kw in message_lower for kw in WEB_SEARCH_KEYWORDS)
+            )
 
-            # 직접 astream() 호출 → LangGraph stream_mode="messages"가 캡처
             answer_parts = []
-            async for chunk in langchain_llm.astream(langchain_messages):
-                content = chunk.content
-                if content:
-                    answer_parts.append(content)
+
+            if needs_web_search and event_publisher is not None:
+                # 네이티브 web_search tool 사용 (OpenAI Responses API)
+                # LangGraph가 캡처하지 못하므로 직접 토큰 발행
+                logger.info(
+                    "Using native web_search tool",
+                    extra={"job_id": job_id, "message_preview": message[:50]},
+                )
+
+                async for chunk in llm.generate_with_tools(
+                    prompt=prepared.prompt,
+                    tools=["web_search"],
+                    system_prompt=prepared.system_prompt,
+                ):
+                    if chunk:
+                        answer_parts.append(chunk)
+                        # 직접 토큰 이벤트 발행 (Redis Streams → Event Router → SSE)
+                        await event_publisher.notify_token_v2(
+                            task_id=job_id,
+                            content=chunk,
+                            node="answer",
+                        )
+
+                # 토큰 스트림 완료 처리
+                await event_publisher.finalize_token_stream(job_id)
+            else:
+                # 기존 LangChain 방식 (LangGraph stream_mode="messages" 캡처)
+                langchain_llm = llm.get_langchain_llm()
+
+                # LangChain 메시지 구성
+                langchain_messages = []
+                if prepared.system_prompt:
+                    langchain_messages.append(SystemMessage(content=prepared.system_prompt))
+                langchain_messages.append(HumanMessage(content=prepared.prompt))
+
+                # 직접 astream() 호출 → LangGraph stream_mode="messages"가 캡처
+                async for chunk in langchain_llm.astream(langchain_messages):
+                    content = chunk.content
+                    if content:
+                        answer_parts.append(content)
 
             answer = "".join(answer_parts)
 
