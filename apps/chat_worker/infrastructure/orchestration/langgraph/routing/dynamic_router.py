@@ -109,13 +109,12 @@ INTENT_TO_NODE: dict[str, str] = {
     "waste": "waste_rag",
     "character": "character",
     "location": "location",
-    "web_search": "web_search",
     "bulk_waste": "bulk_waste",
     "recyclable_price": "recyclable_price",
     "collection_point": "collection_point",
     "weather": "weather",
     "image_generation": "image_generation",
-    "general": "general",
+    "general": "general",  # 웹 검색도 general에서 네이티브 tool로 처리
 }
 
 

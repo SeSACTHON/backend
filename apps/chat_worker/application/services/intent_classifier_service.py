@@ -396,7 +396,6 @@ class IntentClassifierService:
                 "건전지",
                 "의류",
             ],
-            Intent.WEB_SEARCH: ["최신", "최근", "뉴스", "정책", "규제", "발표", "공지"],
             Intent.IMAGE_GENERATION: [
                 "이미지",
                 "그림",
@@ -405,7 +404,20 @@ class IntentClassifierService:
                 "보여줘",
                 "그려",
             ],
-            Intent.GENERAL: ["안녕", "뭐야", "왜", "어때"],
+            Intent.GENERAL: [
+                "안녕",
+                "뭐야",
+                "왜",
+                "어때",
+                # 웹 검색 키워드 (WEB_SEARCH → GENERAL 통합)
+                "최신",
+                "최근",
+                "뉴스",
+                "정책",
+                "규제",
+                "발표",
+                "공지",
+            ],
         }
 
         keywords = keyword_map.get(intent, [])

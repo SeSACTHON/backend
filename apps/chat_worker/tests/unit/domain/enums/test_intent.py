@@ -14,7 +14,7 @@ class TestIntent:
         assert Intent.BULK_WASTE.value == "bulk_waste"
         assert Intent.RECYCLABLE_PRICE.value == "recyclable_price"
         assert Intent.COLLECTION_POINT.value == "collection_point"
-        assert Intent.WEB_SEARCH.value == "web_search"
+        # WEB_SEARCH는 GENERAL로 통합됨 (PR #441)
         assert Intent.IMAGE_GENERATION.value == "image_generation"
         assert Intent.GENERAL.value == "general"
 
@@ -26,7 +26,8 @@ class TestIntent:
         assert Intent.from_string("bulk_waste") == Intent.BULK_WASTE
         assert Intent.from_string("recyclable_price") == Intent.RECYCLABLE_PRICE
         assert Intent.from_string("collection_point") == Intent.COLLECTION_POINT
-        assert Intent.from_string("web_search") == Intent.WEB_SEARCH
+        # web_search는 GENERAL로 통합됨 - 이제 GENERAL 반환
+        assert Intent.from_string("web_search") == Intent.GENERAL
         assert Intent.from_string("image_generation") == Intent.IMAGE_GENERATION
         assert Intent.from_string("general") == Intent.GENERAL
 
@@ -54,9 +55,9 @@ class TestIntent:
         assert Intent.WASTE == "waste"
 
     def test_intent_count(self) -> None:
-        """총 의도 수 확인."""
+        """총 의도 수 확인 (WEB_SEARCH 제거 후 8개)."""
         all_intents = list(Intent)
-        assert len(all_intents) == 9
+        assert len(all_intents) == 8
 
     def test_intent_in_set(self) -> None:
         """Set에서 사용 가능."""

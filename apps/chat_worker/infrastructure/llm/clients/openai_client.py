@@ -7,6 +7,10 @@ Port: application/ports/llm/llm_client.py
 
 Structured Output 지원:
 - https://platform.openai.com/docs/guides/structured-outputs
+
+Native Tools 지원 (Responses API):
+- https://platform.openai.com/docs/api-reference/responses
+- web_search: 실시간 웹 검색
 """
 
 from __future__ import annotations
@@ -191,3 +195,99 @@ class OpenAILLMClient(LLMClientPort):
         except Exception as e:
             logger.error(f"Structured output generation failed: {e}")
             raise
+
+    async def generate_with_tools(
+        self,
+        prompt: str,
+        tools: list[str],
+        system_prompt: str | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> AsyncIterator[str]:
+        """네이티브 도구를 사용한 스트리밍 생성 (Responses API).
+
+        OpenAI Responses API를 사용하여 네이티브 도구(web_search 등)를
+        활용한 응답을 생성합니다.
+
+        Args:
+            prompt: 사용자 프롬프트
+            tools: 사용할 도구 목록 (예: ["web_search"])
+            system_prompt: 시스템 프롬프트
+            context: 추가 컨텍스트 (JSON으로 변환)
+
+        Yields:
+            생성된 텍스트 청크
+        """
+        # 입력 메시지 구성
+        input_messages = []
+        if system_prompt:
+            input_messages.append(
+                {
+                    "role": "developer",  # Responses API uses "developer" for system
+                    "content": system_prompt,
+                }
+            )
+
+        user_content = prompt
+        if context:
+            context_str = json.dumps(context, ensure_ascii=False, indent=2)
+            user_content = f"## Context\n{context_str}\n\n## Question\n{prompt}"
+
+        input_messages.append({"role": "user", "content": user_content})
+
+        # 도구 구성
+        tool_configs = []
+        for tool in tools:
+            if tool == "web_search":
+                tool_configs.append(
+                    {
+                        "type": "web_search",
+                        "search_context_size": "medium",  # low, medium, high
+                    }
+                )
+            # 추가 도구는 여기에 확장
+
+        try:
+            # Responses API 호출 (스트리밍)
+            response = await self._client.responses.create(
+                model=self._model,
+                input=input_messages,
+                tools=tool_configs if tool_configs else None,
+                stream=True,
+            )
+
+            async for event in response:
+                # output_text.delta 이벤트에서 텍스트 추출
+                if hasattr(event, "type"):
+                    if event.type == "response.output_text.delta":
+                        if hasattr(event, "delta") and event.delta:
+                            yield event.delta
+                    elif event.type == "response.completed":
+                        # 완료 시 sources 정보 로깅
+                        if hasattr(event, "response"):
+                            resp = event.response
+                            if hasattr(resp, "output") and resp.output:
+                                for output in resp.output:
+                                    if hasattr(output, "sources"):
+                                        logger.debug(
+                                            "Web search sources",
+                                            extra={"sources": output.sources},
+                                        )
+
+        except AttributeError:
+            # Responses API가 지원되지 않는 경우 fallback
+            logger.warning("Responses API not available, falling back to chat completions")
+            async for chunk in self.generate_stream(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                context=context,
+            ):
+                yield chunk
+        except Exception as e:
+            logger.error(f"generate_with_tools failed: {e}")
+            # Fallback to regular generation
+            async for chunk in self.generate_stream(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                context=context,
+            ):
+                yield chunk

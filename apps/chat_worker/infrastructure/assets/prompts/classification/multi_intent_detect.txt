@@ -5,12 +5,15 @@
 사용자 메시지를 분석하여 서로 **다른 카테고리**의 의도가 2개 이상 포함되어 있는지 판별하세요.
 
 # Categories
-다음 5가지 카테고리를 기준으로 판별합니다:
+다음 카테고리를 기준으로 판별합니다:
 - waste: 분리배출 방법, 재활용
 - character: 캐릭터 정보
 - location: 위치/센터 정보
-- web_search: 최신 뉴스/정책
-- general: 일반 대화
+- bulk_waste: 대형폐기물 처리
+- recyclable_price: 재활용자원 시세
+- collection_point: 수거함 위치
+- image_generation: 이미지 생성
+- general: 일반 대화, 최신 정책/뉴스 질문
 
 # Rules
 
@@ -61,13 +64,13 @@ Output:
 }
 ```
 
-Input: "근처 센터 알려주고 최신 정책도 찾아줘"
+Input: "근처 센터 알려주고 고철 시세도 찾아줘"
 Output:
 ```json
 {
   "is_multi": true,
-  "reason": "위치(location)와 웹검색(web_search) 두 가지 다른 카테고리",
-  "detected_categories": ["location", "web_search"],
+  "reason": "위치(location)와 시세(recyclable_price) 두 가지 다른 카테고리",
+  "detected_categories": ["location", "recyclable_price"],
   "confidence": 0.92
 }
 ```

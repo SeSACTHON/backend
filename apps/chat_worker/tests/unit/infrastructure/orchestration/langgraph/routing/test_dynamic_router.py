@@ -299,7 +299,7 @@ class TestIntentToNodeMapping:
             "waste",
             "character",
             "location",
-            "web_search",
+            # web_search는 GENERAL로 통합됨 (PR #441)
             "bulk_waste",
             "recyclable_price",
             "collection_point",

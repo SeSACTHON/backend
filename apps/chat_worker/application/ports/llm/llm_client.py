@@ -4,6 +4,7 @@
 - 텍스트 생성 (generate)
 - 스트리밍 생성 (generate_stream)
 - 구조화된 응답 생성 (generate_structured)
+- 네이티브 도구 사용 생성 (generate_with_tools)
 
 포함하지 않는 것 (LLMPolicy로 분리):
 - 프롬프트 템플릿
@@ -13,6 +14,7 @@
 
 참고:
 - OpenAI Structured Outputs: https://platform.openai.com/docs/guides/structured-outputs
+- OpenAI Responses API: https://platform.openai.com/docs/api-reference/responses
 - Gemini Structured Output: https://ai.google.dev/gemini-api/docs/structured-output
 """
 
@@ -133,3 +135,36 @@ class LLMClientPort(ABC):
             return response_schema.model_validate(data)
         except (json.JSONDecodeError, ValueError) as e:
             raise ValueError(f"Failed to parse structured response: {e}") from e
+
+    async def generate_with_tools(
+        self,
+        prompt: str,
+        tools: list[str],
+        system_prompt: str | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> AsyncIterator[str]:
+        """네이티브 도구를 사용한 스트리밍 생성.
+
+        OpenAI Responses API 또는 Gemini Google Search를 통해
+        네이티브 도구(web_search 등)를 사용하여 응답을 생성합니다.
+
+        Args:
+            prompt: 사용자 프롬프트
+            tools: 사용할 도구 목록 (예: ["web_search"])
+            system_prompt: 시스템 프롬프트
+            context: 추가 컨텍스트 (JSON으로 변환)
+
+        Yields:
+            생성된 텍스트 청크
+
+        Note:
+            기본 구현은 도구 없이 일반 generate_stream을 호출합니다.
+            OpenAI/Gemini 구현체는 네이티브 tool API를 사용합니다.
+        """
+        # 기본 구현: 도구 없이 일반 스트리밍
+        async for chunk in self.generate_stream(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            context=context,
+        ):
+            yield chunk

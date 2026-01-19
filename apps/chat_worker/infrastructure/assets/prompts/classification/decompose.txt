@@ -17,8 +17,11 @@
 - waste: 분리배출 방법
 - character: 캐릭터 정보
 - location: 위치 정보
-- web_search: 최신 정책/뉴스
-- general: 일반 대화
+- bulk_waste: 대형폐기물 처리
+- recyclable_price: 재활용자원 시세
+- collection_point: 수거함 위치
+- image_generation: 이미지 생성
+- general: 일반 대화, 최신 정책/뉴스
 
 # Output Format
 ```json
