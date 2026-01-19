@@ -3,6 +3,8 @@
 내부 서비스에서 이미지 업로드를 처리하는 gRPC 서버입니다.
 메인 FastAPI 앱과 별도로 실행됩니다.
 
+aioboto3를 사용하여 비동기 S3 업로드를 지원합니다.
+
 Usage:
     python -m images.presentation.grpc.server
 """
@@ -14,7 +16,7 @@ import logging
 import signal
 from concurrent import futures
 
-import boto3
+import aioboto3
 import grpc
 
 from images.core import get_settings
@@ -33,11 +35,8 @@ async def serve(standalone: bool = False) -> None:
     """
     settings = get_settings()
 
-    # S3 클라이언트 생성
-    s3_client = boto3.client(
-        "s3",
-        region_name=settings.aws_region,
-    )
+    # aioboto3 세션 생성 (비동기 S3 클라이언트용)
+    session = aioboto3.Session()
 
     # gRPC 서버 생성
     # 이미지 데이터를 위해 max message size 증가 (10MB)
@@ -49,9 +48,9 @@ async def serve(standalone: bool = False) -> None:
         ],
     )
 
-    # Servicer 등록
+    # Servicer 등록 (aioboto3 세션 주입)
     servicer = ImageServicer(
-        s3_client=s3_client,
+        session=session,
         settings=settings,
     )
     image_pb2_grpc.add_ImageServiceServicer_to_server(servicer, server)
@@ -62,7 +61,7 @@ async def serve(standalone: bool = False) -> None:
     server.add_insecure_port(listen_addr)
 
     logger.info(
-        "Starting gRPC server",
+        "Starting gRPC server (aioboto3)",
         extra={
             "address": listen_addr,
             "s3_bucket": settings.s3_bucket,
