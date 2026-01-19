@@ -20,6 +20,7 @@ class Message:
         chat_id: 채팅 세션 ID (FK)
         role: 메시지 역할 ('user' | 'assistant')
         content: 메시지 내용
+        image_url: 첨부 이미지 URL (user 메시지용)
         intent: AI 분류 intent (assistant만)
         metadata: 추가 메타데이터 (node_results, citations 등)
         job_id: 비동기 작업 ID (응답 추적용)
@@ -30,6 +31,7 @@ class Message:
     role: str
     content: str
     id: UUID = field(default_factory=uuid4)
+    image_url: str | None = None
     intent: str | None = None
     metadata: dict[str, Any] | None = None
     job_id: UUID | None = None
@@ -45,6 +47,7 @@ class Message:
         cls,
         chat_id: UUID,
         content: str,
+        image_url: str | None = None,
         job_id: UUID | None = None,
     ) -> "Message":
         """사용자 메시지 생성."""
@@ -52,6 +55,7 @@ class Message:
             chat_id=chat_id,
             role="user",
             content=content,
+            image_url=image_url,
             job_id=job_id,
         )
 
