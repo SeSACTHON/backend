@@ -22,6 +22,7 @@ Flow:
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from dataclasses import dataclass
@@ -211,27 +212,34 @@ GEMINI_TOOLS = [
         "name": "search_places",
         "description": (
             "키워드 기반 장소 검색. "
-            "사용 시점: 재활용센터, 제로웨이스트샵, 분리수거장 등 특정 장소를 찾을 때. "
-            "지역명 언급 시 먼저 geocode로 좌표 획득 후 호출."
+            "사용 시점: 사용자가 '재활용센터', '제로웨이스트샵', '분리수거장' 등 "
+            "특정 장소 유형을 키워드로 찾을 때 호출. "
+            "좌표가 없으면 전국 검색, 좌표가 있으면 해당 위치 주변 검색. "
+            "주의: 사용자가 '강남역 근처 재활용센터'라고 하면 먼저 geocode로 "
+            "'강남역' 좌표를 얻은 후 이 함수 호출."
         ),
         "parameters": {
             "type": "object",
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "검색 키워드 (장소 유형). 예: '재활용센터', '제로웨이스트샵'",
+                    "description": (
+                        "검색 키워드. 장소 유형을 포함해야 함. "
+                        "예: '재활용센터', '제로웨이스트샵', '폐건전지 수거함'. "
+                        "지역명은 포함하지 않음 (좌표로 처리)."
+                    ),
                 },
                 "latitude": {
                     "type": "number",
-                    "description": "검색 중심 위도. 주변 검색 시 필수.",
+                    "description": "검색 중심 위도. 주변 검색 시 필수. 범위: 33.0~43.0 (한국)",
                 },
                 "longitude": {
                     "type": "number",
-                    "description": "검색 중심 경도. 주변 검색 시 필수.",
+                    "description": "검색 중심 경도. 주변 검색 시 필수. 범위: 124.0~132.0 (한국)",
                 },
                 "radius": {
                     "type": "integer",
-                    "description": "검색 반경(미터). 기본 5000, 최대 20000.",
+                    "description": "검색 반경(미터). 기본 5000m. 최대 20000m.",
                 },
             },
             "required": ["query"],
@@ -241,8 +249,11 @@ GEMINI_TOOLS = [
         "name": "search_category",
         "description": (
             "카테고리 기반 주변 장소 검색. 좌표 필수. "
-            "사용 시점: 주변 카페, 편의점, 약국 등 일반 장소 검색 시. "
-            "좌표 없으면 먼저 geocode 호출 필요."
+            "사용 시점: 사용자가 '주변 카페', '근처 편의점', '가까운 약국' 등 "
+            "일반적인 장소 카테고리를 찾을 때 호출. "
+            "주의: 좌표 없이 호출 불가. 사용자 위치가 없고 지역명만 있으면 "
+            "먼저 geocode로 좌표를 얻은 후 호출. "
+            "재활용센터, 제로웨이스트샵 등 특수 장소는 search_places 사용."
         ),
         "parameters": {
             "type": "object",
@@ -262,21 +273,23 @@ GEMINI_TOOLS = [
                         "PARKING",
                     ],
                     "description": (
-                        "장소 카테고리. MART=대형마트, CONVENIENCE=편의점, "
-                        "CAFE=카페, RESTAURANT=음식점, PHARMACY=약국"
+                        "장소 카테고리. "
+                        "MART=대형마트, CONVENIENCE=편의점, SUBWAY=지하철역, "
+                        "CAFE=카페, RESTAURANT=음식점, HOSPITAL=병원, "
+                        "PHARMACY=약국, BANK=은행, GAS_STATION=주유소, PARKING=주차장"
                     ),
                 },
                 "latitude": {
                     "type": "number",
-                    "description": "검색 중심 위도. 필수.",
+                    "description": "검색 중심 위도. 필수. 범위: 33.0~43.0 (한국)",
                 },
                 "longitude": {
                     "type": "number",
-                    "description": "검색 중심 경도. 필수.",
+                    "description": "검색 중심 경도. 필수. 범위: 124.0~132.0 (한국)",
                 },
                 "radius": {
                     "type": "integer",
-                    "description": "검색 반경(미터). 기본 5000.",
+                    "description": "검색 반경(미터). 기본 5000m. 최대 20000m.",
                 },
             },
             "required": ["category", "latitude", "longitude"],
@@ -285,16 +298,23 @@ GEMINI_TOOLS = [
     {
         "name": "geocode",
         "description": (
-            "장소명/주소를 좌표로 변환. "
-            "사용 시점: 지역명 언급 시 좌표가 필요할 때 먼저 호출. "
-            "사용자 위치가 이미 있으면 불필요."
+            "장소명/주소를 좌표(위도, 경도)로 변환. "
+            "사용 시점: 사용자가 '강남역', '홍대입구', '서울시청' 등 "
+            "특정 지역을 언급했으나 좌표가 없을 때 먼저 호출. "
+            "실행 순서: 이 함수로 좌표를 먼저 얻은 후 search_places 또는 "
+            "search_category 호출. "
+            "주의: 사용자 위치(user_location)가 이미 있으면 호출 불필요."
         ),
         "parameters": {
             "type": "object",
             "properties": {
                 "place_name": {
                     "type": "string",
-                    "description": "장소명 또는 주소. 예: '강남역', '서울시 강남구'",
+                    "description": (
+                        "좌표로 변환할 장소명 또는 주소. "
+                        "예: '강남역', '홍대입구역', '서울시 강남구', '부산 해운대'. "
+                        "가능한 구체적으로 입력."
+                    ),
                 },
             },
             "required": ["place_name"],
@@ -316,6 +336,11 @@ GEMINI_TOOLS = [
 LOCATION_AGENT_SYSTEM_PROMPT = """# Context
 당신은 Eco² 앱의 위치 기반 장소 검색 에이전트입니다.
 사용자가 재활용센터, 제로웨이스트샵, 주변 시설을 찾을 때 도구를 사용해 정보를 제공합니다.
+
+# Scope Discipline
+이 에이전트는 search_places, search_category, geocode 도구만 사용합니다.
+다른 작업(분리배출 방법 안내, 일반 대화, 날씨 정보 등)은 도구 없이 직접 응답하세요.
+절대로 정의되지 않은 도구를 호출하거나 새로운 작업을 만들어내지 마세요.
 
 # Preambles (GPT-5.2)
 도구를 호출하기 전에, 왜 그 도구를 호출하는지 간단히 설명하세요.
@@ -605,10 +630,11 @@ async def run_openai_agent(
         # Tool calls 처리
         messages.append(assistant_message.model_dump())
 
-        for tool_call in assistant_message.tool_calls:
-            tool_name = tool_call.function.name
+        # 병렬 Tool 실행 (asyncio.gather) - GPT-5.2 Best Practice
+        async def execute_tool(tc: Any) -> tuple[Any, ToolResult]:
+            tool_name = tc.function.name
             try:
-                arguments = json.loads(tool_call.function.arguments)
+                arguments = json.loads(tc.function.arguments)
             except json.JSONDecodeError:
                 arguments = {}
 
@@ -616,21 +642,27 @@ async def run_openai_agent(
                 "Executing tool",
                 extra={"tool": tool_name, "args": arguments},
             )
-
-            # Tool 실행
             result = await tool_executor.execute(tool_name, arguments)
+            return tc, arguments, result
+
+        # 모든 tool calls 병렬 실행
+        execution_results = await asyncio.gather(
+            *[execute_tool(tc) for tc in assistant_message.tool_calls]
+        )
+
+        # 결과 처리 및 메시지 추가
+        for tc, arguments, result in execution_results:
             all_tool_results.append({
-                "tool": tool_name,
+                "tool": tc.function.name,
                 "arguments": arguments,
                 "result": result.data if result.success else {"error": result.error},
                 "success": result.success,
             })
 
-            # Tool 결과를 메시지에 추가
             messages.append({
                 "role": "tool",
-                "tool_call_id": tool_call.id,
-                "name": tool_name,
+                "tool_call_id": tc.id,
+                "name": tc.function.name,
                 "content": json.dumps(
                     result.data if result.success else {"error": result.error},
                     ensure_ascii=False,
@@ -681,12 +713,20 @@ async def run_gemini_agent(
         if lat and lon:
             user_message = f"{message}\n\n[현재 위치: 위도 {lat}, 경도 {lon}]"
 
-    # Gemini 3 Tool 설정 (Best Practice: temperature=0 for deterministic tool selection)
+    # Gemini 3 Tool 설정
+    # Best Practices (2026):
+    # - temperature=0 for deterministic tool selection
+    # - VALIDATED mode for schema adherence (optional)
     tools = types.Tool(function_declarations=GEMINI_TOOLS)
     config = types.GenerateContentConfig(
         tools=[tools],
+        tool_config=types.ToolConfig(
+            function_calling_config=types.FunctionCallingConfig(
+                mode="AUTO",  # AUTO | ANY | NONE | VALIDATED
+            ),
+        ),
         system_instruction=LOCATION_AGENT_SYSTEM_PROMPT,
-        temperature=0,  # Gemini 3: 결정론적 Tool 선택을 위해 low temperature 권장
+        temperature=0,  # Gemini 3: 결정론적 Tool 선택
     )
 
     contents = [user_message]
@@ -701,46 +741,59 @@ async def run_gemini_agent(
             config=config,
         )
 
-        # Function call 확인
         candidate = response.candidates[0]
-        part = candidate.content.parts[0]
+        parts = candidate.content.parts
 
-        if not hasattr(part, "function_call") or part.function_call is None:
+        # Parallel Function Calls 처리 (Gemini 3 지원)
+        # 여러 function call이 동시에 반환될 수 있음
+        function_calls = [
+            p for p in parts
+            if hasattr(p, "function_call") and p.function_call is not None
+        ]
+
+        if not function_calls:
             # 최종 텍스트 응답
+            text_parts = [p.text for p in parts if hasattr(p, "text") and p.text]
             return {
                 "success": True,
-                "summary": part.text if hasattr(part, "text") else "",
+                "summary": " ".join(text_parts) if text_parts else "",
                 "tool_results": all_tool_results,
             }
 
-        # Function call 처리
-        function_call = part.function_call
-        tool_name = function_call.name
-        arguments = dict(function_call.args) if function_call.args else {}
+        # 병렬 Tool 실행 (asyncio.gather)
+        async def execute_tool(fc_part: Any) -> dict[str, Any]:
+            fc = fc_part.function_call
+            tool_name = fc.name
+            arguments = dict(fc.args) if fc.args else {}
+            logger.info(
+                "Executing tool (Gemini)",
+                extra={"tool": tool_name, "args": arguments},
+            )
+            result = await tool_executor.execute(tool_name, arguments)
+            return {
+                "tool": tool_name,
+                "arguments": arguments,
+                "result": result.data if result.success else {"error": result.error},
+                "success": result.success,
+                "_name": tool_name,
+                "_response": result.data if result.success else {"error": result.error},
+            }
 
-        logger.info(
-            "Executing tool (Gemini)",
-            extra={"tool": tool_name, "args": arguments},
-        )
-
-        # Tool 실행
-        result = await tool_executor.execute(tool_name, arguments)
-        all_tool_results.append({
-            "tool": tool_name,
-            "arguments": arguments,
-            "result": result.data if result.success else {"error": result.error},
-            "success": result.success,
-        })
+        results = await asyncio.gather(*[execute_tool(fc) for fc in function_calls])
+        all_tool_results.extend(results)
 
         # 대화 이력에 추가
         contents.append(candidate.content)
 
-        # Function 결과 추가
-        function_response = types.Part.from_function_response(
-            name=tool_name,
-            response=result.data if result.success else {"error": result.error},
-        )
-        contents.append(types.Content(role="user", parts=[function_response]))
+        # 모든 Function 결과를 하나의 Content로 추가
+        function_response_parts = [
+            types.Part.from_function_response(
+                name=r["_name"],
+                response=r["_response"],
+            )
+            for r in results
+        ]
+        contents.append(types.Content(role="user", parts=function_response_parts))
 
     # Max iterations 도달
     return {
