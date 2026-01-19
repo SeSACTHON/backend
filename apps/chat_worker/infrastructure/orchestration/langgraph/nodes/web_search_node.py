@@ -1,5 +1,13 @@
 """Web Search Node - LangGraph 어댑터.
 
+.. deprecated::
+    이 노드는 더 이상 Intent 기반 라우팅에 사용되지 않습니다.
+    웹 검색은 GENERAL intent에서 네이티브 web_search tool
+    (OpenAI Responses API)을 사용하여 처리됩니다.
+
+    이 노드는 Feedback Fallback에서만 사용됩니다.
+    신규 개발 시에는 GenerateAnswerCommand의 네이티브 도구를 사용하세요.
+
 얇은 어댑터: state 변환 + Command 호출 + progress notify (UX).
 정책/흐름은 SearchWebCommand(Application)에서 처리.
 
@@ -8,13 +16,16 @@ Clean Architecture:
 - Command(UseCase): SearchWebCommand - 정책/흐름
 - Service: WebSearchService - 순수 비즈니스 로직
 
-사용 시나리오:
+Legacy 사용 시나리오 (Feedback Fallback):
 1. RAG에 없는 최신 분리배출 정책
 2. 환경 관련 최신 뉴스/트렌드
 3. 일반 상식 보완
 
-Flow:
+Flow (Deprecated):
     Router → web_search → Answer
+
+Flow (Current - GENERAL intent):
+    Router → general → Answer (with native web_search tool)
 """
 
 from __future__ import annotations

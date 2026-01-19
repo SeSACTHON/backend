@@ -37,6 +37,13 @@ logger = logging.getLogger(__name__)
 ANSWER_CACHE_TTL = 3600  # 1시간
 CACHEABLE_INTENTS = frozenset({"general", "greeting"})
 
+# 웹 검색 트리거 키워드 (GENERAL intent에서 네이티브 검색 활성화)
+WEB_SEARCH_KEYWORDS = frozenset({
+    "최신", "최근", "뉴스", "정책", "규제", "발표", "공지",
+    "2024", "2025", "2026", "올해", "작년", "지난달",
+    "현재", "요즘", "트렌드", "업데이트",
+})
+
 
 @dataclass(frozen=True)
 class GenerateAnswerInput:
@@ -152,6 +159,24 @@ class GenerateAnswerCommand:
             return self._prompt_builder.build_multi(all_intents)
         return self._prompt_builder.build(input_dto.intent)
 
+    def _needs_web_search(self, message: str, intent: str) -> bool:
+        """웹 검색 필요 여부 판단.
+
+        GENERAL intent에서 실시간 정보가 필요한 질문인지 확인.
+
+        Args:
+            message: 사용자 메시지
+            intent: 분류된 의도
+
+        Returns:
+            웹 검색 필요 여부
+        """
+        if intent != "general":
+            return False
+
+        message_lower = message.lower()
+        return any(keyword in message_lower for keyword in WEB_SEARCH_KEYWORDS)
+
     async def execute(
         self,
         input_dto: GenerateAnswerInput,
@@ -196,13 +221,29 @@ class GenerateAnswerCommand:
             )
 
         # 4. LLM 호출 (Command에서 Port 호출 - 스트리밍)
+        # GENERAL intent에서 웹 검색이 필요한 경우 네이티브 도구 사용
+        use_web_search = self._needs_web_search(input_dto.message, input_dto.intent)
+
         answer_parts = []
-        async for token in self._llm.generate_stream(
-            prompt=prompt,
-            system_prompt=system_prompt,
-        ):
-            answer_parts.append(token)
-            yield token
+        if use_web_search:
+            logger.info(
+                "Using native web_search tool",
+                extra={"job_id": input_dto.job_id, "message": input_dto.message[:50]},
+            )
+            async for token in self._llm.generate_with_tools(
+                prompt=prompt,
+                tools=["web_search"],
+                system_prompt=system_prompt,
+            ):
+                answer_parts.append(token)
+                yield token
+        else:
+            async for token in self._llm.generate_stream(
+                prompt=prompt,
+                system_prompt=system_prompt,
+            ):
+                answer_parts.append(token)
+                yield token
 
         # 5. 캐시 저장 (Command에서 Port 호출)
         if is_cacheable and answer_parts:
@@ -254,12 +295,24 @@ class GenerateAnswerCommand:
         prompt = self._service.build_prompt(context)
         system_prompt = self._build_system_prompt(input_dto)
 
+        # GENERAL intent에서 웹 검색이 필요한 경우 네이티브 도구 사용
+        use_web_search = self._needs_web_search(input_dto.message, input_dto.intent)
+
         try:
-            async for token in self._llm.generate_stream(
-                prompt=prompt,
-                system_prompt=system_prompt,
-            ):
-                answer_parts.append(token)
+            if use_web_search:
+                events.append("web_search_used")
+                async for token in self._llm.generate_with_tools(
+                    prompt=prompt,
+                    tools=["web_search"],
+                    system_prompt=system_prompt,
+                ):
+                    answer_parts.append(token)
+            else:
+                async for token in self._llm.generate_stream(
+                    prompt=prompt,
+                    system_prompt=system_prompt,
+                ):
+                    answer_parts.append(token)
             events.append("llm_called")
         except Exception as e:
             logger.error(f"LLM call failed: {e}")
