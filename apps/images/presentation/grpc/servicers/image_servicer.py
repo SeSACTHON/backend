@@ -4,23 +4,22 @@
 
 RPC Methods:
 - UploadBytes: 바이트 데이터를 S3에 업로드하고 CDN URL 반환
+
+aioboto3를 사용하여 진정한 비동기 I/O로 S3 업로드를 처리합니다.
 """
 
 from __future__ import annotations
 
-import asyncio
 import logging
-from functools import partial
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
+import aioboto3
 import grpc
 
 from images.proto import image_pb2, image_pb2_grpc
 
 if TYPE_CHECKING:
-    from botocore.client import BaseClient
-
     from images.core import Settings
 
 logger = logging.getLogger(__name__)
@@ -52,21 +51,21 @@ MAX_IMAGE_SIZE = 10 * 1024 * 1024
 class ImageServicer(image_pb2_grpc.ImageServiceServicer):
     """Image gRPC Servicer.
 
-    S3에 직접 이미지를 업로드합니다.
+    aioboto3를 사용하여 S3에 비동기로 이미지를 업로드합니다.
     """
 
     def __init__(
         self,
-        s3_client: "BaseClient",
+        session: aioboto3.Session,
         settings: "Settings",
     ) -> None:
         """Initialize.
 
         Args:
-            s3_client: boto3 S3 클라이언트
+            session: aioboto3 세션
             settings: 이미지 서비스 설정
         """
-        self._s3 = s3_client
+        self._session = session
         self._settings = settings
 
     async def UploadBytes(
@@ -75,6 +74,8 @@ class ImageServicer(image_pb2_grpc.ImageServiceServicer):
         context: grpc.aio.ServicerContext,
     ) -> image_pb2.UploadBytesResponse:
         """바이트 데이터를 S3에 업로드합니다.
+
+        aioboto3를 사용하여 논블로킹 비동기 I/O로 처리합니다.
 
         Args:
             request: 업로드 요청 (channel, image_data, content_type, uploader_id)
@@ -112,12 +113,12 @@ class ImageServicer(image_pb2_grpc.ImageServiceServicer):
             identifier = uuid4().hex
             key = f"{channel}/{identifier}{ext}"
 
-            # 3. S3 업로드 (비동기 - 이벤트 루프 블로킹 방지)
-            loop = asyncio.get_running_loop()
-            await loop.run_in_executor(
-                None,
-                partial(
-                    self._s3.put_object,
+            # 3. S3 업로드 (aioboto3 - 진정한 비동기 I/O)
+            async with self._session.client(
+                "s3",
+                region_name=self._settings.aws_region,
+            ) as s3:
+                await s3.put_object(
                     Bucket=self._settings.s3_bucket,
                     Key=key,
                     Body=request.image_data,
@@ -126,15 +127,14 @@ class ImageServicer(image_pb2_grpc.ImageServiceServicer):
                         "uploader_id": request.uploader_id or "system",
                         **dict(request.metadata),
                     },
-                ),
-            )
+                )
 
             # 4. CDN URL 생성
             cdn_domain = str(self._settings.cdn_domain).rstrip("/")
             cdn_url = f"{cdn_domain}/{key}"
 
             logger.info(
-                "Image uploaded via gRPC",
+                "Image uploaded via gRPC (aioboto3)",
                 extra={
                     "channel": channel,
                     "key": key,
