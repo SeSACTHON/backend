@@ -536,7 +536,7 @@ class SSEBroadcastManager:
             if subscribed_event:
                 subscribed_event.set()
 
-            logger.debug(
+            logger.info(
                 "pubsub_subscribed",
                 extra={"job_id": job_id, "channel": channel},
             )
