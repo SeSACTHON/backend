@@ -444,6 +444,7 @@ class ProcessChatCommand:
         """messages 모드 청크 처리.
 
         LLM 토큰을 notify_token_v2로 전달.
+        answer 노드는 자체적으로 토큰을 발행하므로 건너뜁니다.
 
         Note:
             현재 아키텍처에서는 모든 토큰 발행을 개별 노드에서 직접 처리합니다:
