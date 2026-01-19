@@ -90,6 +90,7 @@ logger = logging.getLogger(__name__)
 # ============================================================
 
 _redis: Redis | None = None
+_redis_streams: Redis | None = None  # 이벤트 스트리밍 전용 (event-router와 동일)
 _progress_notifier: ProgressNotifierPort | None = None
 _domain_event_bus: RedisStreamDomainEventBus | None = None
 _retriever: RetrieverPort | None = None
@@ -110,7 +111,7 @@ _image_generator: ImageGeneratorPort | None = None
 
 
 async def get_redis() -> Redis:
-    """Redis 클라이언트 싱글톤."""
+    """Redis 클라이언트 싱글톤 (기본 - 캐시, Pub/Sub 등)."""
     global _redis
     if _redis is None:
         settings = get_settings()
@@ -123,8 +124,31 @@ async def get_redis() -> Redis:
     return _redis
 
 
+async def get_redis_streams() -> Redis:
+    """Redis Streams 클라이언트 싱글톤 (이벤트 스트리밍 전용).
+
+    event-router와 동일한 Redis를 바라봐야 함.
+    설정되지 않으면 기본 redis_url 사용 (로컬 개발용).
+    """
+    global _redis_streams
+    if _redis_streams is None:
+        settings = get_settings()
+        # redis_streams_url이 설정되면 사용, 아니면 redis_url 폴백
+        streams_url = settings.redis_streams_url or settings.redis_url
+        _redis_streams = Redis.from_url(
+            streams_url,
+            encoding="utf-8",
+            decode_responses=True,
+        )
+        logger.info("Redis Streams connected: %s", streams_url)
+    return _redis_streams
+
+
 async def get_progress_notifier() -> ProgressNotifierPort:
-    """ProgressNotifier 싱글톤 (SSE/UI 이벤트)."""
+    """ProgressNotifier 싱글톤 (SSE/UI 이벤트).
+
+    Redis Streams로 이벤트 발행 → event-router가 소비.
+    """
     global _progress_notifier
     if _progress_notifier is None:
         redis = await get_redis()
@@ -241,36 +265,39 @@ def create_vision_client(
 
 
 # ============================================================
-# Image Generator Factory (Responses API)
+# Image Generator Factory (Provider 통일)
 # ============================================================
 
 
 def get_image_generator() -> ImageGeneratorPort | None:
     """이미지 생성 클라이언트 싱글톤.
 
-    OpenAI Responses API의 네이티브 image_generation tool 사용.
+    default_provider 설정에 따라 적합한 이미지 생성기 선택.
     enable_image_generation=True일 때만 활성화 (비용 발생).
 
-    아키텍처 의사결정:
-    - Chat Completions API: 기존 파이프라인 유지 (multi-intent 라우팅)
-    - Responses API: 이미지 생성 서브에이전트에서만 사용
-    - 같은 OpenAI API 키로 두 API 혼용 가능
-
-    비용 (gpt-image-1.5, 1024x1024 기준):
-    - low: ~$0.02
-    - medium: ~$0.07
-    - high: ~$0.19
-    + Responses API 토큰 비용 추가
+    Provider별 이미지 생성:
+    - openai: OpenAI Responses API (gpt-image-1.5)
+    - google: Gemini Native Image Generation (gemini-3-pro-image-preview)
 
     환경변수:
     - CHAT_WORKER_ENABLE_IMAGE_GENERATION: True로 설정 시 활성화
-    - CHAT_WORKER_IMAGE_GENERATION_MODEL: Responses API 모델 (기본: gpt-4o)
+    - CHAT_WORKER_DEFAULT_PROVIDER: 이미지 생성 Provider 결정
     """
     global _image_generator
     if _image_generator is None:
         settings = get_settings()
 
-        if settings.enable_image_generation and settings.openai_api_key:
+        if not settings.enable_image_generation:
+            logger.info("Image generation disabled (enable_image_generation=False)")
+            return None
+
+        provider = settings.default_provider
+
+        if provider == "openai":
+            if not settings.openai_api_key:
+                logger.warning("Image generation disabled (no OpenAI API key)")
+                return None
+
             from chat_worker.infrastructure.llm.image_generator import (
                 OpenAIResponsesImageGenerator,
             )
@@ -282,14 +309,27 @@ def get_image_generator() -> ImageGeneratorPort | None:
                 default_quality=settings.image_generation_default_quality,
             )
             logger.info(
-                "OpenAI Image Generator created (Responses API, model=%s)",
+                "OpenAI Image Generator created (model=%s)",
                 settings.image_generation_model,
             )
+
+        elif provider == "google":
+            if not settings.google_api_key:
+                logger.warning("Image generation disabled (no Google API key)")
+                return None
+
+            from chat_worker.infrastructure.llm.image_generator import (
+                GeminiNativeImageGenerator,
+            )
+
+            _image_generator = GeminiNativeImageGenerator(
+                model="gemini-3-pro-image-preview",
+                api_key=settings.google_api_key,
+            )
+            logger.info("Gemini Image Generator created (model=gemini-3-pro-image-preview)")
+
         else:
-            if not settings.enable_image_generation:
-                logger.info("Image generation disabled (enable_image_generation=False)")
-            elif not settings.openai_api_key:
-                logger.warning("Image generation disabled (no OpenAI API key)")
+            logger.warning("Unknown provider for image generation: %s", provider)
             return None
 
     return _image_generator
@@ -750,6 +790,9 @@ async def get_chat_graph(
         max_tokens_before_summary=settings.max_tokens_before_summary,  # None이면 동적 계산
         max_summary_tokens=settings.max_summary_tokens,  # None이면 동적 계산
         keep_recent_messages=settings.keep_recent_messages,  # None이면 동적 계산
+        # Dynamic routing 활성화 (Channel Separation + Priority Scheduling 적용됨)
+        # ChatState Annotated Reducer로 Send API 병렬 실행 안전
+        enable_dynamic_routing=True,
     )
 
 
@@ -772,6 +815,10 @@ async def get_process_chat_command(
     - DB Consumer가 Redis Streams에서 소비하여 PostgreSQL 저장
     - RabbitMQ 의존성 제거됨
 
+    Telemetry (LangSmith OTEL):
+    - LangGraph run config 생성 (run_name, tags, metadata)
+    - OTEL 내보내기 활성화 시 Jaeger에서 추적 가능
+
     ```
     ProcessChatCommand
         │
@@ -781,11 +828,13 @@ async def get_process_chat_command(
         │       ├── RetrieverPort (LocalJSON)
         │       └── ProgressNotifierPort (Redis)
         │
-        └── ProgressNotifierPort (Redis)
-                │
-                └── done 이벤트 (persistence 데이터 포함)
-                        │
-                        └── DB Consumer → PostgreSQL
+        ├── ProgressNotifierPort (Redis)
+        │       │
+        │       └── done 이벤트 (persistence 데이터 포함)
+        │               │
+        │               └── DB Consumer → PostgreSQL
+        │
+        └── TelemetryConfigPort (LangSmith OTEL)
     ```
     """
     settings = get_settings()
@@ -795,10 +844,20 @@ async def get_process_chat_command(
     progress_notifier = await get_progress_notifier()
     metrics = get_metrics()  # MetricsPort
 
+    # LangSmith OTEL Telemetry (optional)
+    telemetry = None
+    try:
+        from chat_worker.setup.langsmith import TelemetryConfig
+
+        telemetry = TelemetryConfig()
+    except ImportError:
+        pass
+
     return ProcessChatCommand(
         pipeline=pipeline,
         progress_notifier=progress_notifier,
         metrics=metrics,
+        telemetry=telemetry,
         provider=actual_provider,
     )
 
@@ -810,7 +869,7 @@ async def get_process_chat_command(
 
 async def cleanup():
     """리소스 정리."""
-    global _redis, _character_client, _location_client, _kakao_local_client, _weather_client, _bulk_waste_client, _collection_point_client, _checkpointer
+    global _redis, _redis_streams, _character_client, _location_client, _kakao_local_client, _weather_client, _bulk_waste_client, _collection_point_client, _checkpointer
     global _progress_notifier, _domain_event_bus, _interaction_state_store, _input_requester, _image_generator
 
     # 체크포인터 종료
@@ -864,3 +923,9 @@ async def cleanup():
         await _redis.close()
         _redis = None
         logger.info("Redis disconnected")
+
+    # Redis Streams 종료
+    if _redis_streams:
+        await _redis_streams.close()
+        _redis_streams = None
+        logger.info("Redis Streams disconnected")

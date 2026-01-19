@@ -18,6 +18,10 @@ from chat_worker.application.commands import (
     SearchRAGCommand,
     SearchRAGInput,
 )
+from chat_worker.infrastructure.orchestration.langgraph.context_helper import (
+    create_context,
+    create_error_context,
+)
 from chat_worker.infrastructure.orchestration.langgraph.nodes.node_executor import (
     NodeExecutor,
 )
@@ -65,7 +69,7 @@ def create_rag_node(
         Returns:
             업데이트된 상태
         """
-        job_id = state["job_id"]
+        job_id = state.get("job_id", "")
 
         # Progress: 시작 (UX)
         await event_publisher.notify_stage(
@@ -87,12 +91,6 @@ def create_rag_node(
             # 2. Command 실행 (정책/흐름은 Command에서)
             output = await command.execute(input_dto)
 
-            # 3. output → state 변환
-            state_update = {
-                **state,
-                "disposal_rules": output.disposal_rules,
-            }
-
             # Progress: 완료 (UX)
             await event_publisher.notify_stage(
                 task_id=job_id,
@@ -106,7 +104,14 @@ def create_rag_node(
                 message="규정 검색 완료" if output.found else "규정 검색 완료 (결과 없음)",
             )
 
-            return state_update
+            # 3. output → state 변환
+            return {
+                "disposal_rules": create_context(
+                    data=output.disposal_rules or {},
+                    producer="waste_rag",
+                    job_id=job_id,
+                ),
+            }
 
         except Exception as e:
             logger.error(f"RAG node failed: {e}", extra={"job_id": job_id})
@@ -116,7 +121,13 @@ def create_rag_node(
                 status="failed",
                 result={"error": str(e)},
             )
-            return {**state, "disposal_rules": None}
+            return {
+                "disposal_rules": create_error_context(
+                    producer="waste_rag",
+                    job_id=job_id,
+                    error=str(e),
+                ),
+            }
 
     # NodeExecutor로 래핑 (Policy 적용: timeout, retry, circuit breaker)
     executor = NodeExecutor.get_instance()

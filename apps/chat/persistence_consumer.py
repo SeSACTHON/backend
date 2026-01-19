@@ -7,7 +7,7 @@ Architecture:
         │
         │ Consumer Group: chat-persistence
         ▼
-    ChatPersistenceConsumer (Infrastructure)
+    RedisStreamsConsumerClient (Infrastructure)
         │
         │ persistence dict (from done event)
         ▼
@@ -28,7 +28,7 @@ Architecture:
         └── XACK (on success)
 
 Run:
-    python -m chat.consumer
+    python -m chat.persistence_consumer
 """
 
 from __future__ import annotations
@@ -52,8 +52,8 @@ def setup_logging() -> None:
     )
 
 
-class ChatPersistenceConsumer:
-    """Chat Persistence Consumer.
+class PersistenceConsumerApp:
+    """Chat Persistence Consumer Application.
 
     Redis Streams에서 done 이벤트의 persistence 데이터를 읽어 PostgreSQL에 저장.
 
@@ -62,7 +62,7 @@ class ChatPersistenceConsumer:
     - Event Router: SSE fan-out (Consumer Group: event-router)
     - DB Consumer: PostgreSQL 저장 (Consumer Group: chat-persistence)
 
-    main.py의 책임:
+    Entry Point 책임:
     - DI 설정
     - 연결 관리 (Redis, DB)
     - Consumer 시작/종료
@@ -130,8 +130,8 @@ class ChatPersistenceConsumer:
 async def main() -> None:
     """Entry point."""
     setup_logging()
-    consumer = ChatPersistenceConsumer()
-    await consumer.start()
+    app = PersistenceConsumerApp()
+    await app.start()
 
 
 if __name__ == "__main__":

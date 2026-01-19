@@ -26,6 +26,10 @@ from chat_worker.application.commands.search_recyclable_price_command import (
     SearchRecyclablePriceCommand,
     SearchRecyclablePriceInput,
 )
+from chat_worker.infrastructure.orchestration.langgraph.context_helper import (
+    create_context,
+    create_error_context,
+)
 from chat_worker.infrastructure.orchestration.langgraph.nodes.node_executor import (
     NodeExecutor,
 )
@@ -112,9 +116,11 @@ def create_recyclable_price_node(
                 result={"error": output.error_message},
             )
             return {
-                **state,
-                "recyclable_price_context": output.price_context,
-                "recyclable_price_error": output.error_message,
+                "recyclable_price_context": create_error_context(
+                    producer="recyclable_price",
+                    job_id=job_id,
+                    error=output.error_message or "재활용자원 시세 조회 실패",
+                ),
             }
 
         # Progress: 완료 (UX)
@@ -141,8 +147,11 @@ def create_recyclable_price_node(
         )
 
         return {
-            **state,
-            "recyclable_price_context": output.price_context,
+            "recyclable_price_context": create_context(
+                data=output.price_context or {},
+                producer="recyclable_price",
+                job_id=job_id,
+            ),
         }
 
     # NodeExecutor로 래핑 (Policy 적용: timeout, retry, circuit breaker)

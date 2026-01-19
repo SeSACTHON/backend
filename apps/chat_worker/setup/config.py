@@ -18,8 +18,13 @@ class Settings(BaseSettings):
     rabbitmq_url: str = "amqp://guest:guest@localhost:5672/"
     rabbitmq_queue: str = "chat.process"
 
-    # Redis (이벤트 스트림, 단기 캐시)
+    # Redis (기본 - 캐시, Pub/Sub 등)
     redis_url: str = "redis://localhost:6379/0"
+
+    # Redis Streams (이벤트 스트리밍 전용)
+    # event-router와 동일한 Redis를 바라봐야 함
+    # None이면 redis_url 사용 (로컬 개발용)
+    redis_streams_url: str | None = None
 
     # PostgreSQL (체크포인팅, 멀티턴 대화 히스토리)
     # Cursor 스타일 장기 세션 유지를 위한 영구 저장소

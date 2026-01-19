@@ -8,6 +8,11 @@ Clean Architecture:
 - Command(UseCase): SearchBulkWasteCommand - 정책/흐름
 - Service: BulkWasteService - 순수 비즈니스 로직
 
+Channel Separation:
+- 출력 채널: bulk_waste_context
+- Reducer: priority_preemptive_reducer
+- spread 금지: {"bulk_waste_context": create_context(...)} 형태로 반환
+
 사용 시나리오:
 1. 대형폐기물 수거 신청 방법 안내
 2. 대형폐기물 품목별 수수료 조회
@@ -25,6 +30,10 @@ from typing import TYPE_CHECKING, Any
 from chat_worker.application.commands.search_bulk_waste_command import (
     SearchBulkWasteCommand,
     SearchBulkWasteInput,
+)
+from chat_worker.infrastructure.orchestration.langgraph.context_helper import (
+    create_context,
+    create_error_context,
 )
 from chat_worker.infrastructure.orchestration.langgraph.nodes.node_executor import (
     NodeExecutor,
@@ -122,9 +131,11 @@ def create_bulk_waste_node(
                 message="지역 정보 대기 중...",
             )
             return {
-                **state,
-                "bulk_waste_context": output.bulk_waste_context,
-                "needs_location": True,
+                "bulk_waste_context": create_context(
+                    data=output.bulk_waste_context or {"needs_location": True},
+                    producer="bulk_waste",
+                    job_id=job_id,
+                ),
             }
 
         if not output.success:
@@ -135,9 +146,11 @@ def create_bulk_waste_node(
                 result={"error": output.error_message},
             )
             return {
-                **state,
-                "bulk_waste_context": output.bulk_waste_context,
-                "bulk_waste_error": output.error_message,
+                "bulk_waste_context": create_error_context(
+                    producer="bulk_waste",
+                    job_id=job_id,
+                    error=output.error_message or "대형폐기물 정보 조회 실패",
+                ),
             }
 
         # Progress: 완료 (UX)
@@ -167,8 +180,11 @@ def create_bulk_waste_node(
         )
 
         return {
-            **state,
-            "bulk_waste_context": output.bulk_waste_context,
+            "bulk_waste_context": create_context(
+                data=output.bulk_waste_context or {},
+                producer="bulk_waste",
+                job_id=job_id,
+            ),
         }
 
     # NodeExecutor로 래핑 (Policy 적용: timeout, retry, circuit breaker)

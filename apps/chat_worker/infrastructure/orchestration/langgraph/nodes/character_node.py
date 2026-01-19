@@ -11,6 +11,11 @@ Clean Architecture:
 Production Architecture:
 - NodeExecutor로 Policy 적용 (timeout, retry, circuit breaker)
 - character 노드는 FAIL_OPEN (선택적 컨텍스트)
+
+Channel Separation:
+- 출력 채널: character_context
+- Reducer: priority_preemptive_reducer
+- spread 금지: {"character_context": create_context(...)} 형태로 반환
 """
 
 from __future__ import annotations
@@ -21,6 +26,10 @@ from typing import TYPE_CHECKING, Any
 from chat_worker.application.commands.get_character_command import (
     GetCharacterCommand,
     GetCharacterInput,
+)
+from chat_worker.infrastructure.orchestration.langgraph.context_helper import (
+    create_context,
+    create_error_context,
 )
 from chat_worker.infrastructure.orchestration.langgraph.nodes.node_executor import (
     NodeExecutor,
@@ -113,9 +122,11 @@ def create_character_subagent_node(
                 message="캐릭터 정보 조회 실패",
             )
             return {
-                **state,
-                "character_context": None,
-                "subagent_error": output.error_message,
+                "character_context": create_error_context(
+                    producer="character",
+                    job_id=job_id,
+                    error=output.error_message or "캐릭터 정보 조회 실패",
+                ),
             }
 
         # Progress: 완료 (UX)
@@ -128,8 +139,11 @@ def create_character_subagent_node(
         )
 
         return {
-            **state,
-            "character_context": output.character_context,
+            "character_context": create_context(
+                data=output.character_context or {},
+                producer="character",
+                job_id=job_id,
+            ),
         }
 
     # NodeExecutor로 래핑 (Policy 적용: timeout, retry, circuit breaker)

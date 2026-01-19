@@ -11,6 +11,11 @@ Clean Architecture:
 Production Architecture:
 - NodeExecutor로 Policy 적용 (timeout, retry, circuit breaker)
 - location 노드는 FAIL_FALLBACK (필수 컨텍스트, 실패 시 대체 안내)
+
+Channel Separation:
+- 출력 채널: location_context
+- Reducer: priority_preemptive_reducer
+- spread 금지: {"location_context": create_context(...)} 형태로 반환
 """
 
 from __future__ import annotations
@@ -21,6 +26,10 @@ from typing import TYPE_CHECKING, Any
 from chat_worker.application.commands.get_location_command import (
     GetLocationCommand,
     GetLocationInput,
+)
+from chat_worker.infrastructure.orchestration.langgraph.context_helper import (
+    create_context,
+    create_error_context,
 )
 from chat_worker.infrastructure.orchestration.langgraph.nodes.node_executor import (
     NodeExecutor,
@@ -108,17 +117,20 @@ def create_location_subagent_node(
                 message="위치 정보 없이 진행합니다.",
             )
             return {
-                **state,
-                "location_context": output.location_context,
-                "location_skipped": True,
-                "needs_location": True,
+                "location_context": create_context(
+                    data=output.location_context or {"needs_location": True},
+                    producer="location",
+                    job_id=job_id,
+                ),
             }
 
         if not output.success:
             return {
-                **state,
-                "location_context": None,
-                "subagent_error": output.error_message,
+                "location_context": create_error_context(
+                    producer="location",
+                    job_id=job_id,
+                    error=output.error_message or "위치 정보 조회 실패",
+                ),
             }
 
         # Progress: 완료 (UX)
@@ -133,8 +145,11 @@ def create_location_subagent_node(
         )
 
         return {
-            **state,
-            "location_context": output.location_context,
+            "location_context": create_context(
+                data=output.location_context or {},
+                producer="location",
+                job_id=job_id,
+            ),
         }
 
     # NodeExecutor로 래핑 (Policy 적용: timeout, retry, circuit breaker)

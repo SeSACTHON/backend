@@ -75,7 +75,7 @@ def create_intent_node(
         Returns:
             업데이트된 상태
         """
-        job_id = state["job_id"]
+        job_id = state.get("job_id", "")
 
         # Progress: 시작 (UX)
         await event_publisher.notify_stage(
@@ -133,7 +133,6 @@ def create_intent_node(
         updated_intent_history = intent_history + [output.intent]
 
         return {
-            **state,
             "intent": output.intent,
             "is_complex": output.is_complex,
             "intent_confidence": output.confidence,

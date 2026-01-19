@@ -73,12 +73,12 @@ def create_feedback_node(
         Returns:
             업데이트된 상태
         """
-        job_id = state["job_id"]
+        job_id = state.get("job_id", "")
         intent = state.get("intent", "general")
 
         # waste intent가 아니면 스킵 (라우팅 로직)
         if intent != "waste":
-            return state
+            return {}  # 빈 딕셔너리: 상태 변경 없음
 
         # Progress: 시작 (UX)
         await event_publisher.notify_stage(
@@ -112,8 +112,7 @@ def create_feedback_node(
                 )
 
             # 4. output → state 변환
-            state_update = {
-                **state,
+            state_update: dict[str, Any] = {
                 "rag_feedback": output.feedback.to_dict(),
                 "rag_quality_score": output.feedback.score,
             }
@@ -147,7 +146,7 @@ def create_feedback_node(
                 status="failed",
                 result={"error": str(e)},
             )
-            return state
+            return {}  # 빈 딕셔너리: 상태 변경 없음
 
     return feedback_node
 
