@@ -176,9 +176,7 @@ class ClassifyIntentCommand:
             )
 
         # 4. Structured 응답 파싱 (Service - Model-Centric)
-        result = self._service.parse_structured_intent_response(
-            structured_result, message, context
-        )
+        result = self._service.parse_structured_intent_response(structured_result, message, context)
         events.append("intent_classified")
 
         # 5. 캐시 저장 (Command에서 Port 호출)
