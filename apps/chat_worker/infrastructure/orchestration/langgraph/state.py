@@ -8,7 +8,7 @@ Channel Separation + Priority Scheduling으로 Send API 병렬 실행 안전.
 ChatState
 ├── Core Layer (Immutable)
 │   ├── job_id, user_id, thread_id     # 메타데이터
-│   └── message, image_url             # 입력
+│   └── message, image_url, user_location  # 입력
 │
 ├── Intent Layer
 │   ├── intent, intent_confidence      # 분류 결과
@@ -189,6 +189,13 @@ class ChatState(TypedDict, total=False):
 
     image_url: str | None
     """이미지 URL (Vision 분석용)."""
+
+    user_location: dict[str, float] | None
+    """사용자 위치 (위도/경도).
+
+    프론트엔드에서 GPS 좌표를 전송하면 날씨, 위치 기반 서비스에 사용.
+    형식: {"latitude": float, "longitude": float}
+    """
 
     conversation_history: list[dict[str, Any]]
     """대화 히스토리 (컨텍스트 제공용)."""
