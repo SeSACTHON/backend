@@ -60,6 +60,11 @@ class LangChainLLMAdapter(LLMClientPort):
         async for token in adapter.generate_stream(prompt, system_prompt):
             # LangGraph stream_mode="messages"에서 자동 캡처
             print(token)
+
+        # 직접 LangChain LLM 사용 (stream_mode="messages" 지원)
+        langchain_llm = adapter.get_langchain_llm()
+        async for chunk in langchain_llm.astream(messages):
+            print(chunk.content)
     """
 
     def __init__(self, llm: "BaseChatModel") -> None:
@@ -73,6 +78,18 @@ class LangChainLLMAdapter(LLMClientPort):
             "LangChainLLMAdapter initialized",
             extra={"llm_type": type(llm).__name__},
         )
+
+    def get_langchain_llm(self) -> "BaseChatModel":
+        """내부 LangChain LLM 반환.
+
+        LangGraph stream_mode="messages"를 위해 직접 LLM 접근이 필요할 때 사용.
+        answer_node에서 직접 llm.astream(messages)를 호출하면
+        LangGraph가 AIMessageChunk를 캡처할 수 있음.
+
+        Returns:
+            내부 BaseChatModel 인스턴스
+        """
+        return self._llm
 
     def _build_messages(
         self,
