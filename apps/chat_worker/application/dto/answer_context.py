@@ -30,6 +30,7 @@ class AnswerContext:
     bulk_waste_context: str | None = None  # 대형폐기물 정보 컨텍스트
     weather_context: str | None = None  # 날씨 기반 분리배출 팁
     collection_point_context: str | None = None  # 수거함 위치 정보
+    image_generation_context: dict[str, Any] | None = None  # 이미지 생성 결과
     user_input: str = ""
     # Multi-turn 대화 컨텍스트
     conversation_history: list[dict[str, str]] | None = None  # 최근 대화 히스토리
@@ -89,6 +90,25 @@ class AnswerContext:
         if self.collection_point_context:
             parts.append(f"## Collection Point Info\n{self.collection_point_context}")
 
+        if self.image_generation_context:
+            img_ctx = self.image_generation_context
+            if img_ctx.get("data", {}).get("image_url"):
+                image_url = img_ctx["data"]["image_url"]
+                description = img_ctx["data"].get("description", "")
+                parts.append(
+                    f"## Generated Image\n"
+                    f"이미지가 성공적으로 생성되었습니다.\n"
+                    f"- Image URL: {image_url}\n"
+                    f"- Description: {description}\n\n"
+                    f"사용자에게 이미지가 생성되었음을 알려주고, 위 URL을 마크다운 이미지 형식으로 보여주세요."
+                )
+            elif img_ctx.get("error"):
+                parts.append(
+                    f"## Image Generation Error\n"
+                    f"이미지 생성에 실패했습니다: {img_ctx.get('error')}\n"
+                    f"사용자에게 이미지 생성에 실패했음을 안내해주세요."
+                )
+
         if self.user_input:
             parts.append(f"## User Question\n{self.user_input}")
 
@@ -107,6 +127,7 @@ class AnswerContext:
                 self.bulk_waste_context,
                 self.weather_context,
                 self.collection_point_context,
+                self.image_generation_context,
                 self.conversation_history,
                 self.conversation_summary,
             ]

@@ -79,6 +79,7 @@ class GenerateAnswerInput:
     bulk_waste_context: str | None = None  # 대형폐기물 정보 (문자열)
     weather_context: str | None = None  # 날씨 기반 분리배출 팁 (문자열)
     collection_point_context: str | None = None  # 수거함 위치 정보 (문자열)
+    image_generation_context: dict[str, Any] | None = None  # 이미지 생성 결과
     # Multi-turn 대화 컨텍스트
     conversation_history: list[dict[str, str]] | None = None  # 최근 대화 히스토리
     conversation_summary: str | None = None  # 압축된 이전 대화 요약
@@ -178,6 +179,7 @@ class GenerateAnswerCommand:
             bulk_waste_context=input_dto.bulk_waste_context,
             weather_context=input_dto.weather_context,
             collection_point_context=input_dto.collection_point_context,
+            image_generation_context=input_dto.image_generation_context,
             user_input=input_dto.message,
             conversation_history=input_dto.conversation_history,
             conversation_summary=input_dto.conversation_summary,

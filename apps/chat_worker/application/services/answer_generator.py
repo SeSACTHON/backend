@@ -55,6 +55,7 @@ class AnswerGeneratorService:
                 "has_bulk_waste": context.bulk_waste_context is not None,
                 "has_weather": context.weather_context is not None,
                 "has_collection_point": context.collection_point_context is not None,
+                "has_image_generation": context.image_generation_context is not None,
                 "has_conversation_history": context.conversation_history is not None,
                 "has_conversation_summary": context.conversation_summary is not None,
                 "conversation_turns": (
@@ -77,6 +78,7 @@ class AnswerGeneratorService:
         bulk_waste_context: str | None = None,
         weather_context: str | None = None,
         collection_point_context: str | None = None,
+        image_generation_context: dict[str, Any] | None = None,
         user_input: str = "",
         conversation_history: list[dict[str, str]] | None = None,
         conversation_summary: str | None = None,
@@ -93,6 +95,7 @@ class AnswerGeneratorService:
             bulk_waste_context: 대형폐기물 정보 컨텍스트 (문자열)
             weather_context: 날씨 기반 분리배출 팁 (문자열)
             collection_point_context: 수거함 위치 정보 (문자열)
+            image_generation_context: 이미지 생성 결과 (딕셔너리)
             user_input: 사용자 입력
             conversation_history: 최근 대화 히스토리 (Multi-turn)
             conversation_summary: 압축된 이전 대화 요약 (Multi-turn)
@@ -110,6 +113,7 @@ class AnswerGeneratorService:
             bulk_waste_context=bulk_waste_context,
             weather_context=weather_context,
             collection_point_context=collection_point_context,
+            image_generation_context=image_generation_context,
             user_input=user_input,
             conversation_history=conversation_history,
             conversation_summary=conversation_summary,

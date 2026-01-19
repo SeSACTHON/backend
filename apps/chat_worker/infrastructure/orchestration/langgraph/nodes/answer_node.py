@@ -120,6 +120,9 @@ def create_answer_node(
                 collection_ctx.get("context") if isinstance(collection_ctx, dict) else None
             )
 
+            # image_generation_context 추출
+            image_gen_ctx = state.get("image_generation_context")
+
             # 대화 히스토리 추출 (Multi-turn 지원)
             messages = state.get("messages", [])
             conversation_history = None
@@ -153,6 +156,7 @@ def create_answer_node(
                 bulk_waste_context=waste_context_str,
                 weather_context=weather_context_str,
                 collection_point_context=collection_context_str,
+                image_generation_context=image_gen_ctx,
                 conversation_history=conversation_history,
                 conversation_summary=conversation_summary,
             )
