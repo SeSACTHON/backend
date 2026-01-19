@@ -148,19 +148,23 @@ async def get_progress_notifier() -> ProgressNotifierPort:
     """ProgressNotifier 싱글톤 (SSE/UI 이벤트).
 
     Redis Streams로 이벤트 발행 → event-router가 소비.
+    redis_streams_url을 사용해야 event-router와 동일한 Redis를 바라봄.
     """
     global _progress_notifier
     if _progress_notifier is None:
-        redis = await get_redis()
+        redis = await get_redis_streams()
         _progress_notifier = RedisProgressNotifier(redis=redis)
     return _progress_notifier
 
 
 async def get_domain_event_bus() -> RedisStreamDomainEventBus:
-    """DomainEventBus 싱글톤 (시스템 이벤트)."""
+    """DomainEventBus 싱글톤 (시스템 이벤트).
+
+    Redis Streams로 이벤트 발행 → event-router가 소비.
+    """
     global _domain_event_bus
     if _domain_event_bus is None:
-        redis = await get_redis()
+        redis = await get_redis_streams()
         _domain_event_bus = RedisStreamDomainEventBus(redis=redis)
     return _domain_event_bus
 
