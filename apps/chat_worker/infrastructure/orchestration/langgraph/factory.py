@@ -445,7 +445,7 @@ def create_chat_graph(
 
         logger.warning("Collection point subagent node using passthrough (no client)")
 
-    # Subagent 노드: Image Generation (Responses API)
+    # Subagent 노드: Image Generation (Gemini Native)
     if image_generator is not None:
         image_generation_node = create_image_generation_node(
             image_generator=image_generator,
@@ -453,7 +453,7 @@ def create_chat_graph(
             default_size=image_default_size,
             default_quality=image_default_quality,
         )
-        logger.info("Image generation subagent node created (Responses API)")
+        logger.info("Image generation subagent node created (Gemini Native)")
     else:
         # Fallback: passthrough
         async def image_generation_node(state: dict[str, Any]) -> dict[str, Any]:

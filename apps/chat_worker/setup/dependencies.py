@@ -316,16 +316,16 @@ def create_vision_client(
 def get_image_generator() -> ImageGeneratorPort | None:
     """이미지 생성 클라이언트 싱글톤.
 
-    default_provider 설정에 따라 적합한 이미지 생성기 선택.
-    enable_image_generation=True일 때만 활성화 (비용 발생).
+    이미지 생성은 항상 Gemini Native Image Generation 사용.
+    - Gemini는 조직 인증 불필요 (OpenAI는 필요)
+    - 참조 이미지 기반 스타일 일관성 우수
+    - gemini-3-pro-image-preview 모델 사용
 
-    Provider별 이미지 생성:
-    - openai: OpenAI Responses API (gpt-image-1.5)
-    - google: Gemini Native Image Generation (gemini-3-pro-image-preview)
+    enable_image_generation=True일 때만 활성화 (비용 발생).
 
     환경변수:
     - CHAT_WORKER_ENABLE_IMAGE_GENERATION: True로 설정 시 활성화
-    - CHAT_WORKER_DEFAULT_PROVIDER: 이미지 생성 Provider 결정
+    - GOOGLE_API_KEY: Gemini API 키 (필수)
     """
     global _image_generator
     if _image_generator is None:
@@ -335,46 +335,20 @@ def get_image_generator() -> ImageGeneratorPort | None:
             logger.info("Image generation disabled (enable_image_generation=False)")
             return None
 
-        provider = settings.default_provider
-
-        if provider == "openai":
-            if not settings.openai_api_key:
-                logger.warning("Image generation disabled (no OpenAI API key)")
-                return None
-
-            from chat_worker.infrastructure.llm.image_generator import (
-                OpenAIResponsesImageGenerator,
-            )
-
-            _image_generator = OpenAIResponsesImageGenerator(
-                model=settings.image_generation_model,
-                api_key=settings.openai_api_key,
-                default_size=settings.image_generation_default_size,
-                default_quality=settings.image_generation_default_quality,
-            )
-            logger.info(
-                "OpenAI Image Generator created (model=%s)",
-                settings.image_generation_model,
-            )
-
-        elif provider == "google":
-            if not settings.google_api_key:
-                logger.warning("Image generation disabled (no Google API key)")
-                return None
-
-            from chat_worker.infrastructure.llm.image_generator import (
-                GeminiNativeImageGenerator,
-            )
-
-            _image_generator = GeminiNativeImageGenerator(
-                model="gemini-3-pro-image-preview",
-                api_key=settings.google_api_key,
-            )
-            logger.info("Gemini Image Generator created (model=gemini-3-pro-image-preview)")
-
-        else:
-            logger.warning("Unknown provider for image generation: %s", provider)
+        # 이미지 생성은 항상 Gemini 사용 (default_provider와 무관)
+        if not settings.google_api_key:
+            logger.warning("Image generation disabled (no Google API key)")
             return None
+
+        from chat_worker.infrastructure.llm.image_generator import (
+            GeminiNativeImageGenerator,
+        )
+
+        _image_generator = GeminiNativeImageGenerator(
+            model="gemini-3-pro-image-preview",
+            api_key=settings.google_api_key,
+        )
+        logger.info("Gemini Image Generator created (model=gemini-3-pro-image-preview)")
 
     return _image_generator
 
