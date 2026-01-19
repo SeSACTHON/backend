@@ -51,22 +51,6 @@ apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
   name: allow-dns
-  namespace: image
-spec:
-  podSelector: {}
-  policyTypes:
-  - Egress
-  egress:
-  - ports:
-    - protocol: UDP
-      port: 53
-    - protocol: TCP
-      port: 53
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: allow-dns
   namespace: images
 spec:
   podSelector: {}
