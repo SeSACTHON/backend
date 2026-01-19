@@ -70,6 +70,21 @@ class GenerateAnswerOutput:
     events: list[str] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class PreparedPrompt:
+    """프롬프트 준비 결과.
+
+    LangGraph stream_mode="messages" 지원을 위해
+    answer_node에서 직접 LLM 호출할 때 사용.
+    """
+
+    prompt: str
+    system_prompt: str
+    cache_key: str
+    is_cacheable: bool
+    cached_answer: str | None = None
+
+
 class GenerateAnswerCommand:
     """답변 생성 Command (UseCase).
 
@@ -151,6 +166,71 @@ class GenerateAnswerCommand:
             all_intents = [input_dto.intent] + list(input_dto.additional_intents)
             return self._prompt_builder.build_multi(all_intents)
         return self._prompt_builder.build(input_dto.intent)
+
+    async def prepare(self, input_dto: GenerateAnswerInput) -> PreparedPrompt:
+        """프롬프트 준비 (LLM 호출 없음).
+
+        LangGraph stream_mode="messages" 지원을 위해
+        answer_node에서 직접 LLM 호출이 필요할 때 사용.
+
+        Args:
+            input_dto: 입력 DTO
+
+        Returns:
+            PreparedPrompt (prompt, system_prompt, cache 정보)
+        """
+        # 1. 컨텍스트 구성
+        context = self._build_context(input_dto)
+        cache_key = self._generate_cache_key(input_dto.message, input_dto.intent)
+        is_cacheable = self._cache is not None and self._is_cacheable(input_dto.intent, context)
+
+        # 2. 캐시 확인
+        cached_answer = None
+        if is_cacheable:
+            try:
+                cached_answer = await self._cache.get(cache_key)
+                if cached_answer:
+                    logger.info(
+                        "Answer cache hit",
+                        extra={"job_id": input_dto.job_id, "intent": input_dto.intent},
+                    )
+            except Exception as e:
+                logger.warning(f"Answer cache get failed: {e}")
+
+        # 3. 프롬프트 구성
+        prompt = self._service.build_prompt(context)
+        system_prompt = self._build_system_prompt(input_dto)
+
+        if input_dto.has_multi_intent:
+            logger.info(
+                f"Built multi-intent prompt for intents="
+                f"{[input_dto.intent] + list(input_dto.additional_intents)}"
+            )
+
+        return PreparedPrompt(
+            prompt=prompt,
+            system_prompt=system_prompt,
+            cache_key=cache_key,
+            is_cacheable=is_cacheable,
+            cached_answer=cached_answer,
+        )
+
+    async def save_to_cache(self, cache_key: str, answer: str) -> None:
+        """캐시에 답변 저장.
+
+        answer_node에서 직접 LLM 호출 후 캐시 저장 시 사용.
+
+        Args:
+            cache_key: 캐시 키
+            answer: 저장할 답변
+        """
+        if self._cache is None:
+            return
+        try:
+            await self._cache.set(cache_key, answer, ttl=ANSWER_CACHE_TTL)
+            logger.debug(f"Answer cached: {cache_key}")
+        except Exception as e:
+            logger.warning(f"Answer cache set failed: {e}")
 
     async def execute(
         self,
