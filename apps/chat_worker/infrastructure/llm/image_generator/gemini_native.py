@@ -262,13 +262,10 @@ class GeminiNativeImageGenerator(ImageGeneratorPort):
             # 콘텐츠 구성
             parts: list[types.Part] = []
 
-            # 참조 이미지 추가
+            # 참조 이미지가 있는 경우: 이미지 먼저, 프롬프트 나중에
+            # 프롬프트는 Command layer에서 이미 빌드됨 (캐릭터 컨텍스트 포함)
             if reference_images:
-                parts.append(
-                    types.Part.from_text(
-                        text="다음 참조 이미지의 캐릭터 스타일을 유지하면서 이미지를 생성해주세요:"
-                    )
-                )
+                # 참조 이미지들 먼저 추가
                 for ref in reference_images:
                     # URL이면 lazy fetch, bytes면 그대로 사용
                     image_data = await self._resolve_reference_bytes(ref)
@@ -278,8 +275,10 @@ class GeminiNativeImageGenerator(ImageGeneratorPort):
                             mime_type=ref.mime_type,
                         )
                     )
-                parts.append(types.Part.from_text(text=f"\n요청: {prompt}"))
+                # 빌드된 프롬프트 추가 (캐릭터 컨텍스트, 지침, 사용자 요청 포함)
+                parts.append(types.Part.from_text(text=prompt))
             else:
+                # 참조 이미지 없는 경우: 프롬프트만 사용
                 parts.append(types.Part.from_text(text=prompt))
 
             # ImageConfig 구성 (aspect_ratio + image_size)

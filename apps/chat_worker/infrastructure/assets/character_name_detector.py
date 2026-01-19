@@ -29,6 +29,7 @@ class DetectedCharacter:
     code: str  # DB 코드 (char-petty)
     name: str  # 공식 이름 (페티)
     cdn_code: str  # CDN 코드 (pet)
+    match_label: str  # 폐기물 카테고리 (무색페트병)
     matched_alias: str  # 매칭된 별칭 (사용자가 입력한 것)
 
 
@@ -49,8 +50,8 @@ class CharacterNameDetector:
     사용자 메시지에서 캐릭터 이름/별칭을 찾아 해당 캐릭터 정보를 반환합니다.
     """
 
-    # 기본 캐릭터 (이코)는 감지 대상에서 제외 (항상 페르소나로 사용)
-    EXCLUDED_CODES: ClassVar[set[str]] = {"char-eco"}
+    # 제외할 캐릭터 코드 (현재 없음 - 모든 캐릭터 감지)
+    EXCLUDED_CODES: ClassVar[set[str]] = set()
 
     def __init__(self, yaml_path: str | Path | None = None):
         """초기화.
@@ -146,6 +147,7 @@ class CharacterNameDetector:
                     code=char_info.code,
                     name=char_info.name,
                     cdn_code=char_info.cdn_code,
+                    match_label=char_info.match_label,
                     matched_alias=alias,
                 )
 
@@ -179,6 +181,7 @@ class CharacterNameDetector:
                         code=char_info.code,
                         name=char_info.name,
                         cdn_code=char_info.cdn_code,
+                        match_label=char_info.match_label,
                         matched_alias=alias,
                     )
 

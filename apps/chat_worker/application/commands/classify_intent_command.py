@@ -55,6 +55,7 @@ class DetectedCharacterDTO:
     name: str  # 공식 이름 (페티)
     cdn_code: str  # CDN 코드 (pet)
     image_url: str  # CDN 이미지 URL
+    match_label: str  # 폐기물 카테고리 (무색페트병)
 
 
 @dataclass
@@ -132,6 +133,7 @@ class ClassifyIntentCommand:
                 extra={
                     "character_code": detected.code,
                     "character_name": detected.name,
+                    "match_label": detected.match_label,
                     "matched_alias": detected.matched_alias,
                 },
             )
@@ -140,6 +142,7 @@ class ClassifyIntentCommand:
                 name=detected.name,
                 cdn_code=detected.cdn_code,
                 image_url=detector.get_cdn_url(detected.cdn_code),
+                match_label=detected.match_label,
             )
         return None
 
