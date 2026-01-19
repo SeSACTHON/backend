@@ -197,6 +197,19 @@ class ChatState(TypedDict, total=False):
     형식: {"latitude": float, "longitude": float}
     """
 
+    llm_model: str | None
+    """프론트엔드가 지정한 LLM 모델.
+
+    Location Agent 등 노드에서 사용.
+    예: "gpt-4o-mini", "gemini-3-flash-preview"
+    """
+
+    llm_provider: str | None
+    """LLM 프로바이더.
+
+    예: "openai", "google"
+    """
+
     conversation_history: list[dict[str, Any]]
     """대화 히스토리 (컨텍스트 제공용)."""
 

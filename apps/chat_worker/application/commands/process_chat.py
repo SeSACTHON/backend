@@ -262,6 +262,7 @@ class ProcessChatCommand:
             )
 
             # 2. 파이프라인 초기 상태
+            # model: 프론트엔드가 지정한 모델 (Location Agent 등에서 사용)
             initial_state = {
                 "job_id": request.job_id,
                 "session_id": request.session_id,
@@ -269,6 +270,8 @@ class ProcessChatCommand:
                 "message": request.message,
                 "image_url": request.image_url,
                 "user_location": request.user_location,
+                "llm_model": request.model,  # Location Agent에서 사용
+                "llm_provider": self._provider,  # OpenAI or Google
             }
 
             # Telemetry + LangGraph config 생성
