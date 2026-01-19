@@ -211,7 +211,7 @@ class GeminiNativeImageGenerator(ImageGeneratorPort):
             if reference_images:
                 parts.append(
                     types.Part.from_text(
-                        "다음 참조 이미지의 캐릭터 스타일을 유지하면서 이미지를 생성해주세요:"
+                        text="다음 참조 이미지의 캐릭터 스타일을 유지하면서 이미지를 생성해주세요:"
                     )
                 )
                 for ref in reference_images:
@@ -221,9 +221,9 @@ class GeminiNativeImageGenerator(ImageGeneratorPort):
                             mime_type=ref.mime_type,
                         )
                     )
-                parts.append(types.Part.from_text(f"\n요청: {prompt}"))
+                parts.append(types.Part.from_text(text=f"\n요청: {prompt}"))
             else:
-                parts.append(types.Part.from_text(prompt))
+                parts.append(types.Part.from_text(text=prompt))
 
             # ImageConfig 구성 (aspect_ratio + image_size)
             image_config = types.ImageConfig(aspect_ratio=aspect_ratio)
