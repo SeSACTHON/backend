@@ -153,14 +153,18 @@ class LangChainOpenAIRunnable(BaseChatModel):
         """
         openai_messages = self._convert_messages(messages)
 
-        response = await self._client.chat.completions.create(
-            model=self.model,
-            messages=openai_messages,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-            stop=stop,
-            stream=False,
-        )
+        # max_tokens가 None이면 파라미터 제외 (OpenAI API 오류 방지)
+        create_params: dict[str, Any] = {
+            "model": self.model,
+            "messages": openai_messages,
+            "temperature": self.temperature,
+            "stop": stop,
+            "stream": False,
+        }
+        if self.max_tokens is not None:
+            create_params["max_tokens"] = self.max_tokens
+
+        response = await self._client.chat.completions.create(**create_params)
 
         content = response.choices[0].message.content or ""
         message = AIMessage(content=content)
@@ -191,14 +195,18 @@ class LangChainOpenAIRunnable(BaseChatModel):
         """
         openai_messages = self._convert_messages(messages)
 
-        stream = await self._client.chat.completions.create(
-            model=self.model,
-            messages=openai_messages,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens,
-            stop=stop,
-            stream=True,
-        )
+        # max_tokens가 None이면 파라미터 제외 (OpenAI API 오류 방지)
+        create_params: dict[str, Any] = {
+            "model": self.model,
+            "messages": openai_messages,
+            "temperature": self.temperature,
+            "stop": stop,
+            "stream": True,
+        }
+        if self.max_tokens is not None:
+            create_params["max_tokens"] = self.max_tokens
+
+        stream = await self._client.chat.completions.create(**create_params)
 
         async for chunk in stream:
             if chunk.choices and chunk.choices[0].delta.content:
