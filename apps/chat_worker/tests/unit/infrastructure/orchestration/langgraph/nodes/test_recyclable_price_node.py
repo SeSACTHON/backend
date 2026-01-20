@@ -215,11 +215,12 @@ class TestRecyclablePriceNode:
         mock_publisher: MockEventPublisher,
         mock_llm: MockLLMClient,
     ):
-        """LLM이 추출한 품목명 사용."""
-        # LLM function call 결과 설정 (detail_type: 페트)
+        """LLM이 추출한 품목명 사용 (detail_type만 있는 경우)."""
+        # LLM function call 결과 설정 (detail_type만, material 없음)
+        # material이 없으면 category가 설정되지 않아 search_price가 호출됨
         mock_llm.set_function_call_result(
             "get_recyclable_price",
-            {"material": "plastic", "detail_type": "페트"},
+            {"detail_type": "페트"},  # material 없음
         )
 
         # Mock 응답 설정
@@ -262,8 +263,9 @@ class TestRecyclablePriceNode:
         mock_publisher: MockEventPublisher,
         mock_llm: MockLLMClient,
     ):
-        """LLM이 추출한 카테고리 전달."""
+        """LLM이 추출한 카테고리 전달 (material이 category로 사용됨)."""
         # LLM function call 결과 설정 (material만 있고 detail_type 없음)
+        # material이 있으면 category로 설정되어 get_category_prices가 호출됨
         mock_llm.set_function_call_result(
             "get_recyclable_price",
             {"material": "metal"},
@@ -287,9 +289,9 @@ class TestRecyclablePriceNode:
 
         await node(state)
 
-        # material이 item_name으로 사용됨
-        assert len(mock_client.search_price_calls) == 1
-        assert mock_client.search_price_calls[0]["item_name"] == "metal"
+        # material이 category로 사용되어 get_category_prices 호출됨
+        assert len(mock_client.get_category_calls) == 1
+        assert mock_client.get_category_calls[0]["category"] == "metal"
 
     @pytest.mark.anyio
     async def test_node_passes_region(

@@ -22,7 +22,10 @@ from chat_worker.application.commands.search_kakao_place_command import (
     SearchKakaoPlaceInput,
     SearchKakaoPlaceOutput,
 )
-from chat_worker.application.ports.kakao_local_client import KakaoSearchResponse
+from chat_worker.application.ports.kakao_local_client import (
+    KakaoSearchMeta,
+    KakaoSearchResponse,
+)
 from chat_worker.infrastructure.orchestration.langgraph.nodes.kakao_place_node import (
     KAKAO_PLACE_FUNCTION,
     create_kakao_place_node,
@@ -107,7 +110,7 @@ class MockKakaoClient:
                     "distance": "100",
                 }
             ],
-            meta={"total_count": 1, "is_end": True},
+            meta=KakaoSearchMeta(total_count=1, pageable_count=1, is_end=True),
         )
 
     async def search_category(
@@ -134,7 +137,7 @@ class MockKakaoClient:
                     "distance": "200",
                 }
             ],
-            meta={"total_count": 1, "is_end": True},
+            meta=KakaoSearchMeta(total_count=1, pageable_count=1, is_end=True),
         )
 
 
