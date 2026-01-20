@@ -5,7 +5,7 @@ Function Calling API 호출 및 결과 파싱 테스트.
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
@@ -36,149 +36,161 @@ class TestOpenAIClientFunctionCalling:
 
         return _create_response
 
-    @pytest.fixture
-    def llm_client_with_mock(self):
-        """Mock이 주입된 LLM 클라이언트 팩토리."""
+    def _create_mock_client(self, mock_response):
+        """Mock OpenAI 클라이언트 생성."""
+        mock_openai = MagicMock()
+        mock_openai.chat = MagicMock()
+        mock_openai.chat.completions = MagicMock()
+        mock_openai.chat.completions.create = AsyncMock(return_value=mock_response)
+        return mock_openai
 
-        def _create_client(mock_response):
-            # __init__을 우회하여 인스턴스 생성
-            llm_client = OpenAILLMClient.__new__(OpenAILLMClient)
+    @pytest.mark.asyncio
+    async def test_function_call_success(self, mock_openai_response):
+        """Function call 성공 시나리오."""
+        mock_response = mock_openai_response("search_place", '{"query": "카페", "radius": 5000}')
+        mock_openai = self._create_mock_client(mock_response)
 
-            # Mock 클라이언트 설정 (명시적 체인)
-            mock_openai = MagicMock()
-            mock_openai.chat = MagicMock()
-            mock_openai.chat.completions = MagicMock()
-            mock_openai.chat.completions.create = AsyncMock(return_value=mock_response)
-
+        with patch.object(OpenAILLMClient, "__init__", lambda self, **kwargs: None):
+            llm_client = OpenAILLMClient(model="gpt-5.2")
             llm_client._client = mock_openai
             llm_client._model = "gpt-5.2"
 
-            return llm_client, mock_openai
-
-        return _create_client
-
-    @pytest.mark.asyncio
-    async def test_function_call_success(self, mock_openai_response, llm_client_with_mock):
-        """Function call 성공 시나리오."""
-        mock_response = mock_openai_response("search_place", '{"query": "카페", "radius": 5000}')
-        llm_client, mock_openai = llm_client_with_mock(mock_response)
-
-        functions = [
-            {
-                "name": "search_place",
-                "description": "장소 검색",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "query": {"type": "string"},
-                        "radius": {"type": "integer"},
+            functions = [
+                {
+                    "name": "search_place",
+                    "description": "장소 검색",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "query": {"type": "string"},
+                            "radius": {"type": "integer"},
+                        },
+                        "required": ["query"],
                     },
-                    "required": ["query"],
-                },
-            }
-        ]
+                }
+            ]
 
-        func_name, func_args = await llm_client.generate_function_call(
-            prompt="주변 카페 찾아줘",
-            functions=functions,
-            system_prompt="장소 검색 파라미터를 추출하세요",
-        )
+            func_name, func_args = await llm_client.generate_function_call(
+                prompt="주변 카페 찾아줘",
+                functions=functions,
+                system_prompt="장소 검색 파라미터를 추출하세요",
+            )
 
-        assert func_name == "search_place"
-        assert func_args == {"query": "카페", "radius": 5000}
+            assert func_name == "search_place"
+            assert func_args == {"query": "카페", "radius": 5000}
 
-        mock_openai.chat.completions.create.assert_called_once()
-        call_kwargs = mock_openai.chat.completions.create.call_args.kwargs
-        assert call_kwargs["model"] == "gpt-5.2"
-        assert call_kwargs["functions"] == functions
-        assert call_kwargs["function_call"] == "auto"
+            mock_openai.chat.completions.create.assert_called_once()
+            call_kwargs = mock_openai.chat.completions.create.call_args.kwargs
+            assert call_kwargs["model"] == "gpt-5.2"
+            assert call_kwargs["functions"] == functions
+            assert call_kwargs["function_call"] == "auto"
 
     @pytest.mark.asyncio
-    async def test_function_call_forced(self, mock_openai_response, llm_client_with_mock):
+    async def test_function_call_forced(self, mock_openai_response):
         """Function call 강제 호출."""
         mock_response = mock_openai_response("get_weather", '{"needs_weather": true}')
-        llm_client, mock_openai = llm_client_with_mock(mock_response)
+        mock_openai = self._create_mock_client(mock_response)
 
-        functions = [
-            {
-                "name": "get_weather",
-                "description": "날씨 조회",
-                "parameters": {
-                    "type": "object",
-                    "properties": {
-                        "needs_weather": {"type": "boolean"},
+        with patch.object(OpenAILLMClient, "__init__", lambda self, **kwargs: None):
+            llm_client = OpenAILLMClient(model="gpt-5.2")
+            llm_client._client = mock_openai
+            llm_client._model = "gpt-5.2"
+
+            functions = [
+                {
+                    "name": "get_weather",
+                    "description": "날씨 조회",
+                    "parameters": {
+                        "type": "object",
+                        "properties": {
+                            "needs_weather": {"type": "boolean"},
+                        },
+                        "required": ["needs_weather"],
                     },
-                    "required": ["needs_weather"],
-                },
-            }
-        ]
+                }
+            ]
 
-        func_name, func_args = await llm_client.generate_function_call(
-            prompt="종이 언제 버려?",
-            functions=functions,
-            function_call={"name": "get_weather"},
-        )
+            func_name, func_args = await llm_client.generate_function_call(
+                prompt="종이 언제 버려?",
+                functions=functions,
+                function_call={"name": "get_weather"},
+            )
 
-        assert func_name == "get_weather"
-        assert func_args == {"needs_weather": True}
+            assert func_name == "get_weather"
+            assert func_args == {"needs_weather": True}
 
-        call_kwargs = mock_openai.chat.completions.create.call_args.kwargs
-        assert call_kwargs["function_call"] == {"name": "get_weather"}
+            call_kwargs = mock_openai.chat.completions.create.call_args.kwargs
+            assert call_kwargs["function_call"] == {"name": "get_weather"}
 
     @pytest.mark.asyncio
-    async def test_no_function_call(self, mock_openai_response, llm_client_with_mock):
+    async def test_no_function_call(self, mock_openai_response):
         """Function call이 없는 경우."""
         mock_response = mock_openai_response(None, None)
-        llm_client, _ = llm_client_with_mock(mock_response)
+        mock_openai = self._create_mock_client(mock_response)
 
-        functions = [
-            {
-                "name": "search_place",
-                "description": "장소 검색",
-                "parameters": {"type": "object", "properties": {}},
-            }
-        ]
+        with patch.object(OpenAILLMClient, "__init__", lambda self, **kwargs: None):
+            llm_client = OpenAILLMClient(model="gpt-5.2")
+            llm_client._client = mock_openai
+            llm_client._model = "gpt-5.2"
 
-        func_name, func_args = await llm_client.generate_function_call(
-            prompt="안녕하세요",
-            functions=functions,
-        )
+            functions = [
+                {
+                    "name": "search_place",
+                    "description": "장소 검색",
+                    "parameters": {"type": "object", "properties": {}},
+                }
+            ]
 
-        assert func_name is None
-        assert func_args is None
-
-    @pytest.mark.asyncio
-    async def test_invalid_json_arguments(self, mock_openai_response, llm_client_with_mock):
-        """잘못된 JSON arguments."""
-        mock_response = mock_openai_response("search_place", "{invalid json}")
-        llm_client, _ = llm_client_with_mock(mock_response)
-
-        functions = [{"name": "search_place", "parameters": {"type": "object"}}]
-
-        with pytest.raises(ValueError, match="Invalid function arguments JSON"):
-            await llm_client.generate_function_call(
-                prompt="테스트",
+            func_name, func_args = await llm_client.generate_function_call(
+                prompt="안녕하세요",
                 functions=functions,
             )
 
+            assert func_name is None
+            assert func_args is None
+
     @pytest.mark.asyncio
-    async def test_system_prompt_included(self, mock_openai_response, llm_client_with_mock):
+    async def test_invalid_json_arguments(self, mock_openai_response):
+        """잘못된 JSON arguments."""
+        mock_response = mock_openai_response("search_place", "{invalid json}")
+        mock_openai = self._create_mock_client(mock_response)
+
+        with patch.object(OpenAILLMClient, "__init__", lambda self, **kwargs: None):
+            llm_client = OpenAILLMClient(model="gpt-5.2")
+            llm_client._client = mock_openai
+            llm_client._model = "gpt-5.2"
+
+            functions = [{"name": "search_place", "parameters": {"type": "object"}}]
+
+            with pytest.raises(ValueError, match="Invalid function arguments JSON"):
+                await llm_client.generate_function_call(
+                    prompt="테스트",
+                    functions=functions,
+                )
+
+    @pytest.mark.asyncio
+    async def test_system_prompt_included(self, mock_openai_response):
         """System prompt 포함 확인."""
         mock_response = mock_openai_response("test_func", "{}")
-        llm_client, mock_openai = llm_client_with_mock(mock_response)
+        mock_openai = self._create_mock_client(mock_response)
 
-        functions = [{"name": "test_func", "parameters": {"type": "object"}}]
+        with patch.object(OpenAILLMClient, "__init__", lambda self, **kwargs: None):
+            llm_client = OpenAILLMClient(model="gpt-5.2")
+            llm_client._client = mock_openai
+            llm_client._model = "gpt-5.2"
 
-        await llm_client.generate_function_call(
-            prompt="테스트",
-            functions=functions,
-            system_prompt="시스템 프롬프트",
-        )
+            functions = [{"name": "test_func", "parameters": {"type": "object"}}]
 
-        call_kwargs = mock_openai.chat.completions.create.call_args.kwargs
-        messages = call_kwargs["messages"]
-        assert len(messages) == 2
-        assert messages[0]["role"] == "system"
-        assert messages[0]["content"] == "시스템 프롬프트"
-        assert messages[1]["role"] == "user"
-        assert messages[1]["content"] == "테스트"
+            await llm_client.generate_function_call(
+                prompt="테스트",
+                functions=functions,
+                system_prompt="시스템 프롬프트",
+            )
+
+            call_kwargs = mock_openai.chat.completions.create.call_args.kwargs
+            messages = call_kwargs["messages"]
+            assert len(messages) == 2
+            assert messages[0]["role"] == "system"
+            assert messages[0]["content"] == "시스템 프롬프트"
+            assert messages[1]["role"] == "user"
+            assert messages[1]["content"] == "테스트"

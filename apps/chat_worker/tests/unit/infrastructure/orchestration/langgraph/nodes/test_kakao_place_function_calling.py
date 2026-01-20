@@ -23,6 +23,7 @@ from chat_worker.application.commands.search_kakao_place_command import (
     SearchKakaoPlaceOutput,
 )
 from chat_worker.application.ports.kakao_local_client import (
+    KakaoPlaceDTO,
     KakaoSearchMeta,
     KakaoSearchResponse,
 )
@@ -100,15 +101,20 @@ class MockKakaoClient:
 
         return KakaoSearchResponse(
             places=[
-                {
-                    "place_name": "테스트 장소",
-                    "address_name": "서울시 강남구",
-                    "phone": "02-1234-5678",
-                    "place_url": "https://place.map.kakao.com/123",
-                    "x": "127.0",
-                    "y": "37.5",
-                    "distance": "100",
-                }
+                KakaoPlaceDTO(
+                    id="123",
+                    place_name="테스트 장소",
+                    category_name="가정,생활 > 재활용센터",
+                    category_group_code="PO3",
+                    category_group_name="공공기관",
+                    phone="02-1234-5678",
+                    address_name="서울시 강남구",
+                    road_address_name="서울시 강남구 테헤란로 1",
+                    x="127.0",
+                    y="37.5",
+                    place_url="https://place.map.kakao.com/123",
+                    distance="100",
+                )
             ],
             meta=KakaoSearchMeta(total_count=1, pageable_count=1, is_end=True),
         )
@@ -127,15 +133,20 @@ class MockKakaoClient:
 
         return KakaoSearchResponse(
             places=[
-                {
-                    "place_name": "카테고리 장소",
-                    "address_name": "서울시 서초구",
-                    "phone": "02-9876-5432",
-                    "place_url": "https://place.map.kakao.com/456",
-                    "x": "127.1",
-                    "y": "37.4",
-                    "distance": "200",
-                }
+                KakaoPlaceDTO(
+                    id="456",
+                    place_name="카테고리 장소",
+                    category_name="가정,생활 > 재활용센터",
+                    category_group_code="PO3",
+                    category_group_name="공공기관",
+                    phone="02-9876-5432",
+                    address_name="서울시 서초구",
+                    road_address_name="서울시 서초구 서초대로 1",
+                    x="127.1",
+                    y="37.4",
+                    place_url="https://place.map.kakao.com/456",
+                    distance="200",
+                )
             ],
             meta=KakaoSearchMeta(total_count=1, pageable_count=1, is_end=True),
         )
