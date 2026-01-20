@@ -13,8 +13,6 @@ import pytest
 # API 키 설정 (테스트용)
 os.environ.setdefault("OPENAI_API_KEY", "test-api-key-for-unit-tests")
 
-from chat_worker.infrastructure.llm.clients.openai_client import OpenAILLMClient  # noqa: E402
-
 
 def create_mock_response(func_name: str | None, func_args: str | None):
     """Mock OpenAI 응답 생성."""
@@ -29,17 +27,10 @@ def create_mock_response(func_name: str | None, func_args: str | None):
     else:
         mock_message.function_call = None
 
-    mock_response.choices = [MagicMock(message=mock_message)]
+    mock_choice = MagicMock()
+    mock_choice.message = mock_message
+    mock_response.choices = [mock_choice]
     return mock_response
-
-
-def create_mock_openai_client(mock_response):
-    """Mock AsyncOpenAI 클라이언트 생성."""
-    mock_client = MagicMock()
-    mock_client.chat = MagicMock()
-    mock_client.chat.completions = MagicMock()
-    mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
-    return mock_client
 
 
 class TestOpenAIClientFunctionCalling:
@@ -48,14 +39,23 @@ class TestOpenAIClientFunctionCalling:
     @pytest.mark.asyncio
     async def test_function_call_success(self):
         """Function call 성공 시나리오."""
+        from chat_worker.infrastructure.llm.clients.openai_client import (
+            OpenAILLMClient,
+        )
+
         mock_response = create_mock_response("search_place", '{"query": "카페", "radius": 5000}')
-        mock_openai_client = create_mock_openai_client(mock_response)
+
+        # Mock client 생성 - AsyncMock으로 create 설정
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
 
         with patch(
-            "chat_worker.infrastructure.llm.clients.openai_client.AsyncOpenAI",
-            return_value=mock_openai_client,
-        ):
+            "chat_worker.infrastructure.llm.clients.openai_client.AsyncOpenAI"
+        ) as mock_openai_class:
+            mock_openai_class.return_value = MagicMock()
             llm_client = OpenAILLMClient(model="gpt-5.2")
+            # _client를 직접 mock으로 교체
+            llm_client._client = mock_client
 
             functions = [
                 {
@@ -81,8 +81,8 @@ class TestOpenAIClientFunctionCalling:
             assert func_name == "search_place"
             assert func_args == {"query": "카페", "radius": 5000}
 
-            mock_openai_client.chat.completions.create.assert_called_once()
-            call_kwargs = mock_openai_client.chat.completions.create.call_args.kwargs
+            mock_client.chat.completions.create.assert_called_once()
+            call_kwargs = mock_client.chat.completions.create.call_args.kwargs
             assert call_kwargs["model"] == "gpt-5.2"
             assert call_kwargs["functions"] == functions
             assert call_kwargs["function_call"] == "auto"
@@ -90,14 +90,21 @@ class TestOpenAIClientFunctionCalling:
     @pytest.mark.asyncio
     async def test_function_call_forced(self):
         """Function call 강제 호출."""
+        from chat_worker.infrastructure.llm.clients.openai_client import (
+            OpenAILLMClient,
+        )
+
         mock_response = create_mock_response("get_weather", '{"needs_weather": true}')
-        mock_openai_client = create_mock_openai_client(mock_response)
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
 
         with patch(
-            "chat_worker.infrastructure.llm.clients.openai_client.AsyncOpenAI",
-            return_value=mock_openai_client,
-        ):
+            "chat_worker.infrastructure.llm.clients.openai_client.AsyncOpenAI"
+        ) as mock_openai_class:
+            mock_openai_class.return_value = MagicMock()
             llm_client = OpenAILLMClient(model="gpt-5.2")
+            llm_client._client = mock_client
 
             functions = [
                 {
@@ -122,20 +129,27 @@ class TestOpenAIClientFunctionCalling:
             assert func_name == "get_weather"
             assert func_args == {"needs_weather": True}
 
-            call_kwargs = mock_openai_client.chat.completions.create.call_args.kwargs
+            call_kwargs = mock_client.chat.completions.create.call_args.kwargs
             assert call_kwargs["function_call"] == {"name": "get_weather"}
 
     @pytest.mark.asyncio
     async def test_no_function_call(self):
         """Function call이 없는 경우."""
+        from chat_worker.infrastructure.llm.clients.openai_client import (
+            OpenAILLMClient,
+        )
+
         mock_response = create_mock_response(None, None)
-        mock_openai_client = create_mock_openai_client(mock_response)
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
 
         with patch(
-            "chat_worker.infrastructure.llm.clients.openai_client.AsyncOpenAI",
-            return_value=mock_openai_client,
-        ):
+            "chat_worker.infrastructure.llm.clients.openai_client.AsyncOpenAI"
+        ) as mock_openai_class:
+            mock_openai_class.return_value = MagicMock()
             llm_client = OpenAILLMClient(model="gpt-5.2")
+            llm_client._client = mock_client
 
             functions = [
                 {
@@ -156,14 +170,21 @@ class TestOpenAIClientFunctionCalling:
     @pytest.mark.asyncio
     async def test_invalid_json_arguments(self):
         """잘못된 JSON arguments."""
+        from chat_worker.infrastructure.llm.clients.openai_client import (
+            OpenAILLMClient,
+        )
+
         mock_response = create_mock_response("search_place", "{invalid json}")
-        mock_openai_client = create_mock_openai_client(mock_response)
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
 
         with patch(
-            "chat_worker.infrastructure.llm.clients.openai_client.AsyncOpenAI",
-            return_value=mock_openai_client,
-        ):
+            "chat_worker.infrastructure.llm.clients.openai_client.AsyncOpenAI"
+        ) as mock_openai_class:
+            mock_openai_class.return_value = MagicMock()
             llm_client = OpenAILLMClient(model="gpt-5.2")
+            llm_client._client = mock_client
 
             functions = [{"name": "search_place", "parameters": {"type": "object"}}]
 
@@ -176,14 +197,21 @@ class TestOpenAIClientFunctionCalling:
     @pytest.mark.asyncio
     async def test_system_prompt_included(self):
         """System prompt 포함 확인."""
+        from chat_worker.infrastructure.llm.clients.openai_client import (
+            OpenAILLMClient,
+        )
+
         mock_response = create_mock_response("test_func", "{}")
-        mock_openai_client = create_mock_openai_client(mock_response)
+
+        mock_client = MagicMock()
+        mock_client.chat.completions.create = AsyncMock(return_value=mock_response)
 
         with patch(
-            "chat_worker.infrastructure.llm.clients.openai_client.AsyncOpenAI",
-            return_value=mock_openai_client,
-        ):
+            "chat_worker.infrastructure.llm.clients.openai_client.AsyncOpenAI"
+        ) as mock_openai_class:
+            mock_openai_class.return_value = MagicMock()
             llm_client = OpenAILLMClient(model="gpt-5.2")
+            llm_client._client = mock_client
 
             functions = [{"name": "test_func", "parameters": {"type": "object"}}]
 
@@ -193,7 +221,7 @@ class TestOpenAIClientFunctionCalling:
                 system_prompt="시스템 프롬프트",
             )
 
-            call_kwargs = mock_openai_client.chat.completions.create.call_args.kwargs
+            call_kwargs = mock_client.chat.completions.create.call_args.kwargs
             messages = call_kwargs["messages"]
             assert len(messages) == 2
             assert messages[0]["role"] == "system"
