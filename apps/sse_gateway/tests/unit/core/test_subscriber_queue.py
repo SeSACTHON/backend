@@ -1,6 +1,5 @@
 """SubscriberQueue Timestamp-based Filtering Tests."""
 
-import asyncio
 import time
 
 import pytest

@@ -41,9 +41,7 @@ class MockLLMClient:
         self.should_raise = False
         self.error_message = "LLM Error"
 
-    def set_function_call_result(
-        self, func_name: str | None, func_args: dict | None
-    ):
+    def set_function_call_result(self, func_name: str | None, func_args: dict | None):
         """Function call 결과 설정."""
         self.function_call_results = [(func_name, func_args)]
 
@@ -443,7 +441,9 @@ class TestKakaoPlaceNodeFunctionCalling:
 
         # Command의 execute를 mock으로 교체
         import chat_worker.infrastructure.orchestration.langgraph.nodes.kakao_place_node as kakao_place_module
-        from chat_worker.application.commands.search_kakao_place_command import SearchKakaoPlaceCommand
+        from chat_worker.application.commands.search_kakao_place_command import (
+            SearchKakaoPlaceCommand,
+        )
 
         original_execute = SearchKakaoPlaceCommand.execute
         SearchKakaoPlaceCommand.execute = mock_execute

@@ -150,7 +150,7 @@ class TestOpenAIClientFunctionCalling:
         mock_message = MagicMock()
         mock_function_call = MagicMock()
         mock_function_call.name = "search_place"
-        mock_function_call.arguments = '{invalid json}'  # 잘못된 JSON
+        mock_function_call.arguments = "{invalid json}"  # 잘못된 JSON
         mock_message.function_call = mock_function_call
         mock_response.choices = [MagicMock(message=mock_message)]
 
@@ -171,7 +171,7 @@ class TestOpenAIClientFunctionCalling:
         mock_message = MagicMock()
         mock_function_call = MagicMock()
         mock_function_call.name = "test_func"
-        mock_function_call.arguments = '{}'
+        mock_function_call.arguments = "{}"
         mock_message.function_call = mock_function_call
         mock_response.choices = [MagicMock(message=mock_message)]
 
