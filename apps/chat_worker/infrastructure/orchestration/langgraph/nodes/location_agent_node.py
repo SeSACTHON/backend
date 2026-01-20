@@ -547,16 +547,18 @@ class KakaoToolExecutor:
         """검색 응답을 LLM이 이해하기 쉬운 형태로 변환."""
         places = []
         for p in response.places[:10]:  # 최대 10개
-            places.append({
-                "name": p.place_name,
-                "address": p.road_address_name or p.address_name,
-                "phone": p.phone,
-                "distance": p.distance_text,
-                "category": p.category_name,
-                "url": p.place_url,
-                "latitude": p.latitude,
-                "longitude": p.longitude,
-            })
+            places.append(
+                {
+                    "name": p.place_name,
+                    "address": p.road_address_name or p.address_name,
+                    "phone": p.phone,
+                    "distance": p.distance_text,
+                    "category": p.category_name,
+                    "url": p.place_url,
+                    "latitude": p.latitude,
+                    "longitude": p.longitude,
+                }
+            )
 
         return {
             "query": response.query,
@@ -652,22 +654,26 @@ async def run_openai_agent(
 
         # 결과 처리 및 메시지 추가
         for tc, arguments, result in execution_results:
-            all_tool_results.append({
-                "tool": tc.function.name,
-                "arguments": arguments,
-                "result": result.data if result.success else {"error": result.error},
-                "success": result.success,
-            })
+            all_tool_results.append(
+                {
+                    "tool": tc.function.name,
+                    "arguments": arguments,
+                    "result": result.data if result.success else {"error": result.error},
+                    "success": result.success,
+                }
+            )
 
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tc.id,
-                "name": tc.function.name,
-                "content": json.dumps(
-                    result.data if result.success else {"error": result.error},
-                    ensure_ascii=False,
-                ),
-            })
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "name": tc.function.name,
+                    "content": json.dumps(
+                        result.data if result.success else {"error": result.error},
+                        ensure_ascii=False,
+                    ),
+                }
+            )
 
     # Max iterations 도달
     return {
@@ -747,8 +753,7 @@ async def run_gemini_agent(
         # Parallel Function Calls 처리 (Gemini 3 지원)
         # 여러 function call이 동시에 반환될 수 있음
         function_calls = [
-            p for p in parts
-            if hasattr(p, "function_call") and p.function_call is not None
+            p for p in parts if hasattr(p, "function_call") and p.function_call is not None
         ]
 
         if not function_calls:
@@ -884,11 +889,13 @@ def create_location_agent_node(
                 result = {
                     "success": True,
                     "summary": None,
-                    "tool_results": [{
-                        "tool": "search_places",
-                        "result": tool_executor._format_search_response(response),
-                        "success": True,
-                    }],
+                    "tool_results": [
+                        {
+                            "tool": "search_places",
+                            "result": tool_executor._format_search_response(response),
+                            "success": True,
+                        }
+                    ],
                 }
 
             # 결과에서 장소 정보 추출

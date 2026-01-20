@@ -102,10 +102,7 @@ OPENAI_TOOLS = [
                 "properties": {
                     "sigungu": {
                         "type": "string",
-                        "description": (
-                            "시군구명. 필수. "
-                            "예: '강남구', '성동구', '해운대구'."
-                        ),
+                        "description": ("시군구명. 필수. " "예: '강남구', '성동구', '해운대구'."),
                     },
                     "item_name": {
                         "type": "string",
@@ -443,22 +440,26 @@ async def run_openai_agent(
         )
 
         for tc, arguments, result in execution_results:
-            all_tool_results.append({
-                "tool": tc.function.name,
-                "arguments": arguments,
-                "result": result.data if result.success else {"error": result.error},
-                "success": result.success,
-            })
+            all_tool_results.append(
+                {
+                    "tool": tc.function.name,
+                    "arguments": arguments,
+                    "result": result.data if result.success else {"error": result.error},
+                    "success": result.success,
+                }
+            )
 
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tc.id,
-                "name": tc.function.name,
-                "content": json.dumps(
-                    result.data if result.success else {"error": result.error},
-                    ensure_ascii=False,
-                ),
-            })
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "name": tc.function.name,
+                    "content": json.dumps(
+                        result.data if result.success else {"error": result.error},
+                        ensure_ascii=False,
+                    ),
+                }
+            )
 
     return {
         "success": True,
@@ -508,8 +509,7 @@ async def run_gemini_agent(
         parts = candidate.content.parts
 
         function_calls = [
-            p for p in parts
-            if hasattr(p, "function_call") and p.function_call is not None
+            p for p in parts if hasattr(p, "function_call") and p.function_call is not None
         ]
 
         if not function_calls:

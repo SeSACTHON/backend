@@ -509,22 +509,26 @@ async def run_openai_agent(
 
         # 결과 처리 및 메시지 추가
         for tc, arguments, result in execution_results:
-            all_tool_results.append({
-                "tool": tc.function.name,
-                "arguments": arguments,
-                "result": result.data if result.success else {"error": result.error},
-                "success": result.success,
-            })
+            all_tool_results.append(
+                {
+                    "tool": tc.function.name,
+                    "arguments": arguments,
+                    "result": result.data if result.success else {"error": result.error},
+                    "success": result.success,
+                }
+            )
 
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tc.id,
-                "name": tc.function.name,
-                "content": json.dumps(
-                    result.data if result.success else {"error": result.error},
-                    ensure_ascii=False,
-                ),
-            })
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "name": tc.function.name,
+                    "content": json.dumps(
+                        result.data if result.success else {"error": result.error},
+                        ensure_ascii=False,
+                    ),
+                }
+            )
 
     # Max iterations 도달
     return {
@@ -600,8 +604,7 @@ async def run_gemini_agent(
 
         # Parallel Function Calls 처리
         function_calls = [
-            p for p in parts
-            if hasattr(p, "function_call") and p.function_call is not None
+            p for p in parts if hasattr(p, "function_call") and p.function_call is not None
         ]
 
         if not function_calls:
@@ -747,18 +750,26 @@ def create_weather_agent_node(
                     lon = user_location.get("longitude") or user_location.get("lon")
 
                 if lat and lon:
-                    weather_result = await tool_executor._get_weather({
-                        "latitude": lat,
-                        "longitude": lon,
-                    })
+                    weather_result = await tool_executor._get_weather(
+                        {
+                            "latitude": lat,
+                            "longitude": lon,
+                        }
+                    )
                     result = {
                         "success": weather_result.success,
                         "summary": None,
-                        "tool_results": [{
-                            "tool": "get_weather",
-                            "result": weather_result.data if weather_result.success else {"error": weather_result.error},
-                            "success": weather_result.success,
-                        }],
+                        "tool_results": [
+                            {
+                                "tool": "get_weather",
+                                "result": (
+                                    weather_result.data
+                                    if weather_result.success
+                                    else {"error": weather_result.error}
+                                ),
+                                "success": weather_result.success,
+                            }
+                        ],
                     }
                 else:
                     result = {
