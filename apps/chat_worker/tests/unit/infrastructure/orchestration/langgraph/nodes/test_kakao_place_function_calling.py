@@ -376,11 +376,11 @@ class TestKakaoPlaceNodeFunctionCalling:
         # When
         result = await node(state)
 
-        # Then: 에러 컨텍스트 반환
+        # Then: 에러 컨텍스트 반환 (success=False, error 메시지 포함)
         assert "kakao_place_context" in result
         context = result["kakao_place_context"]
-        assert context["type"] == "error"
-        assert "검색 정보를 추출할 수 없습니다" in context["error"]
+        assert context.get("success") is False
+        assert "검색 정보를 추출할 수 없습니다" in context.get("error", "")
 
         # Kakao API는 호출되지 않음
         assert not mock_kakao_client.search_keyword_called
@@ -617,9 +617,9 @@ class TestKakaoPlaceNodeFunctionCalling:
     @pytest.mark.anyio
     async def test_function_call_publishes_completed_event(
         self,
-        node,
-        mock_event_publisher: MockEventPublisher,
         mock_llm: MockLLMClient,
+        mock_kakao_client: MockKakaoClient,
+        mock_event_publisher: MockEventPublisher,
     ):
         """완료 이벤트 발행."""
         mock_llm.set_function_call_result(
@@ -629,6 +629,12 @@ class TestKakaoPlaceNodeFunctionCalling:
                 "search_type": "keyword",
                 "radius": 5000,
             },
+        )
+
+        node = create_kakao_place_node(
+            kakao_client=mock_kakao_client,
+            event_publisher=mock_event_publisher,
+            llm=mock_llm,
         )
 
         state = {

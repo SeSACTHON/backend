@@ -202,7 +202,13 @@ class TestRecyclablePriceNode:
         mock_publisher: MockEventPublisher,
         mock_llm: MockLLMClient,
     ):
-        """명시적 품목명 우선 사용."""
+        """LLM이 추출한 품목명 사용."""
+        # LLM function call 결과 설정 (detail_type: 페트)
+        mock_llm.set_function_call_result(
+            "get_recyclable_price",
+            {"material": "plastic", "detail_type": "페트"},
+        )
+
         mock_client.search_price = AsyncMock(
             return_value=RecyclablePriceSearchResponse(
                 items=[
@@ -223,12 +229,11 @@ class TestRecyclablePriceNode:
         state = {
             "job_id": "job-789",
             "message": "캔 얼마야?",  # message에는 "캔"
-            "recyclable_item": "페트",  # 명시적으로 "페트" 지정
         }
 
         await node(state)
 
-        # 명시적 item_name이 우선
+        # LLM이 추출한 detail_type이 item_name으로 사용됨
         call_kwargs = mock_client.search_price.call_args.kwargs
         assert call_kwargs["item_name"] == "페트"
 
@@ -243,8 +248,14 @@ class TestRecyclablePriceNode:
         mock_publisher: MockEventPublisher,
         mock_llm: MockLLMClient,
     ):
-        """카테고리 전달."""
-        mock_client.get_category_prices = AsyncMock(
+        """LLM이 추출한 카테고리 전달."""
+        # LLM function call 결과 설정 (material만 있고 detail_type 없음)
+        mock_llm.set_function_call_result(
+            "get_recyclable_price",
+            {"material": "metal"},
+        )
+
+        mock_client.search_price = AsyncMock(
             return_value=RecyclablePriceSearchResponse(
                 items=[],
                 query="metal",
@@ -257,12 +268,14 @@ class TestRecyclablePriceNode:
         state = {
             "job_id": "job-cat",
             "message": "폐금속 시세",
-            "recyclable_category": RecyclableCategory.METAL,
         }
 
         await node(state)
 
-        mock_client.get_category_prices.assert_called_once()
+        # material이 item_name으로 사용됨
+        mock_client.search_price.assert_called_once()
+        call_kwargs = mock_client.search_price.call_args.kwargs
+        assert call_kwargs["item_name"] == "metal"
 
     @pytest.mark.anyio
     async def test_node_passes_region(
@@ -453,20 +466,36 @@ class TestRecyclablePriceNode:
     @pytest.mark.anyio
     async def test_node_handles_no_item(
         self,
-        node,
+        mock_client: MockRecyclablePriceClient,
         mock_publisher: MockEventPublisher,
+        mock_llm: MockLLMClient,
     ):
-        """품목 없을 때 안내 메시지."""
+        """LLM이 품목 추출 실패 시 fallback으로 검색."""
+        # LLM function call이 None 반환 (품목 추출 실패)
+        mock_llm.set_function_call_result(None, None)
+
+        # fallback으로 message가 item_name이 되어 검색 시도
+        # "안녕하세요"로 검색하면 결과 없음
+        mock_client.search_price = AsyncMock(
+            return_value=RecyclablePriceSearchResponse(
+                items=[],
+                query="안녕하세요",
+                total_count=0,
+            )
+        )
+
+        node = create_recyclable_price_node(mock_client, mock_publisher, mock_llm)
+
         state = {
             "job_id": "job-noitem",
             "message": "안녕하세요",  # 품목 키워드 없음
-            # recyclable_item 없음
         }
 
         result = await node(state)
 
         context = result["recyclable_price_context"]
-        assert context["type"] == "guide"
+        # fallback으로 검색 시도 → 결과 없음 → not_found
+        assert context["type"] == "not_found"
 
     # ==========================================================
     # State Preservation Tests
