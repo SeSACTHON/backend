@@ -60,6 +60,6 @@ def mock_circuit_breaker():
     mock_cb_registry.get = MagicMock(return_value=mock_cb)
 
     # NodeExecutor에 mock 주입
-    executor = NodeExecutor.get_instance(cb_registry=mock_cb_registry)
+    NodeExecutor.get_instance(cb_registry=mock_cb_registry)
 
     yield mock_cb_registry
