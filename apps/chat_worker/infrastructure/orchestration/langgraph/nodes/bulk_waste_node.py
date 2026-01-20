@@ -166,7 +166,7 @@ def create_bulk_waste_node(
                 # Function call 실패 → fallback: state에서 가져오기
                 logger.warning(
                     "Function call failed, using state fallback",
-                    extra={"job_id": job_id, "message": message},
+                    extra={"job_id": job_id, "user_message": message},
                 )
                 item_name = state.get("bulk_waste_item")
                 region = state.get("bulk_waste_sigungu")
@@ -175,7 +175,7 @@ def create_bulk_waste_node(
             # LLM 호출 실패 → fallback: state에서 가져오기
             logger.error(
                 f"Function calling error: {e}",
-                extra={"job_id": job_id, "message": message},
+                extra={"job_id": job_id, "user_message": message},
             )
             item_name = state.get("bulk_waste_item")
             region = state.get("bulk_waste_sigungu")

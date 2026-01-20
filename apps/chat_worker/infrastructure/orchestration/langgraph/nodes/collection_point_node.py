@@ -156,7 +156,7 @@ def create_collection_point_node(
                 # Function call 실패 → fallback: 메시지에서 추출
                 logger.warning(
                     "Function call failed, using fallback",
-                    extra={"job_id": job_id, "message": message},
+                    extra={"job_id": job_id, "user_message": message},
                 )
                 # 기본값 사용
                 func_args = {
@@ -168,7 +168,7 @@ def create_collection_point_node(
             # LLM 호출 실패 → fallback
             logger.error(
                 f"Function calling error: {e}",
-                extra={"job_id": job_id, "message": message},
+                extra={"job_id": job_id, "user_message": message},
             )
             await event_publisher.notify_stage(
                 task_id=job_id,

@@ -166,7 +166,7 @@ def create_weather_node(
                 # 날씨 불필요 → 스킵
                 logger.debug(
                     "Weather not needed for this query",
-                    extra={"job_id": job_id, "message": message},
+                    extra={"job_id": job_id, "user_message": message},
                 )
                 await event_publisher.notify_stage(
                     task_id=job_id,

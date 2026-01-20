@@ -153,7 +153,7 @@ def create_recyclable_price_node(
                 # Function call 실패 → fallback: message 그대로 사용
                 logger.warning(
                     "Function call failed, using fallback",
-                    extra={"job_id": job_id, "message": message},
+                    extra={"job_id": job_id, "user_message": message},
                 )
                 func_args = {}
 
@@ -161,7 +161,7 @@ def create_recyclable_price_node(
             # LLM 호출 실패 → fallback
             logger.error(
                 f"Function calling error: {e}",
-                extra={"job_id": job_id, "message": message},
+                extra={"job_id": job_id, "user_message": message},
             )
             await event_publisher.notify_stage(
                 task_id=job_id,
