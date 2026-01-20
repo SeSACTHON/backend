@@ -97,12 +97,14 @@ Retry: 2회
 
 </details>
 
-### Auth Workers (Clean Architecture) ✅
+### Token Blacklist Event Relay ✅
+
+> JWT 토큰 무효화를 위한 Redis-backed Outbox 패턴. 분산 환경에서 블랙리스트 이벤트의 **At-Least-Once 전달**을 보장합니다.
 
 | Worker | 노드 | 설명 | 입력 | 출력 |
 |--------|------|------|------|------|
-| auth-worker | `worker-storage` | 블랙리스트 이벤트 → Redis 저장 | RabbitMQ `blacklist.events` | Redis `blacklist:{jti}` |
-| auth-relay | `worker-storage` | Redis Outbox → RabbitMQ 재발행 (Outbox Pattern) | Redis `outbox:blacklist` | RabbitMQ `blacklist.events` |
+| auth-worker | `worker-storage` | 블랙리스트 이벤트 수신 → Redis KV 저장 | RabbitMQ `blacklist.events` | Redis `blacklist:{jti}` |
+| auth-relay | `worker-storage` | Redis Outbox 폴링 → RabbitMQ 재발행 | Redis `outbox:blacklist` | RabbitMQ `blacklist.events` |
 
 ### Event Relay Components ✅
 
@@ -132,6 +134,13 @@ Retry: 2회
 ### 1. LangGraph StateGraph (Intent-Routed Workflow)
 
 > `app.get_graph().draw_mermaid()` 스타일 ([참고](https://rudaks.tistory.com/entry/langgraph-%EA%B7%B8%EB%9E%98%ED%94%84%EB%A5%BC-%EC%8B%9C%EA%B0%81%ED%99%94%ED%95%98%EB%8A%94-%EB%B0%A9%EB%B2%95))
+
+**Dynamic Routing (Send API)**를 사용하여 런타임에 복수 노드를 병렬 실행합니다.
+
+- **Multi-Intent Fanout**: `additional_intents` → 각각 병렬 Send
+- **Intent 기반 Enrichment**: `waste` → `weather` 자동 추가 (분리배출 + 날씨 팁)
+- **Conditional Enrichment**: `user_location` 있으면 `weather` 자동 추가
+- **Context Compression**: 토큰 임계값 초과 시 `summarize` 노드에서 이전 대화 요약
 
 ```mermaid
 %%{init: {'flowchart': {'curve': 'linear'}}}%%
@@ -187,6 +196,19 @@ graph TD;
 
 ### 2. Event Bus (Token Streaming Pipeline)
 
+토큰 스트리밍을 위한 **Redis Streams + Pub/Sub** 이중 구조입니다.
+
+| 구성 요소 | Redis 역할 | 키/채널 | 설명 |
+|-----------|------------|---------|------|
+| **Streams** | 내구성 (XADD/XREADGROUP) | `chat:events:{shard}` | Consumer Group으로 Exactly-Once 처리 |
+| **State KV** | 복구용 (SETEX/GET) | `chat:state:{job_id}` | 재연결 시 현재 상태 스냅샷 제공 |
+| **Pub/Sub** | 실시간 (PUBLISH/SUBSCRIBE) | `sse:events:{job_id}` | Fan-out 브로드캐스트 (저장 안됨) |
+
+- **멀티 도메인 지원**: `scan:events`, `chat:events` 동시 구독
+- **Shard 기반 분산**: 도메인별 4개 shard (`chat:events:{0-3}`)
+- **Pending Reclaimer**: 5분 이상 미처리 메시지 자동 재할당
+- **분산 트레이싱**: Pub/Sub 메시지에서 `trace_id` 추출 → Jaeger linked span
+
 ```mermaid
 flowchart LR
     subgraph Worker["🤖 Chat Worker"]
@@ -194,15 +216,16 @@ flowchart LR
     end
 
     subgraph Streams["📊 Redis Streams"]
-        RS[("chat:events:{job_id}<br/>(XADD)")]
+        RS[("chat:events:{shard}<br/>(XADD)")]
     end
 
     subgraph Router["🔀 Event Router"]
         ER["Consumer Group<br/>(XREADGROUP)"]
+        RC["Pending Reclaimer<br/>(XCLAIM)"]
     end
 
     subgraph State["💾 State KV"]
-        SK[("chat:state:{job_id}<br/>(SETEX)")]
+        SK[("chat:state:{job_id}<br/>(SETEX 30s)")]
     end
 
     subgraph PubSub["📡 Redis Pub/Sub"]
@@ -219,8 +242,10 @@ flowchart LR
 
     AN -->|"XADD token"| RS
     RS -->|"XREADGROUP"| ER
+    RS -.->|"XCLAIM (5min idle)"| RC
+    RC -.->|"reprocess"| ER
     ER -->|"SETEX state"| SK
-    ER -->|"PUBLISH"| PS
+    ER -->|"PUBLISH + XACK"| PS
     SK -.->|"GET (reconnect)"| SG
     PS -->|"SUBSCRIBE"| SG
     SG -->|"SSE data:"| CL
@@ -235,7 +260,7 @@ flowchart LR
 
     class AN worker
     class RS streams
-    class ER router
+    class ER,RC router
     class SK state
     class PS pubsub
     class SG gateway
