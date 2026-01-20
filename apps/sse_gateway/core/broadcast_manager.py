@@ -301,6 +301,14 @@ class SSEBroadcastManager:
         # 2. Pub/Sub 구독 시작 + 완료 대기 (핵심: 먼저 구독해야 이벤트 누락 방지)
         subscribed_event: asyncio.Event | None = None
         if job_id not in self._pubsub_tasks or self._pubsub_tasks[job_id].done():
+            logger.info(
+                "pubsub_task_creating",
+                extra={
+                    "job_id": job_id,
+                    "domain": domain,
+                    "has_pubsub_client": self._pubsub_client is not None,
+                },
+            )
             subscribed_event = asyncio.Event()
             self._pubsub_tasks[job_id] = asyncio.create_task(
                 self._pubsub_listener(job_id, subscribed_event)
@@ -520,7 +528,16 @@ class SSEBroadcastManager:
             job_id: 구독할 job ID
             subscribed_event: 구독 완료 시그널 (옵션)
         """
+        logger.info(
+            "pubsub_listener_started",
+            extra={"job_id": job_id, "has_pubsub_client": self._pubsub_client is not None},
+        )
+
         if not self._pubsub_client:
+            logger.warning(
+                "pubsub_listener_no_client",
+                extra={"job_id": job_id},
+            )
             if subscribed_event:
                 subscribed_event.set()
             return
@@ -532,11 +549,7 @@ class SSEBroadcastManager:
             await pubsub.subscribe(channel)
             SSE_PUBSUB_CONNECTED.set(1)
 
-            # 구독 완료 시그널
-            if subscribed_event:
-                subscribed_event.set()
-
-            logger.debug(
+            logger.info(
                 "pubsub_subscribed",
                 extra={"job_id": job_id, "channel": channel},
             )
@@ -544,6 +557,15 @@ class SSEBroadcastManager:
             async for message in pubsub.listen():
                 if self._shutdown:
                     break
+
+                # subscription confirmation 메시지 처리
+                # NOTE: listen() 시작 후에 실제 SUBSCRIBE가 전송되므로
+                # 여기서 subscribed_event를 set해야 race condition 방지
+                if message["type"] == "subscribe":
+                    if subscribed_event:
+                        subscribed_event.set()
+                        subscribed_event = None  # 한 번만 set
+                    continue
 
                 if message["type"] != "message":
                     continue
@@ -561,6 +583,16 @@ class SSEBroadcastManager:
                 stage = event.get("stage", "unknown")
                 seq = event.get("seq", 0)
                 SSE_PUBSUB_MESSAGES_RECEIVED.labels(stage=stage).inc()
+
+                logger.info(
+                    "pubsub_message_received",
+                    extra={
+                        "job_id": job_id,
+                        "stage": stage,
+                        "seq": seq,
+                        "channel": channel,
+                    },
+                )
 
                 # Trace context 추출 및 linked span 생성
                 await self._process_event_with_tracing(job_id, event, stage, seq)
@@ -660,7 +692,7 @@ class SSEBroadcastManager:
                 span.set_attribute("sse.distributed_count", distributed_count)
 
             if subscribers:
-                logger.debug(
+                logger.info(
                     "pubsub_event_distributed",
                     extra={
                         "job_id": job_id,

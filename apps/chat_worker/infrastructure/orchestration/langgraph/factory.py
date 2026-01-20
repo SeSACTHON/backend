@@ -298,8 +298,8 @@ def create_chat_graph(
     )  # P2: Intent 캐싱
     rag_node = create_rag_node(retriever, event_publisher)
     answer_node = create_answer_node(
-        llm, cache=cache, event_publisher=event_publisher
-    )  # P3: Answer 캐싱 (네이티브 스트리밍, GENERAL: native web_search)
+        llm, event_publisher=event_publisher
+    )  # 네이티브 스트리밍 (GENERAL: native web_search)
 
     # Vision 노드 (선택)
     if vision_model is not None:
@@ -486,6 +486,7 @@ def create_chat_graph(
             image_generator=image_generator,
             event_publisher=event_publisher,
             image_storage=image_storage,  # gRPC 업로드 (선택)
+            prompt_loader=prompt_loader,  # 이미지 생성 프롬프트 로더
             default_size=image_default_size,
             default_quality=image_default_quality,
         )
