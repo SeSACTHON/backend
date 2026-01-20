@@ -55,9 +55,9 @@ class TestIntent:
         assert Intent.WASTE == "waste"
 
     def test_intent_count(self) -> None:
-        """총 의도 수 확인 (WEB_SEARCH 제거 후 8개)."""
+        """총 의도 수 확인 (WEATHER 추가 후 9개)."""
         all_intents = list(Intent)
-        assert len(all_intents) == 8
+        assert len(all_intents) == 9
 
     def test_intent_in_set(self) -> None:
         """Set에서 사용 가능."""
