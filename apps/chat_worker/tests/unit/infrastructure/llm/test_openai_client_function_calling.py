@@ -18,9 +18,9 @@ class TestOpenAIClientFunctionCalling:
     @pytest.fixture
     def mock_openai_client(self):
         """Mock OpenAI 클라이언트."""
-        mock_client = MagicMock()
-        mock_client.chat = MagicMock()
-        mock_client.chat.completions = MagicMock()
+        mock_client = AsyncMock()
+        mock_client.chat = AsyncMock()
+        mock_client.chat.completions = AsyncMock()
         return mock_client
 
     @pytest.fixture

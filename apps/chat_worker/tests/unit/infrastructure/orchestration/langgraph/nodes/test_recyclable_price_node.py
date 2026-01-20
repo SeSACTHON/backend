@@ -12,7 +12,7 @@ LangGraph 어댑터(Node) 테스트.
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -104,13 +104,19 @@ class TestRecyclablePriceNode:
         return MockEventPublisher()
 
     @pytest.fixture
+    def mock_llm(self):
+        """Mock LLM."""
+        return Mock()
+
+    @pytest.fixture
     def node(
         self,
         mock_client: MockRecyclablePriceClient,
         mock_publisher: MockEventPublisher,
+        mock_llm: Mock,
     ):
         """테스트용 Node."""
-        return create_recyclable_price_node(mock_client, mock_publisher)
+        return create_recyclable_price_node(mock_client, mock_publisher, mock_llm)
 
     # ==========================================================
     # Basic Execution Tests
@@ -157,6 +163,7 @@ class TestRecyclablePriceNode:
         self,
         mock_client: MockRecyclablePriceClient,
         mock_publisher: MockEventPublisher,
+        mock_llm: Mock,
     ):
         """명시적 품목명 우선 사용."""
         mock_client.search_price = AsyncMock(
@@ -174,7 +181,7 @@ class TestRecyclablePriceNode:
             )
         )
 
-        node = create_recyclable_price_node(mock_client, mock_publisher)
+        node = create_recyclable_price_node(mock_client, mock_publisher, mock_llm)
 
         state = {
             "job_id": "job-789",
@@ -197,6 +204,7 @@ class TestRecyclablePriceNode:
         self,
         mock_client: MockRecyclablePriceClient,
         mock_publisher: MockEventPublisher,
+        mock_llm: Mock,
     ):
         """카테고리 전달."""
         mock_client.get_category_prices = AsyncMock(
@@ -207,7 +215,7 @@ class TestRecyclablePriceNode:
             )
         )
 
-        node = create_recyclable_price_node(mock_client, mock_publisher)
+        node = create_recyclable_price_node(mock_client, mock_publisher, mock_llm)
 
         state = {
             "job_id": "job-cat",
@@ -224,6 +232,7 @@ class TestRecyclablePriceNode:
         self,
         mock_client: MockRecyclablePriceClient,
         mock_publisher: MockEventPublisher,
+        mock_llm: Mock,
     ):
         """권역 전달."""
         mock_client.search_price = AsyncMock(
@@ -234,7 +243,7 @@ class TestRecyclablePriceNode:
             )
         )
 
-        node = create_recyclable_price_node(mock_client, mock_publisher)
+        node = create_recyclable_price_node(mock_client, mock_publisher, mock_llm)
 
         state = {
             "job_id": "job-region",
@@ -339,6 +348,7 @@ class TestRecyclablePriceNode:
     async def test_node_handles_client_error(
         self,
         mock_publisher: MockEventPublisher,
+        mock_llm: Mock,
     ):
         """클라이언트 에러 처리."""
 
@@ -355,7 +365,7 @@ class TestRecyclablePriceNode:
             async def get_price_trend(self, item_name, region=None, months=6):
                 return None
 
-        node = create_recyclable_price_node(ErrorClient(), mock_publisher)
+        node = create_recyclable_price_node(ErrorClient(), mock_publisher, mock_llm)
 
         state = {
             "job_id": "job-error",
@@ -379,6 +389,7 @@ class TestRecyclablePriceNode:
         self,
         mock_client: MockRecyclablePriceClient,
         mock_publisher: MockEventPublisher,
+        mock_llm: Mock,
     ):
         """검색 결과 없음 처리."""
         mock_client.search_price = AsyncMock(
@@ -389,7 +400,7 @@ class TestRecyclablePriceNode:
             )
         )
 
-        node = create_recyclable_price_node(mock_client, mock_publisher)
+        node = create_recyclable_price_node(mock_client, mock_publisher, mock_llm)
 
         state = {
             "job_id": "job-notfound",
