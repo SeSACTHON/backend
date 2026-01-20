@@ -381,7 +381,7 @@ class CollectionPointToolExecutor:
             return ToolResult(
                 tool_name=ToolName.SEARCH_COLLECTION_POINTS,
                 success=False,
-                error=f"검색 조건에 맞는 수거함을 찾을 수 없습니다.",
+                error="검색 조건에 맞는 수거함을 찾을 수 없습니다.",
             )
 
         return ToolResult(
