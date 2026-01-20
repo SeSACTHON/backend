@@ -12,7 +12,7 @@ LangGraph 어댑터(Node) 테스트.
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import AsyncMock, Mock
+from unittest.mock import AsyncMock
 
 import pytest
 
@@ -62,6 +62,43 @@ class MockRecyclablePriceClient:
         pass
 
 
+class MockLLMClient:
+    """테스트용 Mock LLM Client (Function Calling 지원)."""
+
+    def __init__(self):
+        self.function_call_results: list[tuple[str | None, dict | None]] = []
+        self.call_count = 0
+        self.should_raise = False
+        self.error_message = "LLM Error"
+
+    def set_function_call_result(self, func_name: str | None, func_args: dict | None):
+        """Function call 결과 설정."""
+        self.function_call_results = [(func_name, func_args)]
+
+    def set_error(self, error_message: str = "LLM Error"):
+        """에러 발생 설정."""
+        self.should_raise = True
+        self.error_message = error_message
+
+    async def generate_function_call(
+        self,
+        prompt: str,
+        functions: list[dict],
+        system_prompt: str = "",
+        function_call: dict | str = "auto",
+    ) -> tuple[str | None, dict | None]:
+        """Mock function call 생성."""
+        self.call_count += 1
+
+        if self.should_raise:
+            raise Exception(self.error_message)
+
+        if self.function_call_results:
+            return self.function_call_results[0]
+
+        return None, None
+
+
 class MockEventPublisher:
     """테스트용 Mock Event Publisher."""
 
@@ -104,16 +141,16 @@ class TestRecyclablePriceNode:
         return MockEventPublisher()
 
     @pytest.fixture
-    def mock_llm(self):
-        """Mock LLM."""
-        return Mock()
+    def mock_llm(self) -> MockLLMClient:
+        """Mock LLM Client (Function Calling 지원)."""
+        return MockLLMClient()
 
     @pytest.fixture
     def node(
         self,
         mock_client: MockRecyclablePriceClient,
         mock_publisher: MockEventPublisher,
-        mock_llm: Mock,
+        mock_llm: MockLLMClient,
     ):
         """테스트용 Node."""
         return create_recyclable_price_node(mock_client, mock_publisher, mock_llm)
@@ -163,7 +200,7 @@ class TestRecyclablePriceNode:
         self,
         mock_client: MockRecyclablePriceClient,
         mock_publisher: MockEventPublisher,
-        mock_llm: Mock,
+        mock_llm: MockLLMClient,
     ):
         """명시적 품목명 우선 사용."""
         mock_client.search_price = AsyncMock(
@@ -204,7 +241,7 @@ class TestRecyclablePriceNode:
         self,
         mock_client: MockRecyclablePriceClient,
         mock_publisher: MockEventPublisher,
-        mock_llm: Mock,
+        mock_llm: MockLLMClient,
     ):
         """카테고리 전달."""
         mock_client.get_category_prices = AsyncMock(
@@ -232,7 +269,7 @@ class TestRecyclablePriceNode:
         self,
         mock_client: MockRecyclablePriceClient,
         mock_publisher: MockEventPublisher,
-        mock_llm: Mock,
+        mock_llm: MockLLMClient,
     ):
         """권역 전달."""
         mock_client.search_price = AsyncMock(
@@ -348,7 +385,7 @@ class TestRecyclablePriceNode:
     async def test_node_handles_client_error(
         self,
         mock_publisher: MockEventPublisher,
-        mock_llm: Mock,
+        mock_llm: MockLLMClient,
     ):
         """클라이언트 에러 처리."""
 
@@ -389,7 +426,7 @@ class TestRecyclablePriceNode:
         self,
         mock_client: MockRecyclablePriceClient,
         mock_publisher: MockEventPublisher,
-        mock_llm: Mock,
+        mock_llm: MockLLMClient,
     ):
         """검색 결과 없음 처리."""
         mock_client.search_price = AsyncMock(

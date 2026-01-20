@@ -415,7 +415,7 @@ class TestKakaoPlaceNodeFunctionCalling:
         command_execute_called = False
         captured_input = None
 
-        async def mock_execute(input_dto: SearchKakaoPlaceInput):
+        async def mock_execute(self, input_dto: SearchKakaoPlaceInput):
             nonlocal command_execute_called, captured_input
             command_execute_called = True
             captured_input = input_dto
