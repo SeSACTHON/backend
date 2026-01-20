@@ -26,6 +26,12 @@ Channel Separation:
 1. 분리배출 답변에 날씨 기반 팁 추가
 2. 비/눈 예보 시 종이류 실내보관 권장
 3. 고온 시 음식물 빠른 배출 권장
+4. 직접 날씨 질문 시 (WEATHER intent) 날씨 정보 제공
+
+Geocoding 지원:
+- GPS 좌표 없을 시 메시지에서 장소명 추출
+- Kakao Local API로 장소명 → 좌표 변환 (geocoding)
+- 예: "강남역 날씨" → Kakao API → (127.02, 37.50) → KMA API
 
 Flow:
     Router → weather (Function Calling) → [API 실행 or Skip] → Answer
@@ -34,6 +40,7 @@ Flow:
 from __future__ import annotations
 
 import logging
+import re
 from typing import TYPE_CHECKING, Any
 
 from chat_worker.application.commands.get_weather_command import (
@@ -89,6 +96,10 @@ def create_weather_node(
     - Command(UseCase) 호출
     - output → state 변환
     - progress notify (UX)
+
+    Geocoding 지원:
+    - kakao_client가 제공되면 메시지에서 장소명을 추출하여 좌표 변환
+    - GPS 좌표가 없을 때만 geocoding 시도
 
     Args:
         weather_client: 날씨 클라이언트
@@ -185,6 +196,7 @@ def create_weather_node(
         user_location = state.get("user_location")
         lat: float | None = None
         lon: float | None = None
+        geocoded_place: str | None = None
 
         if isinstance(user_location, dict):
             lat = user_location.get("lat") or user_location.get("latitude")
@@ -255,7 +267,12 @@ def create_weather_node(
         context = output.weather_context or {}
         has_tip = bool(context.get("tip"))
 
+        # geocoding된 장소명을 context에 추가
+        if geocoded_place:
+            context["location_name"] = geocoded_place
+
         temp = context.get("temperature")
+        location_msg = f" ({geocoded_place})" if geocoded_place else ""
         await event_publisher.notify_stage(
             task_id=job_id,
             stage="weather",
@@ -264,13 +281,14 @@ def create_weather_node(
             result={
                 "temperature": temp,
                 "has_tip": has_tip,
+                "location_name": geocoded_place,
             },
-            message=f"날씨 확인 완료: {temp}도" if temp else "날씨 확인 완료",
+            message=f"날씨 확인 완료{location_msg}: {temp}도" if temp else "날씨 확인 완료",
         )
 
         return {
             "weather_context": create_context(
-                data=output.weather_context or {},
+                data=context,
                 producer="weather",
                 job_id=job_id,
             ),

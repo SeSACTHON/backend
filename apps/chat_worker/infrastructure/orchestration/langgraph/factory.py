@@ -105,6 +105,9 @@ from chat_worker.infrastructure.orchestration.langgraph.routing import (
 from chat_worker.infrastructure.orchestration.langgraph.nodes.kakao_place_node import (
     create_kakao_place_node,
 )
+from chat_worker.infrastructure.orchestration.langgraph.nodes.location_agent_node import (
+    create_location_agent_node,
+)
 
 # NOTE: web_search_node는 더 이상 Intent 기반 라우팅에 사용되지 않음
 # GENERAL intent에서 네이티브 web_search tool (OpenAI Responses API)을 사용
@@ -213,6 +216,12 @@ def create_chat_graph(
     enable_dynamic_routing: bool = True,  # Send API 동적 라우팅
     enable_multi_intent: bool = True,  # Multi-intent fanout
     enable_enrichment: bool = True,  # Intent 기반 enrichment
+    # Location Agent 설정 (LLM + Kakao API Tools)
+    openai_async_client: Any | None = None,  # openai.AsyncOpenAI (function calling용)
+    gemini_client: Any | None = None,  # google.genai.Client (function calling용)
+    location_agent_model: str = "gpt-4o-mini",  # Location Agent 모델
+    location_agent_provider: str = "openai",  # Location Agent 프로바이더
+    enable_location_agent: bool = True,  # Location Agent 활성화 (False면 기존 kakao_place_node 사용)
 ) -> StateGraph:
     """Chat 파이프라인 그래프 생성.
 
@@ -359,7 +368,7 @@ def create_chat_graph(
 
         logger.warning("Character subagent node using passthrough (no client)")
 
-    # Subagent 노드: Location (카카오맵 HTTP)
+    # Subagent 노드: Location (LLM Agent + Kakao API Tools)
     # gRPC location_client는 미사용 (deprecated)
     _ = location_client  # suppress unused warning
     if kakao_client is not None:
@@ -421,6 +430,7 @@ def create_chat_graph(
         logger.warning("Recyclable price subagent node using passthrough (no client)")
 
     # Subagent 노드: Weather (기상청 API) - 병렬 실행 가능
+    # kakao_client를 전달하여 geocoding 지원 (메시지에서 장소명 추출 → 좌표 변환)
     if weather_client is not None:
         weather_node = create_weather_node(
             weather_client=weather_client,
