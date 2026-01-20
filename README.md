@@ -97,12 +97,14 @@ Retry: 2회
 
 </details>
 
-### Auth Workers (Clean Architecture) ✅
+### Token Blacklist Event Relay ✅
+
+> JWT 토큰 무효화를 위한 Redis-backed Outbox 패턴. 분산 환경에서 블랙리스트 이벤트의 **At-Least-Once 전달**을 보장합니다.
 
 | Worker | 노드 | 설명 | 입력 | 출력 |
 |--------|------|------|------|------|
-| auth-worker | `worker-storage` | 블랙리스트 이벤트 → Redis 저장 | RabbitMQ `blacklist.events` | Redis `blacklist:{jti}` |
-| auth-relay | `worker-storage` | Redis Outbox → RabbitMQ 재발행 (Outbox Pattern) | Redis `outbox:blacklist` | RabbitMQ `blacklist.events` |
+| auth-worker | `worker-storage` | 블랙리스트 이벤트 수신 → Redis KV 저장 | RabbitMQ `blacklist.events` | Redis `blacklist:{jti}` |
+| auth-relay | `worker-storage` | Redis Outbox 폴링 → RabbitMQ 재발행 | Redis `outbox:blacklist` | RabbitMQ `blacklist.events` |
 
 ### Event Relay Components ✅
 
@@ -129,100 +131,140 @@ Retry: 2회
 
 > **Status**: e2e 검증 중
 
+### 1. LangGraph StateGraph (Intent-Routed Workflow)
+
+> `app.get_graph().draw_mermaid()` 스타일 ([참고](https://rudaks.tistory.com/entry/langgraph-%EA%B7%B8%EB%9E%98%ED%94%84%EB%A5%BC-%EC%8B%9C%EA%B0%81%ED%99%94%ED%95%98%EB%8A%94-%EB%B0%A9%EB%B2%95))
+
+**Dynamic Routing (Send API)**를 사용하여 런타임에 복수 노드를 병렬 실행합니다.
+
+- **Multi-Intent Fanout**: `additional_intents` → 각각 병렬 Send
+- **Intent 기반 Enrichment**: `waste` → `weather` 자동 추가 (분리배출 + 날씨 팁)
+- **Conditional Enrichment**: `user_location` 있으면 `weather` 자동 추가
+- **Context Compression**: 토큰 임계값 초과 시 `summarize` 노드에서 이전 대화 요약
+
 ```mermaid
-flowchart TB
+%%{init: {'flowchart': {'curve': 'linear'}}}%%
+graph TD;
+    __start__([<p>__start__</p>]):::first
+    intent(intent)
+    vision(vision)
+    router{router}
+    waste_rag(waste_rag)
+    character(character)
+    location(location)
+    weather(weather)
+    collection_point(collection_point)
+    bulk_waste(bulk_waste)
+    recyclable_price(recyclable_price)
+    image_generation(image_generation)
+    general(general)
+    aggregator(aggregator)
+    summarize(summarize)
+    answer(answer)
+    __end__([<p>__end__</p>]):::last
+
+    __start__ --> intent;
+    intent -->|image_url exists| vision;
+    intent -->|no image| router;
+    vision --> router;
+    router -->|WASTE| waste_rag;
+    router -->|CHARACTER| character;
+    router -->|LOCATION| location;
+    router -->|WEATHER| weather;
+    router -->|COLLECTION_POINT| collection_point;
+    router -->|BULK_WASTE| bulk_waste;
+    router -->|RECYCLABLE_PRICE| recyclable_price;
+    router -->|IMAGE_GENERATION| image_generation;
+    router -->|GENERAL| general;
+    waste_rag --> aggregator;
+    character --> aggregator;
+    location --> aggregator;
+    weather --> aggregator;
+    collection_point --> aggregator;
+    bulk_waste --> aggregator;
+    recyclable_price --> aggregator;
+    image_generation --> aggregator;
+    general --> aggregator;
+    aggregator -->|tokens > threshold| summarize;
+    aggregator -->|tokens <= threshold| answer;
+    summarize --> answer;
+    answer --> __end__;
+
+    classDef first fill:#b2dfdb,stroke:#00796b,stroke-width:2px
+    classDef last fill:#ffccbc,stroke:#e64a19,stroke-width:2px
+```
+
+### 2. Event Bus (Token Streaming Pipeline)
+
+토큰 스트리밍을 위한 **Redis Streams + Pub/Sub** 이중 구조입니다.
+
+| 구성 요소 | Redis 역할 | 키/채널 | 설명 |
+|-----------|------------|---------|------|
+| **Streams** | 내구성 (XADD/XREADGROUP) | `chat:events:{shard}` | Consumer Group으로 Exactly-Once 처리 |
+| **State KV** | 복구용 (SETEX/GET) | `chat:state:{job_id}` | 재연결 시 현재 상태 스냅샷 제공 |
+| **Pub/Sub** | 실시간 (PUBLISH/SUBSCRIBE) | `sse:events:{job_id}` | Fan-out 브로드캐스트 (저장 안됨) |
+
+- **멀티 도메인 지원**: `scan:events`, `chat:events` 동시 구독
+- **Shard 기반 분산**: 도메인별 4개 shard (`chat:events:{0-3}`)
+- **Pending Reclaimer**: 5분 이상 미처리 메시지 자동 재할당
+- **분산 트레이싱**: Pub/Sub 메시지에서 `trace_id` 추출 → Jaeger linked span
+
+```mermaid
+flowchart LR
+    subgraph Worker["🤖 Chat Worker"]
+        AN["Answer Node<br/>(Token Generator)"]
+    end
+
+    subgraph Streams["📊 Redis Streams"]
+        RS[("chat:events:{shard}<br/>(XADD)")]
+    end
+
+    subgraph Router["🔀 Event Router"]
+        ER["Consumer Group<br/>(XREADGROUP)"]
+        RC["Pending Reclaimer<br/>(XCLAIM)"]
+    end
+
+    subgraph State["💾 State KV"]
+        SK[("chat:state:{job_id}<br/>(SETEX 30s)")]
+    end
+
+    subgraph PubSub["📡 Redis Pub/Sub"]
+        PS[("sse:events:{job_id}<br/>(PUBLISH)")]
+    end
+
+    subgraph Gateway["🌐 SSE Gateway"]
+        SG["Pub/Sub Subscriber<br/>(SUBSCRIBE)"]
+    end
+
     subgraph Client["👤 Client"]
-        CL["Browser/App"]
+        CL["Browser/App<br/>(EventSource)"]
     end
 
-    subgraph API["🌐 Chat API"]
-        CA["POST /api/v1/chat<br/>TaskIQ Job 발행"]
-    end
+    AN -->|"XADD token"| RS
+    RS -->|"XREADGROUP"| ER
+    RS -.->|"XCLAIM (5min idle)"| RC
+    RC -.->|"reprocess"| ER
+    ER -->|"SETEX state"| SK
+    ER -->|"PUBLISH + XACK"| PS
+    SK -.->|"GET (reconnect)"| SG
+    PS -->|"SUBSCRIBE"| SG
+    SG -->|"SSE data:"| CL
 
-    subgraph MQ["📬 RabbitMQ"]
-        CQ[("chat.process")]
-    end
-
-    subgraph Worker["🤖 Chat Worker (LangGraph)"]
-        subgraph Graph["LangGraph StateGraph"]
-            IC["Intent Classification<br/>(9 Intents)"]
-            Router["Conditional Router"]
-
-            subgraph Agents["Domain Agents"]
-                WA["Waste Agent"]
-                CHA["Character Agent"]
-                WEA["Weather Agent<br/>(Function Calling)"]
-                LA["Location Agent<br/>(Function Calling)"]
-                IA["Info Agent"]
-                NA["News Agent<br/>(Function Calling)"]
-                IGA["Image Generation<br/>(Gemini)"]
-                GA["General Agent<br/>(web_search)"]
-                GRA["Greeting Agent"]
-            end
-
-            AN["Answer Node<br/>(Token Streaming)"]
-        end
-    end
-
-    subgraph External["🌍 External APIs"]
-        OAI["OpenAI GPT-5.2"]
-        GEM["Google Gemini 3"]
-        KAK["Kakao Local API"]
-        KMA["기상청 API"]
-        INFO["Info API"]
-    end
-
-    subgraph Relay["📡 Event Relay"]
-        RS[("Redis Streams")]
-        PS[("Pub/Sub")]
-        SSE["SSE Gateway"]
-    end
-
-    CL -->|POST| CA
-    CA -->|Dispatch| CQ
-    CA -.->|202 Accepted| CL
-
-    CQ --> IC
-    IC --> Router
-    Router -->|WASTE| WA
-    Router -->|CHARACTER| CHA
-    Router -->|WEATHER| WEA
-    Router -->|LOCATION| LA
-    Router -->|INFO| IA
-    Router -->|NEWS| NA
-    Router -->|IMAGE_GEN| IGA
-    Router -->|GENERAL| GA
-    Router -->|GREETING| GRA
-
-    WA & CHA & IA & GRA --> AN
-    WEA -->|Function Call| KMA
-    LA -->|Function Call| KAK
-    NA -->|Function Call| INFO
-    GA -->|web_search| OAI
-    IGA -->|Image Gen| GEM
-
-    WEA & LA & NA & GA & IGA --> AN
-
-    AN -->|Token Stream| RS
-    RS --> PS
-    PS --> SSE
-    SSE -->|SSE| CL
-
-    classDef client fill:#e1bee7,stroke:#7b1fa2,stroke-width:2px,color:#000
-    classDef api fill:#b2dfdb,stroke:#00796b,stroke-width:2px,color:#000
-    classDef mq fill:#bbdefb,stroke:#1976d2,stroke-width:2px,color:#000
     classDef worker fill:#fff9c4,stroke:#f9a825,stroke-width:2px,color:#000
-    classDef agent fill:#c8e6c9,stroke:#388e3c,stroke-width:2px,color:#000
-    classDef external fill:#ffcc80,stroke:#e65100,stroke-width:2px,color:#000
-    classDef relay fill:#ffccbc,stroke:#e64a19,stroke-width:2px,color:#000
+    classDef streams fill:#ffccbc,stroke:#e64a19,stroke-width:2px,color:#000
+    classDef router fill:#b3e5fc,stroke:#0288d1,stroke-width:2px,color:#000
+    classDef state fill:#d1c4e9,stroke:#512da8,stroke-width:2px,color:#000
+    classDef pubsub fill:#c8e6c9,stroke:#388e3c,stroke-width:2px,color:#000
+    classDef gateway fill:#b2dfdb,stroke:#00796b,stroke-width:2px,color:#000
+    classDef client fill:#e1bee7,stroke:#7b1fa2,stroke-width:2px,color:#000
 
+    class AN worker
+    class RS streams
+    class ER,RC router
+    class SK state
+    class PS pubsub
+    class SG gateway
     class CL client
-    class CA api
-    class CQ mq
-    class IC,Router,AN worker
-    class WA,CHA,WEA,LA,IA,NA,IGA,GA,GRA agent
-    class OAI,GEM,KAK,KMA,INFO external
-    class RS,PS,SSE relay
 ```
 
 ### Intent Classification
