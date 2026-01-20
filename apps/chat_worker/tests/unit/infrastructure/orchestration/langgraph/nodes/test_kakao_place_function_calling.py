@@ -22,6 +22,7 @@ from chat_worker.application.commands.search_kakao_place_command import (
     SearchKakaoPlaceInput,
     SearchKakaoPlaceOutput,
 )
+from chat_worker.application.ports.kakao_local_client import KakaoPlaceSearchResponse
 from chat_worker.infrastructure.orchestration.langgraph.nodes.kakao_place_node import (
     KAKAO_PLACE_FUNCTION,
     create_kakao_place_node,
@@ -94,10 +95,6 @@ class MockKakaoClient:
         self.last_query = query
         self.last_radius = radius
 
-        from chat_worker.application.ports.kakao_local_client import (
-            KakaoPlaceSearchResponse,
-        )
-
         return KakaoPlaceSearchResponse(
             places=[
                 {
@@ -124,10 +121,6 @@ class MockKakaoClient:
         """Mock 카테고리 검색."""
         self.search_category_called = True
         self.last_radius = radius
-
-        from chat_worker.application.ports.kakao_local_client import (
-            KakaoPlaceSearchResponse,
-        )
 
         return KakaoPlaceSearchResponse(
             places=[

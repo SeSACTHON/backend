@@ -45,12 +45,25 @@ class MockRecyclablePriceClient:
             survey_date="2025-01",
             total_count=1,
         )
+        self._category_response: RecyclablePriceSearchResponse | None = None
+        self.search_price_calls: list[dict] = []
+        self.get_category_calls: list[dict] = []
+
+    def set_response(self, response: RecyclablePriceSearchResponse):
+        """search_price 응답 설정."""
+        self._response = response
+
+    def set_category_response(self, response: RecyclablePriceSearchResponse):
+        """get_category_prices 응답 설정."""
+        self._category_response = response
 
     async def search_price(self, item_name: str, region=None):
+        self.search_price_calls.append({"item_name": item_name, "region": region})
         return self._response
 
     async def get_category_prices(self, category, region=None):
-        return self._response
+        self.get_category_calls.append({"category": category, "region": region})
+        return self._category_response or self._response
 
     async def get_all_prices(self, region=None):
         return self._response
@@ -209,8 +222,9 @@ class TestRecyclablePriceNode:
             {"material": "plastic", "detail_type": "페트"},
         )
 
-        mock_client.search_price = AsyncMock(
-            return_value=RecyclablePriceSearchResponse(
+        # Mock 응답 설정
+        mock_client.set_response(
+            RecyclablePriceSearchResponse(
                 items=[
                     RecyclablePriceDTO(
                         item_code="plastic_pet",
@@ -234,8 +248,8 @@ class TestRecyclablePriceNode:
         await node(state)
 
         # LLM이 추출한 detail_type이 item_name으로 사용됨
-        call_kwargs = mock_client.search_price.call_args.kwargs
-        assert call_kwargs["item_name"] == "페트"
+        assert len(mock_client.search_price_calls) == 1
+        assert mock_client.search_price_calls[0]["item_name"] == "페트"
 
     # ==========================================================
     # State Transformation Tests
@@ -255,8 +269,9 @@ class TestRecyclablePriceNode:
             {"material": "metal"},
         )
 
-        mock_client.search_price = AsyncMock(
-            return_value=RecyclablePriceSearchResponse(
+        # Mock 응답 설정
+        mock_client.set_response(
+            RecyclablePriceSearchResponse(
                 items=[],
                 query="metal",
                 total_count=0,
@@ -273,9 +288,8 @@ class TestRecyclablePriceNode:
         await node(state)
 
         # material이 item_name으로 사용됨
-        mock_client.search_price.assert_called_once()
-        call_kwargs = mock_client.search_price.call_args.kwargs
-        assert call_kwargs["item_name"] == "metal"
+        assert len(mock_client.search_price_calls) == 1
+        assert mock_client.search_price_calls[0]["item_name"] == "metal"
 
     @pytest.mark.anyio
     async def test_node_passes_region(
