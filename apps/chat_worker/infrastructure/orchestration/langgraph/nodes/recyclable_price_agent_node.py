@@ -89,8 +89,15 @@ OPENAI_TOOLS = [
                     "region": {
                         "type": "string",
                         "enum": [
-                            "capital", "gangwon", "chungbuk", "chungnam",
-                            "jeonbuk", "jeonnam", "gyeongbuk", "gyeongnam", "national",
+                            "capital",
+                            "gangwon",
+                            "chungbuk",
+                            "chungnam",
+                            "jeonbuk",
+                            "jeonnam",
+                            "gyeongbuk",
+                            "gyeongnam",
+                            "national",
                         ],
                         "description": (
                             "권역. 선택. "
@@ -131,8 +138,15 @@ OPENAI_TOOLS = [
                     "region": {
                         "type": "string",
                         "enum": [
-                            "capital", "gangwon", "chungbuk", "chungnam",
-                            "jeonbuk", "jeonnam", "gyeongbuk", "gyeongnam", "national",
+                            "capital",
+                            "gangwon",
+                            "chungbuk",
+                            "chungnam",
+                            "jeonbuk",
+                            "jeonnam",
+                            "gyeongbuk",
+                            "gyeongnam",
+                            "national",
                         ],
                         "description": "권역. 선택. 기본값: national(전국평균).",
                     },
@@ -168,8 +182,15 @@ GEMINI_TOOLS = [
                 "region": {
                     "type": "string",
                     "enum": [
-                        "capital", "gangwon", "chungbuk", "chungnam",
-                        "jeonbuk", "jeonnam", "gyeongbuk", "gyeongnam", "national",
+                        "capital",
+                        "gangwon",
+                        "chungbuk",
+                        "chungnam",
+                        "jeonbuk",
+                        "jeonnam",
+                        "gyeongbuk",
+                        "gyeongnam",
+                        "national",
                     ],
                     "description": "권역. 선택. 기본값: national(전국평균).",
                 },
@@ -195,8 +216,15 @@ GEMINI_TOOLS = [
                 "region": {
                     "type": "string",
                     "enum": [
-                        "capital", "gangwon", "chungbuk", "chungnam",
-                        "jeonbuk", "jeonnam", "gyeongbuk", "gyeongnam", "national",
+                        "capital",
+                        "gangwon",
+                        "chungbuk",
+                        "chungnam",
+                        "jeonbuk",
+                        "jeonnam",
+                        "gyeongbuk",
+                        "gyeongnam",
+                        "national",
                     ],
                     "description": "권역. 선택. 기본값: national(전국평균).",
                 },
@@ -500,22 +528,26 @@ async def run_openai_agent(
         )
 
         for tc, arguments, result in execution_results:
-            all_tool_results.append({
-                "tool": tc.function.name,
-                "arguments": arguments,
-                "result": result.data if result.success else {"error": result.error},
-                "success": result.success,
-            })
+            all_tool_results.append(
+                {
+                    "tool": tc.function.name,
+                    "arguments": arguments,
+                    "result": result.data if result.success else {"error": result.error},
+                    "success": result.success,
+                }
+            )
 
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tc.id,
-                "name": tc.function.name,
-                "content": json.dumps(
-                    result.data if result.success else {"error": result.error},
-                    ensure_ascii=False,
-                ),
-            })
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "name": tc.function.name,
+                    "content": json.dumps(
+                        result.data if result.success else {"error": result.error},
+                        ensure_ascii=False,
+                    ),
+                }
+            )
 
     return {
         "success": True,
@@ -565,8 +597,7 @@ async def run_gemini_agent(
         parts = candidate.content.parts
 
         function_calls = [
-            p for p in parts
-            if hasattr(p, "function_call") and p.function_call is not None
+            p for p in parts if hasattr(p, "function_call") and p.function_call is not None
         ]
 
         if not function_calls:

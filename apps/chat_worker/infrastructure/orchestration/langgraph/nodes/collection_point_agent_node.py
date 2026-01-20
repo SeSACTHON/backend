@@ -85,8 +85,7 @@ OPENAI_TOOLS = [
                     "name_keyword": {
                         "type": "string",
                         "description": (
-                            "상호명 검색어. "
-                            "예: '이마트', '홈플러스', '주민센터', '구청'."
+                            "상호명 검색어. " "예: '이마트', '홈플러스', '주민센터', '구청'."
                         ),
                     },
                 },
@@ -565,22 +564,26 @@ async def run_openai_agent(
         )
 
         for tc, arguments, result in execution_results:
-            all_tool_results.append({
-                "tool": tc.function.name,
-                "arguments": arguments,
-                "result": result.data if result.success else {"error": result.error},
-                "success": result.success,
-            })
+            all_tool_results.append(
+                {
+                    "tool": tc.function.name,
+                    "arguments": arguments,
+                    "result": result.data if result.success else {"error": result.error},
+                    "success": result.success,
+                }
+            )
 
-            messages.append({
-                "role": "tool",
-                "tool_call_id": tc.id,
-                "name": tc.function.name,
-                "content": json.dumps(
-                    result.data if result.success else {"error": result.error},
-                    ensure_ascii=False,
-                ),
-            })
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": tc.id,
+                    "name": tc.function.name,
+                    "content": json.dumps(
+                        result.data if result.success else {"error": result.error},
+                        ensure_ascii=False,
+                    ),
+                }
+            )
 
     return {
         "success": True,
@@ -638,8 +641,7 @@ async def run_gemini_agent(
         parts = candidate.content.parts
 
         function_calls = [
-            p for p in parts
-            if hasattr(p, "function_call") and p.function_call is not None
+            p for p in parts if hasattr(p, "function_call") and p.function_call is not None
         ]
 
         if not function_calls:
