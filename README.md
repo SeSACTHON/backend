@@ -72,10 +72,30 @@ Platform Layer           : ArgoCD, Istiod, KEDA, Prometheus, Grafana, Kiali, Jae
 
 ### TaskIQ Workers (LangGraph) ✅
 
-| Worker | 노드 | 설명 | Queue | Scaling |
-|--------|------|------|-------|---------|
-| chat-worker | `worker-ai` | LangGraph Multi-Agent 실행 (9 Intents) | `chat.process` | KEDA (RabbitMQ) |
+| Worker | 노드 | 설명 | Exchange / Queue | Scaling |
+|--------|------|------|------------------|---------|
+| chat-worker | `worker-ai` | LangGraph Multi-Agent 실행 (9 Intents, timeout 120s, retry 2) | `chat_tasks` → `chat.process` | KEDA (RabbitMQ) |
 | chat-persistence-consumer | `worker-storage` | Redis Streams → PostgreSQL 메시지 저장 | - | 단일 인스턴스 |
+
+<details>
+<summary>📋 TaskIQ Worker 상세 설정</summary>
+
+```yaml
+# chat-worker 설정
+Exchange: chat_tasks (direct)
+Queue: chat.process (DLX, TTL 설정)
+Workers: 4 (concurrent)
+Max Async Tasks: 10
+Timeout: 120s
+Retry: 2회
+
+# 트레이싱
+- aio-pika Instrumentation (MQ 메시지 추적)
+- OpenAI/Gemini Instrumentation (LLM API 호출)
+- LangSmith OTEL (LangGraph → Jaeger 통합)
+```
+
+</details>
 
 ### Auth Workers (Clean Architecture) ✅
 
@@ -95,27 +115,19 @@ Platform Layer           : ArgoCD, Istiod, KEDA, Prometheus, Grafana, Kiali, Jae
 
 ---
 
-## AI Domain Progress
+## LLM Image Classification Pipeline (Scan API, Chat API 이미지 인식)
 ![ECA49AD6-EA0C-4957-8891-8C6FA12A2916](https://github.com/user-attachments/assets/52242701-3c5d-4cf3-9ab7-7c391215f17f)
 
 | 항목 | 진행 내용 (2026-01 기준) |
 |------|-------------------------|
-| **LangGraph Multi-Agent** | `apps/chat_worker/application/nodes/`에 9개 Intent별 Agent 구현. Intent Classification → Domain Agent Router → Answer Node 파이프라인. |
 | Vision 인식 파이프라인 | `apps/scan_worker/`에서 **GPT-5.2 Vision**으로 폐기물 이미지 분류. `item_class_list.yaml`, `situation_tags.yaml`에 카테고리/상황 태그 정의. |
-| Intent Classification | **LangGraph Intent Node**에서 with_structured_output 기반 9개 Intent 분류 (WASTE, CHARACTER, WEATHER, LOCATION, INFO, NEWS, IMAGE_GENERATION, GENERAL, GREETING). |
-| Function Calling Agents | **Location Agent** (Kakao Local API), **Weather Agent** (기상청 API), **News Agent** (Info API) - GPT-5.2/Gemini 3 네이티브 Function Calling 적용. |
-| 이미지 생성 | **Gemini 2.0 Flash**로 이미지 생성, **gRPC**로 Images API에 업로드 후 CDN URL 반환. Character Reference 지원. |
 | RAG/지식 베이스 | `apps/scan_worker/infrastructure/source/*.json`에 음식물/재활용 품목별 처리 지침 축적. Lite RAG 검색·요약. |
-| Token Streaming | **LangChain LLM 직접 호출**로 토큰 단위 스트리밍. Event Router → Pub/Sub → SSE Gateway 실시간 전달. |
-| 메시지 영속화 | **chat-persistence-consumer**가 Redis Streams → PostgreSQL로 대화 기록 저장. LangGraph Checkpointer 구현. |
-| API 구조 | `apps/chat/` → FastAPI + `apps/chat_worker/` LangGraph Agent. `/api/v1/chat` 엔드포인트는 RabbitMQ로 TaskIQ Job 발행. |
-| 트레이싱 | **LangSmith** 연동으로 LangGraph 실행 트레이스 수집. **OpenTelemetry** E2E 분산 트레이싱. |
 
 ---
 
-## Chat Agent Architecture (LangGraph) ✅
+## Chat Agent Architecture (LangGraph)
 
-> **Status**: LangGraph 기반 Multi-Agent 아키텍처 완료 (v1.1.0-pre)
+> **Status**: e2e 검증 중
 
 ```mermaid
 flowchart TB
@@ -228,6 +240,17 @@ flowchart TB
 | `GREETING` | 인사/잡담 | Greeting Agent | - |
 
 ### 주요 특징
+
+| 항목 | 설명 |
+|------|------|
+| LangGraph Multi-Agent | `apps/chat_worker/application/nodes/`에 9개 Intent별 Agent 구현. Intent Classification → Domain Agent Router → Answer Node 파이프라인. |
+| Intent Classification | **LangGraph Intent Node**에서 with_structured_output 기반 9개 Intent 분류. |
+| Function Calling Agents | **Location Agent** (Kakao Local API), **Weather Agent** (기상청 API), **News Agent** (Info API) - GPT-5.2/Gemini 3 네이티브 Function Calling 적용. |
+| 이미지 생성 | **Gemini 2.0 Flash**로 이미지 생성, **gRPC**로 Images API에 업로드 후 CDN URL 반환. Character Reference 지원. |
+| Token Streaming | **LangChain LLM 직접 호출**로 토큰 단위 스트리밍. Event Router → Pub/Sub → SSE Gateway 실시간 전달. |
+| 메시지 영속화 | **chat-persistence-consumer**가 Redis Streams → PostgreSQL로 대화 기록 저장. LangGraph Checkpointer 구현. |
+| API 구조 | `apps/chat/` → FastAPI + `apps/chat_worker/` LangGraph Agent. `/api/v1/chat` 엔드포인트는 RabbitMQ로 TaskIQ Job 발행. |
+| 트레이싱 | **LangSmith** 연동으로 LangGraph 실행 트레이스 수집. **OpenTelemetry** E2E 분산 트레이싱. |
 
 - **Multi-Intent 지원**: 단일 메시지에서 복수 Intent 추출 및 순차 처리
 - **Function Calling**: GPT-5.2 / Gemini 3 네이티브 tool 호출
