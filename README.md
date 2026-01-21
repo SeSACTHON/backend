@@ -373,7 +373,7 @@ flowchart LR
 
 ---
 
-## Async Task Pipeline (Celery + GEVENT or Taskiq + Asyncio) ✅
+## Async Task Pipeline (Scan: Celery + GEVENT, Chat: Taskiq + Asyncio) ✅
 
 > **Status**: RabbitMQ + Celery + KEDA 이벤트 드리븐 오토스케일링 완료
 
