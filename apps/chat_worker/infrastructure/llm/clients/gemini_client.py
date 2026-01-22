@@ -7,6 +7,9 @@ Port: application/ports/llm/llm_client.py
 
 Structured Output 지원:
 - https://ai.google.dev/gemini-api/docs/structured-output
+
+Function Calling 지원:
+- https://ai.google.dev/gemini-api/docs/function-calling
 """
 
 from __future__ import annotations

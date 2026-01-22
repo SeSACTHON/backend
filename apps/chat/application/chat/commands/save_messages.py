@@ -30,6 +30,7 @@ class MessageSaveInput:
     assistant_message_created_at: datetime
     intent: str | None = None
     metadata: dict[str, Any] | None = None
+    user_image_url: str | None = None
 
 
 @dataclass
@@ -92,6 +93,7 @@ class SaveMessagesCommand:
                     chat_id=chat_id,
                     role="user",
                     content=event.user_message,
+                    image_url=event.user_image_url,
                     created_at=event.user_message_created_at,
                 )
                 messages.append(user_msg)

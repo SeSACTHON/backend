@@ -131,6 +131,7 @@ class MessageSaveHandler:
                         ),
                         intent=data.get("intent"),
                         metadata=data.get("metadata"),
+                        user_image_url=data.get("user_image_url"),
                     )
                 )
             except Exception as e:
