@@ -160,7 +160,12 @@ def route_after_intent(state: dict[str, Any]) -> str:
         다음 노드 이름 (vision 또는 router)
     """
     # image_url이 있고 아직 분류 안됐으면 vision으로
-    if state.get("image_url") and not state.get("classification_result"):
+    # _reset 마커는 분류 결과가 없는 것으로 취급
+    classification_result = state.get("classification_result")
+    has_classification = classification_result and not (
+        isinstance(classification_result, dict) and classification_result.get("_reset")
+    )
+    if state.get("image_url") and not has_classification:
         return "vision"
     return "router"
 
