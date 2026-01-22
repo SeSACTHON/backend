@@ -918,9 +918,10 @@ class SSEBroadcastManager:
                 seq = int(data.get("seq", "0"))
                 if from_seq < seq <= to_seq:
                     # Last-Event-ID 기반 중복 방지: 이미 수신한 이벤트 스킵
-                    if after_stream_id and SubscriberQueue._compare_stream_id(
-                        msg_id, after_stream_id
-                    ) <= 0:
+                    if (
+                        after_stream_id
+                        and SubscriberQueue._compare_stream_id(msg_id, after_stream_id) <= 0
+                    ):
                         continue
                     event = dict(data)  # 이미 문자열
                     # stream_id 추가 (SSE id 필드용)
