@@ -233,7 +233,9 @@ def create_kakao_place_node(
                 "success": output.success,
                 "needs_location": output.needs_location,
                 "error": output.error_message,
-                "places_found": output.places_context.get("count", 0) if output.places_context else 0,
+                "places_found": (
+                    output.places_context.get("count", 0) if output.places_context else 0
+                ),
             },
         )
 
