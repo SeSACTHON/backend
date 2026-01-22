@@ -149,21 +149,19 @@ class PendingReclaimer:
                     count=self._count,
                 )
                 reclaim_latency = time.perf_counter() - start_time
-                EVENT_ROUTER_RECLAIM_LATENCY.labels(
-                    domain=domain, shard=shard_str
-                ).observe(reclaim_latency)
+                EVENT_ROUTER_RECLAIM_LATENCY.labels(domain=domain, shard=shard_str).observe(
+                    reclaim_latency
+                )
 
                 # result: (next_start_id, [(msg_id, data), ...], deleted_ids)
                 if len(result) >= 2:
                     messages = result[1]
                     if messages:
-                        reclaimed_count = await self._process_reclaimed(
-                            stream_key, messages
-                        )
+                        reclaimed_count = await self._process_reclaimed(stream_key, messages)
                         domain_reclaimed += reclaimed_count
-                        EVENT_ROUTER_RECLAIM_MESSAGES.labels(
-                            domain=domain, shard=shard_str
-                        ).inc(reclaimed_count)
+                        EVENT_ROUTER_RECLAIM_MESSAGES.labels(domain=domain, shard=shard_str).inc(
+                            reclaimed_count
+                        )
 
             except Exception as e:
                 if "NOGROUP" in str(e):
@@ -203,9 +201,7 @@ class PendingReclaimer:
             # 이벤트 처리 (stream_key 전달하여 도메인별 state prefix 결정)
             # 실패 시 ACK 하지 않음 → 다음 reclaim 주기에 재시도
             try:
-                success = await self._processor.process_event(
-                    event, stream_name=stream_key
-                )
+                success = await self._processor.process_event(event, stream_name=stream_key)
                 if not success:
                     # Pub/Sub 발행 실패 - 다음 reclaim 주기에 재시도
                     logger.warning(
