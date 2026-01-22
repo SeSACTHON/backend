@@ -338,6 +338,7 @@ class ProcessChatCommand:
                         "user_id": request.user_id,
                         "user_message": request.message,
                         "user_message_created_at": now.isoformat(),
+                        "user_image_url": request.image_url,
                         "assistant_message": answer,
                         "assistant_message_created_at": now.isoformat(),
                         "intent": intent,
