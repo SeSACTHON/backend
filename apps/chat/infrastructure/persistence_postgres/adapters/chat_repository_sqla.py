@@ -179,7 +179,6 @@ class ChatRepositorySQLA(ChatRepositoryPort):
                 "chat_id": msg.chat_id,
                 "role": msg.role,
                 "content": msg.content,
-                "image_url": msg.image_url,
                 "intent": msg.intent,
                 "metadata": msg.metadata,
                 "job_id": msg.job_id,
