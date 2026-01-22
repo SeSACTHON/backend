@@ -103,59 +103,78 @@ class PendingReclaimer:
         logger.info("reclaimer_stopped")
 
     async def _reclaim_pending(self) -> None:
-        """모든 도메인의 모든 shard에서 Pending 메시지 재할당."""
+        """모든 도메인의 모든 shard에서 Pending 메시지 재할당.
+
+        각 도메인을 병렬로 처리하여 한 도메인의 지연이 다른 도메인에 영향 없음.
+        """
+        # 도메인별 병렬 처리
+        tasks = [
+            self._reclaim_domain(prefix, shard_count)
+            for prefix, shard_count in self._stream_configs
+        ]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # 결과 집계
         total_reclaimed = 0
-
-        for prefix, shard_count in self._stream_configs:
-            domain = prefix.split(":")[0]
-
-            for shard in range(shard_count):
-                stream_key = f"{prefix}:{shard}"
-                # 메트릭 라벨: domain:shard 형식
-                shard_label = f"{domain}:{shard}"
-
-                try:
-                    # XAUTOCLAIM: 오래된 Pending 메시지 재할당
-                    start_time = time.perf_counter()
-                    result = await self._redis.xautoclaim(
-                        stream_key,
-                        self._consumer_group,
-                        self._consumer_name,
-                        min_idle_time=self._min_idle_ms,
-                        start_id="0-0",
-                        count=self._count,
-                    )
-                    reclaim_latency = time.perf_counter() - start_time
-                    EVENT_ROUTER_RECLAIM_LATENCY.labels(shard=shard_label).observe(
-                        reclaim_latency
-                    )
-
-                    # result: (next_start_id, [(msg_id, data), ...], deleted_ids)
-                    if len(result) >= 2:
-                        messages = result[1]
-                        if messages:
-                            reclaimed_count = await self._process_reclaimed(
-                                stream_key, messages
-                            )
-                            total_reclaimed += reclaimed_count
-                            EVENT_ROUTER_RECLAIM_MESSAGES.labels(
-                                shard=shard_label
-                            ).inc(reclaimed_count)
-
-                except Exception as e:
-                    if "NOGROUP" in str(e):
-                        # Consumer Group이 없음 (아직 생성 전)
-                        continue
-                    logger.error(
-                        "xautoclaim_error",
-                        extra={"stream": stream_key, "domain": domain, "error": str(e)},
-                    )
+        for result in results:
+            if isinstance(result, Exception):
+                logger.error("reclaim_domain_error", extra={"error": str(result)})
+            elif isinstance(result, int):
+                total_reclaimed += result
 
         if total_reclaimed > 0:
             logger.info(
                 "reclaim_completed",
                 extra={"total_reclaimed": total_reclaimed},
             )
+
+    async def _reclaim_domain(self, prefix: str, shard_count: int) -> int:
+        """단일 도메인의 모든 shard에서 Pending 메시지 재할당."""
+        domain = prefix.split(":")[0]
+        domain_reclaimed = 0
+
+        for shard in range(shard_count):
+            stream_key = f"{prefix}:{shard}"
+            shard_str = str(shard)
+
+            try:
+                # XAUTOCLAIM: 오래된 Pending 메시지 재할당
+                start_time = time.perf_counter()
+                result = await self._redis.xautoclaim(
+                    stream_key,
+                    self._consumer_group,
+                    self._consumer_name,
+                    min_idle_time=self._min_idle_ms,
+                    start_id="0-0",
+                    count=self._count,
+                )
+                reclaim_latency = time.perf_counter() - start_time
+                EVENT_ROUTER_RECLAIM_LATENCY.labels(
+                    domain=domain, shard=shard_str
+                ).observe(reclaim_latency)
+
+                # result: (next_start_id, [(msg_id, data), ...], deleted_ids)
+                if len(result) >= 2:
+                    messages = result[1]
+                    if messages:
+                        reclaimed_count = await self._process_reclaimed(
+                            stream_key, messages
+                        )
+                        domain_reclaimed += reclaimed_count
+                        EVENT_ROUTER_RECLAIM_MESSAGES.labels(
+                            domain=domain, shard=shard_str
+                        ).inc(reclaimed_count)
+
+            except Exception as e:
+                if "NOGROUP" in str(e):
+                    # Consumer Group이 없음 (아직 생성 전)
+                    continue
+                logger.error(
+                    "xautoclaim_error",
+                    extra={"stream": stream_key, "domain": domain, "error": str(e)},
+                )
+
+        return domain_reclaimed
 
     async def _process_reclaimed(
         self,
