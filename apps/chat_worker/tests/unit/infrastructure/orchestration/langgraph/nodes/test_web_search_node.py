@@ -309,8 +309,8 @@ class TestWebSearchNodeEnrichment:
         assert mock_llm.function_call_count == 1
         # Web search 호출 안됨
         assert mock_llm.web_search_count == 0
-        # 빈 결과 (skip)
-        assert result == {}
+        # web_search_results 없음 (skip)
+        assert "web_search_results" not in result
 
     @pytest.mark.anyio
     async def test_enrichment_function_call_failure(
@@ -335,8 +335,8 @@ class TestWebSearchNodeEnrichment:
         assert mock_llm.function_call_count == 1
         # Web search 호출 안됨
         assert mock_llm.web_search_count == 0
-        # 빈 결과 (skip)
-        assert result == {}
+        # web_search_results 없음 (skip)
+        assert "web_search_results" not in result
 
     @pytest.mark.anyio
     async def test_enrichment_no_function_call_response(
@@ -358,7 +358,8 @@ class TestWebSearchNodeEnrichment:
 
         assert mock_llm.function_call_count == 1
         assert mock_llm.web_search_count == 0
-        assert result == {}
+        # web_search_results 없음 (skip)
+        assert "web_search_results" not in result
 
 
 class TestWebSearchNodeEvents:
