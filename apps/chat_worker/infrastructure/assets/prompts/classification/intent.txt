@@ -64,13 +64,20 @@ Eco² 앱의 채팅 시스템에서 적절한 처리 경로를 결정하기 위�
 - "캐릭터 그려줘"
 - "메탈리가 분리배출하는 모습 그려줘"
 
+## web_search
+실시간 정보, 최신 뉴스, 정책, 규제, 트렌드 등 최신 데이터가 필요한 질문.
+- "최신 분리배출 정책 알려줘"
+- "환경부 뉴스"
+- "2026년 재활용 규제"
+- "플라스틱 규제 트렌드"
+- "요즘 분리배출 어떻게 바뀌었어?"
+
 ## general
 위 카테고리에 명확히 해당하지 않는 모든 질문.
-인사, 환경 상식, 최신 정책/뉴스, 일반 대화 등.
+인사, 환경 상식, 일반 대화 등.
 - "안녕"
 - "분리배출 왜 해야해?"
 - "탄소중립이 뭐야?"
-- "최신 환경 정책"
 
 # 판단 가이드라인
 
@@ -82,11 +89,13 @@ Eco² 앱의 채팅 시스템에서 적절한 처리 경로를 결정하기 위�
 
 3. **확신이 낮으면 general**: 판단이 어려우면 general로 분류하되, confidence를 낮게 설정하세요.
 
+5. **web_search vs general**: 최신 정보, 뉴스, 정책 변경 등 실시간 데이터가 필요한 질문은 web_search로, 시간에 무관한 상식이나 일반 대화는 general로 분류하세요.
+
 4. **복합 질문**: 여러 의도가 섞여 있으면 가장 핵심적인 의도를 선택하세요.
 
 # Output
 JSON 형식으로 응답하세요:
-- intent: 9개 카테고리 중 하나 (waste, character, location, bulk_waste, recyclable_price, collection_point, weather, image_generation, general)
+- intent: 10개 카테고리 중 하나 (waste, character, location, bulk_waste, recyclable_price, collection_point, weather, image_generation, web_search, general)
 - confidence: 0.0~1.0 (확실하면 0.85+, 애매하면 0.5~0.7)
 - reasoning: 이 의도로 분류한 이유 (한 문장)
 
@@ -115,6 +124,9 @@ A: {"intent": "weather", "confidence": 0.95, "reasoning": "현재 날씨 정보 
 
 Q: "우산 챙겨야 할까?"
 A: {"intent": "weather", "confidence": 0.90, "reasoning": "강수 여부 확인 질문"}
+
+Q: "최신 분리배출 정책 알려줘"
+A: {"intent": "web_search", "confidence": 0.92, "reasoning": "최신 정책 정보 요청, 실시간 검색 필요"}
 
 Q: "분리배출이 환경에 도움이 되나요?"
 A: {"intent": "general", "confidence": 0.85, "reasoning": "환경 상식 질문, 특정 품목 처리 아님"}

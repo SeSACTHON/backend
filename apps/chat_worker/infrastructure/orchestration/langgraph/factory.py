@@ -24,11 +24,11 @@ START → intent → [vision?] → dynamic_router
                      [summarize?] ← Context Compression
                             │
                             ▼
-                         answer → END (GENERAL: native web_search tool)
+                         answer → END
 ```
 
-Note: web_search Intent는 GENERAL로 통합됨. Answer 생성 시
-네이티브 web_search tool (OpenAI Responses API)을 사용하여 실시간 정보 검색.
+Note: web_search는 독립 intent + enrichment로 동작.
+네이티브 web_search tool (OpenAI/Gemini)로 실시간 정보 검색.
 
 Dynamic Routing (Send API):
 1. Multi-intent fanout: additional_intents → 각각 병렬 Send
@@ -106,12 +106,9 @@ from chat_worker.infrastructure.orchestration.langgraph.nodes.kakao_place_node i
     create_kakao_place_node,
 )
 
-# NOTE: web_search_node는 더 이상 Intent 기반 라우팅에 사용되지 않음
-# GENERAL intent에서 네이티브 web_search tool (OpenAI Responses API)을 사용
-# web_search_client는 Feedback Fallback에서만 사용됨 (저품질 RAG 결과 보완)
-# from chat_worker.infrastructure.orchestration.langgraph.nodes.web_search_node import (
-#     create_web_search_node,
-# )  # DEPRECATED
+from chat_worker.infrastructure.orchestration.langgraph.nodes.web_search_node import (
+    create_web_search_node,
+)
 from chat_worker.infrastructure.orchestration.langgraph.state import ChatState
 from chat_worker.infrastructure.orchestration.langgraph.summarization import (
     SummarizationNode,
@@ -388,16 +385,12 @@ def create_chat_graph(
 
         logger.warning("Location subagent node using passthrough (no Kakao client)")
 
-    # NOTE: Web Search 노드는 더 이상 Intent 기반 라우팅에 사용되지 않음
-    # GENERAL intent에서 네이티브 web_search tool (OpenAI Responses API)을 사용
-    # web_search_client는 Feedback Fallback에서만 사용됨
-    # 하위 호환성을 위해 passthrough 노드 유지
-    async def web_search_node(state: dict[str, Any]) -> dict[str, Any]:
-        """DEPRECATED: Web search is now handled natively in GENERAL intent."""
-        logger.debug("web_search_node is deprecated, using passthrough")
-        return state
-
-    logger.info("Web search now handled by native tool in GENERAL intent (node deprecated)")
+    # Web Search 노드: 네이티브 LLM 웹 검색 (OpenAI/Gemini)
+    web_search_node = create_web_search_node(
+        llm=llm,
+        event_publisher=event_publisher,
+    )
+    logger.info("Web search node created (native LLM web search)")
 
     # Subagent 노드: Bulk Waste (대형폐기물 - 행정안전부 API)
     if bulk_waste_client is not None:

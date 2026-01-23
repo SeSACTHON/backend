@@ -13,7 +13,8 @@
 - recyclable_price: 재활용자원 시세
 - collection_point: 수거함 위치
 - image_generation: 이미지 생성
-- general: 일반 대화, 최신 정책/뉴스 질문
+- web_search: 최신 정보, 뉴스, 정책, 규제, 트렌드
+- general: 일반 대화
 
 # Rules
 
