@@ -49,6 +49,21 @@ spec:
           value: '1.0'
         - name: RELAY_BATCH_SIZE
           value: '10'
+        # OpenTelemetry
+        - name: OTEL_SERVICE_NAME
+          value: auth-relay
+        - name: OTEL_TRACES_EXPORTER
+          value: otlp
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: http://jaeger-collector-clusterip.istio-system.svc.cluster.local:4318
+        - name: OTEL_METRICS_EXPORTER
+          value: none
+        - name: OTEL_LOGS_EXPORTER
+          value: none
+        - name: OTEL_PROPAGATORS
+          value: b3,tracecontext,baggage
+        - name: OTEL_EXPORTER_OTLP_PROTOCOL
+          value: http/protobuf
         # Logging
         - name: LOG_LEVEL
           value: INFO
