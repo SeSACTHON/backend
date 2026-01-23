@@ -20,7 +20,6 @@ opentelemetry-distro==0.50b0
 opentelemetry-exporter-otlp==1.29.0
 opentelemetry-instrumentation-fastapi==0.50b0
 opentelemetry-instrumentation-redis==0.50b0
-opentelemetry-propagator-b3==1.29.0
 
 # Testing
 pytest>=8.0.0

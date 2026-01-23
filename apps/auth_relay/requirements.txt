@@ -9,3 +9,9 @@ aio-pika>=9.0.0
 
 # ECS Logging
 ecs-logging>=2.0.0
+
+# OpenTelemetry
+opentelemetry-api>=1.28.0,<2.0.0
+opentelemetry-sdk>=1.28.0,<2.0.0
+opentelemetry-exporter-otlp-proto-http>=1.28.0,<2.0.0
+opentelemetry-instrumentation-aio-pika>=0.49b0

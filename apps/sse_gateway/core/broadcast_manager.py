@@ -349,6 +349,7 @@ class SSEBroadcastManager:
         domain: str = "scan",
         timeout_seconds: float = 15.0,
         max_wait_seconds: int = 300,
+        last_event_id: str | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """job_id에 대한 구독 시작.
 
@@ -357,11 +358,15 @@ class SSEBroadcastManager:
             domain: 서비스 도메인 (scan, chat)
             timeout_seconds: Queue.get() 타임아웃 (keepalive 주기)
             max_wait_seconds: 최대 대기 시간 (기본 5분)
+            last_event_id: SSE 표준 Last-Event-ID (재연결 시 중복 방지)
 
         Yields:
             이벤트 딕셔너리
         """
         subscriber = SubscriberQueue(job_id=job_id, domain=domain)
+        # Last-Event-ID 기반 중복 방지: 이미 수신한 이벤트 필터링
+        if last_event_id and "-" in last_event_id:
+            subscriber.last_stream_id = last_event_id
         connection_start = time.time()
         first_event_time: float | None = None
         event_count = 0
@@ -427,7 +432,11 @@ class SSEBroadcastManager:
             )
 
             async for event in self._catch_up_from_streams(
-                job_id, from_seq=subscriber.last_seq, to_seq=state_seq, domain=domain
+                job_id,
+                from_seq=subscriber.last_seq,
+                to_seq=state_seq,
+                domain=domain,
+                after_stream_id=last_event_id,
             ):
                 event_count += 1
                 if first_event_time is None:
@@ -864,7 +873,12 @@ class SSEBroadcastManager:
             )
 
     async def _catch_up_from_streams(
-        self, job_id: str, from_seq: int, to_seq: int, domain: str = "scan"
+        self,
+        job_id: str,
+        from_seq: int,
+        to_seq: int,
+        domain: str = "scan",
+        after_stream_id: str | None = None,
     ) -> AsyncGenerator[dict[str, Any], None]:
         """Streams에서 누락된 이벤트를 catch-up.
 
@@ -875,6 +889,7 @@ class SSEBroadcastManager:
             from_seq: 마지막으로 수신한 seq (이 이후부터 읽음)
             to_seq: 목표 seq (이 seq까지 읽음)
             domain: 서비스 도메인 (scan, chat)
+            after_stream_id: 이 stream_id 이후 이벤트만 반환 (Last-Event-ID 기반 중복 방지)
 
         Yields:
             누락된 이벤트들 (seq 순서대로)
@@ -902,6 +917,12 @@ class SSEBroadcastManager:
 
                 seq = int(data.get("seq", "0"))
                 if from_seq < seq <= to_seq:
+                    # Last-Event-ID 기반 중복 방지: 이미 수신한 이벤트 스킵
+                    if (
+                        after_stream_id
+                        and SubscriberQueue._compare_stream_id(msg_id, after_stream_id) <= 0
+                    ):
+                        continue
                     event = dict(data)  # 이미 문자열
                     # stream_id 추가 (SSE id 필드용)
                     event["stream_id"] = msg_id
@@ -1058,6 +1079,71 @@ class SSEBroadcastManager:
             logger.warning(
                 "token_catch_up_error",
                 extra={"job_id": job_id, "error": str(e)},
+            )
+
+    async def catch_up_from_last_event_id(
+        self,
+        job_id: str,
+        last_event_id: str,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """Last-Event-ID 기반 토큰 복구 (네이티브 SSE 표준).
+
+        브라우저 EventSource 자동 재연결 시 Last-Event-ID 헤더로 전달되는
+        Redis Stream ID를 사용하여 누락된 토큰을 XRANGE로 효율적으로 복구.
+
+        Args:
+            job_id: 작업 ID
+            last_event_id: 마지막으로 수신한 SSE id (Redis Stream ID 형식)
+
+        Yields:
+            Token 이벤트 (stage=token)
+        """
+        if not self._streams_client:
+            return
+
+        token_stream_key = f"{TOKEN_STREAM_PREFIX}:{job_id}"
+
+        try:
+            # XRANGE with exclusive lower bound: (last_event_id ~ +
+            # Redis Stream ID가 다른 stream의 것이라도 timestamp 기반이므로
+            # 그 이후 시점의 토큰을 정확히 반환
+            messages = await self._streams_client.xrange(
+                token_stream_key,
+                min=f"({last_event_id}",  # exclusive lower bound
+                max="+",
+                count=10000,
+            )
+
+            caught_up_count = 0
+            for msg_id, data in messages:
+                caught_up_count += 1
+                yield {
+                    "stage": "token",
+                    "status": "streaming",
+                    "seq": int(data.get("seq", "0")),
+                    "content": data.get("delta", ""),
+                    "node": data.get("node", ""),
+                    "stream_id": msg_id,
+                }
+
+            if caught_up_count > 0:
+                logger.info(
+                    "token_catch_up_from_last_event_id",
+                    extra={
+                        "job_id": job_id,
+                        "last_event_id": last_event_id,
+                        "caught_up_count": caught_up_count,
+                    },
+                )
+
+        except Exception as e:
+            logger.warning(
+                "token_catch_up_from_last_event_id_error",
+                extra={
+                    "job_id": job_id,
+                    "last_event_id": last_event_id,
+                    "error": str(e),
+                },
             )
 
     async def get_token_recovery_event(

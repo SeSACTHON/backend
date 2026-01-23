@@ -36,6 +36,8 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Any, Protocol
 
+from langchain_core.messages import HumanMessage
+
 from chat_worker.application.services.progress_tracker import (
     DynamicProgressTracker,
     SUBAGENT_NODES,
@@ -272,6 +274,9 @@ class ProcessChatCommand:
                 "message": request.message,
                 "image_url": request.image_url,
                 "user_location": request.user_location,
+                # 멀티턴: 현재 사용자 메시지를 messages에 추가
+                # add_messages reducer가 checkpointer의 이전 messages와 병합
+                "messages": [HumanMessage(content=request.message)],
                 # Context 필드 리셋 (매 턴마다 새로 계산)
                 "classification_result": _reset_marker,
                 "disposal_rules": _reset_marker,
@@ -373,12 +378,23 @@ class ProcessChatCommand:
                 self._metrics.track_error(intent, type(e).__name__)
 
             # 작업 실패 이벤트 (running → failed)
-            await self._progress_notifier.notify_stage(
-                task_id=request.job_id,
-                stage="done",
-                status="failed",
-                result={"error": str(e)},
-            )
+            # Redis 장애 시 이중 실패 방지
+            try:
+                await self._progress_notifier.notify_stage(
+                    task_id=request.job_id,
+                    stage="done",
+                    status="failed",
+                    result={"error": str(e)},
+                )
+            except Exception as notify_err:
+                logger.error(
+                    "Failed to publish failure event (Redis unavailable)",
+                    extra={
+                        **log_ctx,
+                        "original_error": str(e),
+                        "notify_error": str(notify_err),
+                    },
+                )
 
             return ProcessChatResponse(
                 job_id=request.job_id,

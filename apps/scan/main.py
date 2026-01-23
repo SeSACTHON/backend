@@ -15,6 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from scan.presentation.http.controllers import health_router, scan_router
+from scan.presentation.http.errors import register_exception_handlers
 from scan.setup.config import get_settings
 from scan.setup.tracing import (
     configure_tracing,
@@ -62,6 +63,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # 예외 핸들러 등록
+    register_exception_handlers(app)
 
     # OpenTelemetry FastAPI instrumentation
     instrument_fastapi(app)

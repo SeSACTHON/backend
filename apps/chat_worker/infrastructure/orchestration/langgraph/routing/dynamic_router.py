@@ -90,6 +90,30 @@ ENRICHMENT_RULES: dict[str, EnrichmentRule] = {
 }
 
 
+# 웹 검색 enrichment 트리거 키워드
+WEB_SEARCH_TRIGGER_KEYWORDS = frozenset(
+    {
+        "최신",
+        "최근",
+        "뉴스",
+        "정책",
+        "규제",
+        "발표",
+        "공지",
+        "2024",
+        "2025",
+        "2026",
+        "올해",
+        "작년",
+        "지난달",
+        "현재",
+        "요즘",
+        "트렌드",
+        "업데이트",
+    }
+)
+
+
 # 조건부 Enrichment (state 기반)
 CONDITIONAL_ENRICHMENTS: list[ConditionalEnrichment] = [
     ConditionalEnrichment(
@@ -100,6 +124,14 @@ CONDITIONAL_ENRICHMENTS: list[ConditionalEnrichment] = [
         ),
         exclude_intents=("weather", "image_generation"),
         description="위치 정보가 있고 관련 intent면 날씨 추가",
+    ),
+    ConditionalEnrichment(
+        node="web_search",
+        condition=lambda state: any(
+            kw in state.get("message", "").lower() for kw in WEB_SEARCH_TRIGGER_KEYWORDS
+        ),
+        exclude_intents=("web_search", "general", "character", "image_generation"),
+        description="최신 정보 키워드가 있으면 웹 검색 추가",
     ),
 ]
 
@@ -114,8 +146,32 @@ INTENT_TO_NODE: dict[str, str] = {
     "collection_point": "collection_point",
     "weather": "weather",
     "image_generation": "image_generation",
-    "general": "general",  # 웹 검색도 general에서 네이티브 tool로 처리
+    "web_search": "web_search",
+    "general": "general",
 }
+
+# 웹 검색 enrichment 트리거 키워드
+WEB_SEARCH_TRIGGER_KEYWORDS = frozenset(
+    {
+        "최신",
+        "최근",
+        "뉴스",
+        "정책",
+        "규제",
+        "발표",
+        "공지",
+        "2024",
+        "2025",
+        "2026",
+        "올해",
+        "작년",
+        "지난달",
+        "현재",
+        "요즘",
+        "트렌드",
+        "업데이트",
+    }
+)
 
 
 # ============================================================

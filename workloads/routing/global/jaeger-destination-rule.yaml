@@ -18,8 +18,8 @@ spec:
         connectTimeout: 10s
         maxConnections: 100
       http:
-        h2UpgradePolicy: UPGRADE
-        http2MaxRequests: 1000
+        h2UpgradePolicy: DO_NOT_UPGRADE
+        http1MaxPendingRequests: 1000
 ---
 apiVersion: networking.istio.io/v1beta1
 kind: DestinationRule

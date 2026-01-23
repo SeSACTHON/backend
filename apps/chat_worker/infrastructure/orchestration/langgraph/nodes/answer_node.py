@@ -11,11 +11,7 @@ Clean Architecture:
 토큰 스트리밍 아키텍처:
 - answer_node에서 모든 토큰을 직접 발행 (notify_token_v2)
 - ProcessChatCommand는 answer 노드의 토큰을 건너뜀 (중복 방지)
-- 웹 검색/LangChain 경로 모두 동일한 발행 메커니즘 사용
-
-GENERAL Intent + Native Web Search:
-- GENERAL intent에서는 OpenAI Responses API의 네이티브 web_search tool 사용
-- generate_with_tools()로 스트리밍 생성 → notify_token_v2()로 직접 토큰 발행
+- LangChain/네이티브 경로 모두 동일한 발행 메커니즘 사용
 """
 
 from __future__ import annotations
@@ -23,12 +19,11 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Any
 
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
 
 from chat_worker.application.commands.generate_answer_command import (
     GenerateAnswerCommand,
     GenerateAnswerInput,
-    WEB_SEARCH_KEYWORDS,
 )
 from chat_worker.infrastructure.assets.prompt_loader import PromptBuilder
 from chat_worker.infrastructure.orchestration.langgraph.sequence import cleanup_sequence
@@ -51,16 +46,13 @@ def create_answer_node(
     - Command(UseCase) 호출
     - output → state 변환
 
-    네이티브 스트리밍 환경에서는 Progress/Token 이벤트를
-    ProcessChatCommand가 astream_events로 처리합니다.
-
-    GENERAL intent + 웹 검색 키워드:
-    - OpenAI Responses API의 네이티브 web_search tool 사용
-    - LangGraph가 캡처하지 못하므로 event_publisher로 직접 토큰 발행
+    토큰 스트리밍:
+    - answer_node에서 토큰을 직접 발행 (notify_token_v2)
+    - ProcessChatCommand는 answer 노드의 토큰을 건너뜀 (중복 방지)
 
     Args:
         llm: LLM 클라이언트
-        event_publisher: 이벤트 발행자 (선택, 웹 검색 시 토큰 직접 발행용)
+        event_publisher: 이벤트 발행자 (토큰 직접 발행용)
 
     Returns:
         answer_node 함수
@@ -79,12 +71,6 @@ def create_answer_node(
         1. state에서 값 추출 (LangGraph glue)
         2. LLM 호출 및 토큰 직접 발행 (notify_token_v2)
         3. output → state 변환
-
-        Note:
-            토큰 스트리밍 아키텍처:
-            - answer_node에서 토큰을 직접 발행 (notify_token_v2)
-            - ProcessChatCommand는 answer 노드의 토큰을 건너뜀 (중복 방지)
-            - 웹 검색/LangChain 경로 모두 동일한 발행 메커니즘 사용
 
         Args:
             state: 현재 LangGraph 상태
@@ -114,6 +100,14 @@ def create_answer_node(
             collection_ctx = state.get("collection_point_context")
             collection_context_str = (
                 collection_ctx.get("context") if isinstance(collection_ctx, dict) else None
+            )
+
+            # web_search_results에서 context 문자열 추출
+            web_search_ctx = state.get("web_search_results")
+            web_search_context_str = (
+                web_search_ctx.get("context")
+                if isinstance(web_search_ctx, dict) and web_search_ctx.get("success", True)
+                else None
             )
 
             # image_generation_context 추출
@@ -147,7 +141,7 @@ def create_answer_node(
                 disposal_rules=state.get("disposal_rules"),
                 character_context=state.get("character_context"),
                 location_context=state.get("location_context"),
-                web_search_results=state.get("web_search_results"),
+                web_search_results=web_search_context_str,
                 recyclable_price_context=price_context_str,
                 bulk_waste_context=waste_context_str,
                 weather_context=weather_context_str,
@@ -160,84 +154,46 @@ def create_answer_node(
             # 2. 프롬프트 준비 (Command에서 컨텍스트 빌드만 수행)
             prepared = await command.prepare(input_dto)
 
-            # 3. LLM 호출 - 웹 검색 필요 여부에 따라 분기
-            intent = state.get("intent", "general")
-            message = state.get("message", "")
-            message_lower = message.lower()
-
-            # GENERAL intent에서 웹 검색 키워드가 있으면 네이티브 web_search 사용
-            needs_web_search = intent == "general" and any(
-                kw in message_lower for kw in WEB_SEARCH_KEYWORDS
-            )
-
+            # 3. LLM 스트리밍 호출 및 토큰 발행
             answer_parts = []
 
-            if needs_web_search and event_publisher is not None:
-                # 네이티브 web_search tool 사용 (OpenAI Responses API)
-                # LangGraph가 캡처하지 못하므로 직접 토큰 발행
-                logger.info(
-                    "Using native web_search tool",
-                    extra={"job_id": job_id, "message_preview": message[:50]},
-                )
+            if hasattr(llm, "get_langchain_llm"):
+                # LangChain 방식
+                langchain_llm = llm.get_langchain_llm()
 
-                async for chunk in llm.generate_with_tools(
+                langchain_messages = []
+                if prepared.system_prompt:
+                    langchain_messages.append(SystemMessage(content=prepared.system_prompt))
+                langchain_messages.append(HumanMessage(content=prepared.prompt))
+
+                async for chunk in langchain_llm.astream(langchain_messages):
+                    content = chunk.content
+                    if content:
+                        answer_parts.append(content)
+                        if event_publisher is not None:
+                            await event_publisher.notify_token_v2(
+                                task_id=job_id,
+                                content=content,
+                                node="answer",
+                            )
+            else:
+                # 네이티브 LLM (OpenAI/Gemini) - generate_stream 사용
+                async for chunk in llm.generate_stream(
                     prompt=prepared.prompt,
-                    tools=["web_search"],
                     system_prompt=prepared.system_prompt,
                 ):
                     if chunk:
                         answer_parts.append(chunk)
-                        # 직접 토큰 이벤트 발행 (Redis Streams → Event Router → SSE)
-                        await event_publisher.notify_token_v2(
-                            task_id=job_id,
-                            content=chunk,
-                            node="answer",
-                        )
+                        if event_publisher is not None:
+                            await event_publisher.notify_token_v2(
+                                task_id=job_id,
+                                content=chunk,
+                                node="answer",
+                            )
 
-                # 토큰 스트림 완료 처리
+            # 토큰 스트림 완료 처리
+            if event_publisher is not None:
                 await event_publisher.finalize_token_stream(job_id)
-            else:
-                # LLM 스트리밍 호출
-                # LangChain Adapter가 있으면 LangChain 방식, 없으면 네이티브 generate_stream 사용
-                if hasattr(llm, "get_langchain_llm"):
-                    # LangChain 방식 (answer_node에서 직접 토큰 발행)
-                    langchain_llm = llm.get_langchain_llm()
-
-                    # LangChain 메시지 구성
-                    langchain_messages = []
-                    if prepared.system_prompt:
-                        langchain_messages.append(SystemMessage(content=prepared.system_prompt))
-                    langchain_messages.append(HumanMessage(content=prepared.prompt))
-
-                    # 직접 astream() 호출 및 토큰 발행
-                    async for chunk in langchain_llm.astream(langchain_messages):
-                        content = chunk.content
-                        if content:
-                            answer_parts.append(content)
-                            if event_publisher is not None:
-                                await event_publisher.notify_token_v2(
-                                    task_id=job_id,
-                                    content=content,
-                                    node="answer",
-                                )
-                else:
-                    # 네이티브 LLM (Gemini 등) - generate_stream 직접 사용
-                    async for chunk in llm.generate_stream(
-                        prompt=prepared.prompt,
-                        system_prompt=prepared.system_prompt,
-                    ):
-                        if chunk:
-                            answer_parts.append(chunk)
-                            if event_publisher is not None:
-                                await event_publisher.notify_token_v2(
-                                    task_id=job_id,
-                                    content=chunk,
-                                    node="answer",
-                                )
-
-                # 토큰 스트림 완료 처리
-                if event_publisher is not None:
-                    await event_publisher.finalize_token_stream(job_id)
 
             answer = "".join(answer_parts)
 
@@ -251,7 +207,8 @@ def create_answer_node(
             cleanup_sequence(job_id)
 
             # 7. output → state 변환
-            return {"answer": answer}
+            # 멀티턴: AIMessage를 messages에 추가하여 checkpointer가 저장
+            return {"answer": answer, "messages": [AIMessage(content=answer)]}
 
         except Exception as e:
             logger.error(
@@ -261,8 +218,10 @@ def create_answer_node(
             )
             # 에러 발생 시에도 Lamport Clock 정리
             cleanup_sequence(job_id)
+            error_answer = "답변 생성 중 오류가 발생했습니다. 다시 시도해주세요."
             return {
-                "answer": "답변 생성 중 오류가 발생했습니다. 다시 시도해주세요.",
+                "answer": error_answer,
+                "messages": [AIMessage(content=error_answer)],
             }
 
     return answer_node
