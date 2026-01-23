@@ -234,7 +234,15 @@ class TestCenterDetailController:
         assert response.status_code == 422
 
     def test_detail_negative_id(self, client: TestClient) -> None:
-        """음수 ID 요청 (라우팅은 정상, 결과 없음 404)."""
-        response = client.get("/api/v1/locations/centers/-1")
-        # DI에서 실제 DB 연결 필요하므로 여기서는 에러 유형만 확인
-        assert response.status_code in (404, 500)
+        """음수 ID 요청 시 404 반환."""
+        from location.setup.dependencies import get_center_detail_query
+
+        mock_query = AsyncMock()
+        mock_query.execute = AsyncMock(return_value=None)
+
+        app.dependency_overrides[get_center_detail_query] = lambda: mock_query
+        try:
+            response = client.get("/api/v1/locations/centers/-1")
+            assert response.status_code == 404
+        finally:
+            app.dependency_overrides.clear()
