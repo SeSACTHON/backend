@@ -26,7 +26,6 @@ opentelemetry-exporter-otlp==1.29.0
 opentelemetry-instrumentation-fastapi==0.50b0
 opentelemetry-instrumentation-sqlalchemy==0.50b0
 opentelemetry-instrumentation-asyncpg==0.50b0
-opentelemetry-propagator-b3==1.29.0
 
 # Testing
 pytest>=8.0.0

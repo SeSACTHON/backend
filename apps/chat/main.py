@@ -18,6 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from chat.infrastructure.persistence_postgres.mappings import start_mappers
 from chat.presentation.http.controllers import chat_router
+from chat.presentation.http.errors import register_exception_handlers
 from chat.setup.config import get_settings
 from chat.setup.dependencies import get_container
 from chat.setup.tracing import (
@@ -102,6 +103,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # 예외 핸들러 등록
+    register_exception_handlers(app)
 
     # OpenTelemetry FastAPI instrumentation
     instrument_fastapi(app)

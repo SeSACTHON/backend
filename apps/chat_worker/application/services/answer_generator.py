@@ -73,7 +73,7 @@ class AnswerGeneratorService:
         disposal_rules: dict[str, Any] | None = None,
         character_context: dict[str, Any] | None = None,
         location_context: dict[str, Any] | None = None,
-        web_search_results: dict[str, Any] | None = None,
+        web_search_results: str | None = None,
         recyclable_price_context: str | None = None,
         bulk_waste_context: str | None = None,
         weather_context: str | None = None,

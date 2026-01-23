@@ -111,6 +111,126 @@ class GeminiLLMClient(LLMClientPort):
             if chunk.text:
                 yield chunk.text
 
+    async def generate_with_tools(
+        self,
+        prompt: str,
+        tools: list[str],
+        system_prompt: str | None = None,
+        context: dict[str, Any] | None = None,
+    ) -> AsyncIterator[str]:
+        """도구를 사용한 텍스트 생성 (Google Search Grounding).
+
+        Args:
+            prompt: 사용자 프롬프트
+            tools: 사용할 도구 목록 (예: ["web_search"])
+            system_prompt: 시스템 프롬프트
+            context: 추가 컨텍스트
+        """
+        from google.genai import types
+
+        tool_configs = []
+        for tool in tools:
+            if tool == "web_search":
+                tool_configs.append(types.Tool(google_search=types.GoogleSearch()))
+
+        config = types.GenerateContentConfig(
+            tools=tool_configs if tool_configs else None,
+        )
+
+        full_prompt = ""
+        if system_prompt:
+            full_prompt = f"{system_prompt}\n\n"
+        if context:
+            context_str = json.dumps(context, ensure_ascii=False, indent=2)
+            full_prompt += f"## Context\n{context_str}\n\n"
+        full_prompt += f"## Question\n{prompt}"
+
+        try:
+            response = await self._client.aio.models.generate_content_stream(
+                model=self._model,
+                contents=full_prompt,
+                config=config,
+            )
+            async for chunk in response:
+                if chunk.text:
+                    yield chunk.text
+        except Exception as e:
+            logger.warning(f"generate_with_tools failed, falling back to plain: {e}")
+            async for chunk in self.generate_stream(
+                prompt=prompt,
+                system_prompt=system_prompt,
+                context=context,
+            ):
+                yield chunk
+
+    async def generate_function_call(
+        self,
+        prompt: str,
+        functions: list[dict[str, Any]],
+        system_prompt: str | None = None,
+        function_call: str | dict[str, str] = "auto",
+    ) -> tuple[str, dict[str, Any] | None]:
+        """Function Calling (Gemini 네이티브).
+
+        Args:
+            prompt: 사용자 프롬프트
+            functions: OpenAI 형식의 function definitions
+            system_prompt: 시스템 프롬프트
+            function_call: 호출 모드 ("auto", "none", {"name": "func_name"})
+
+        Returns:
+            (function_name, arguments) 튜플
+        """
+        from google.genai import types
+
+        # OpenAI format → Gemini FunctionDeclaration
+        function_declarations = []
+        for func in functions:
+            func_decl = types.FunctionDeclaration(
+                name=func["name"],
+                description=func.get("description", ""),
+                parameters=func.get("parameters"),
+            )
+            function_declarations.append(func_decl)
+
+        tool = types.Tool(function_declarations=function_declarations)
+
+        # function_call mode 변환
+        if isinstance(function_call, dict) and "name" in function_call:
+            fc_mode = "ANY"
+        elif function_call == "none":
+            fc_mode = "NONE"
+        else:
+            fc_mode = "AUTO"
+
+        config = types.GenerateContentConfig(
+            tools=[tool],
+            tool_config=types.ToolConfig(
+                function_calling_config=types.FunctionCallingConfig(mode=fc_mode)
+            ),
+        )
+
+        full_prompt = ""
+        if system_prompt:
+            full_prompt = f"{system_prompt}\n\n"
+        full_prompt += prompt
+
+        response = await self._client.aio.models.generate_content(
+            model=self._model,
+            contents=full_prompt,
+            config=config,
+        )
+
+        # Function call 결과 추출
+        if response.candidates:
+            for part in response.candidates[0].content.parts:
+                if part.function_call:
+                    func_name = part.function_call.name
+                    func_args = dict(part.function_call.args) if part.function_call.args else {}
+                    return (func_name, func_args)
+
+        return ("", None)
+
     async def generate_structured(
         self,
         prompt: str,

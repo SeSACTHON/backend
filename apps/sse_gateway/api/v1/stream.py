@@ -10,10 +10,14 @@ import json
 import logging
 from typing import AsyncGenerator
 
-from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi import APIRouter, Query, Request
 from sse_starlette.sse import EventSourceResponse
 
 from sse_gateway.core.broadcast_manager import SSEBroadcastManager
+from sse_gateway.core.exceptions.validation import (
+    InvalidJobIdError,
+    UnsupportedServiceError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -193,7 +197,7 @@ async def stream_events(
         ```
     """
     if not job_id:
-        raise HTTPException(status_code=400, detail="job_id is required")
+        raise InvalidJobIdError()
 
     last_event_id = request.headers.get("Last-Event-ID") or request.headers.get("last-event-id")
 
@@ -284,13 +288,10 @@ async def stream_events_restful(
         ```
     """
     if not job_id or len(job_id) < 10:
-        raise HTTPException(status_code=400, detail="유효하지 않은 job_id입니다")
+        raise InvalidJobIdError()
 
     if service not in SUPPORTED_DOMAINS:
-        raise HTTPException(
-            status_code=400,
-            detail=f"지원하지 않는 서비스입니다. (지원: {', '.join(SUPPORTED_DOMAINS)})",
-        )
+        raise UnsupportedServiceError(SUPPORTED_DOMAINS)
 
     # 네이티브 SSE: Last-Event-ID 헤더 읽기
     # 브라우저 EventSource가 자동 재연결 시 마지막 수신 id를 헤더로 전송

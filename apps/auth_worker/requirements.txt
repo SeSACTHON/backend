@@ -11,3 +11,9 @@ ecs-logging>=2.1.0
 
 # Type hints
 typing-extensions>=4.9.0
+
+# OpenTelemetry
+opentelemetry-api>=1.28.0,<2.0.0
+opentelemetry-sdk>=1.28.0,<2.0.0
+opentelemetry-exporter-otlp-proto-http>=1.28.0,<2.0.0
+opentelemetry-instrumentation-aio-pika>=0.49b0
