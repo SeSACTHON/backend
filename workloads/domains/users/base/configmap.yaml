@@ -6,6 +6,7 @@ metadata:
 data:
   ENVIRONMENT: dev
   USERS_APP_NAME: Users API
-  USERS_DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgresql.postgres.svc.cluster.local:5432/ecoeco
+  # USERS_DATABASE_URL is overridden by ExternalSecret (credentials)
+  USERS_DATABASE_URL: postgresql+asyncpg://sesacthon:placeholder@dev-postgresql.postgres.svc.cluster.local:5432/ecoeco
   USERS_DATABASE_ECHO: 'false'
   USERS_AUTH_DISABLED: 'false'
