@@ -4,11 +4,17 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 
+from location.application.common.exceptions.validation import (
+    InvalidPickupCategoryError,
+    InvalidStoreCategoryError,
+    KakaoApiUnavailableError,
+)
 from location.application.nearby import GetNearbyCentersQuery, SearchRequest
 from location.application.nearby.queries.search_by_keyword import SearchByKeywordQuery
 from location.domain.enums import PickupCategory, StoreCategory
+from location.domain.exceptions.location import LocationNotFoundError
 from location.presentation.http.schemas import LocationDetail, LocationEntry, SuggestEntry
 from location.setup.dependencies import (
     get_center_detail_query,
@@ -91,7 +97,7 @@ async def search(
 ) -> list[LocationEntry]:
     """키워드로 장소를 검색합니다 (Kakao API + DB 하이브리드)."""
     if search_query is None:
-        raise HTTPException(status_code=503, detail="Kakao API is not configured.")
+        raise KakaoApiUnavailableError()
 
     entries = await search_query.execute(query=q, radius=radius)
 
@@ -128,7 +134,7 @@ async def suggest(
     """자동완성을 위한 장소 제안을 반환합니다."""
     suggest_query = get_suggest_places_query()
     if suggest_query is None:
-        raise HTTPException(status_code=503, detail="Kakao API is not configured.")
+        raise KakaoApiUnavailableError()
 
     places = await suggest_query.execute(query=query)
     return [
@@ -151,7 +157,7 @@ async def center_detail(
     """장소 상세 정보를 조회합니다."""
     result = await detail_query.execute(center_id=center_id)
     if result is None:
-        raise HTTPException(status_code=404, detail="Location not found.")
+        raise LocationNotFoundError()
 
     return LocationDetail(
         id=result.id,
@@ -182,12 +188,10 @@ def _parse_store_category_param(raw: str) -> set[StoreCategory] | None:
             continue
         try:
             categories.add(StoreCategory(value))
-        except ValueError as exc:
-            allowed = [c.value for c in StoreCategory]
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid store_category '{value}'. " f"Allowed values: {allowed} or 'all'.",
-            ) from exc
+        except ValueError:
+            raise InvalidStoreCategoryError(
+                value=value, allowed=[c.value for c in StoreCategory]
+            )
     return categories or None
 
 
@@ -202,11 +206,8 @@ def _parse_pickup_category_param(raw: str) -> set[PickupCategory] | None:
             continue
         try:
             categories.add(PickupCategory(value))
-        except ValueError as exc:
-            allowed = [c.value for c in PickupCategory]
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid pickup_category '{value}'. "
-                f"Allowed values: {allowed} or 'all'.",
-            ) from exc
+        except ValueError:
+            raise InvalidPickupCategoryError(
+                value=value, allowed=[c.value for c in PickupCategory]
+            )
     return categories or None

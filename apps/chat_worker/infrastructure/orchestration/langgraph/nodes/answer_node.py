@@ -72,12 +72,6 @@ def create_answer_node(
         2. LLM 호출 및 토큰 직접 발행 (notify_token_v2)
         3. output → state 변환
 
-        Note:
-            토큰 스트리밍 아키텍처:
-            - answer_node에서 토큰을 직접 발행 (notify_token_v2)
-            - ProcessChatCommand는 answer 노드의 토큰을 건너뜀 (중복 방지)
-            - 웹 검색/LangChain 경로 모두 동일한 발행 메커니즘 사용
-
         Args:
             state: 현재 LangGraph 상태
 

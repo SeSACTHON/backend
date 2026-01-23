@@ -11,10 +11,13 @@ from __future__ import annotations
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, HttpUrl
 
+from scan.application.common.exceptions.auth import UnauthorizedError
+from scan.application.common.exceptions.validation import ImageUrlRequiredError
+from scan.domain.exceptions.scan import ResultNotFoundError, UnsupportedModelError
 from scan.application.classify.commands import (
     SubmitClassificationRequest,
 )
@@ -111,13 +114,10 @@ def get_current_user(
         User: 인증된 사용자 정보
 
     Raises:
-        HTTPException: X-User-ID 헤더가 없는 경우 (401)
+        UnauthorizedError: X-User-ID 헤더가 없는 경우
     """
     if not x_user_id:
-        raise HTTPException(
-            status_code=401,
-            detail="Unauthorized: X-User-ID header is required",
-        )
+        raise UnauthorizedError()
     return User(user_id=x_user_id, role=x_user_role)
 
 
@@ -149,21 +149,14 @@ async def submit_scan(
     """
     image_url = str(payload.image_url) if payload.image_url else None
     if not image_url:
-        raise HTTPException(status_code=400, detail="image_url is required")
+        raise ImageUrlRequiredError()
 
     # 모델 검증
     settings = get_settings()
     model = payload.model or settings.llm_default_model
 
     if not settings.validate_model(model):
-        raise HTTPException(
-            status_code=400,
-            detail={
-                "error": "unsupported_model",
-                "message": f"Unsupported model: '{model}'",
-                "supported_models": settings.get_all_supported_models(),
-            },
-        )
+        raise UnsupportedModelError(model, settings.get_all_supported_models())
 
     request = SubmitClassificationRequest(
         user_id=user.user_id,
@@ -206,10 +199,7 @@ async def get_result(
     result = await query.execute(job_id)
 
     if result is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"Result not found for job_id: {job_id}",
-        )
+        raise ResultNotFoundError(job_id)
 
     if isinstance(result, ProcessingResponse):
         return JSONResponse(

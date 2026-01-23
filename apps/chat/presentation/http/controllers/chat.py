@@ -21,12 +21,15 @@ from datetime import datetime
 from typing import Annotated, Any
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query, Response
+from fastapi import APIRouter, Depends, Header, Query, Response
 from pydantic import BaseModel, Field, HttpUrl
 
+from chat.application.common.exceptions.auth import UnauthorizedError
+from chat.application.common.exceptions.validation import MessageRequiredError
 from chat.application.chat.commands import SubmitChatRequest
 from chat.domain.entities.chat import Chat
 from chat.domain.entities.message import Message  # MessageResponse용
+from chat.domain.exceptions.chat import ChatAccessDeniedError, ChatNotFoundError
 from chat.setup.dependencies import (
     ChatRepositoryDep,
     SubmitCommandDep,
@@ -200,10 +203,7 @@ def get_current_user(
 ) -> User:
     """Ext-Authz에서 주입된 사용자 정보 추출."""
     if not x_user_id:
-        raise HTTPException(
-            status_code=401,
-            detail="Unauthorized: X-User-ID header is required",
-        )
+        raise UnauthorizedError()
     return User(user_id=x_user_id, role=x_user_role)
 
 
@@ -297,10 +297,10 @@ async def get_chat(
     # 채팅 존재 확인 및 권한 검증
     chat = await repo.get_chat_by_id(chat_id)
     if not chat:
-        raise HTTPException(status_code=404, detail="Chat not found")
+        raise ChatNotFoundError(str(chat_id))
 
     if str(chat.user_id) != user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise ChatAccessDeniedError()
 
     # 메시지 조회
     messages, has_more = await repo.get_messages_by_chat(
@@ -343,10 +343,10 @@ async def delete_chat(
     # 채팅 존재 확인 및 권한 검증
     chat = await repo.get_chat_by_id(chat_id)
     if not chat:
-        raise HTTPException(status_code=404, detail="Chat not found")
+        raise ChatNotFoundError(str(chat_id))
 
     if str(chat.user_id) != user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise ChatAccessDeniedError()
 
     await repo.delete_chat(chat_id)
 
@@ -376,10 +376,10 @@ async def update_chat(
     # 채팅 존재 확인 및 권한 검증
     chat = await repo.get_chat_by_id(chat_id)
     if not chat:
-        raise HTTPException(status_code=404, detail="Chat not found")
+        raise ChatNotFoundError(str(chat_id))
 
     if str(chat.user_id) != user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise ChatAccessDeniedError()
 
     # 제목 업데이트
     chat.title = payload.title
@@ -418,15 +418,15 @@ async def send_message(
     - 클라이언트는 stream_url로 SSE 연결하여 응답 수신
     """
     if not payload.message.strip():
-        raise HTTPException(status_code=400, detail="message is required")
+        raise MessageRequiredError()
 
     # 채팅 존재 확인 및 권한 검증
     chat = await repo.get_chat_by_id(chat_id)
     if not chat:
-        raise HTTPException(status_code=404, detail="Chat not found")
+        raise ChatNotFoundError(str(chat_id))
 
     if str(chat.user_id) != user.user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+        raise ChatAccessDeniedError()
 
     # Worker에 작업 제출 (DB 저장은 Worker 완료 시 배치로)
     user_location = None

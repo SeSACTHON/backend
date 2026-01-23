@@ -17,6 +17,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from sse_gateway.api.errors import register_exception_handlers
 from sse_gateway.api.v1.stream import router as stream_router
 from sse_gateway.config import get_settings
 from sse_gateway.core.broadcast_manager import SSEBroadcastManager
@@ -83,6 +84,9 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# 예외 핸들러 등록
+register_exception_handlers(app)
 
 # CORS - credentials 사용 시 특정 origin 필요
 ALLOWED_ORIGINS = [

@@ -23,6 +23,7 @@ from location.infrastructure.observability import (
     shutdown_tracing,
 )
 from location.presentation.http.controllers import health_router, location_router
+from location.presentation.http.errors import register_exception_handlers
 from location.setup.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -83,6 +84,9 @@ def create_app() -> FastAPI:
     # OpenTelemetry FastAPI instrumentation
     if settings.otel_enabled:
         instrument_fastapi(app)
+
+    # 예외 핸들러 등록
+    register_exception_handlers(app)
 
     # 라우터 등록
     app.include_router(health_router)

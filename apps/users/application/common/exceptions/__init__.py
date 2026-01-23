@@ -1,8 +1,4 @@
-"""Application Exceptions.
-
-공통 예외만 포함합니다. 도메인별 예외는 각 도메인에서 직접 import하세요:
-  - apps.users.application.profile.exceptions.*
-"""
+"""Application Exceptions."""
 
 from users.application.common.exceptions.auth import (
     InvalidUserIdFormatError,

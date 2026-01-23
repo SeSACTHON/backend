@@ -18,6 +18,7 @@
 - weather_node: 날씨 정보 조회 (기상청 API)
 - collection_point_node: 수거함 위치 검색 (한국환경공단 KECO API)
 - image_generation_node: 이미지 생성 (Responses API)
+- web_search_node: 웹 검색 (OpenAI/Gemini 네이티브)
 """
 
 from chat_worker.infrastructure.orchestration.langgraph.nodes.answer_node import (
@@ -60,6 +61,9 @@ from chat_worker.infrastructure.orchestration.langgraph.nodes.weather_node impor
 from chat_worker.infrastructure.orchestration.langgraph.nodes.collection_point_node import (
     create_collection_point_node,
 )
+from chat_worker.infrastructure.orchestration.langgraph.nodes.web_search_node import (
+    create_web_search_node,
+)
 from chat_worker.infrastructure.orchestration.langgraph.nodes.aggregator_node import (
     create_aggregator_node,
 )
@@ -84,6 +88,7 @@ __all__ = [
     "create_weather_node",
     "create_collection_point_node",
     "create_image_generation_node",
+    "create_web_search_node",
     # Node Executor (Policy 적용)
     "NodeExecutor",
     "with_policy",

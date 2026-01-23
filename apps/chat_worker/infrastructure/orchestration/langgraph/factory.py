@@ -97,6 +97,7 @@ from chat_worker.infrastructure.orchestration.langgraph.nodes import (
     create_recyclable_price_node,
     create_vision_node,
     create_weather_node,
+    create_web_search_node,
     route_after_feedback,
 )
 from chat_worker.infrastructure.orchestration.langgraph.routing import (
@@ -296,9 +297,7 @@ def create_chat_graph(
         llm, event_publisher, prompt_loader=prompt_loader, cache=cache
     )  # P2: Intent 캐싱
     rag_node = create_rag_node(retriever, event_publisher)
-    answer_node = create_answer_node(
-        llm, event_publisher=event_publisher
-    )  # 네이티브 스트리밍 (GENERAL: native web_search)
+    answer_node = create_answer_node(llm, event_publisher=event_publisher)  # 네이티브 스트리밍
 
     # Vision 노드 (선택)
     if vision_model is not None:
@@ -600,11 +599,11 @@ def create_chat_graph(
                 "waste": "waste_rag",
                 "character": "character",
                 "location": "location",
-                "web_search": "web_search",
                 "bulk_waste": "bulk_waste",
                 "recyclable_price": "recyclable_price",
                 "collection_point": "collection_point",
                 "image_generation": "image_generation",
+                "web_search": "web_search",
                 "general": "general",
             },
         )
