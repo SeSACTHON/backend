@@ -199,9 +199,7 @@ async def _check_redis_connectivity() -> None:
                 f"Redis ({name}) connectivity FAILED: {url} - {e}",
                 extra={"redis_name": name, "url": url, "error": str(e)},
             )
-            raise ConnectionError(
-                f"Redis ({name}) unavailable at {url}: {e}"
-            ) from e
+            raise ConnectionError(f"Redis ({name}) unavailable at {url}: {e}") from e
 
 
 async def startup():
