@@ -100,8 +100,8 @@ class PlainAsyncRedisSaver(BaseCheckpointSaver):
         if not data:
             return None
 
-        checkpoint = json.loads(data["checkpoint"])
-        metadata = json.loads(data["metadata"]) if data.get("metadata") else {}
+        checkpoint = self._deserialize(data["checkpoint"])
+        metadata = self._deserialize(data["metadata"]) if data.get("metadata") else {}
         parent_checkpoint_id = data.get("parent_checkpoint_id")
 
         # Parent config
@@ -158,8 +158,8 @@ class PlainAsyncRedisSaver(BaseCheckpointSaver):
         pipe.hset(
             cp_key,
             mapping={
-                "checkpoint": json.dumps(checkpoint, default=str),
-                "metadata": json.dumps(metadata, default=str),
+                "checkpoint": self._serialize(checkpoint),
+                "metadata": self._serialize(metadata),
                 "parent_checkpoint_id": parent_checkpoint_id or "",
                 "thread_id": thread_id,
                 "checkpoint_ns": checkpoint_ns,
@@ -210,7 +210,7 @@ class PlainAsyncRedisSaver(BaseCheckpointSaver):
             pipe.hset(
                 writes_key,
                 f"{idx}:{channel}",
-                json.dumps({"channel": channel, "value": value}, default=str),
+                self._serialize({"channel": channel, "value": value}),
             )
         pipe.expire(writes_key, self._ttl_seconds)
         await pipe.execute()
@@ -306,6 +306,20 @@ class PlainAsyncRedisSaver(BaseCheckpointSaver):
                 return time.time()
         return time.time()
 
+    def _serialize(self, obj: Any) -> str:
+        """객체를 JSON 문자열로 직렬화 (serde로 타입 정보 보존)."""
+        return self.serde.dumps(obj).decode("utf-8")
+
+    def _deserialize(self, data: str) -> Any:
+        """JSON 문자열을 객체로 역직렬화.
+
+        serde 포맷 우선, 실패 시 legacy json.loads 폴백 (하위 호환).
+        """
+        try:
+            return self.serde.loads(data.encode("utf-8"))
+        except Exception:
+            return json.loads(data)
+
     async def _get_pending_writes(
         self, thread_id: str, checkpoint_ns: str, checkpoint_id: str
     ) -> list[tuple[str, str, Any]]:
@@ -321,7 +335,7 @@ class PlainAsyncRedisSaver(BaseCheckpointSaver):
 
             data = await self._redis.hgetall(key)
             for _field, value_json in sorted(data.items()):
-                entry = json.loads(value_json)
+                entry = self._deserialize(value_json)
                 writes.append((task_id, entry["channel"], entry["value"]))
 
         return writes
