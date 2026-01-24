@@ -5,8 +5,9 @@
 
 Port: application/ports/llm/llm_client.py
 
-Structured Output 지원 (Responses API):
-- https://platform.openai.com/docs/api-reference/responses
+Structured Output 지원:
+- Primary: Agents SDK (Agent + output_type + Runner.run)
+- Fallback: Responses API (text.format json_schema)
 
 Agents SDK (Primary - web_search):
 - https://openai.github.io/openai-agents-python/ref/tool/#agents.tool.WebSearchTool
@@ -145,10 +146,10 @@ class OpenAILLMClient(LLMClientPort):
         max_tokens: int | None = None,
         temperature: float | None = None,
     ) -> T:
-        """구조화된 응답 생성 (Responses API Structured Output).
+        """구조화된 응답 생성.
 
-        OpenAI Responses API의 text.format을 사용하여
-        JSON 스키마를 준수하는 응답을 보장합니다.
+        Primary: Agents SDK (Agent + output_type + Runner.run)
+        Fallback: Responses API (text.format json_schema)
 
         Args:
             prompt: 사용자 프롬프트
@@ -160,12 +161,68 @@ class OpenAILLMClient(LLMClientPort):
         Returns:
             response_schema 타입의 인스턴스
         """
+        # Primary: Agents SDK
+        try:
+            return await self._structured_with_agents_sdk(
+                prompt, response_schema, system_prompt
+            )
+        except Exception as e:
+            logger.warning(
+                "Agents SDK structured output failed, falling back to Responses API",
+                extra={"error": str(e), "schema": response_schema.__name__},
+            )
+
+        # Fallback: Responses API
+        return await self._structured_with_responses_api(
+            prompt, response_schema, system_prompt, max_tokens, temperature
+        )
+
+    async def _structured_with_agents_sdk(
+        self,
+        prompt: str,
+        response_schema: type[T],
+        system_prompt: str | None = None,
+    ) -> T:
+        """Agents SDK로 구조화된 응답 생성 (Primary)."""
+        from agents import Agent, Runner, RunConfig
+        from agents.models.openai_responses import OpenAIResponsesModel
+
+        agent = Agent(
+            name="structured_output_agent",
+            instructions=system_prompt or "",
+            model=OpenAIResponsesModel(
+                model=self._model,
+                openai_client=self._client,
+            ),
+            output_type=response_schema,
+        )
+
+        result = await Runner.run(
+            agent,
+            input=prompt,
+            run_config=RunConfig(tracing_disabled=True),
+        )
+
+        logger.debug(
+            "Structured output generated (Agents SDK)",
+            extra={"schema": response_schema.__name__},
+        )
+        return result.final_output
+
+    async def _structured_with_responses_api(
+        self,
+        prompt: str,
+        response_schema: type[T],
+        system_prompt: str | None = None,
+        max_tokens: int | None = None,
+        temperature: float | None = None,
+    ) -> T:
+        """Responses API로 구조화된 응답 생성 (Fallback)."""
         input_messages: list[dict[str, str]] = []
         if system_prompt:
             input_messages.append({"role": "developer", "content": system_prompt})
         input_messages.append({"role": "user", "content": prompt})
 
-        # Responses API 파라미터
         kwargs: dict[str, Any] = {
             "model": self._model,
             "input": input_messages,
@@ -187,12 +244,11 @@ class OpenAILLMClient(LLMClientPort):
             response = await self._client.responses.create(**kwargs)
             content = response.output_text or "{}"
 
-            # JSON 파싱 및 Pydantic 검증
             data = json.loads(content)
             result = response_schema.model_validate(data)
 
             logger.debug(
-                "Structured output generated",
+                "Structured output generated (Responses API)",
                 extra={"schema": response_schema.__name__},
             )
             return result

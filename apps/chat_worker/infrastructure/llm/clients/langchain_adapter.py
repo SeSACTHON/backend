@@ -23,7 +23,7 @@ generate_with_tools:
 - Fallback: Responses API (web_search tool)
 
 generate_structured:
-- Primary: Responses API (text.format json_schema)
+- Primary: Agents SDK (Agent + output_type + Runner.run)
 - Fallback: LangChain with_structured_output()
 
 핵심:
@@ -180,9 +180,9 @@ class LangChainLLMAdapter(LLMClientPort):
         max_tokens: int | None = None,
         temperature: float | None = None,
     ) -> T:
-        """구조화된 응답 생성 (Responses API Structured Output).
+        """구조화된 응답 생성.
 
-        Primary: Responses API의 text.format (json_schema)
+        Primary: Agents SDK (Agent + output_type + Runner.run)
         Fallback: LangChain with_structured_output()
 
         Args:
@@ -195,46 +195,15 @@ class LangChainLLMAdapter(LLMClientPort):
         Returns:
             response_schema 타입의 인스턴스
         """
-        # Primary: Responses API (client 있을 때)
+        # Primary: Agents SDK (client 있을 때)
         if hasattr(self._llm, "_client") and self._llm._client is not None:
-            client = self._llm._client
-            model_name = getattr(self._llm, "model", "gpt-5.2")
-
-            input_messages: list[dict[str, str]] = []
-            if system_prompt:
-                input_messages.append({"role": "developer", "content": system_prompt})
-            input_messages.append({"role": "user", "content": prompt})
-
-            kwargs: dict[str, Any] = {
-                "model": model_name,
-                "input": input_messages,
-                "text": {
-                    "format": {
-                        "type": "json_schema",
-                        "name": response_schema.__name__,
-                        "schema": response_schema.model_json_schema(),
-                        "strict": True,
-                    },
-                },
-            }
-            if max_tokens is not None:
-                kwargs["max_output_tokens"] = max_tokens
-            if temperature is not None:
-                kwargs["temperature"] = temperature
-
             try:
-                response = await client.responses.create(**kwargs)
-                content = response.output_text or "{}"
-                data = json.loads(content)
-                result = response_schema.model_validate(data)
-                logger.debug(
-                    "Structured output generated (Responses API)",
-                    extra={"schema": response_schema.__name__},
+                return await self._structured_with_agents_sdk(
+                    prompt, response_schema, system_prompt
                 )
-                return result
             except Exception as e:
                 logger.warning(
-                    "Responses API structured output failed, falling back to LangChain",
+                    "Agents SDK structured output failed, falling back to LangChain",
                     extra={"error": str(e), "schema": response_schema.__name__},
                 )
 
@@ -252,6 +221,41 @@ class LangChainLLMAdapter(LLMClientPort):
         except Exception as e:
             logger.error(f"Structured output generation failed: {e}")
             raise
+
+    async def _structured_with_agents_sdk(
+        self,
+        prompt: str,
+        response_schema: type[T],
+        system_prompt: str | None = None,
+    ) -> T:
+        """Agents SDK로 구조화된 응답 생성 (Primary)."""
+        from agents import Agent, Runner, RunConfig
+        from agents.models.openai_responses import OpenAIResponsesModel
+
+        client = self._llm._client
+        model_name = getattr(self._llm, "model", "gpt-5.2")
+
+        agent = Agent(
+            name="structured_output_agent",
+            instructions=system_prompt or "",
+            model=OpenAIResponsesModel(
+                model=model_name,
+                openai_client=client,
+            ),
+            output_type=response_schema,
+        )
+
+        result = await Runner.run(
+            agent,
+            input=prompt,
+            run_config=RunConfig(tracing_disabled=True),
+        )
+
+        logger.debug(
+            "Structured output generated (Agents SDK)",
+            extra={"schema": response_schema.__name__},
+        )
+        return result.final_output
 
     async def generate_with_tools(
         self,
