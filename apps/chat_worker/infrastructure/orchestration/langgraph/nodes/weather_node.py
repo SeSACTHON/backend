@@ -129,15 +129,20 @@ def create_weather_node(
         """
         job_id = state.get("job_id", "")
         message = state.get("message", "")
+        intent = state.get("intent", "general")
 
-        # Progress: 시작 (UX) - 조용하게 (보조 정보)
-        await event_publisher.notify_stage(
-            task_id=job_id,
-            stage="weather",
-            status="started",
-            progress=40,
-            message="날씨 정보 필요 여부 확인 중",
-        )
+        # Primary intent일 때만 stage 이벤트 발행 (enrichment면 UI 간섭 방지)
+        is_primary = intent == "weather"
+
+        # Progress: 시작 (UX) - primary일 때만
+        if is_primary:
+            await event_publisher.notify_stage(
+                task_id=job_id,
+                stage="weather",
+                status="started",
+                progress=40,
+                message="날씨 정보 확인 중",
+            )
 
         # 1. LLM Function Calling으로 날씨 정보 필요 여부 판단
         system_prompt = """사용자 질문에 날씨 정보가 필요한지 판단하세요.
@@ -168,12 +173,13 @@ def create_weather_node(
                     "Weather not needed for this query",
                     extra={"job_id": job_id, "user_message": message},
                 )
-                await event_publisher.notify_stage(
-                    task_id=job_id,
-                    stage="weather",
-                    status="skipped",
-                    message="날씨 정보 불필요",
-                )
+                if is_primary:
+                    await event_publisher.notify_stage(
+                        task_id=job_id,
+                        stage="weather",
+                        status="skipped",
+                        message="날씨 정보 불필요",
+                    )
                 return {
                     "weather_context": create_context(
                         data={"skipped": True, "reason": "날씨 정보 불필요"},
@@ -226,12 +232,13 @@ def create_weather_node(
                 "Weather skipped - no location",
                 extra={"job_id": job_id},
             )
-            await event_publisher.notify_stage(
-                task_id=job_id,
-                stage="weather",
-                status="skipped",
-                message="위치 정보 없음",
-            )
+            if is_primary:
+                await event_publisher.notify_stage(
+                    task_id=job_id,
+                    stage="weather",
+                    status="skipped",
+                    message="위치 정보 없음",
+                )
             return {
                 "weather_context": create_error_context(
                     producer="weather",
@@ -248,12 +255,13 @@ def create_weather_node(
                     "error": output.error_message,
                 },
             )
-            await event_publisher.notify_stage(
-                task_id=job_id,
-                stage="weather",
-                status="failed",
-                result={"error": output.error_message},
-            )
+            if is_primary:
+                await event_publisher.notify_stage(
+                    task_id=job_id,
+                    stage="weather",
+                    status="failed",
+                    result={"error": output.error_message},
+                )
             return {
                 "weather_context": create_error_context(
                     producer="weather",
@@ -270,20 +278,21 @@ def create_weather_node(
         if geocoded_place:
             context["location_name"] = geocoded_place
 
-        temp = context.get("temperature")
-        location_msg = f" ({geocoded_place})" if geocoded_place else ""
-        await event_publisher.notify_stage(
-            task_id=job_id,
-            stage="weather",
-            status="completed",
-            progress=45,
-            result={
-                "temperature": temp,
-                "has_tip": has_tip,
-                "location_name": geocoded_place,
-            },
-            message=f"날씨 확인 완료{location_msg}: {temp}도" if temp else "날씨 확인 완료",
-        )
+        if is_primary:
+            temp = context.get("temperature")
+            location_msg = f" ({geocoded_place})" if geocoded_place else ""
+            await event_publisher.notify_stage(
+                task_id=job_id,
+                stage="weather",
+                status="completed",
+                progress=45,
+                result={
+                    "temperature": temp,
+                    "has_tip": has_tip,
+                    "location_name": geocoded_place,
+                },
+                message=f"날씨 확인 완료{location_msg}: {temp}도" if temp else "날씨 확인 완료",
+            )
 
         return {
             "weather_context": create_context(

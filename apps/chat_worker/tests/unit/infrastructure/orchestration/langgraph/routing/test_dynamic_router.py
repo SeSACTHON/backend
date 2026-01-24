@@ -259,6 +259,65 @@ class TestDynamicRouter:
         assert len(sends) == 1
         assert sends[0].node == "waste_rag"
 
+    def test_conditional_web_search_for_low_confidence_general(self):
+        """general intent + 낮은 confidence → web_search enrichment 추가."""
+        router = create_dynamic_router(
+            enable_multi_intent=False,
+            enable_enrichment=False,
+            enable_conditional=True,
+        )
+
+        state = {
+            "intent": "general",
+            "intent_confidence": 0.55,  # 낮은 확신도
+            "message": "대홍수 평점 알려줘",
+            "job_id": "test-123",
+        }
+        sends = router(state)
+
+        nodes = {s.node for s in sends}
+        assert "general" in nodes
+        assert "web_search" in nodes
+
+    def test_conditional_web_search_not_triggered_for_high_confidence_general(self):
+        """general intent + 높은 confidence → web_search 미추가."""
+        router = create_dynamic_router(
+            enable_multi_intent=False,
+            enable_enrichment=False,
+            enable_conditional=True,
+        )
+
+        state = {
+            "intent": "general",
+            "intent_confidence": 0.90,  # 높은 확신도
+            "message": "안녕하세요",
+            "job_id": "test-123",
+        }
+        sends = router(state)
+
+        nodes = {s.node for s in sends}
+        assert nodes == {"general"}
+
+    def test_conditional_web_search_for_non_general_with_keyword(self):
+        """비-general intent + 실시간 키워드 → web_search enrichment 추가."""
+        router = create_dynamic_router(
+            enable_multi_intent=False,
+            enable_enrichment=False,
+            enable_conditional=True,
+        )
+
+        state = {
+            "intent": "waste",
+            "intent_confidence": 0.90,
+            "message": "최신 분리배출 정책 알려줘",  # "최신" 키워드
+            "job_id": "test-123",
+        }
+        sends = router(state)
+
+        nodes = {s.node for s in sends}
+        assert "waste_rag" in nodes
+        assert "web_search" in nodes
+
 
 class TestEnrichmentRules:
     """Enrichment 규칙 테스트."""
