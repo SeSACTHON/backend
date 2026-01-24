@@ -517,7 +517,14 @@ async def run_agents_sdk_agent(
     tool_executor: CollectionPointToolExecutor,
 ) -> dict[str, Any]:
     """Agents SDK로 Collection Point Agent 실행 (Primary)."""
-    from agents import Agent, Runner, RunConfig, function_tool, RunContextWrapper, OpenAIResponsesModel
+    from agents import (
+        Agent,
+        Runner,
+        RunConfig,
+        function_tool,
+        RunContextWrapper,
+        OpenAIResponsesModel,
+    )
 
     @function_tool
     async def search_collection_points(
@@ -539,8 +546,12 @@ async def run_agents_sdk_agent(
         result = await ctx.context.tool_executor.execute("search_collection_points", args)
         result_data = result.data if result.success else {"error": result.error}
         ctx.context.tool_results.append(
-            {"tool": "search_collection_points", "arguments": args,
-             "result": result_data, "success": result.success}
+            {
+                "tool": "search_collection_points",
+                "arguments": args,
+                "result": result_data,
+                "success": result.success,
+            }
         )
         return json.dumps(result_data, ensure_ascii=False)
 
@@ -566,8 +577,12 @@ async def run_agents_sdk_agent(
         result = await ctx.context.tool_executor.execute("get_nearby_collection_points", args)
         result_data = result.data if result.success else {"error": result.error}
         ctx.context.tool_results.append(
-            {"tool": "get_nearby_collection_points", "arguments": args,
-             "result": result_data, "success": result.success}
+            {
+                "tool": "get_nearby_collection_points",
+                "arguments": args,
+                "result": result_data,
+                "success": result.success,
+            }
         )
         return json.dumps(result_data, ensure_ascii=False)
 
@@ -581,13 +596,15 @@ async def run_agents_sdk_agent(
         Args:
             place_name: 좌표로 변환할 장소명 또는 주소. 예: '강남역', '홍대'.
         """
-        result = await ctx.context.tool_executor.execute(
-            "geocode", {"place_name": place_name}
-        )
+        result = await ctx.context.tool_executor.execute("geocode", {"place_name": place_name})
         result_data = result.data if result.success else {"error": result.error}
         ctx.context.tool_results.append(
-            {"tool": "geocode", "arguments": {"place_name": place_name},
-             "result": result_data, "success": result.success}
+            {
+                "tool": "geocode",
+                "arguments": {"place_name": place_name},
+                "result": result_data,
+                "success": result.success,
+            }
         )
         return json.dumps(result_data, ensure_ascii=False)
 

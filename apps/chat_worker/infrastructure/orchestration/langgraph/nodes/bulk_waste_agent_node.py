@@ -399,7 +399,14 @@ async def run_agents_sdk_agent(
     tool_executor: BulkWasteToolExecutor,
 ) -> dict[str, Any]:
     """Agents SDK로 Bulk Waste Agent 실행 (Primary)."""
-    from agents import Agent, Runner, RunConfig, function_tool, RunContextWrapper, OpenAIResponsesModel
+    from agents import (
+        Agent,
+        Runner,
+        RunConfig,
+        function_tool,
+        RunContextWrapper,
+        OpenAIResponsesModel,
+    )
 
     @function_tool
     async def get_collection_info(
@@ -416,8 +423,12 @@ async def run_agents_sdk_agent(
         )
         result_data = result.data if result.success else {"error": result.error}
         ctx.context.tool_results.append(
-            {"tool": "get_collection_info", "arguments": {"sigungu": sigungu},
-             "result": result_data, "success": result.success}
+            {
+                "tool": "get_collection_info",
+                "arguments": {"sigungu": sigungu},
+                "result": result_data,
+                "success": result.success,
+            }
         )
         return json.dumps(result_data, ensure_ascii=False)
 
@@ -438,8 +449,12 @@ async def run_agents_sdk_agent(
         )
         result_data = result.data if result.success else {"error": result.error}
         ctx.context.tool_results.append(
-            {"tool": "search_fee", "arguments": {"sigungu": sigungu, "item_name": item_name},
-             "result": result_data, "success": result.success}
+            {
+                "tool": "search_fee",
+                "arguments": {"sigungu": sigungu, "item_name": item_name},
+                "result": result_data,
+                "success": result.success,
+            }
         )
         return json.dumps(result_data, ensure_ascii=False)
 

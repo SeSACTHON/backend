@@ -263,9 +263,8 @@ class LangChainLLMAdapter(LLMClientPort):
             result = Runner.run_streamed(agent, input=user_content)
 
             async for event in result.stream_events():
-                if (
-                    event.type == "raw_response_event"
-                    and isinstance(event.data, ResponseTextDeltaEvent)
+                if event.type == "raw_response_event" and isinstance(
+                    event.data, ResponseTextDeltaEvent
                 ):
                     if event.data.delta:
                         _yielded = True
@@ -274,9 +273,7 @@ class LangChainLLMAdapter(LLMClientPort):
             return
 
         except ImportError:
-            logger.warning(
-                "openai-agents not installed, falling back to Responses API"
-            )
+            logger.warning("openai-agents not installed, falling back to Responses API")
         except Exception as e:
             if _yielded:
                 raise
@@ -294,9 +291,7 @@ class LangChainLLMAdapter(LLMClientPort):
         tool_configs = []
         for tool in tools:
             if tool == "web_search":
-                tool_configs.append(
-                    {"type": "web_search_preview", "search_context_size": "medium"}
-                )
+                tool_configs.append({"type": "web_search_preview", "search_context_size": "medium"})
 
         try:
             response = await client.responses.create(

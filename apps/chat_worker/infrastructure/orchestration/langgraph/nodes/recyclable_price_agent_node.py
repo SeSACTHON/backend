@@ -497,7 +497,14 @@ async def run_agents_sdk_agent(
     tool_executor: RecyclablePriceToolExecutor,
 ) -> dict[str, Any]:
     """Agents SDK로 Recyclable Price Agent 실행 (Primary)."""
-    from agents import Agent, Runner, RunConfig, function_tool, RunContextWrapper, OpenAIResponsesModel
+    from agents import (
+        Agent,
+        Runner,
+        RunConfig,
+        function_tool,
+        RunContextWrapper,
+        OpenAIResponsesModel,
+    )
 
     @function_tool
     async def search_price(
@@ -515,8 +522,12 @@ async def run_agents_sdk_agent(
         result = await ctx.context.tool_executor.execute("search_price", args)
         result_data = result.data if result.success else {"error": result.error}
         ctx.context.tool_results.append(
-            {"tool": "search_price", "arguments": args,
-             "result": result_data, "success": result.success}
+            {
+                "tool": "search_price",
+                "arguments": args,
+                "result": result_data,
+                "success": result.success,
+            }
         )
         return json.dumps(result_data, ensure_ascii=False)
 
@@ -536,8 +547,12 @@ async def run_agents_sdk_agent(
         result = await ctx.context.tool_executor.execute("get_category_prices", args)
         result_data = result.data if result.success else {"error": result.error}
         ctx.context.tool_results.append(
-            {"tool": "get_category_prices", "arguments": args,
-             "result": result_data, "success": result.success}
+            {
+                "tool": "get_category_prices",
+                "arguments": args,
+                "result": result_data,
+                "success": result.success,
+            }
         )
         return json.dumps(result_data, ensure_ascii=False)
 
