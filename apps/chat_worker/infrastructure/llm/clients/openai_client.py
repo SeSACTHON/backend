@@ -280,9 +280,7 @@ class OpenAILLMClient(LLMClientPort):
         tool_configs = []
         for tool in tools:
             if tool == "web_search":
-                tool_configs.append(
-                    {"type": "web_search_preview", "search_context_size": "medium"}
-                )
+                tool_configs.append({"type": "web_search_preview", "search_context_size": "medium"})
 
         try:
             response = await self._client.responses.create(
