@@ -9,24 +9,22 @@ data:
   CHAT_WORKER_SERVICE_NAME: chat-worker
   CHAT_WORKER_ENVIRONMENT: base
   CHAT_WORKER_LOG_LEVEL: INFO
-  # RabbitMQ (Taskiq) - credentials overridden by secret
-  CHAT_WORKER_RABBITMQ_URL: amqp://guest:guest@eco2-rabbitmq.rabbitmq.svc.cluster.local:5672/eco2
+  # CHAT_WORKER_RABBITMQ_URL: provided by ExternalSecret
   CHAT_WORKER_RABBITMQ_QUEUE: chat.process
-  # Redis (기본 - progress_notifier 등, Master Pod 직접 연결)
-  CHAT_WORKER_REDIS_URL: redis://rfr-pubsub-redis-0.rfr-pubsub-redis.redis.svc.cluster.local:6379/0
+  # Redis (기본 - cache, checkpoint, interaction state)
+  # cache-redis: dev replicas=1 (항상 master), DB 2로 Celery(0,1)/Location(5)/Image(6) 격리
+  CHAT_WORKER_REDIS_URL: redis://rfr-cache-redis.redis.svc.cluster.local:6379/2
   # Redis (Streams - 이벤트 발행, event-router가 소비)
-  CHAT_WORKER_REDIS_STREAMS_URL: redis://rfr-streams-redis-0.rfr-streams-redis.redis.svc.cluster.local:6379/0
-  # Redis (Pub/Sub - SSE Gateway 브로드캐스트)
-  CHAT_WORKER_REDIS_PUBSUB_URL: redis://rfr-pubsub-redis-0.rfr-pubsub-redis.redis.svc.cluster.local:6379/0
+  CHAT_WORKER_REDIS_STREAMS_URL: redis://rfr-streams-redis.redis.svc.cluster.local:6379/0
   # Checkpoint TTL (분, Worker Redis에 저장)
   CHAT_WORKER_CHECKPOINT_TTL_MINUTES: '1440'
   # Checkpoint Read-Through (Worker용, Cold Start PG Fallback)
   # Redis TTL 만료 세션 → PG에서 읽어 Redis로 promote (LRU)
-  CHAT_WORKER_CHECKPOINT_READ_POSTGRES_URL: postgresql+asyncpg://postgres:postgres@postgresql.postgres.svc.cluster.local:5432/eco2
+  # CHAT_WORKER_CHECKPOINT_READ_POSTGRES_URL is in secrets (credentials)
   CHAT_WORKER_CHECKPOINT_READ_PG_POOL_MIN: '1'
   CHAT_WORKER_CHECKPOINT_READ_PG_POOL_MAX: '2'
   # Checkpoint Syncer (Redis → PostgreSQL 동기화)
-  CHAT_WORKER_SYNCER_POSTGRES_URL: postgresql+asyncpg://postgres:postgres@postgresql.postgres.svc.cluster.local:5432/eco2
+  # CHAT_WORKER_SYNCER_POSTGRES_URL is in secrets (credentials)
   CHAT_WORKER_SYNCER_PG_POOL_MIN_SIZE: '1'
   CHAT_WORKER_SYNCER_PG_POOL_MAX_SIZE: '5'
   CHAT_WORKER_SYNCER_INTERVAL: '5.0'

@@ -10,7 +10,8 @@ grpcio>=1.60.0
 grpcio-tools>=1.60.0
 
 # LLM Clients (chat 패키지 의존성)
-openai>=1.58.0
+openai>=2.9.0,<3  # Responses API + Agents SDK (openai-agents requires >=2.9.0)
+openai-agents>=0.7.0  # Agents SDK (WebSearchTool, multi-agent)
 anthropic>=0.40.0
 google-genai>=0.3.0
 tiktoken>=0.8.0
@@ -20,8 +21,7 @@ Pillow>=10.0.0  # Image processing for Gemini native image generation
 # Python >=3.10 필요
 langgraph>=1.0.6,<2.0.0
 langchain-core>=1.0.0,<2.0.0  # LangGraph 1.0과 호환
-langgraph-checkpoint-postgres>=2.0.0  # PostgreSQL 체크포인터
-langgraph-checkpoint-redis>=0.3.0  # Redis 체크포인터 (Fallback)
+langgraph-checkpoint-postgres>=2.0.0  # PostgreSQL 체크포인터 (checkpoint_syncer용)
 
 # LangSmith + OpenTelemetry 통합
 # >= 0.4.25 권장 (OTEL export 안정성 개선)

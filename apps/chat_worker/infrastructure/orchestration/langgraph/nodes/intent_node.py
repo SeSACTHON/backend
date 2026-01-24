@@ -97,6 +97,8 @@ def create_intent_node(
         if messages:
             conversation_history = []
             for msg in messages[-6:]:  # 최근 6개 메시지 (3턴)
+                if isinstance(msg, str):
+                    continue  # legacy checkpoint (pre-serde)
                 role = "user" if msg.type == "human" else "assistant"
                 content = msg.content if isinstance(msg.content, str) else str(msg.content)
                 conversation_history.append({"role": role, "content": content})

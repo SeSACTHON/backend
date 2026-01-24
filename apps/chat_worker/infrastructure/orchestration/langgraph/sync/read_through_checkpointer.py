@@ -25,6 +25,7 @@ from typing import Any, AsyncIterator, Optional, Sequence
 
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import (
+    BaseCheckpointSaver,
     ChannelVersions,
     Checkpoint,
     CheckpointMetadata,
@@ -34,7 +35,7 @@ from langgraph.checkpoint.base import (
 logger = logging.getLogger(__name__)
 
 
-class ReadThroughCheckpointer:
+class ReadThroughCheckpointer(BaseCheckpointSaver):
     """Redis Primary + PostgreSQL Read-Through Checkpointer.
 
     Write path: SyncableRedisSaver (Redis + sync queue)
@@ -50,6 +51,7 @@ class ReadThroughCheckpointer:
         redis_saver: Any,  # SyncableRedisSaver
         pg_saver: Any,  # AsyncPostgresSaver (read-only)
     ):
+        super().__init__()
         self._redis_saver = redis_saver
         self._pg_saver = pg_saver
         self._promote_count = 0
@@ -120,10 +122,9 @@ class ReadThroughCheckpointer:
         checkpoint: Checkpoint,
         metadata: CheckpointMetadata,
         new_versions: ChannelVersions,
-        stream_mode: str = "values",
     ) -> RunnableConfig:
         """Checkpoint 저장 (SyncableRedisSaver에 위임)."""
-        return await self._redis_saver.aput(config, checkpoint, metadata, new_versions, stream_mode)
+        return await self._redis_saver.aput(config, checkpoint, metadata, new_versions)
 
     async def aput_writes(
         self,
