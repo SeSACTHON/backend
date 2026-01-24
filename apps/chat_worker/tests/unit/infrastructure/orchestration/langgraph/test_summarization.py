@@ -35,9 +35,7 @@ class TestSummarizeMessagesTruncation:
         """800K chars 초과 메시지는 잘림 (tail 보존)."""
         llm = MockLLM()
         # 각 메시지가 100K chars → 10개 = 1M chars (800K 초과)
-        messages = [
-            HumanMessage(content="X" * 100_000) for _ in range(10)
-        ]
+        messages = [HumanMessage(content="X" * 100_000) for _ in range(10)]
 
         result = await summarize_messages(
             messages=messages,
