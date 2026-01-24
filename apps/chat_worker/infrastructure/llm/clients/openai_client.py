@@ -207,11 +207,10 @@ class OpenAILLMClient(LLMClientPort):
         system_prompt: str | None = None,
         context: dict[str, Any] | None = None,
     ) -> AsyncIterator[str]:
-        """네이티브 도구를 사용한 스트리밍 생성.
+        """네이티브 도구를 사용한 스트리밍 생성 (Responses API).
 
-        Strategy:
-        1. Primary: Agents SDK (openai-agents) — Agent + Runner.run_streamed()
-        2. Fallback: Responses API (client.responses.create) — SDK 미설치 또는 실패 시
+        OpenAI Responses API의 hosted tool (web_search)을 직접 사용.
+        API가 검색 실행 + 텍스트 생성을 단일 호출로 처리.
 
         Args:
             prompt: 사용자 프롬프트
@@ -228,63 +227,20 @@ class OpenAILLMClient(LLMClientPort):
             context_str = json.dumps(context, ensure_ascii=False, indent=2)
             user_content = f"## Context\n{context_str}\n\n## Question\n{prompt}"
 
-        # --- Primary: Agents SDK ---
-        _yielded = False
-        try:
-            from agents import Agent, Runner, WebSearchTool, OpenAIResponsesModel, RunConfig
-            from openai.types.responses import ResponseTextDeltaEvent
-
-            agent_tools = []
-            for tool in tools:
-                if tool == "web_search":
-                    agent_tools.append(WebSearchTool(search_context_size="medium"))
-
-            agent = Agent(
-                name="web_search_agent",
-                instructions=system_prompt or "",
-                model=OpenAIResponsesModel(
-                    model=self._model,
-                    openai_client=self._client,
-                ),
-                tools=agent_tools,
-            )
-
-            result = Runner.run_streamed(
-                agent,
-                input=user_content,
-                run_config=RunConfig(tracing_disabled=True),
-            )
-
-            async for event in result.stream_events():
-                if event.type == "raw_response_event" and isinstance(
-                    event.data, ResponseTextDeltaEvent
-                ):
-                    if event.data.delta:
-                        _yielded = True
-                        yield event.data.delta
-
-            return
-
-        except ImportError:
-            logger.warning("openai-agents not installed, falling back to Responses API")
-        except Exception as e:
-            if _yielded:
-                raise
-            logger.warning(
-                "Agents SDK failed, falling back to Responses API",
-                extra={"error": str(e), "model": self._model},
-            )
-
-        # --- Fallback: Responses API ---
+        # Responses API 입력 메시지
         input_messages: list[dict[str, str]] = []
         if system_prompt:
             input_messages.append({"role": "developer", "content": system_prompt})
         input_messages.append({"role": "user", "content": user_content})
 
-        tool_configs = []
+        # Tool 설정 (GA: "web_search")
+        tool_configs: list[dict[str, Any]] = []
         for tool in tools:
             if tool == "web_search":
-                tool_configs.append({"type": "web_search_preview", "search_context_size": "medium"})
+                tool_configs.append({
+                    "type": "web_search",
+                    "search_context_size": "medium",
+                })
 
         try:
             response = await self._client.responses.create(
@@ -301,7 +257,7 @@ class OpenAILLMClient(LLMClientPort):
 
         except Exception as e:
             logger.error(
-                "generate_with_tools failed (Responses API fallback)",
+                "generate_with_tools failed",
                 extra={"error": str(e), "model": self._model, "tools": tools},
             )
             raise
