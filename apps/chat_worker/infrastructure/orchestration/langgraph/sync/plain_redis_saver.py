@@ -17,6 +17,7 @@ cp:history:{thread_id}:{checkpoint_ns}               → Sorted Set (checkpoint_
 
 from __future__ import annotations
 
+import base64
 import json
 import logging
 import time
@@ -138,7 +139,6 @@ class PlainAsyncRedisSaver(BaseCheckpointSaver):
         checkpoint: Checkpoint,
         metadata: CheckpointMetadata,
         new_versions: ChannelVersions,
-        stream_mode: str = "values",
     ) -> RunnableConfig:
         """Checkpoint 저장."""
         assert self._redis is not None, "Call asetup() first"
@@ -307,19 +307,37 @@ class PlainAsyncRedisSaver(BaseCheckpointSaver):
         return time.time()
 
     def _serialize(self, obj: Any) -> str:
-        """객체를 JSON 문자열로 직렬화 (serde로 타입 정보 보존)."""
-        _type, data = self.serde.dumps_typed(obj)
-        return data.decode("utf-8")
+        """객체를 직렬화 (serde로 타입 정보 보존).
+
+        JsonPlusSerializer는 msgpack 바이너리를 반환하므로,
+        Redis string 저장을 위해 base64로 인코딩.
+        포맷: "type_tag:base64_data" (예: "msgpack:xIcF9...")
+        """
+        type_tag, data = self.serde.dumps_typed(obj)
+        encoded = base64.b64encode(data).decode("ascii")
+        return f"{type_tag}:{encoded}"
 
     def _deserialize(self, data: str) -> Any:
-        """JSON 문자열을 객체로 역직렬화.
+        """직렬화된 문자열을 객체로 역직렬화.
 
-        serde 포맷 우선, 실패 시 legacy json.loads 폴백 (하위 호환).
+        포맷 감지:
+        1. "type_tag:base64_data" → serde.loads_typed (현재 포맷)
+        2. legacy json.loads 폴백 (하위 호환)
         """
+        # 현재 포맷: "type_tag:base64_data"
+        if ":" in data:
+            type_tag, encoded = data.split(":", 1)
+            if type_tag in ("msgpack", "json"):
+                try:
+                    raw = base64.b64decode(encoded)
+                    return self.serde.loads_typed((type_tag, raw))
+                except Exception:
+                    pass
+        # Legacy 폴백: plain JSON
         try:
-            return self.serde.loads_typed(("json", data.encode("utf-8")))
-        except Exception:
             return json.loads(data)
+        except Exception:
+            return data
 
     async def _get_pending_writes(
         self, thread_id: str, checkpoint_ns: str, checkpoint_id: str
