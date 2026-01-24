@@ -176,8 +176,8 @@ def create_web_search_node(
         # Standalone mode: intent == "web_search" → 무조건 검색
         is_standalone = intent == "web_search"
 
-        # 1. 진행 상황 알림
-        if event_publisher is not None:
+        # 1. 진행 상황 알림 (primary intent일 때만 — enrichment면 UI 간섭 방지)
+        if event_publisher is not None and is_standalone:
             await event_publisher.notify_stage(
                 task_id=job_id,
                 stage="web_search",
@@ -245,7 +245,7 @@ def create_web_search_node(
                 "Web search returned no results",
                 extra={"job_id": job_id},
             )
-            if event_publisher is not None:
+            if event_publisher is not None and is_standalone:
                 await event_publisher.notify_stage(
                     task_id=job_id,
                     stage="web_search",
@@ -261,7 +261,7 @@ def create_web_search_node(
             }
 
         # 4. 결과를 context 채널에 저장
-        if event_publisher is not None:
+        if event_publisher is not None and is_standalone:
             await event_publisher.notify_stage(
                 task_id=job_id,
                 stage="web_search",
