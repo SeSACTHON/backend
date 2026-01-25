@@ -33,7 +33,7 @@ import logging
 import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import TYPE_CHECKING, Any, Protocol
 
 from langchain_core.messages import HumanMessage
@@ -328,7 +328,9 @@ class ProcessChatCommand:
             # 5. 작업 완료 이벤트 (running → completed)
             # Event-First Architecture: done 이벤트에 persistence 데이터 포함
             # DB Consumer가 이 이벤트를 소비하여 PostgreSQL에 저장
-            now = datetime.now(timezone.utc)
+            # User 메시지는 Assistant 응답보다 1ms 먼저 생성된 것으로 기록 (정렬 순서 보장)
+            assistant_created_at = datetime.now(timezone.utc)
+            user_created_at = assistant_created_at - timedelta(milliseconds=1)
             await self._progress_notifier.notify_stage(
                 task_id=request.job_id,
                 stage="done",
@@ -342,10 +344,10 @@ class ProcessChatCommand:
                         "conversation_id": request.session_id,
                         "user_id": request.user_id,
                         "user_message": request.message,
-                        "user_message_created_at": now.isoformat(),
+                        "user_message_created_at": user_created_at.isoformat(),
                         "user_image_url": request.image_url,
                         "assistant_message": answer,
-                        "assistant_message_created_at": now.isoformat(),
+                        "assistant_message_created_at": assistant_created_at.isoformat(),
                         "intent": intent,
                         "metadata": result.get("metadata"),
                     },

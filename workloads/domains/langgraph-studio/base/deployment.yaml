@@ -1,0 +1,98 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langgraph-studio
+  namespace: istio-system
+  labels:
+    app: langgraph-studio
+    tier: observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langgraph-studio
+  template:
+    metadata:
+      labels:
+        app: langgraph-studio
+        version: v1
+      annotations:
+        sidecar.istio.io/inject: 'false'
+    spec:
+      containers:
+      - name: langgraph-studio
+        image: docker.io/mng990/eco2:chat-worker-dev-latest
+        command: [langgraph]
+        args:
+        - dev
+        - --host
+        - 0.0.0.0
+        - --port
+        - '2024'
+        - --no-browser
+        ports:
+        - containerPort: 2024
+          name: http
+          protocol: TCP
+        env:
+        # LangSmith 설정
+        - name: LANGCHAIN_TRACING_V2
+          value: 'true'
+        - name: LANGCHAIN_PROJECT
+          value: eco2-langgraph-studio
+        - name: LANGCHAIN_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: langsmith-secret
+              key: api-key
+              optional: true
+        # LLM API Keys
+        - name: OPENAI_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: langgraph-studio-secret
+              key: openai-api-key
+              optional: true
+        - name: GOOGLE_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: langgraph-studio-secret
+              key: google-api-key
+              optional: true
+        workingDir: /app
+        volumeMounts:
+        - name: langgraph-config
+          mountPath: /app/langgraph.json
+          subPath: langgraph.json
+        resources:
+          requests:
+            cpu: 100m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+        livenessProbe:
+          httpGet:
+            path: /ok
+            port: 2024
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ok
+            port: 2024
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+      volumes:
+      - name: langgraph-config
+        configMap:
+          name: langgraph-config
+      nodeSelector:
+        domain: observability
+      tolerations:
+      - key: domain
+        operator: Equal
+        value: observability
+        effect: NoSchedule
