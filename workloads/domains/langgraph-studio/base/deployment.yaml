@@ -22,8 +22,9 @@ spec:
       containers:
       - name: langgraph-studio
         image: docker.io/mng990/eco2:chat-worker-dev-latest
-        command: [python, -m, langgraph, dev]
+        command: [langgraph]
         args:
+        - dev
         - --host
         - 0.0.0.0
         - --port
