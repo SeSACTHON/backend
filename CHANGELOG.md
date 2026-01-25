@@ -7,11 +7,14 @@ Eco² Backend 프로젝트의 모든 주목할 만한 변경사항을 기록합�
 
 ---
 
-## [1.1.0-pre] - 2026-01-21
+## [1.1.0] - 2026-01-25
 
 ### 🚀 Highlights
 > **Chat Agent 전환**: Celery 기반 단순 파이프라인에서 LangGraph 기반 Multi-Agent 아키텍처로 전면 전환.
 > 9개 Intent 분류, Function Calling Agents, 이미지 생성, Token Streaming 등 차세대 대화형 AI 시스템 구축.
+>
+> **OpenAI Agents SDK 마이그레이션**: Structured Output과 Web Search에 Primary(Agents SDK) + Fallback(Responses API) 듀얼 패턴 적용.
+> **Redis Primary Checkpoint**: LangGraph 체크포인트를 Redis에 먼저 쓰고 PostgreSQL로 비동기 동기화하는 2-tier 아키텍처 구현.
 
 ### Added
 - **LangGraph 기반 Multi-Agent 아키텍처**
@@ -27,10 +30,27 @@ Eco² Backend 프로젝트의 모든 주목할 만한 변경사항을 기록합�
   - **GPT-5.2 / Gemini 3 네이티브 Function Calling** 적용
 
 - **이미지 생성 파이프라인**
-  - **Gemini 기반 이미지 생성**: `gemini-2.0-flash-exp` 모델 활용
+  - **Gemini 3 Pro Image 모델**: `gemini-3-pro-image-preview` 네이티브 이미지 생성
   - **gRPC 이미지 업로드**: Images API와 gRPC 통신으로 S3 업로드 후 CDN URL 반환
   - **Character Reference 지원**: 캐릭터 이름 감지 및 이미지 생성 컨텍스트 전달
   - **Token Explosion 방지**: Base64 이미지를 프롬프트에서 제외하는 안전 장치
+
+- **OpenAI Agents SDK 마이그레이션**
+  - **Structured Output**: Agent + output_type + Runner.run 기반 JSON 스키마 생성
+  - **Web Search Tool**: WebSearchTool + Runner.run_streamed 기반 실시간 검색
+  - **Fallback 패턴**: Agents SDK 실패 시 Responses API로 자동 전환
+  - **LangChain Adapter**: LangChainLLMAdapter에서 _client 기반 Agents SDK 호출
+
+- **Redis Primary Checkpoint 아키텍처**
+  - **Redis First Write**: LangGraph 체크포인트를 Redis에 먼저 저장 (10ms)
+  - **PostgreSQL Async Sync**: 백그라운드에서 PostgreSQL로 비동기 동기화
+  - **Optimistic Update**: 클라이언트에 즉시 응답 후 영속화 완료
+  - **Eventual Consistency**: Redis 장애 시 PostgreSQL에서 복구 가능
+
+- **google-genai SDK 1.60.0 마이그레이션**
+  - **system_instruction 파라미터**: GenerateContentConfig 내부로 이동
+  - **FunctionCallingConfigMode**: 열거형 기반 function calling 모드 설정
+  - **Gemini Client 업데이트**: 최신 SDK 스펙에 맞춰 전면 수정
 
 - **Token Streaming 개선**
   - **stream_mode=messages**: LangGraph 메시지 스트리밍 모드 적용
@@ -66,6 +86,8 @@ Eco² Backend 프로젝트의 모든 주목할 만한 변경사항을 기록합�
 - **Token Duplication**: answer_node에서 토큰 발행 단일화
 - **max_tokens 처리**: None 값 API 호출 제외
 - **Multi-Intent JSON 파싱**: Markdown 코드 블록 제거 로직 추가
+- **InvalidUpdateError 병렬 노드 실행**: `_handle_failure()`에서 입력 state spread 제거로 `job_id` 충돌 방지
+- **google-genai SDK 호환성**: system_instruction, FunctionCallingConfigMode 최신 API 적용
 
 ### Infrastructure
 - **chat-worker 노드**: TaskIQ + RabbitMQ 기반 비동기 작업 처리
@@ -717,6 +739,6 @@ Eco² Backend 프로젝트의 모든 주목할 만한 변경사항을 기록합�
 
 ---
 
-**문서 버전**: 1.1.0-pre
-**최종 업데이트**: 2026-01-21
+**문서 버전**: 1.1.0
+**최종 업데이트**: 2026-01-25
 **관리자**: Backend Platform Team
