@@ -119,7 +119,10 @@ class ChatRepositorySQLA(ChatRepositoryPort):
         stmt = (
             select(Message)
             .where(messages_table.c.chat_id == chat_id)
-            .order_by(messages_table.c.created_at.asc())
+            .order_by(
+                messages_table.c.created_at.asc(),
+                messages_table.c.role.desc(),  # 동일 timestamp 시 user가 assistant보다 먼저
+            )
             .limit(limit + 1)
         )
 
