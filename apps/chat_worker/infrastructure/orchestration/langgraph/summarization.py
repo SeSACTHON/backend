@@ -157,16 +157,18 @@ DEFAULT_KEEP_RECENT_MESSAGES = 6  # 동적 계산으로 대체됨
 
 
 def count_tokens_approximately(messages: list["AnyMessage"]) -> int:
-    """대략적인 토큰 수 계산.
+    """대략적인 토큰 수 계산 (다국어 대응).
 
-    정확한 토큰 계산은 tiktoken 필요.
-    여기서는 문자 수 기반 근사치 사용 (~4자 = 1토큰).
+    BPE 토크나이저 특성:
+    - 영어: ~4자 = 1토큰
+    - 한글: ~1.5자 = 1토큰 (자모 분리로 인해 1자당 2-3 tokens)
+    - 혼합 텍스트: 보수적으로 2자 = 1토큰 적용
 
     Args:
         messages: 메시지 리스트
 
     Returns:
-        대략적인 토큰 수
+        대략적인 토큰 수 (보수적 추정)
     """
     total_chars = 0
     for msg in messages:
@@ -178,7 +180,7 @@ def count_tokens_approximately(messages: list["AnyMessage"]) -> int:
                 for item in content:
                     if isinstance(item, dict) and "text" in item:
                         total_chars += len(item["text"])
-    return total_chars // 4  # 대략 4자당 1토큰
+    return total_chars // 2  # 한글 혼합 고려: 보수적으로 2자당 1토큰
 
 
 # 기본 프롬프트 (PromptLoader가 없을 때 사용)
@@ -223,7 +225,7 @@ async def summarize_messages(
     existing_summary: str | None = None,
     max_summary_tokens: int = DEFAULT_MAX_SUMMARY_TOKENS,
     prompt_loader: "PromptLoaderPort | None" = None,
-    max_input_chars: int = 800_000,
+    max_input_tokens: int | None = None,
 ) -> str:
     """메시지 히스토리 요약.
 
@@ -233,13 +235,15 @@ async def summarize_messages(
         existing_summary: 기존 요약 (있으면 병합)
         max_summary_tokens: 요약 최대 토큰
         prompt_loader: 프롬프트 로더 (선택)
-        max_input_chars: messages_text 최대 문자 수 (기본 800K ≈ 200K tokens)
+        max_input_tokens: 최대 입력 토큰 수 (None이면 200K 기본값)
 
     Returns:
         요약된 텍스트
     """
     if not messages:
         return existing_summary or ""
+
+    effective_max_tokens = max_input_tokens or 200_000
 
     # 요약 프롬프트 로드 (PromptLoader 또는 기본값)
     if prompt_loader is not None:
@@ -256,18 +260,21 @@ async def summarize_messages(
         f"{msg.__class__.__name__}: {msg.content}" for msg in messages if hasattr(msg, "content")
     )
 
-    # 입력 크기 제한: 모델 context window 초과 방지
-    # 초과 시 가장 최근 메시지 위주로 유지 (tail 보존)
-    if len(messages_text) > max_input_chars:
+    # 토큰 기반 입력 크기 제한
+    estimated_tokens = len(messages_text) // 2  # 한글 혼합 보수적 추정
+    if estimated_tokens > effective_max_tokens:
+        # tail 보존: 최근 메시지 위주로 유지
+        ratio = effective_max_tokens / estimated_tokens
+        truncated_len = int(len(messages_text) * ratio * 0.9)  # 10% 여유
         logger.warning(
             "summarize_messages input truncated",
             extra={
-                "original_chars": len(messages_text),
-                "truncated_to": max_input_chars,
+                "original_tokens": estimated_tokens,
+                "truncated_to_tokens": effective_max_tokens,
                 "message_count": len(messages),
             },
         )
-        messages_text = messages_text[-max_input_chars:]
+        messages_text = messages_text[-truncated_len:]
 
     # 프롬프트 포맷팅
     existing_summary_section = f"이전 요약:\n{existing_summary}\n\n" if existing_summary else ""
@@ -276,6 +283,18 @@ async def summarize_messages(
         existing_summary_section=existing_summary_section,
         messages_text=messages_text,
     )
+
+    # Final token guard: llm.generate() 호출 전 최종 검증
+    final_tokens = len(summary_prompt) // 2
+    if final_tokens > effective_max_tokens:
+        logger.error(
+            "summarize_messages: final prompt exceeds token limit, skipping",
+            extra={
+                "final_tokens": final_tokens,
+                "max_input_tokens": effective_max_tokens,
+            },
+        )
+        return existing_summary or ""
 
     try:
         summary = await llm.generate(summary_prompt)
@@ -287,12 +306,13 @@ async def summarize_messages(
             },
         )
         return summary
-    except (ValueError, RuntimeError) as e:
+    except Exception as e:
         logger.error(
             "summarization_failed",
             extra={"error": str(e), "error_type": type(e).__name__},
         )
         # Fallback: 기존 요약 반환 또는 빈 문자열
+        # BadRequestError(token limit), APIError 등 모든 예외 포착
         return existing_summary or ""
 
 
@@ -469,6 +489,8 @@ class SummarizationNode:
             # 대략 1 메시지 = 500 토큰 가정 (코드 포함 시 더 길어짐)
             keep_recent_tokens = config.keep_recent_tokens
             self.keep_recent_messages = keep_recent_messages or max(10, keep_recent_tokens // 500)
+            # 요약 LLM 호출 시 최대 입력 토큰 (trigger_threshold의 70%)
+            self._max_input_tokens = int(config.trigger_threshold * 0.7)
 
             logger.info(
                 "SummarizationNode initialized with dynamic config",
@@ -479,6 +501,7 @@ class SummarizationNode:
                     "summary_tokens": self.max_summary_tokens,
                     "keep_recent_tokens": keep_recent_tokens,
                     "keep_recent_messages": self.keep_recent_messages,
+                    "max_input_tokens": self._max_input_tokens,
                 },
             )
         else:
@@ -488,6 +511,7 @@ class SummarizationNode:
             )
             self.max_summary_tokens = max_summary_tokens or DEFAULT_MAX_SUMMARY_TOKENS
             self.keep_recent_messages = keep_recent_messages or DEFAULT_KEEP_RECENT_MESSAGES
+            self._max_input_tokens = 200_000  # safe default
 
             logger.info(
                 "SummarizationNode initialized with static config",
@@ -498,15 +522,78 @@ class SummarizationNode:
                 },
             )
 
-        self._hook = create_summarization_hook(
-            llm=llm,
-            token_counter=token_counter,
-            max_tokens_before_summary=self.max_tokens_before_summary,
-            max_summary_tokens=self.max_summary_tokens,
-            keep_recent_messages=self.keep_recent_messages,
-            prompt_loader=prompt_loader,
+    async def __call__(self, state: dict[str, Any]) -> dict[str, Any]:
+        """LangGraph 노드: 컨텍스트 압축 + RemoveMessage.
+
+        임계값 초과 시:
+        1. older_messages를 요약
+        2. RemoveMessage로 older_messages 삭제
+        3. 요약 SystemMessage 추가
+        """
+        from langchain_core.messages import RemoveMessage
+
+        messages: list = state.get("messages", [])
+
+        if not messages:
+            return {}
+
+        current_tokens = self.token_counter(messages)
+
+        # 임계값 미만이면 패스
+        if current_tokens <= self.max_tokens_before_summary:
+            logger.debug(
+                "context_within_limit",
+                extra={
+                    "current_tokens": current_tokens,
+                    "threshold": self.max_tokens_before_summary,
+                },
+            )
+            return {}
+
+        logger.info(
+            "context_compression_triggered",
+            extra={
+                "current_tokens": current_tokens,
+                "threshold": self.max_tokens_before_summary,
+            },
         )
 
-    async def __call__(self, state: dict[str, Any]) -> dict[str, Any]:
-        """노드 또는 hook으로 호출."""
-        return await self._hook(state)
+        # 최근 메시지 보호
+        older_messages = messages[: -self.keep_recent_messages]
+
+        if not older_messages:
+            return {}
+
+        # 요약 생성
+        existing_summary = state.get("summary", "")
+        new_summary = await summarize_messages(
+            older_messages,
+            self.llm,
+            existing_summary=existing_summary,
+            max_summary_tokens=self.max_summary_tokens,
+            prompt_loader=self.prompt_loader,
+            max_input_tokens=self._max_input_tokens,
+        )
+
+        # RemoveMessage로 이전 메시지 제거 + 요약 SystemMessage 추가
+        remove_msgs = [RemoveMessage(id=m.id) for m in older_messages if m.id]
+        summary_msg = SystemMessage(
+            content=f"[이전 대화 요약]\n{new_summary}",
+            id="summary",
+        )
+
+        compressed_tokens = self.token_counter(messages[-self.keep_recent_messages :])
+        logger.info(
+            "context_compressed",
+            extra={
+                "original_tokens": current_tokens,
+                "compressed_tokens": compressed_tokens,
+                "removed_messages": len(remove_msgs),
+                "compression_ratio": f"{(1 - compressed_tokens / current_tokens) * 100:.1f}%",
+            },
+        )
+
+        return {
+            "messages": remove_msgs + [summary_msg],
+            "summary": new_summary,
+        }
