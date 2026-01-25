@@ -64,6 +64,8 @@ spec:
         - name: langgraph-config
           mountPath: /app/langgraph.json
           subPath: langgraph.json
+        - name: langgraph-data
+          mountPath: /app/.langgraph_api
         resources:
           requests:
             cpu: 100m
@@ -89,6 +91,8 @@ spec:
       - name: langgraph-config
         configMap:
           name: langgraph-config
+      - name: langgraph-data
+        emptyDir: {}
       nodeSelector:
         domain: observability
       tolerations:
