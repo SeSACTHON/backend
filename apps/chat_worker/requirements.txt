@@ -13,7 +13,7 @@ grpcio-tools>=1.60.0
 openai>=2.9.0,<3  # Responses API + Agents SDK (openai-agents requires >=2.9.0)
 openai-agents>=0.7.0  # Agents SDK (WebSearchTool, multi-agent)
 anthropic>=0.40.0
-google-genai>=0.3.0
+google-genai>=1.60.0
 tiktoken>=0.8.0
 Pillow>=10.0.0  # Image processing for Gemini native image generation
 
