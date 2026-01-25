@@ -68,7 +68,11 @@ async def event_generator(
             }
 
         # 2. Token 복구
-        if last_event_id and "-" in last_event_id and not last_event_id.startswith(("recovery:", "progress:")):
+        if (
+            last_event_id
+            and "-" in last_event_id
+            and not last_event_id.startswith(("recovery:", "progress:"))
+        ):
             # 네이티브 Last-Event-ID 기반 복구 (Redis Stream ID)
             # 브라우저 EventSource 자동 재연결 시 전송됨
             logger.info(

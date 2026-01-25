@@ -187,8 +187,8 @@ MODEL_PRICING: dict[str, dict[str, float]] = {
 IMAGE_MODEL_PRICING: dict[str, dict[str, float]] = {
     # Google Gemini 3 (이미지 출력)
     "gemini-3-pro-image-preview": {
-        "1k": 0.134,   # 1K-2K resolution
-        "4k": 0.24,    # 4K resolution
+        "1k": 0.134,  # 1K-2K resolution
+        "4k": 0.24,  # 4K resolution
         "default": 0.134,
     },
     # OpenAI DALL-E / GPT Image
@@ -279,6 +279,7 @@ def traceable_llm(
             return response
         ```
     """
+
     def decorator(func: Callable[P, R]) -> Callable[P, R]:
         run_name = name or func.__name__
 
@@ -336,6 +337,7 @@ def traceable_llm(
             return func(*args, **kwargs)
 
         import asyncio
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper  # type: ignore
         return sync_wrapper  # type: ignore
@@ -369,6 +371,7 @@ def traceable_tool(
             ...
         ```
     """
+
     def decorator(func: Callable[P, R]) -> Callable[P, R]:
         run_name = name or func.__name__
 
@@ -447,6 +450,7 @@ def traceable_tool(
             return traced_func(*args, **kwargs)
 
         import asyncio
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper  # type: ignore
         return sync_wrapper  # type: ignore
@@ -476,6 +480,7 @@ def traceable_image(
             ...
         ```
     """
+
     def decorator(func: Callable[P, R]) -> Callable[P, R]:
         run_name = name or func.__name__
 
@@ -534,6 +539,7 @@ def traceable_image(
             return await traced_func(*args, **kwargs)
 
         import asyncio
+
         if asyncio.iscoroutinefunction(func):
             return async_wrapper  # type: ignore
         # 이미지 생성은 항상 async

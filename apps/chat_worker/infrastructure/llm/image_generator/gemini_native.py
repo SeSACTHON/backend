@@ -352,12 +352,14 @@ class GeminiNativeImageGenerator(ImageGeneratorPort):
                             count=1,
                         )
                         run_tree.metadata = run_tree.metadata or {}
-                        run_tree.metadata.update({
-                            "image_model": self._model,
-                            "image_size": image_size or "default",
-                            "image_cost_usd": cost,
-                            "aspect_ratio": aspect_ratio,
-                        })
+                        run_tree.metadata.update(
+                            {
+                                "image_model": self._model,
+                                "image_size": image_size or "default",
+                                "image_cost_usd": cost,
+                                "aspect_ratio": aspect_ratio,
+                            }
+                        )
                 except Exception as e:
                     logger.debug("Failed to track image generation cost: %s", e)
 
