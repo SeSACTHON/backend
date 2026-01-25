@@ -1,9 +1,14 @@
-"""SSE Broadcast Manager - Redis Pub/Sub 기반.
+"""SSE Broadcast Manager - Redis Pub/Sub 기반 (Shard 최적화).
 
 Event Router + Pub/Sub 아키텍처:
-1. Event Router가 Redis Streams 소비 → Pub/Sub 발행
-2. SSE-Gateway는 job_id별 채널 구독
-3. 어느 Pod에 연결되든 동일 이벤트 수신
+1. Event Router가 Redis Streams 소비 → Pub/Sub 발행 (shard별 채널)
+2. SSE-Gateway는 모든 shard 채널 구독 (4개 고정)
+3. 내부에서 job_id로 필터링하여 해당 클라이언트에만 전달
+
+Shard 기반 Pub/Sub (연결 최적화):
+- 기존: sse:events:{job_id} (N개 채널, N개 연결)
+- 현재: sse:events:{shard} (4개 채널, 4개 연결)
+- 동시 접속 1000명 → 여전히 4개 연결만 사용
 
 분산 트레이싱 통합:
 - Pub/Sub 메시지에서 trace context 추출 (trace_id, span_id, traceparent)
@@ -12,15 +17,17 @@ Event Router + Pub/Sub 아키텍처:
 
 이점:
 - Pod 수와 무관하게 자유로운 수평확장
+- Redis 연결 수 O(N) → O(4)로 대폭 감소
 - Consistent Hash 불필요
 - 장애 복구 용이 (State KV 활용)
 
-참조: docs/blogs/async/34-sse-HA-architecture.md
+참조: docs/blogs/async/53-sse-pubsub-connection-optimization.md
 """
 
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -254,8 +261,8 @@ class SSEBroadcastManager:
         """초기화."""
         # job_id → SubscriberQueue 집합
         self._subscribers: dict[str, set[SubscriberQueue]] = defaultdict(set)
-        # job_id → Pub/Sub listener task
-        self._pubsub_tasks: dict[str, asyncio.Task[None]] = {}
+        # Shard 기반 Pub/Sub listener tasks (4개 고정)
+        self._shard_listener_tasks: dict[int, asyncio.Task[None]] = {}
         # Redis 클라이언트 (역할별 분리)
         self._streams_client: aioredis.Redis | None = None  # State 조회용
         self._pubsub_client: aioredis.Redis | None = None  # Pub/Sub 구독용
@@ -263,8 +270,28 @@ class SSEBroadcastManager:
         self._shutdown: bool = False
         # 설정
         self._state_timeout_seconds: int = 30
-        # 도메인별 shard 수 (scan_worker, event_router와 일치 필요)
+        # Pub/Sub shard 수 (Event Router와 일치 필요)
+        self._pubsub_shard_count: int = 4
+        # 도메인별 Streams shard 수 (scan_worker, event_router와 일치 필요)
         self._shard_counts: dict[str, int] = {"scan": 4, "chat": 4}
+        # Shard listeners 시작 완료 이벤트
+        self._shard_listeners_ready: asyncio.Event | None = None
+
+    def _get_shard_for_job(self, job_id: str) -> int:
+        """job_id에서 Pub/Sub shard 계산.
+
+        MD5 해시를 사용하여 job_id를 shard로 매핑.
+        Event Router와 동일한 해시 함수 사용.
+
+        Args:
+            job_id: 작업 ID
+
+        Returns:
+            shard 번호 (0 ~ shard_count-1)
+        """
+        hash_bytes = hashlib.md5(job_id.encode()).digest()[:8]
+        hash_int = int.from_bytes(hash_bytes, byteorder="big")
+        return hash_int % self._pubsub_shard_count
 
     @classmethod
     async def get_instance(cls) -> SSEBroadcastManager:
@@ -288,7 +315,9 @@ class SSEBroadcastManager:
 
         settings = get_settings()
         self._state_timeout_seconds = settings.state_timeout_seconds
-        # 도메인별 shard 수 설정 (event_router와 일치)
+        # Pub/Sub shard 수 (Event Router와 일치)
+        self._pubsub_shard_count = settings.shard_count
+        # 도메인별 Streams shard 수 설정 (event_router와 일치)
         self._shard_counts = {
             "scan": settings.shard_count,
             "chat": settings.chat_shard_count,
@@ -314,11 +343,16 @@ class SSEBroadcastManager:
             health_check_interval=30,
         )
 
+        # Shard 기반 Pub/Sub 리스너 시작 (4개 고정)
+        self._shard_listeners_ready = asyncio.Event()
+        await self._start_shard_listeners()
+
         logger.info(
             "broadcast_manager_redis_connected",
             extra={
                 "streams_url": settings.redis_streams_url,
                 "pubsub_url": settings.redis_pubsub_url,
+                "pubsub_shard_count": self._pubsub_shard_count,
                 "shard_counts": self._shard_counts,
             },
         )
@@ -330,8 +364,8 @@ class SSEBroadcastManager:
             if cls._instance is not None:
                 cls._instance._shutdown = True
 
-                # 모든 Pub/Sub tasks 취소
-                for job_id, task in cls._instance._pubsub_tasks.items():
+                # 모든 Shard listener tasks 취소
+                for shard, task in cls._instance._shard_listener_tasks.items():
                     task.cancel()
                     try:
                         await task
@@ -345,6 +379,41 @@ class SSEBroadcastManager:
 
                 cls._instance = None
                 logger.info("broadcast_manager_shutdown")
+
+    async def _start_shard_listeners(self) -> None:
+        """모든 shard에 대한 Pub/Sub 리스너 시작.
+
+        연결 최적화: job_id별 채널 대신 shard별 채널 구독.
+        - 기존: N개 job → N개 연결
+        - 현재: N개 job → 4개 연결 (shard 수)
+        """
+        ready_events: list[asyncio.Event] = []
+
+        for shard in range(self._pubsub_shard_count):
+            if shard not in self._shard_listener_tasks or self._shard_listener_tasks[shard].done():
+                ready_event = asyncio.Event()
+                ready_events.append(ready_event)
+                self._shard_listener_tasks[shard] = asyncio.create_task(
+                    self._shard_pubsub_listener(shard, ready_event)
+                )
+
+        # 모든 shard 구독 완료 대기 (최대 2초)
+        if ready_events:
+            try:
+                await asyncio.wait_for(
+                    asyncio.gather(*[e.wait() for e in ready_events]),
+                    timeout=2.0,
+                )
+            except asyncio.TimeoutError:
+                logger.warning("shard_listeners_subscribe_timeout")
+
+        if self._shard_listeners_ready:
+            self._shard_listeners_ready.set()
+
+        logger.info(
+            "shard_listeners_started",
+            extra={"shard_count": self._pubsub_shard_count},
+        )
 
     async def subscribe(
         self,
@@ -383,32 +452,18 @@ class SSEBroadcastManager:
         self._subscribers[job_id].add(subscriber)
         SSE_ACTIVE_JOBS.set(len(self._subscribers))
 
-        # 2. Pub/Sub 구독 시작 + 완료 대기 (핵심: 먼저 구독해야 이벤트 누락 방지)
-        subscribed_event: asyncio.Event | None = None
-        if job_id not in self._pubsub_tasks or self._pubsub_tasks[job_id].done():
-            logger.info(
-                "pubsub_task_creating",
-                extra={
-                    "job_id": job_id,
-                    "domain": domain,
-                    "has_pubsub_client": self._pubsub_client is not None,
-                },
-            )
-            subscribed_event = asyncio.Event()
-            self._pubsub_tasks[job_id] = asyncio.create_task(
-                self._pubsub_listener(job_id, subscribed_event)
-            )
-
-        # 구독 완료 대기 (최대 1초)
-        if subscribed_event:
+        # 2. Shard 리스너 준비 완료 대기 (초기화 시 이미 시작됨)
+        # Shard 기반 구독: job_id별 채널 대신 shard별 채널 구독
+        # → 연결 수 O(N) → O(4)로 대폭 감소
+        if self._shard_listeners_ready:
             subscribe_start = time.time()
             try:
-                await asyncio.wait_for(subscribed_event.wait(), timeout=1.0)
+                await asyncio.wait_for(self._shard_listeners_ready.wait(), timeout=1.0)
                 SSE_PUBSUB_SUBSCRIBE_LATENCY.observe(time.time() - subscribe_start)
             except asyncio.TimeoutError:
                 SSE_PUBSUB_SUBSCRIBE_LATENCY.observe(1.0)
                 logger.warning(
-                    "pubsub_subscribe_timeout",
+                    "shard_listeners_not_ready",
                     extra={"job_id": job_id, "domain": domain},
                 )
 
@@ -583,17 +638,11 @@ class SSEBroadcastManager:
             self._subscribers[job_id].discard(subscriber)
             SSE_ACTIVE_JOBS.set(len(self._subscribers))
 
-            # 마지막 구독자면 Pub/Sub 취소
+            # 마지막 구독자면 subscribers dict에서 제거
+            # (Shard 리스너는 계속 유지 - 다른 job_id도 동일 shard 사용)
             if not self._subscribers[job_id]:
                 del self._subscribers[job_id]
                 SSE_ACTIVE_JOBS.set(len(self._subscribers))
-                if job_id in self._pubsub_tasks:
-                    self._pubsub_tasks[job_id].cancel()
-                    try:
-                        await self._pubsub_tasks[job_id]
-                    except asyncio.CancelledError:
-                        pass
-                    del self._pubsub_tasks[job_id]
 
             logger.info(
                 "broadcast_subscribe_ended",
@@ -605,44 +654,44 @@ class SSEBroadcastManager:
                 },
             )
 
-    async def _pubsub_listener(
-        self, job_id: str, subscribed_event: asyncio.Event | None = None
+    async def _shard_pubsub_listener(
+        self, shard: int, subscribed_event: asyncio.Event | None = None
     ) -> None:
-        """job_id별 Pub/Sub 리스너.
+        """Shard별 Pub/Sub 리스너.
 
-        Redis Pub/Sub 채널을 구독하고 이벤트를 해당 job_id의
+        Redis Pub/Sub shard 채널을 구독하고 이벤트를 해당 job_id의
         모든 SubscriberQueue에 분배.
+
+        연결 최적화:
+        - 기존: job_id별 채널 (N개 연결)
+        - 현재: shard별 채널 (4개 연결)
+        - 이벤트의 job_id로 필터링하여 올바른 구독자에게 전달
 
         Stale Connection 방어:
         - get_message(timeout=N) 사용하여 무한 대기 방지
         - 연속 timeout 시 PING으로 connection liveness 확인
         - PING 실패 시 재구독 (K8s TCP idle timeout 대응)
 
-        분산 트레이싱:
-        - event에서 trace context 추출 (trace_id, span_id, traceparent)
-        - linked span 생성하여 Event Router span과 연결
-        - 전체 파이프라인 시각화 지원
-
         Args:
-            job_id: 구독할 job ID
+            shard: Pub/Sub shard 번호
             subscribed_event: 구독 완료 시그널 (옵션)
         """
         logger.info(
-            "pubsub_listener_started",
-            extra={"job_id": job_id, "has_pubsub_client": self._pubsub_client is not None},
+            "shard_pubsub_listener_started",
+            extra={"shard": shard, "has_pubsub_client": self._pubsub_client is not None},
         )
 
         if not self._pubsub_client:
             logger.warning(
-                "pubsub_listener_no_client",
-                extra={"job_id": job_id},
+                "shard_pubsub_listener_no_client",
+                extra={"shard": shard},
             )
             if subscribed_event:
                 subscribed_event.set()
             return
 
-        channel = f"{PUBSUB_CHANNEL_PREFIX}{job_id}"
-        max_reconnects = 3
+        channel = f"{PUBSUB_CHANNEL_PREFIX}{shard}"
+        max_reconnects = 5
         reconnect_count = 0
 
         while reconnect_count <= max_reconnects and not self._shutdown:
@@ -653,9 +702,9 @@ class SSEBroadcastManager:
                 SSE_PUBSUB_CONNECTED.set(1)
 
                 logger.info(
-                    "pubsub_subscribed",
+                    "shard_pubsub_subscribed",
                     extra={
-                        "job_id": job_id,
+                        "shard": shard,
                         "channel": channel,
                         "reconnect_count": reconnect_count,
                     },
@@ -683,9 +732,9 @@ class SSEBroadcastManager:
                                 consecutive_timeouts = 0  # PING 성공 → 리셋
                             except Exception as ping_err:
                                 logger.warning(
-                                    "pubsub_ping_failed",
+                                    "shard_pubsub_ping_failed",
                                     extra={
-                                        "job_id": job_id,
+                                        "shard": shard,
                                         "error": str(ping_err),
                                         "reconnect_count": reconnect_count,
                                     },
@@ -714,8 +763,17 @@ class SSEBroadcastManager:
                         event = json.loads(message["data"])
                     except json.JSONDecodeError:
                         logger.warning(
-                            "pubsub_message_parse_error",
-                            extra={"job_id": job_id, "data": message["data"]},
+                            "shard_pubsub_message_parse_error",
+                            extra={"shard": shard, "data": message["data"]},
+                        )
+                        continue
+
+                    # 이벤트에서 job_id 추출 (라우팅용)
+                    job_id = event.get("job_id")
+                    if not job_id:
+                        logger.warning(
+                            "shard_pubsub_message_missing_job_id",
+                            extra={"shard": shard, "event": event},
                         )
                         continue
 
@@ -724,9 +782,10 @@ class SSEBroadcastManager:
                     seq = event.get("seq", 0)
                     SSE_PUBSUB_MESSAGES_RECEIVED.labels(stage=stage).inc()
 
-                    logger.info(
-                        "pubsub_message_received",
+                    logger.debug(
+                        "shard_pubsub_message_received",
                         extra={
+                            "shard": shard,
                             "job_id": job_id,
                             "stage": stage,
                             "seq": seq,
@@ -734,16 +793,16 @@ class SSEBroadcastManager:
                         },
                     )
 
-                    # Trace context 추출 및 linked span 생성
+                    # job_id로 필터링하여 해당 구독자에게만 전달
                     await self._process_event_with_tracing(job_id, event, stage, seq)
 
             except asyncio.CancelledError:
-                logger.debug("pubsub_listener_cancelled", extra={"job_id": job_id})
+                logger.debug("shard_pubsub_listener_cancelled", extra={"shard": shard})
                 return
             except Exception as e:
                 logger.error(
-                    "pubsub_listener_error",
-                    extra={"job_id": job_id, "error": str(e), "reconnect_count": reconnect_count},
+                    "shard_pubsub_listener_error",
+                    extra={"shard": shard, "error": str(e), "reconnect_count": reconnect_count},
                 )
             finally:
                 try:
@@ -762,14 +821,14 @@ class SSEBroadcastManager:
 
                 await asyncio.sleep(0.5 * reconnect_count)  # backoff
                 logger.info(
-                    "pubsub_listener_reconnecting",
-                    extra={"job_id": job_id, "attempt": reconnect_count},
+                    "shard_pubsub_listener_reconnecting",
+                    extra={"shard": shard, "attempt": reconnect_count},
                 )
 
         if reconnect_count > max_reconnects:
             logger.error(
-                "pubsub_listener_max_reconnects_exceeded",
-                extra={"job_id": job_id, "max_reconnects": max_reconnects},
+                "shard_pubsub_listener_max_reconnects_exceeded",
+                extra={"shard": shard, "max_reconnects": max_reconnects},
             )
 
     async def _process_event_with_tracing(
