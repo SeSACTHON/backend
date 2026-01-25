@@ -405,8 +405,31 @@ class EventProcessor:
             EVENT_ROUTER_EVENTS_PROCESSED.labels(stage=stage).inc()
             return publish_success
         else:
-            # 중복 이벤트: 이미 처리되었으므로 ACK 가능 (True 반환)
-            # Pub/Sub 발행 실패와 구분하여 불필요한 reclaim 방지
+            # 중복 이벤트: publish_key가 이미 존재
+            # 터미널 이벤트(done/error)는 Pub/Sub 재발행 시도 (이전 발행 실패 복구)
+            if stage in ("done", "error"):
+                try:
+                    await self._pubsub_redis.publish(channel, event_data)
+                    logger.info(
+                        "terminal_event_republished",
+                        extra={
+                            "job_id": job_id,
+                            "stage": stage,
+                            "seq": seq,
+                            "channel": channel,
+                        },
+                    )
+                except Exception as e:
+                    logger.warning(
+                        "terminal_event_republish_failed",
+                        extra={
+                            "job_id": job_id,
+                            "stage": stage,
+                            "seq": seq,
+                            "error": str(e),
+                        },
+                    )
+
             EVENT_ROUTER_EVENTS_SKIPPED.labels(reason="duplicate_or_out_of_order").inc()
             if span:
                 span.set_attribute("event.skipped", True)

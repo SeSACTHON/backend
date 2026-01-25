@@ -93,23 +93,36 @@ ENRICHMENT_RULES: dict[str, EnrichmentRule] = {
 # 웹 검색 enrichment 트리거 키워드
 WEB_SEARCH_TRIGGER_KEYWORDS = frozenset(
     {
+        # 시간 기반
         "최신",
         "최근",
-        "뉴스",
-        "정책",
-        "규제",
-        "발표",
-        "공지",
-        "2024",
-        "2025",
-        "2026",
         "올해",
         "작년",
         "지난달",
         "현재",
         "요즘",
+        "오늘",
+        "어제",
+        "이번주",
+        "2024",
+        "2025",
+        "2026",
+        # 검색 의도
+        "뉴스",
+        "정책",
+        "규제",
+        "발표",
+        "공지",
         "트렌드",
         "업데이트",
+        # 범용 검색
+        "검색",
+        "찾아봐",
+        "알아봐",
+        "주가",
+        "결과",
+        "순위",
+        "랭킹",
     }
 )
 
@@ -127,11 +140,20 @@ CONDITIONAL_ENRICHMENTS: list[ConditionalEnrichment] = [
     ),
     ConditionalEnrichment(
         node="web_search",
-        condition=lambda state: any(
-            kw in state.get("message", "").lower() for kw in WEB_SEARCH_TRIGGER_KEYWORDS
+        condition=lambda state: (
+            # Case 1: general + 확신도 낮음 → 분류기가 모르는 질문 = 검색 필요
+            (state.get("intent") == "general" and state.get("intent_confidence", 1.0) < 0.75)
+            or
+            # Case 2: 비-general에서 실시간 키워드 → 보조 검색 필요
+            (
+                state.get("intent") != "general"
+                and any(
+                    kw in state.get("message", "").lower() for kw in WEB_SEARCH_TRIGGER_KEYWORDS
+                )
+            )
         ),
-        exclude_intents=("web_search", "general", "character", "image_generation"),
-        description="최신 정보 키워드가 있으면 웹 검색 추가",
+        exclude_intents=("web_search", "character", "image_generation"),
+        description="확신도 낮은 general이거나 실시간 키워드 있으면 웹 검색 추가",
     ),
 ]
 
@@ -149,29 +171,6 @@ INTENT_TO_NODE: dict[str, str] = {
     "web_search": "web_search",
     "general": "general",
 }
-
-# 웹 검색 enrichment 트리거 키워드
-WEB_SEARCH_TRIGGER_KEYWORDS = frozenset(
-    {
-        "최신",
-        "최근",
-        "뉴스",
-        "정책",
-        "규제",
-        "발표",
-        "공지",
-        "2024",
-        "2025",
-        "2026",
-        "올해",
-        "작년",
-        "지난달",
-        "현재",
-        "요즘",
-        "트렌드",
-        "업데이트",
-    }
-)
 
 
 # ============================================================

@@ -218,6 +218,7 @@ class TestWeatherFunctionCalling:
 
         state = {
             "job_id": "test-job-1",
+            "intent": "weather",  # primary intent → stage 이벤트 발행
             "message": "비 오는데 종이 버려도 돼?",
             "user_location": {"lat": 37.5665, "lon": 126.9780},
         }
@@ -290,10 +291,8 @@ class TestWeatherFunctionCalling:
         assert weather_ctx.get("skipped") is True
         assert weather_ctx.get("reason") == "날씨 정보 불필요"
 
-        # Then: 스킵 이벤트 발행됨
-        skipped_events = [e for e in mock_publisher.stages if e["status"] == "skipped"]
-        assert len(skipped_events) >= 1
-        assert skipped_events[0]["stage"] == "weather"
+        # Then: enrichment 모드 → stage 이벤트 미발행 (UI 간섭 방지)
+        assert len(mock_publisher.stages) == 0
 
     @pytest.mark.anyio
     async def test_function_call_fallback(
@@ -464,9 +463,8 @@ class TestWeatherNodeEdgeCases:
         assert weather_ctx.get("success") is False
         assert weather_ctx.get("error") == "위치 정보 없음"
 
-        # Then: 스킵 이벤트 발행됨
-        skipped_events = [e for e in mock_publisher.stages if e["status"] == "skipped"]
-        assert len(skipped_events) >= 1
+        # Then: enrichment 모드 → stage 이벤트 미발행 (UI 간섭 방지)
+        assert len(mock_publisher.stages) == 0
 
     @pytest.mark.anyio
     async def test_weather_api_error(
@@ -517,9 +515,8 @@ class TestWeatherNodeEdgeCases:
         assert weather_ctx.get("success") is False
         assert weather_ctx.get("error") == "API timeout"
 
-        # Then: 실패 이벤트 발행됨
-        failed_events = [e for e in mock_publisher.stages if e["status"] == "failed"]
-        assert len(failed_events) >= 1
+        # Then: enrichment 모드 → stage 이벤트 미발행 (UI 간섭 방지)
+        assert len(mock_publisher.stages) == 0
 
     @pytest.mark.anyio
     async def test_function_call_with_different_locations(

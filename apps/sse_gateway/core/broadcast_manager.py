@@ -524,7 +524,12 @@ class SSEBroadcastManager:
 
                             # NOTE: last_seq 갱신 없이 State만 emit
                             # 중간 이벤트 필터링 방지
-                            if state_seq > subscriber.last_seq:
+                            # done/error는 seq 비교 무시 (token seq > done seq이므로)
+                            is_terminal = (
+                                state.get("stage") in ("done", "error")
+                                or state.get("status") == "failed"
+                            )
+                            if state_seq > subscriber.last_seq or is_terminal:
                                 last_event_time = time.time()
                                 event_count += 1
                                 SSE_EVENTS_DISTRIBUTED.labels(
@@ -605,6 +610,11 @@ class SSEBroadcastManager:
         Redis Pub/Sub 채널을 구독하고 이벤트를 해당 job_id의
         모든 SubscriberQueue에 분배.
 
+        Stale Connection 방어:
+        - get_message(timeout=N) 사용하여 무한 대기 방지
+        - 연속 timeout 시 PING으로 connection liveness 확인
+        - PING 실패 시 재구독 (K8s TCP idle timeout 대응)
+
         분산 트레이싱:
         - event에서 trace context 추출 (trace_id, span_id, traceparent)
         - linked span 생성하여 Event Router span과 연결
@@ -629,71 +639,135 @@ class SSEBroadcastManager:
             return
 
         channel = f"{PUBSUB_CHANNEL_PREFIX}{job_id}"
-        pubsub = self._pubsub_client.pubsub()
+        max_reconnects = 3
+        reconnect_count = 0
 
-        try:
-            await pubsub.subscribe(channel)
-            SSE_PUBSUB_CONNECTED.set(1)
+        while reconnect_count <= max_reconnects and not self._shutdown:
+            pubsub = self._pubsub_client.pubsub()
 
-            logger.info(
-                "pubsub_subscribed",
-                extra={"job_id": job_id, "channel": channel},
-            )
-
-            async for message in pubsub.listen():
-                if self._shutdown:
-                    break
-
-                # subscription confirmation 메시지 처리
-                # NOTE: listen() 시작 후에 실제 SUBSCRIBE가 전송되므로
-                # 여기서 subscribed_event를 set해야 race condition 방지
-                if message["type"] == "subscribe":
-                    if subscribed_event:
-                        subscribed_event.set()
-                        subscribed_event = None  # 한 번만 set
-                    continue
-
-                if message["type"] != "message":
-                    continue
-
-                try:
-                    event = json.loads(message["data"])
-                except json.JSONDecodeError:
-                    logger.warning(
-                        "pubsub_message_parse_error",
-                        extra={"job_id": job_id, "data": message["data"]},
-                    )
-                    continue
-
-                # 메트릭: Pub/Sub 메시지 수신
-                stage = event.get("stage", "unknown")
-                seq = event.get("seq", 0)
-                SSE_PUBSUB_MESSAGES_RECEIVED.labels(stage=stage).inc()
+            try:
+                await pubsub.subscribe(channel)
+                SSE_PUBSUB_CONNECTED.set(1)
 
                 logger.info(
-                    "pubsub_message_received",
+                    "pubsub_subscribed",
                     extra={
                         "job_id": job_id,
-                        "stage": stage,
-                        "seq": seq,
                         "channel": channel,
+                        "reconnect_count": reconnect_count,
                     },
                 )
 
-                # Trace context 추출 및 linked span 생성
-                await self._process_event_with_tracing(job_id, event, stage, seq)
+                # get_message 기반 루프: timeout으로 stale connection 감지
+                consecutive_timeouts = 0
+                subscribed_confirmed = False
 
-        except asyncio.CancelledError:
-            logger.debug("pubsub_listener_cancelled", extra={"job_id": job_id})
-        except Exception as e:
+                while not self._shutdown:
+                    # timeout=5s: 5초마다 liveness 확인 기회
+                    message = await pubsub.get_message(
+                        ignore_subscribe_messages=False,
+                        timeout=5.0,
+                    )
+
+                    if message is None:
+                        # timeout: 메시지 없음
+                        consecutive_timeouts += 1
+
+                        # 3회 연속 timeout (15초) → PING으로 connection 확인
+                        if consecutive_timeouts >= 3:
+                            try:
+                                await pubsub.ping()
+                                consecutive_timeouts = 0  # PING 성공 → 리셋
+                            except Exception as ping_err:
+                                logger.warning(
+                                    "pubsub_ping_failed",
+                                    extra={
+                                        "job_id": job_id,
+                                        "error": str(ping_err),
+                                        "reconnect_count": reconnect_count,
+                                    },
+                                )
+                                break  # 재구독 시도
+
+                        continue
+
+                    consecutive_timeouts = 0
+
+                    # subscription confirmation 처리
+                    if message["type"] == "subscribe":
+                        if subscribed_event and not subscribed_confirmed:
+                            subscribed_event.set()
+                            subscribed_confirmed = True
+                        continue
+
+                    # pong 메시지 (ping 응답)
+                    if message["type"] == "pong":
+                        continue
+
+                    if message["type"] != "message":
+                        continue
+
+                    try:
+                        event = json.loads(message["data"])
+                    except json.JSONDecodeError:
+                        logger.warning(
+                            "pubsub_message_parse_error",
+                            extra={"job_id": job_id, "data": message["data"]},
+                        )
+                        continue
+
+                    # 메트릭: Pub/Sub 메시지 수신
+                    stage = event.get("stage", "unknown")
+                    seq = event.get("seq", 0)
+                    SSE_PUBSUB_MESSAGES_RECEIVED.labels(stage=stage).inc()
+
+                    logger.info(
+                        "pubsub_message_received",
+                        extra={
+                            "job_id": job_id,
+                            "stage": stage,
+                            "seq": seq,
+                            "channel": channel,
+                        },
+                    )
+
+                    # Trace context 추출 및 linked span 생성
+                    await self._process_event_with_tracing(job_id, event, stage, seq)
+
+            except asyncio.CancelledError:
+                logger.debug("pubsub_listener_cancelled", extra={"job_id": job_id})
+                return
+            except Exception as e:
+                logger.error(
+                    "pubsub_listener_error",
+                    extra={"job_id": job_id, "error": str(e), "reconnect_count": reconnect_count},
+                )
+            finally:
+                try:
+                    await pubsub.unsubscribe(channel)
+                    await pubsub.close()
+                except Exception:
+                    pass
+
+            # 재구독 시도
+            reconnect_count += 1
+            if reconnect_count <= max_reconnects and not self._shutdown:
+                # subscribed_event가 아직 set 안됐으면 set (구독자 블로킹 방지)
+                if subscribed_event:
+                    subscribed_event.set()
+                    subscribed_event = None
+
+                await asyncio.sleep(0.5 * reconnect_count)  # backoff
+                logger.info(
+                    "pubsub_listener_reconnecting",
+                    extra={"job_id": job_id, "attempt": reconnect_count},
+                )
+
+        if reconnect_count > max_reconnects:
             logger.error(
-                "pubsub_listener_error",
-                extra={"job_id": job_id, "error": str(e)},
+                "pubsub_listener_max_reconnects_exceeded",
+                extra={"job_id": job_id, "max_reconnects": max_reconnects},
             )
-        finally:
-            await pubsub.unsubscribe(channel)
-            await pubsub.close()
-            logger.debug("pubsub_unsubscribed", extra={"job_id": job_id})
 
     async def _process_event_with_tracing(
         self,

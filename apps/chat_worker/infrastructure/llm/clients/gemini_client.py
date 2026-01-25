@@ -10,6 +10,11 @@ Structured Output 지원:
 
 Function Calling 지원:
 - https://ai.google.dev/gemini-api/docs/function-calling
+
+SDK 버전: google-genai >= 1.60.0
+- FunctionCallingConfigMode enum 사용
+- allowed_function_names 지원
+- system_instruction 필드 사용
 """
 
 from __future__ import annotations
@@ -21,6 +26,7 @@ from collections.abc import AsyncIterator
 from typing import Any, TypeVar
 
 from google import genai
+from google.genai import types
 from pydantic import BaseModel
 
 from chat_worker.application.ports.llm import LLMClientPort
@@ -65,26 +71,28 @@ class GeminiLLMClient(LLMClientPort):
         max_tokens: int | None = None,
         temperature: float | None = None,
     ) -> str:
-        """텍스트 생성."""
-        full_prompt = ""
-        if system_prompt:
-            full_prompt = f"{system_prompt}\n\n"
+        """텍스트 생성.
+
+        google-genai 1.60.0: system_instruction 필드로 시스템 프롬프트 분리.
+        """
+        # 사용자 프롬프트 구성
+        user_content = ""
         if context:
             context_str = json.dumps(context, ensure_ascii=False, indent=2)
-            full_prompt += f"## Context\n{context_str}\n\n"
-        full_prompt += f"## Question\n{prompt}"
+            user_content = f"## Context\n{context_str}\n\n"
+        user_content += f"## Question\n{prompt}"
 
-        # API 호출 파라미터
-        config = {}
-        if max_tokens is not None:
-            config["max_output_tokens"] = max_tokens
-        if temperature is not None:
-            config["temperature"] = temperature
+        # GenerateContentConfig 구성
+        config = types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            max_output_tokens=max_tokens,
+            temperature=temperature,
+        )
 
         response = await self._client.aio.models.generate_content(
             model=self._model,
-            contents=full_prompt,
-            config=config if config else None,
+            contents=user_content,
+            config=config,
         )
         return response.text or ""
 
@@ -94,18 +102,24 @@ class GeminiLLMClient(LLMClientPort):
         system_prompt: str | None = None,
         context: dict[str, Any] | None = None,
     ) -> AsyncIterator[str]:
-        """스트리밍 텍스트 생성."""
-        full_prompt = ""
-        if system_prompt:
-            full_prompt = f"{system_prompt}\n\n"
+        """스트리밍 텍스트 생성.
+
+        google-genai 1.60.0: system_instruction 필드로 시스템 프롬프트 분리.
+        """
+        user_content = ""
         if context:
             context_str = json.dumps(context, ensure_ascii=False, indent=2)
-            full_prompt += f"## Context\n{context_str}\n\n"
-        full_prompt += f"## Question\n{prompt}"
+            user_content = f"## Context\n{context_str}\n\n"
+        user_content += f"## Question\n{prompt}"
+
+        config = types.GenerateContentConfig(
+            system_instruction=system_prompt,
+        )
 
         response = await self._client.aio.models.generate_content_stream(
             model=self._model,
-            contents=full_prompt,
+            contents=user_content,
+            config=config,
         )
         async for chunk in response:
             if chunk.text:
@@ -120,35 +134,34 @@ class GeminiLLMClient(LLMClientPort):
     ) -> AsyncIterator[str]:
         """도구를 사용한 텍스트 생성 (Google Search Grounding).
 
+        google-genai 1.60.0: system_instruction 필드로 시스템 프롬프트 분리.
+
         Args:
             prompt: 사용자 프롬프트
             tools: 사용할 도구 목록 (예: ["web_search"])
             system_prompt: 시스템 프롬프트
             context: 추가 컨텍스트
         """
-        from google.genai import types
-
         tool_configs = []
         for tool in tools:
             if tool == "web_search":
                 tool_configs.append(types.Tool(google_search=types.GoogleSearch()))
 
-        config = types.GenerateContentConfig(
-            tools=tool_configs if tool_configs else None,
-        )
-
-        full_prompt = ""
-        if system_prompt:
-            full_prompt = f"{system_prompt}\n\n"
+        user_content = ""
         if context:
             context_str = json.dumps(context, ensure_ascii=False, indent=2)
-            full_prompt += f"## Context\n{context_str}\n\n"
-        full_prompt += f"## Question\n{prompt}"
+            user_content = f"## Context\n{context_str}\n\n"
+        user_content += f"## Question\n{prompt}"
+
+        config = types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            tools=tool_configs if tool_configs else None,
+        )
 
         try:
             response = await self._client.aio.models.generate_content_stream(
                 model=self._model,
-                contents=full_prompt,
+                contents=user_content,
                 config=config,
             )
             async for chunk in response:
@@ -172,6 +185,11 @@ class GeminiLLMClient(LLMClientPort):
     ) -> tuple[str, dict[str, Any] | None]:
         """Function Calling (Gemini 네이티브).
 
+        google-genai 1.60.0:
+        - FunctionCallingConfigMode enum 사용
+        - allowed_function_names 지원 (특정 함수 강제)
+        - system_instruction 필드 사용
+
         Args:
             prompt: 사용자 프롬프트
             functions: OpenAI 형식의 function definitions
@@ -181,8 +199,6 @@ class GeminiLLMClient(LLMClientPort):
         Returns:
             (function_name, arguments) 튜플
         """
-        from google.genai import types
-
         # OpenAI format → Gemini FunctionDeclaration
         function_declarations = []
         for func in functions:
@@ -195,29 +211,32 @@ class GeminiLLMClient(LLMClientPort):
 
         tool = types.Tool(function_declarations=function_declarations)
 
-        # function_call mode 변환
+        # function_call mode 변환 (enum 사용)
+        fc_mode = types.FunctionCallingConfigMode.AUTO
+        allowed_names: list[str] | None = None
+
         if isinstance(function_call, dict) and "name" in function_call:
-            fc_mode = "ANY"
+            fc_mode = types.FunctionCallingConfigMode.ANY
+            allowed_names = [function_call["name"]]
         elif function_call == "none":
-            fc_mode = "NONE"
-        else:
-            fc_mode = "AUTO"
+            fc_mode = types.FunctionCallingConfigMode.NONE
+
+        function_calling_config = types.FunctionCallingConfig(
+            mode=fc_mode,
+            allowed_function_names=allowed_names,
+        )
 
         config = types.GenerateContentConfig(
+            system_instruction=system_prompt,
             tools=[tool],
             tool_config=types.ToolConfig(
-                function_calling_config=types.FunctionCallingConfig(mode=fc_mode)
+                function_calling_config=function_calling_config,
             ),
         )
 
-        full_prompt = ""
-        if system_prompt:
-            full_prompt = f"{system_prompt}\n\n"
-        full_prompt += prompt
-
         response = await self._client.aio.models.generate_content(
             model=self._model,
-            contents=full_prompt,
+            contents=prompt,
             config=config,
         )
 
@@ -241,6 +260,8 @@ class GeminiLLMClient(LLMClientPort):
     ) -> T:
         """구조화된 응답 생성 (Gemini Structured Output).
 
+        google-genai 1.60.0: system_instruction 필드로 시스템 프롬프트 분리.
+
         Gemini의 네이티브 Structured Output API를 사용하여
         JSON 스키마를 준수하는 응답을 보장합니다.
 
@@ -254,25 +275,21 @@ class GeminiLLMClient(LLMClientPort):
         Returns:
             response_schema 타입의 인스턴스
         """
-        full_prompt = ""
-        if system_prompt:
-            full_prompt = f"{system_prompt}\n\n"
-        full_prompt += f"## Question\n{prompt}"
+        user_content = f"## Question\n{prompt}"
 
-        # API 호출 파라미터
-        config: dict[str, Any] = {
-            "response_mime_type": "application/json",
-            "response_schema": response_schema,
-        }
-        if max_tokens is not None:
-            config["max_output_tokens"] = max_tokens
-        if temperature is not None:
-            config["temperature"] = temperature
+        # GenerateContentConfig 구성
+        config = types.GenerateContentConfig(
+            system_instruction=system_prompt,
+            response_mime_type="application/json",
+            response_schema=response_schema,
+            max_output_tokens=max_tokens,
+            temperature=temperature,
+        )
 
         try:
             response = await self._client.aio.models.generate_content(
                 model=self._model,
-                contents=full_prompt,
+                contents=user_content,
                 config=config,
             )
             # 빈 응답 또는 공백만 있는 응답 처리

@@ -47,34 +47,9 @@ from __future__ import annotations
 from typing import Annotated, Any, TypedDict
 
 from langchain_core.messages import AnyMessage
+from langgraph.graph.message import add_messages  # RemoveMessage 지원
 
 from .priority import Priority
-
-
-# ============================================================
-# Reducers
-# ============================================================
-
-
-def add_messages(
-    existing: list[AnyMessage] | None,
-    new: list[AnyMessage] | AnyMessage,
-) -> list[AnyMessage]:
-    """메시지 리스트 병합 Reducer.
-
-    Args:
-        existing: 기존 메시지 리스트
-        new: 추가할 메시지 (단일 또는 리스트)
-
-    Returns:
-        병합된 메시지 리스트
-    """
-    if existing is None:
-        existing = []
-
-    if isinstance(new, list):
-        return existing + new
-    return existing + [new]
 
 
 def priority_preemptive_reducer(
@@ -386,6 +361,5 @@ class LLMInputState(TypedDict):
 __all__ = [
     "ChatState",
     "LLMInputState",
-    "add_messages",
     "priority_preemptive_reducer",
 ]

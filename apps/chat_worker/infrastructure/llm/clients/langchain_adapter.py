@@ -18,6 +18,14 @@ GenerateAnswerCommand
                                     └── LangGraph stream_mode="messages" 캡처
 ```
 
+generate_with_tools:
+- Primary: Agents SDK (WebSearchTool + Runner.run_streamed)
+- Fallback: Responses API (web_search tool)
+
+generate_structured:
+- Primary: Agents SDK (Agent + output_type + Runner.run)
+- Fallback: LangChain with_structured_output()
+
 핵심:
 - LLMClientPort 인터페이스 구현
 - 내부적으로 LangChain Runnable 사용
@@ -174,31 +182,80 @@ class LangChainLLMAdapter(LLMClientPort):
     ) -> T:
         """구조화된 응답 생성.
 
-        LangChain의 with_structured_output() 사용.
+        Primary: Agents SDK (Agent + output_type + Runner.run)
+        Fallback: LangChain with_structured_output()
 
         Args:
             prompt: 사용자 프롬프트
             response_schema: Pydantic BaseModel 서브클래스
             system_prompt: 시스템 프롬프트
-            max_tokens: 최대 토큰 수 (무시됨)
-            temperature: 생성 온도 (무시됨)
+            max_tokens: 최대 토큰 수
+            temperature: 생성 온도
 
         Returns:
             response_schema 타입의 인스턴스
         """
+        # Primary: Agents SDK (client 있을 때)
+        if hasattr(self._llm, "_client") and self._llm._client is not None:
+            try:
+                return await self._structured_with_agents_sdk(
+                    prompt, response_schema, system_prompt
+                )
+            except Exception as e:
+                logger.warning(
+                    "Agents SDK structured output failed, falling back to LangChain",
+                    extra={"error": str(e), "schema": response_schema.__name__},
+                )
+
+        # Fallback: LangChain with_structured_output
         messages = self._build_messages(prompt, system_prompt)
         structured_llm = self._llm.with_structured_output(response_schema)
 
         try:
             result = await structured_llm.ainvoke(messages)
             logger.debug(
-                "Structured output generated",
+                "Structured output generated (LangChain fallback)",
                 extra={"schema": response_schema.__name__},
             )
             return result
         except Exception as e:
             logger.error(f"Structured output generation failed: {e}")
             raise
+
+    async def _structured_with_agents_sdk(
+        self,
+        prompt: str,
+        response_schema: type[T],
+        system_prompt: str | None = None,
+    ) -> T:
+        """Agents SDK로 구조화된 응답 생성 (Primary)."""
+        from agents import Agent, Runner, RunConfig
+        from agents.models.openai_responses import OpenAIResponsesModel
+
+        client = self._llm._client
+        model_name = getattr(self._llm, "model", "gpt-5.2")
+
+        agent = Agent(
+            name="structured_output_agent",
+            instructions=system_prompt or "",
+            model=OpenAIResponsesModel(
+                model=model_name,
+                openai_client=client,
+            ),
+            output_type=response_schema,
+        )
+
+        result = await Runner.run(
+            agent,
+            input=prompt,
+            run_config=RunConfig(tracing_disabled=True),
+        )
+
+        logger.debug(
+            "Structured output generated (Agents SDK)",
+            extra={"schema": response_schema.__name__},
+        )
+        return result.final_output
 
     async def generate_with_tools(
         self,
@@ -209,9 +266,8 @@ class LangChainLLMAdapter(LLMClientPort):
     ) -> AsyncIterator[str]:
         """네이티브 도구를 사용한 스트리밍 생성.
 
-        Strategy:
-        1. Primary: Agents SDK (openai-agents) — Agent + Runner.run_streamed()
-        2. Fallback: Responses API (client.responses.create) — SDK 미설치 또는 실패 시
+        Primary: OpenAI Agents SDK (WebSearchTool + Runner.run_streamed)
+        Fallback: Responses API (tools: [{"type": "web_search"}])
 
         Args:
             prompt: 사용자 프롬프트
@@ -233,65 +289,95 @@ class LangChainLLMAdapter(LLMClientPort):
         client = self._llm._client
         model_name = getattr(self._llm, "model", "gpt-5.2")
 
-        # 입력 구성
         user_content = prompt
         if context:
             context_str = json.dumps(context, ensure_ascii=False, indent=2)
             user_content = f"## Context\n{context_str}\n\n## Question\n{prompt}"
 
-        # --- Primary: Agents SDK ---
-        _yielded = False
+        # Primary: Agents SDK
         try:
-            from agents import Agent, Runner, WebSearchTool, OpenAIResponsesModel
-            from openai.types.responses import ResponseTextDeltaEvent
-
-            agent_tools = []
-            for tool in tools:
-                if tool == "web_search":
-                    agent_tools.append(WebSearchTool(search_context_size="medium"))
-
-            agent = Agent(
-                name="web_search_agent",
-                instructions=system_prompt or "",
-                model=OpenAIResponsesModel(
-                    model=model_name,
-                    openai_client=client,
-                ),
-                tools=agent_tools,
-            )
-
-            result = Runner.run_streamed(agent, input=user_content)
-
-            async for event in result.stream_events():
-                if event.type == "raw_response_event" and isinstance(
-                    event.data, ResponseTextDeltaEvent
-                ):
-                    if event.data.delta:
-                        _yielded = True
-                        yield event.data.delta
-
+            async for chunk in self._generate_with_agents_sdk(
+                client, model_name, user_content, tools, system_prompt
+            ):
+                yield chunk
             return
-
-        except ImportError:
-            logger.warning("openai-agents not installed, falling back to Responses API")
         except Exception as e:
-            if _yielded:
-                raise
             logger.warning(
                 "Agents SDK failed, falling back to Responses API",
-                extra={"error": str(e), "model": model_name},
+                extra={"error": str(e), "model": model_name, "tools": tools},
             )
 
-        # --- Fallback: Responses API ---
+        # Fallback: Responses API
+        async for chunk in self._generate_with_responses_api(
+            client, model_name, user_content, tools, system_prompt
+        ):
+            yield chunk
+
+    async def _generate_with_agents_sdk(
+        self,
+        client: Any,
+        model_name: str,
+        user_content: str,
+        tools: list[str],
+        system_prompt: str | None = None,
+    ) -> AsyncIterator[str]:
+        """Agents SDK로 도구 사용 스트리밍 생성 (Primary)."""
+        from agents import Agent, Runner, RunConfig, WebSearchTool
+        from agents.models.openai_responses import OpenAIResponsesModel
+        from openai.types.responses import ResponseTextDeltaEvent
+
+        agent_tools = []
+        for tool in tools:
+            if tool == "web_search":
+                agent_tools.append(WebSearchTool(search_context_size="medium"))
+
+        agent = Agent(
+            name="web_search_agent",
+            instructions=system_prompt or "",
+            model=OpenAIResponsesModel(
+                model=model_name,
+                openai_client=client,
+            ),
+            tools=agent_tools,
+        )
+
+        result = Runner.run_streamed(
+            agent,
+            input=user_content,
+            run_config=RunConfig(tracing_disabled=True),
+        )
+
+        async for event in result.stream_events():
+            if (
+                event.type == "raw_response_event"
+                and isinstance(event.data, ResponseTextDeltaEvent)
+                and event.data.delta
+            ):
+                yield event.data.delta
+
+    async def _generate_with_responses_api(
+        self,
+        client: Any,
+        model_name: str,
+        user_content: str,
+        tools: list[str],
+        system_prompt: str | None = None,
+    ) -> AsyncIterator[str]:
+        """Responses API로 도구 사용 스트리밍 생성 (Fallback)."""
         input_messages: list[dict[str, str]] = []
         if system_prompt:
             input_messages.append({"role": "developer", "content": system_prompt})
         input_messages.append({"role": "user", "content": user_content})
 
-        tool_configs = []
+        tool_configs: list[dict[str, Any]] = []
         for tool in tools:
             if tool == "web_search":
-                tool_configs.append({"type": "web_search_preview", "search_context_size": "medium"})
+                tool_configs.append(
+                    {
+                        "type": "web_search",
+                        "search_context_size": "medium",
+                    }
+                )
 
         try:
             response = await client.responses.create(
@@ -308,7 +394,7 @@ class LangChainLLMAdapter(LLMClientPort):
 
         except Exception as e:
             logger.error(
-                "generate_with_tools failed (Responses API fallback)",
+                "Responses API fallback failed",
                 extra={"error": str(e), "model": model_name, "tools": tools},
             )
             raise

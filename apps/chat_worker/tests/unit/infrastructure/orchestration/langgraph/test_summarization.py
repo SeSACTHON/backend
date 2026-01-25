@@ -32,25 +32,25 @@ class TestSummarizeMessagesTruncation:
 
     @pytest.mark.anyio
     async def test_large_input_truncated(self):
-        """800K chars 초과 메시지는 잘림 (tail 보존)."""
+        """토큰 제한 초과 메시지는 잘림 (tail 보존)."""
         llm = MockLLM()
-        # 각 메시지가 100K chars → 10개 = 1M chars (800K 초과)
+        # 각 메시지가 100K chars → 10개 = 1M chars → ~500K tokens (200K 초과)
         messages = [HumanMessage(content="X" * 100_000) for _ in range(10)]
 
         result = await summarize_messages(
             messages=messages,
             llm=llm,
-            max_input_chars=800_000,
+            max_input_tokens=200_000,
         )
 
         assert result == "요약 결과"
-        # 프롬프트에 포함된 messages_text가 800K 이하여야 함
+        # 프롬프트에 포함된 토큰이 200K 이하여야 함
         assert llm.last_prompt is not None
-        assert len(llm.last_prompt) <= 900_000  # template overhead 포함
+        assert len(llm.last_prompt) // 2 <= 200_000
 
     @pytest.mark.anyio
     async def test_small_input_not_truncated(self):
-        """800K chars 이하 메시지는 그대로."""
+        """토큰 제한 이하 메시지는 그대로."""
         llm = MockLLM()
         messages = [
             HumanMessage(content="Hello"),
@@ -60,7 +60,7 @@ class TestSummarizeMessagesTruncation:
         result = await summarize_messages(
             messages=messages,
             llm=llm,
-            max_input_chars=800_000,
+            max_input_tokens=200_000,
         )
 
         assert result == "요약 결과"
@@ -81,7 +81,7 @@ class TestSummarizeMessagesTruncation:
         result = await summarize_messages(
             messages=messages,
             llm=llm,
-            max_input_chars=1_000,  # 매우 작은 제한
+            max_input_tokens=5_000,  # 작은 제한 (500K chars → ~250K tokens)
         )
 
         assert result == "요약 결과"
