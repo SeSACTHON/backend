@@ -39,6 +39,11 @@ from chat_worker.infrastructure.llm.config import (
     HTTP_TIMEOUT,
     MAX_RETRIES,
 )
+from chat_worker.infrastructure.telemetry import (
+    calculate_cost,
+    is_langsmith_enabled,
+    track_token_usage,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -108,6 +113,23 @@ class OpenAILLMClient(LLMClientPort):
             kwargs["temperature"] = temperature
 
         response = await self._client.chat.completions.create(**kwargs)
+
+        # LangSmith 토큰 추적
+        if is_langsmith_enabled() and response.usage:
+            try:
+                from langsmith.run_helpers import get_current_run_tree
+
+                run_tree = get_current_run_tree()
+                if run_tree:
+                    track_token_usage(
+                        run_tree=run_tree,
+                        model=self._model,
+                        input_tokens=response.usage.prompt_tokens,
+                        output_tokens=response.usage.completion_tokens,
+                    )
+            except Exception as e:
+                logger.debug("Failed to track token usage: %s", e)
+
         return response.choices[0].message.content or ""
 
     async def generate_stream(

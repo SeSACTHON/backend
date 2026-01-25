@@ -31,6 +31,10 @@ from pydantic import BaseModel
 
 from chat_worker.application.ports.llm import LLMClientPort
 from chat_worker.infrastructure.llm.config import MODEL_CONTEXT_WINDOWS
+from chat_worker.infrastructure.telemetry import (
+    is_langsmith_enabled,
+    track_token_usage,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +98,23 @@ class GeminiLLMClient(LLMClientPort):
             contents=user_content,
             config=config,
         )
+
+        # LangSmith 토큰 추적
+        if is_langsmith_enabled() and response.usage_metadata:
+            try:
+                from langsmith.run_helpers import get_current_run_tree
+
+                run_tree = get_current_run_tree()
+                if run_tree:
+                    track_token_usage(
+                        run_tree=run_tree,
+                        model=self._model,
+                        input_tokens=response.usage_metadata.prompt_token_count,
+                        output_tokens=response.usage_metadata.candidates_token_count,
+                    )
+            except Exception as e:
+                logger.debug("Failed to track token usage: %s", e)
+
         return response.text or ""
 
     async def generate_stream(
