@@ -47,9 +47,28 @@ async def event_generator(
     """
     manager = await SSEBroadcastManager.get_instance()
 
-    # Token 복구 (chat 도메인만)
+    # 이벤트 복구 (chat 도메인만)
     if domain == "chat":
-        if last_event_id and "-" in last_event_id and not last_event_id.startswith("recovery:"):
+        # 1. Progress 이벤트 복구 (놓친 stage 이벤트 전송)
+        # last_progress_seq 쿼리 파라미터로 마지막 받은 progress seq 전달
+        last_progress_seq = 0
+        if last_event_id and last_event_id.startswith("progress:"):
+            try:
+                last_progress_seq = int(last_event_id.split(":", 1)[1])
+            except (ValueError, IndexError):
+                pass
+
+        async for progress_event in manager.catch_up_progress_events(job_id, last_progress_seq):
+            if await request.is_disconnected():
+                break
+            yield {
+                "event": progress_event.get("stage", "progress"),
+                "data": json.dumps(progress_event),
+                "id": progress_event.get("stream_id", ""),
+            }
+
+        # 2. Token 복구
+        if last_event_id and "-" in last_event_id and not last_event_id.startswith(("recovery:", "progress:")):
             # 네이티브 Last-Event-ID 기반 복구 (Redis Stream ID)
             # 브라우저 EventSource 자동 재연결 시 전송됨
             logger.info(

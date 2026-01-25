@@ -68,6 +68,9 @@ PUBSUB_CHANNEL_PREFIX = "sse:events:"
 TOKEN_STREAM_PREFIX = "chat:tokens"  # job별 전용 Token Stream
 TOKEN_STATE_PREFIX = "chat:token_state"  # 주기적 누적 텍스트 스냅샷
 
+# Progress Event Stream (복구 가능한 Progress 이벤트)
+PROGRESS_STREAM_PREFIX = "chat:progress"  # job별 전용 Progress Stream
+
 
 def get_state_prefix(domain: str | None = None) -> str:
     """도메인별 State KV 접두사 반환."""
@@ -1218,6 +1221,74 @@ class SSEBroadcastManager:
                     "last_event_id": last_event_id,
                     "error": str(e),
                 },
+            )
+
+    async def catch_up_progress_events(
+        self,
+        job_id: str,
+        from_seq: int = 0,
+    ) -> AsyncGenerator[dict[str, Any], None]:
+        """Progress Stream에서 누락된 Progress 이벤트 복구.
+
+        재연결 시 마지막 seq 이후의 progress 이벤트를 catch-up.
+        Token과 달리 Progress는 seq가 stage*10 기반 (STAGE_ORDER).
+
+        Args:
+            job_id: 작업 ID
+            from_seq: 마지막으로 받은 seq (이 이후부터 복구)
+
+        Yields:
+            Progress 이벤트
+            - stage: "intent", "vision", "answer" 등
+            - status: "started", "completed", "failed"
+            - seq: 단계별 seq
+            - progress: 진행률 (선택)
+            - result: 결과 데이터 (선택)
+            - message: UI 메시지 (선택)
+        """
+        if not self._streams_client:
+            return
+
+        progress_stream_key = f"{PROGRESS_STREAM_PREFIX}:{job_id}"
+
+        try:
+            # Progress Stream에서 모든 이벤트 읽기
+            messages = await self._streams_client.xrange(
+                progress_stream_key,
+                min="-",
+                max="+",
+                count=100,  # Progress 이벤트는 최대 ~40개 (17노드 * 2상태)
+            )
+
+            caught_up_count = 0
+            for msg_id, data in messages:
+                seq = int(data.get("seq", "0"))
+                if seq > from_seq:
+                    caught_up_count += 1
+                    yield {
+                        "stage": data.get("stage", ""),
+                        "status": data.get("status", ""),
+                        "seq": seq,
+                        "progress": data.get("progress", ""),
+                        "result": data.get("result", ""),
+                        "message": data.get("message", ""),
+                        "stream_id": data.get("stream_id", msg_id),
+                    }
+
+            if caught_up_count > 0:
+                logger.info(
+                    "progress_catch_up_completed",
+                    extra={
+                        "job_id": job_id,
+                        "from_seq": from_seq,
+                        "caught_up_count": caught_up_count,
+                    },
+                )
+
+        except Exception as e:
+            logger.warning(
+                "progress_catch_up_error",
+                extra={"job_id": job_id, "error": str(e)},
             )
 
     async def get_token_recovery_event(
