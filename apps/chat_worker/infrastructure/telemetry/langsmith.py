@@ -183,6 +183,23 @@ MODEL_PRICING: dict[str, dict[str, float]] = {
     "gemini-1.5-flash": {"input": 0.075, "output": 0.30},
 }
 
+# 이미지 생성 모델 가격 (USD per image)
+IMAGE_MODEL_PRICING: dict[str, dict[str, float]] = {
+    # Google Gemini 3 (이미지 출력)
+    "gemini-3-pro-image-preview": {
+        "1k": 0.134,   # 1K-2K resolution
+        "4k": 0.24,    # 4K resolution
+        "default": 0.134,
+    },
+    # OpenAI DALL-E / GPT Image
+    "gpt-image-1.5": {
+        "1024x1024": 0.04,
+        "1024x1792": 0.08,
+        "1792x1024": 0.08,
+        "default": 0.04,
+    },
+}
+
 
 def calculate_cost(
     model: str,
@@ -203,6 +220,34 @@ def calculate_cost(
     input_cost = (input_tokens / 1_000_000) * pricing["input"]
     output_cost = (output_tokens / 1_000_000) * pricing["output"]
     return input_cost + output_cost
+
+
+def calculate_image_cost(
+    model: str,
+    size: str = "default",
+    count: int = 1,
+) -> float:
+    """이미지 생성 비용 계산.
+
+    Args:
+        model: 이미지 모델 이름
+        size: 이미지 크기/해상도 (1k, 4k, 1024x1024 등)
+        count: 생성된 이미지 수
+
+    Returns:
+        예상 비용 (USD)
+
+    Example:
+        ```python
+        cost = calculate_image_cost("gemini-3-pro-image-preview", "1k", 1)
+        # $0.134
+        cost = calculate_image_cost("gpt-image-1.5", "1024x1024", 2)
+        # $0.08
+        ```
+    """
+    pricing = IMAGE_MODEL_PRICING.get(model, {"default": 0.10})
+    unit_cost = pricing.get(size, pricing.get("default", 0.10))
+    return unit_cost * count
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -405,6 +450,94 @@ def traceable_tool(
         if asyncio.iscoroutinefunction(func):
             return async_wrapper  # type: ignore
         return sync_wrapper  # type: ignore
+
+    return decorator
+
+
+def traceable_image(
+    model: str = "gemini-3-pro-image-preview",
+    name: str | None = None,
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
+    """이미지 생성 추적 데코레이터.
+
+    LangSmith에서 다음 메트릭을 자동 추적:
+    - Image Generation Latency
+    - Cost per Image
+    - Error rate
+
+    Args:
+        model: 이미지 모델 이름 (비용 계산용)
+        name: 트레이스 이름 (기본: 함수명)
+
+    Example:
+        ```python
+        @traceable_image(model="gemini-3-pro-image-preview")
+        async def generate_character_image(prompt: str) -> ImageGenerationResult:
+            ...
+        ```
+    """
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+        run_name = name or func.__name__
+
+        @functools.wraps(func)
+        async def async_wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
+            if not is_langsmith_enabled():
+                return await func(*args, **kwargs)  # type: ignore
+
+            try:
+                from langsmith import traceable
+                from langsmith.run_helpers import get_current_run_tree
+            except ImportError:
+                return await func(*args, **kwargs)  # type: ignore
+
+            @traceable(
+                run_type="tool",
+                name=run_name,
+                metadata={"model": model, "type": "image_generation"},
+                tags=[f"model:{model}", "type:image_generation"],
+            )
+            async def traced_func(*a: Any, **kw: Any) -> R:
+                start_time = time.perf_counter()
+                error_occurred = False
+                result = None
+                try:
+                    result = await func(*a, **kw)  # type: ignore
+                    return result
+                except Exception as e:
+                    error_occurred = True
+                    raise e
+                finally:
+                    latency_ms = (time.perf_counter() - start_time) * 1000
+
+                    # 이미지 크기 추출 (결과에서)
+                    size = "default"
+                    if result and hasattr(result, "width") and hasattr(result, "height"):
+                        width = getattr(result, "width", 0) or 0
+                        if width >= 3840:
+                            size = "4k"
+                        else:
+                            size = "1k"
+
+                    cost = calculate_image_cost(model, size, count=1)
+
+                    run_tree = get_current_run_tree()
+                    if run_tree:
+                        run_tree.extra = run_tree.extra or {}
+                        run_tree.extra["metrics"] = {
+                            "latency_ms": latency_ms,
+                            "cost_usd": cost,
+                            "image_count": 1,
+                            "image_size": size,
+                            "error": error_occurred,
+                        }
+
+            return await traced_func(*args, **kwargs)
+
+        import asyncio
+        if asyncio.iscoroutinefunction(func):
+            return async_wrapper  # type: ignore
+        # 이미지 생성은 항상 async
+        return async_wrapper  # type: ignore
 
     return decorator
 
@@ -705,9 +838,13 @@ __all__ = [
     # 메트릭 추적 데코레이터
     "traceable_llm",
     "traceable_tool",
+    "traceable_image",
     "track_token_usage",
+    # 비용 계산
     "calculate_cost",
+    "calculate_image_cost",
     "MODEL_PRICING",
+    "IMAGE_MODEL_PRICING",
     # Config 생성
     "get_run_config",
     "get_subagent_tags",

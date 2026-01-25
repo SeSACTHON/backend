@@ -37,16 +37,19 @@ from chat_worker.infrastructure.telemetry.tracer import (
     with_span,
 )
 from chat_worker.infrastructure.telemetry.langsmith import (
+    IMAGE_MODEL_PRICING,
     LANGSMITH_ENABLED,
     LANGSMITH_PROJECT,
     MODEL_PRICING,
     calculate_cost,
+    calculate_image_cost,
     configure_langsmith,
     create_feature_metadata,
     get_feature_info,
     get_run_config,
     get_subagent_tags,
     is_langsmith_enabled,
+    traceable_image,
     traceable_llm,
     traceable_tool,
     track_token_usage,
@@ -69,9 +72,13 @@ __all__ = [
     # LangSmith 메트릭 추적
     "traceable_llm",
     "traceable_tool",
+    "traceable_image",
     "track_token_usage",
+    # 비용 계산
     "calculate_cost",
+    "calculate_image_cost",
     "MODEL_PRICING",
+    "IMAGE_MODEL_PRICING",
     # LangSmith Config
     "get_run_config",
     "get_subagent_tags",
