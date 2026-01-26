@@ -172,15 +172,23 @@ class LangChainOpenAIRunnable(BaseChatModel):
 
         # 토큰 사용량 추출 (LangSmith 추적용)
         token_usage = {}
+        usage_metadata = None
         if response.usage:
             token_usage = {
                 "prompt_tokens": response.usage.prompt_tokens,
                 "completion_tokens": response.usage.completion_tokens,
                 "total_tokens": response.usage.total_tokens,
             }
+            # LangSmith가 읽는 표준 필드
+            usage_metadata = {
+                "input_tokens": response.usage.prompt_tokens,
+                "output_tokens": response.usage.completion_tokens,
+                "total_tokens": response.usage.total_tokens,
+            }
 
         message = AIMessage(
             content=content,
+            usage_metadata=usage_metadata,
             response_metadata={
                 "model": self.model,
                 "token_usage": token_usage,
@@ -239,8 +247,15 @@ class LangChainOpenAIRunnable(BaseChatModel):
                     "completion_tokens": chunk.usage.completion_tokens,
                     "total_tokens": chunk.usage.total_tokens,
                 }
+                # LangSmith가 읽는 표준 필드
+                usage_metadata = {
+                    "input_tokens": chunk.usage.prompt_tokens,
+                    "output_tokens": chunk.usage.completion_tokens,
+                    "total_tokens": chunk.usage.total_tokens,
+                }
                 message_chunk = AIMessageChunk(
                     content="",
+                    usage_metadata=usage_metadata,
                     response_metadata={
                         "model": self.model,
                         "token_usage": token_usage,
