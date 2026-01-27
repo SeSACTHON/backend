@@ -56,7 +56,7 @@ Platform Layer           : ArgoCD, Istiod, KEDA, Prometheus, Grafana, Kiali, Jae
 | auth | JWT 인증/인가 (RS256) | `docker.io/mng990/eco2:auth-{env}-latest` |
 | users | 사용자 정보 관리 (gRPC) | `docker.io/mng990/eco2:users-{env}-latest` |
 | scan | Lite RAG + GPT-5.2 Vision 폐기물 분류 | `docker.io/mng990/eco2:scan-{env}-latest` |
-| chat | **LangGraph Multi-Agent 챗봇** (9 Intents) | `docker.io/mng990/eco2:chat-{env}-latest` |
+| chat | **LangGraph Multi-Agent 챗봇** (10 Intents) | `docker.io/mng990/eco2:chat-{env}-latest` |
 | character | 캐릭터 제공 | `docker.io/mng990/eco2:character-{env}-latest` |
 | location | 지도/수거함 검색 | `docker.io/mng990/eco2:location-{env}-latest` |
 | info | 환경 뉴스 조회 | `docker.io/mng990/eco2:info-{env}-latest` |
@@ -77,7 +77,7 @@ Platform Layer           : ArgoCD, Istiod, KEDA, Prometheus, Grafana, Kiali, Jae
 
 | Worker | 노드 | 설명 | Exchange / Queue | Scaling |
 |--------|------|------|------------------|---------|
-| chat-worker | `worker-ai` | LangGraph Multi-Agent 실행 (9 Intents, timeout 120s, retry 2) | `chat_tasks` → `chat.process` | KEDA (RabbitMQ) |
+| chat-worker | `worker-ai` | LangGraph Multi-Agent 실행 (10 Intents, timeout 120s, retry 2) | `chat_tasks` → `chat.process` | KEDA (RabbitMQ) |
 | checkpoint-syncer | `worker-storage` | Redis → PostgreSQL 체크포인트 배치 동기화 (5s interval) | - | 단일 인스턴스 |
 | chat-persistence-consumer | `worker-storage` | Redis Streams → PostgreSQL 메시지 저장 | - | 단일 인스턴스 |
 
@@ -139,6 +139,8 @@ Retry: 2회
 
 > `app.get_graph().draw_mermaid()` ([참고](https://rudaks.tistory.com/entry/langgraph-%EA%B7%B8%EB%9E%98%ED%94%84%EB%A5%BC-%EC%8B%9C%EA%B0%81%ED%99%94%ED%95%98%EB%8A%94-%EB%B0%A9%EB%B2%95))
 
+**Pipeline Flow**:
+> Intent Classification → Dynamic Router (Send API) → 10종 서브에이전트 병렬 실행 → Aggregator (결과 수집·필수 컨텍스트 검증) → Dynamic Summarization (토큰 임계값 초과 시 OpenCode 스타일 압축) → Answer Node (토큰 스트리밍)
 
 Dynamic Routing (Send API)를 사용하여 런타임에 복수 노드를 병렬 실행합니다.
 
@@ -162,6 +164,7 @@ graph TD;
     bulk_waste(bulk_waste)
     recyclable_price(recyclable_price)
     image_generation(image_generation)
+    web_search(web_search)
     general(general)
     aggregator(aggregator)
     summarize(summarize)
@@ -180,6 +183,7 @@ graph TD;
     router -->|BULK_WASTE| bulk_waste;
     router -->|RECYCLABLE_PRICE| recyclable_price;
     router -->|IMAGE_GENERATION| image_generation;
+    router -->|WEB_SEARCH| web_search;
     router -->|GENERAL| general;
     waste_rag --> aggregator;
     character --> aggregator;
@@ -189,6 +193,7 @@ graph TD;
     bulk_waste --> aggregator;
     recyclable_price --> aggregator;
     image_generation --> aggregator;
+    web_search --> aggregator;
     general --> aggregator;
     aggregator -->|tokens > threshold| summarize;
     aggregator -->|tokens <= threshold| answer;
@@ -271,25 +276,28 @@ flowchart LR
 
 ### Intent Classification
 
-| Intent | 설명 | Agent | External API |
-|--------|------|-------|--------------|
-| `WASTE` | 폐기물 분류/분리배출 질문 | Waste Agent | - |
-| `CHARACTER` | 캐릭터 관련 질문 | Character Agent | - |
-| `WEATHER` | 날씨 정보 요청 | Weather Agent | 기상청 API (Function Calling) |
-| `LOCATION` | 위치/수거함 검색 | Location Agent | Kakao Local API (Function Calling) |
-| `INFO` | 환경 정보 질문 | Info Agent | - |
-| `NEWS` | 환경 뉴스 검색 | News Agent | Info API (Function Calling) |
-| `IMAGE_GENERATION` | 이미지 생성 요청 | Image Generation Agent | Gemini 3 Pro Image |
-| `GENERAL` | 일반 질문 (웹 검색) | General Agent | OpenAI web_search tool |
-| `GREETING` | 인사/잡담 | Greeting Agent | - |
+| Intent | 설명 | Agent | External API / Tool |
+|--------|------|-------|---------------------|
+| `WASTE` | 폐기물 분류/분리배출 질문 | Waste RAG Agent | Tag-Based Contextual Retrieval |
+| `CHARACTER` | 캐릭터 관련 질문 | Character Agent | gRPC (Character API) |
+| `WEATHER` | 날씨 정보 요청 | Weather Agent | 기상청 API (Tool Calling) |
+| `LOCATION` | 위치/수거함 검색 | Location Agent | Kakao Local API (Tool Calling) |
+| `BULK_WASTE` | 대형폐기물 배출 질문 | Bulk Waste Agent | 자치구 API (Tool Calling) |
+| `RECYCLABLE_PRICE` | 재활용품 시세 조회 | Recyclable Price Agent | 시세 API (Tool Calling) |
+| `COLLECTION_POINT` | 수거함/재활용센터 검색 | Collection Point Agent | Kakao Local API (Tool Calling) |
+| `IMAGE_GENERATION` | 이미지 생성 요청 | Image Generation Agent | Gemini 3 Pro Image + gRPC (Images API) |
+| `WEB_SEARCH` | 웹 검색 요청 | Web Search Agent | OpenAI web_search / Gemini Google Search (Native) |
+| `GENERAL` | 일반 질문 | General Agent | - |
 
 ### 주요 특징
 
 | 항목 | 설명 |
 |------|------|
-| LangGraph Multi-Agent | `apps/chat_worker/infrastructure/orchestration/langgraph/nodes/`에 9개 Intent별 Agent 구현. Intent Classification → Domain Agent Router → Answer Node 파이프라인. |
-| Intent Classification | **LangGraph Intent Node**에서 with_structured_output 기반 9개 Intent 분류. |
-| Function Calling Agents | **OpenAI Agents SDK** Primary + **Responses API** Fallback 이중 구조. 6개 노드(web_search, bulk_waste, weather, recyclable_price, location, collection_point) 적용. |
+| LangGraph Multi-Agent | `apps/chat_worker/infrastructure/orchestration/langgraph/nodes/`에 10개 Intent별 Agent 구현. Intent Classification → Dynamic Router (Send API) → Aggregator → Answer Node 파이프라인. |
+| Intent Classification | **LangGraph Intent Node**에서 with_structured_output 기반 10개 Intent 분류. Multi-Intent Fanout으로 복수 Intent 병렬 처리. |
+| Tool Calling Agents | **LLM Native Tool Calling** 기반 6개 노드 — weather, bulk_waste, recyclable_price, location, collection_point (Kakao Local API), web_search (OpenAI/Gemini Native). |
+| Aggregator | 병렬 실행된 서브에이전트 결과 수집 + 필수 컨텍스트(weather, location) 검증. Fail-Open Policy로 보조 정보 누락 시에도 진행. |
+| Dynamic Summarization | 토큰 임계값(4K) 초과 시 **OpenCode 스타일** 이전 대화 요약. 핵심 정보 보존 + 컨텍스트 압축. |
 | 이미지 생성 | **Gemini 3 Pro Image**로 이미지 생성, **gRPC**로 Images API에 업로드 후 CDN URL 반환. Character Reference 지원. |
 | Token Streaming | **LangChain LLM 직접 호출**로 토큰 단위 스트리밍. Event Router → Pub/Sub → SSE Gateway 실시간 전달. |
 | Checkpoint | **Redis Primary + PostgreSQL Async Sync** 아키텍처. Worker는 Redis에 직접 쓰고, checkpoint_syncer가 비동기로 PG에 아카이브. |
@@ -297,8 +305,9 @@ flowchart LR
 | API 구조 | `apps/chat/` → FastAPI + `apps/chat_worker/` LangGraph Agent. `/api/v1/chat` 엔드포인트는 RabbitMQ로 TaskIQ Job 발행. |
 | 트레이싱 | **LangSmith** 연동으로 LangGraph 실행 트레이스 수집. **OpenTelemetry** E2E 분산 트레이싱. |
 
-- **Multi-Intent 지원**: 단일 메시지에서 복수 Intent 추출 및 순차 처리
-- **OpenAI Agents SDK**: Primary + Responses API Fallback 이중 구조로 안정성 확보
+- **Multi-Intent Fanout**: Send API로 복수 Intent 병렬 실행 + Enrichment 자동 추가 (waste → weather)
+- **Tool Calling 기반 API 통합**: LLM Native (OpenAI web_search, Gemini Google Search) + Kakao Local API (HTTP)
+- **gRPC 내부 통신**: Character API, Images API (Location gRPC deprecated → Kakao HTTP 대체)
 - **Token Streaming**: LangChain LLM 직접 호출로 실시간 토큰 전달
 - **이미지 생성**: Gemini 기반 생성 + gRPC CDN 업로드
 - **Character Reference**: 캐릭터 이름 감지 및 컨텍스트 전달
@@ -641,7 +650,7 @@ ArgoCD App-of-Apps 패턴 기반 GitOps. 모든 리소스는 `sync-wave`로 의�
   - **Redis 인스턴스 라우팅 수정**: ProgressNotifier → get_redis_streams()
 
 - **LangGraph Multi-Agent 아키텍처** ✅
-  - **9개 Intent 분류**: WASTE, CHARACTER, WEATHER, LOCATION, IMAGE_GENERATION, GENERAL
+  - **10개 Intent 분류**: WASTE, CHARACTER, LOCATION, BULK_WASTE, RECYCLABLE_PRICE, COLLECTION_POINT, WEATHER, IMAGE_GENERATION, WEB_SEARCH, GENERAL
   - **이미지 생성**: Gemini 3 Pro Image + gRPC CDN Upload, Character Reference 지원
   - **Token Streaming**: LangChain LLM 직접 호출, Event Router Unicode 수정
   - **메시지 영속화**: chat-persistence-consumer (Redis Streams → PostgreSQL)
@@ -719,7 +728,7 @@ ArgoCD App-of-Apps 패턴 기반 GitOps. 모든 리소스는 `sync-wave`로 의�
 - ✅ **OpenAI Tier 4 검증**: TPM 61% 사용, Rate Limit 0건
 
 ### v1.1.0 - Chat Agent & Agents SDK
-- ✅ **LangGraph Multi-Agent 아키텍처 완료** (9개 Intent 분류)
+- ✅ **LangGraph Multi-Agent 아키텍처 완료** (10개 Intent 분류)
 - ✅ **OpenAI Agents SDK Migration**: Primary + Responses API Fallback 이중 구조
 - ✅ **6개 Function Calling 노드**: web_search, bulk_waste, weather, recyclable_price, location, collection_point
 - ✅ **Redis Primary Checkpoint**: Worker PG 연결 96% 감소 (192 → 8)
