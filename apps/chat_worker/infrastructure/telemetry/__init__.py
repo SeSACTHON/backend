@@ -37,14 +37,22 @@ from chat_worker.infrastructure.telemetry.tracer import (
     with_span,
 )
 from chat_worker.infrastructure.telemetry.langsmith import (
+    IMAGE_MODEL_PRICING,
     LANGSMITH_ENABLED,
     LANGSMITH_PROJECT,
+    MODEL_PRICING,
+    calculate_cost,
+    calculate_image_cost,
     configure_langsmith,
     create_feature_metadata,
     get_feature_info,
     get_run_config,
     get_subagent_tags,
     is_langsmith_enabled,
+    traceable_image,
+    traceable_llm,
+    traceable_tool,
+    track_token_usage,
 )
 from chat_worker.infrastructure.telemetry.langsmith_adapter import (
     LangSmithTelemetryAdapter,
@@ -56,15 +64,26 @@ __all__ = [
     "get_tracer",
     "set_span_attributes",
     "with_span",
-    # LangSmith
+    # LangSmith 설정
     "LANGSMITH_ENABLED",
     "LANGSMITH_PROJECT",
     "configure_langsmith",
-    "create_feature_metadata",
-    "get_feature_info",
+    "is_langsmith_enabled",
+    # LangSmith 메트릭 추적
+    "traceable_llm",
+    "traceable_tool",
+    "traceable_image",
+    "track_token_usage",
+    # 비용 계산
+    "calculate_cost",
+    "calculate_image_cost",
+    "MODEL_PRICING",
+    "IMAGE_MODEL_PRICING",
+    # LangSmith Config
     "get_run_config",
     "get_subagent_tags",
-    "is_langsmith_enabled",
+    "create_feature_metadata",
+    "get_feature_info",
     # Clean Architecture Adapter
     "LangSmithTelemetryAdapter",
 ]

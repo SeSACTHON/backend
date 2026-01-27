@@ -34,6 +34,11 @@ from chat_worker.application.ports.image_generator import (
     ImageGeneratorPort,
     ReferenceImage,
 )
+from chat_worker.infrastructure.telemetry import (
+    calculate_image_cost,
+    is_langsmith_enabled,
+    track_token_usage,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -299,6 +304,22 @@ class GeminiNativeImageGenerator(ImageGeneratorPort):
                 ),
             )
 
+            # LangSmith 토큰 추적 (이미지 생성에도 프롬프트 토큰 사용)
+            if is_langsmith_enabled() and response.usage_metadata:
+                try:
+                    from langsmith.run_helpers import get_current_run_tree
+
+                    run_tree = get_current_run_tree()
+                    if run_tree:
+                        track_token_usage(
+                            run_tree=run_tree,
+                            model=self._model,
+                            input_tokens=response.usage_metadata.prompt_token_count or 0,
+                            output_tokens=response.usage_metadata.candidates_token_count or 0,
+                        )
+                except ImportError:
+                    pass
+
             # 응답 파싱
             image_bytes = None
             description = None
@@ -333,6 +354,31 @@ class GeminiNativeImageGenerator(ImageGeneratorPort):
                 width,
                 height,
             )
+
+            # LangSmith 이미지 생성 비용 추적
+            if is_langsmith_enabled():
+                try:
+                    from langsmith.run_helpers import get_current_run_tree
+
+                    run_tree = get_current_run_tree()
+                    if run_tree:
+                        # image_size에 따른 비용 계산
+                        cost = calculate_image_cost(
+                            model=self._model,
+                            size=image_size or "default",
+                            count=1,
+                        )
+                        run_tree.metadata = run_tree.metadata or {}
+                        run_tree.metadata.update(
+                            {
+                                "image_model": self._model,
+                                "image_size": image_size or "default",
+                                "image_cost_usd": cost,
+                                "aspect_ratio": aspect_ratio,
+                            }
+                        )
+                except Exception as e:
+                    logger.debug("Failed to track image generation cost: %s", e)
 
             return ImageGenerationResult(
                 image_url=image_url,

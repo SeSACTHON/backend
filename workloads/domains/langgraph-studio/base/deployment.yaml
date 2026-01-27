@@ -22,6 +22,7 @@ spec:
       containers:
       - name: langgraph-studio
         image: docker.io/mng990/eco2:chat-worker-dev-latest
+        imagePullPolicy: Always
         command: [langgraph]
         args:
         - dev
@@ -35,6 +36,11 @@ spec:
           name: http
           protocol: TCP
         env:
+        # LLM 설정
+        - name: LLM_PROVIDER
+          value: google
+        - name: LLM_MODEL
+          value: gemini-3-flash-preview
         # LangSmith 설정
         - name: LANGCHAIN_TRACING_V2
           value: 'true'
@@ -64,6 +70,8 @@ spec:
         - name: langgraph-config
           mountPath: /app/langgraph.json
           subPath: langgraph.json
+        - name: langgraph-data
+          mountPath: /app/.langgraph_api
         resources:
           requests:
             cpu: 100m
@@ -89,6 +97,8 @@ spec:
       - name: langgraph-config
         configMap:
           name: langgraph-config
+      - name: langgraph-data
+        emptyDir: {}
       nodeSelector:
         domain: observability
       tolerations:

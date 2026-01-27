@@ -2,12 +2,17 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-- auth-redis-failover.yaml       # Blacklist + OAuth State (noeviction, PVC)
-- streams-redis-failover.yaml    # SSE 이벤트 (noeviction, emptyDir)
-- cache-redis-failover.yaml      # Celery Result + Cache (allkeys-lru, emptyDir)
-- pubsub-redis-failover.yaml     # Pub/Sub 브로드캐스트 (allkeys-lru, emptyDir)
-- servicemonitor.yaml            # Prometheus 메트릭 수집
+- auth-redis-failover.yaml          # Blacklist + OAuth State (noeviction, PVC)
+- streams-redis-failover.yaml       # SSE 이벤트 (noeviction, emptyDir)
+- cache-redis-failover.yaml         # Celery Result + Cache (allkeys-lru, emptyDir)
+- pubsub-redis-failover.yaml        # Pub/Sub 브로드캐스트 (allkeys-lru, emptyDir)
+- pubsub-redis-master-service.yaml  # Pub/Sub Master-only Service (Pub/Sub 필수)
+- servicemonitor.yaml               # Prometheus 메트릭 수집
 
-commonLabels:
-  managed-by: kustomize
-  tier: data
+# labels 사용: includeSelectors: false로 Service selector에 라벨 추가 방지
+# Redis Operator가 생성한 Pod에는 이 라벨들이 없으므로 selector에 포함되면 매칭 실패
+labels:
+- pairs:
+    managed-by: kustomize
+    tier: data
+  includeSelectors: false

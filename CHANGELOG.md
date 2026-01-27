@@ -7,6 +7,56 @@ Eco² Backend 프로젝트의 모든 주목할 만한 변경사항을 기록합�
 
 ---
 
+## [1.1.1] - 2026-01-28
+
+### 🚀 Highlights
+> **Redis Pub/Sub 채널 샤딩**: user_id 해시 기반 채널 분산으로 Hot Key 문제 해결.
+> **VU 500-1000 부하 테스트 완료**: OpenAI Tier 4 환경에서 VU 900까지 99.7% 성공률 달성.
+> **KEDA ScaledObject 최적화**: minReplicas 1→2로 Cold Start 방지, maxReplicas 3→5로 처리량 확장.
+
+### Added
+- **Redis Pub/Sub 채널 샤딩**
+  - **user_id 해시 기반 분산**: `sse:events:{user_id}` → `sse:events:{hash(user_id) % 8}`
+  - **Hot Key 방지**: 단일 채널 과부하 해소
+  - **SSE Gateway 호환**: 해시 함수 동기화로 클라이언트 라우팅 유지
+
+- **VU 500-1000 부하 테스트**
+  - **OpenAI Tier 4 검증**: TPM 4,000,000 한도 내 61% 사용, Rate Limit 0건
+  - **VU 900 권장 한계**: 99.7% 성공률, 405.5 req/m 처리량
+  - **VU 1000 한계 테스트**: 97.8% 성공률, Celery Probe Timeout 33건
+
+- **부하 테스트 리포트**
+  - `docs/blogs/tests/2026-01-27-scan-load-test-vu800.md`
+  - `docs/blogs/tests/2026-01-27-scan-load-test-vu900.md`
+  - `docs/blogs/tests/2026-01-27-scan-load-test-vu1000-final.md`
+
+### Changed
+- **KEDA ScaledObject 최적화 (scan-worker)**
+  - minReplicas: 1 → 2 (Cold Start 방지)
+  - maxReplicas: 3 → 5 (처리량 67% 증가)
+  - Multi-Node 분산: k8s-worker-ai + k8s-worker-ai-2
+
+### Fixed
+- **Cold Start 장애 방지**
+  - minReplicas 2로 설정하여 VU 800+ 부하 시 Cascading Failure 방지
+  - 실패율 37.7% 감소 (VU 1000 기준 53건 → 33건)
+
+### Performance
+| VU | 성공률 | 실패 | E2E P95 | Throughput | Worker Restart |
+|----|--------|------|---------|------------|----------------|
+| 500 | 99.7% | 4 | 92.3s | 351.9 req/m | No |
+| 600 | 99.7% | 4 | 108.3s | 351.9 req/m | No |
+| 700 | 99.2% | 11 | 122.3s | 329.1 req/m | No |
+| 800 | 99.7% | 4 | 144.6s | 367.3 req/m | No |
+| **900** | **99.7%** | **4** | **149.6s** | **405.5 req/m** | **No** |
+| 1000 | 97.8% | 33 | 173.3s | 373.4 req/m | Yes |
+
+### Infrastructure
+- **workloads/scaling/dev/kustomization.yaml**: scan-worker ScaledObject 패치 (min=2, max=5)
+- **OpenAI Tier 4**: TPM 4,000,000, RPM 10,000 검증 완료
+
+---
+
 ## [1.1.0] - 2026-01-25
 
 ### 🚀 Highlights
@@ -739,6 +789,6 @@ Eco² Backend 프로젝트의 모든 주목할 만한 변경사항을 기록합�
 
 ---
 
-**문서 버전**: 1.1.0
-**최종 업데이트**: 2026-01-25
+**문서 버전**: 1.1.1
+**최종 업데이트**: 2026-01-28
 **관리자**: Backend Platform Team

@@ -190,7 +190,7 @@ class ChatPersistenceConsumer:
                 logger.info("Consumer cancelled")
                 break
             except Exception as e:
-                logger.error("Consumer error", extra={"error": str(e)})
+                logger.error("Consumer error", extra={"error": str(e)}, exc_info=True)
                 await asyncio.sleep(1)
 
         logger.info("Consumer stopped")

@@ -8,7 +8,6 @@ data:
     {
       "dependencies": ["."],
       "graphs": {
-        "chat": "./apps/chat_worker/infrastructure/orchestration/langgraph/factory.py:create_chat_graph"
-      },
-      "env": ".env"
+        "chat": "./chat_worker/infrastructure/orchestration/langgraph/studio.py:create_studio_graph"
+      }
     }

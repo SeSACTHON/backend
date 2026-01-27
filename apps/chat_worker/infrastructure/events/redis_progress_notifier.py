@@ -149,6 +149,13 @@ TOKEN_STATE_PREFIX = "chat:token_state"  # 주기적 누적 텍스트 스냅샷
 TOKEN_STREAM_TTL = 3600  # 1시간
 TOKEN_STATE_SAVE_INTERVAL = 10  # 10 토큰마다 State 저장
 
+# ─────────────────────────────────────────────────────────────────
+# Progress Event Stream (복구 가능한 Progress 이벤트)
+# ─────────────────────────────────────────────────────────────────
+
+PROGRESS_STREAM_PREFIX = "chat:progress"  # job별 전용 Progress Stream
+PROGRESS_STREAM_TTL = 3600  # 1시간
+
 
 # ─────────────────────────────────────────────────────────────────
 # 멱등성 Lua Script (scan_worker와 동일)
@@ -157,6 +164,7 @@ TOKEN_STATE_SAVE_INTERVAL = 10  # 10 토큰마다 State 저장
 IDEMPOTENT_XADD_SCRIPT = """
 local publish_key = KEYS[1]  -- chat:published:{job_id}:{stage}:{seq}
 local stream_key = KEYS[2]   -- chat:events:{shard}
+local progress_stream = KEYS[3]  -- chat:progress:{job_id} (job별 복구용)
 
 -- 이미 발행했는지 체크
 if redis.call('EXISTS', publish_key) == 1 then
@@ -165,7 +173,7 @@ if redis.call('EXISTS', publish_key) == 1 then
 end
 
 -- XADD 실행 (MAXLEN ~ 로 효율적 trim)
--- ARGV[11]: trace_id, ARGV[12]: span_id, ARGV[13]: traceparent
+-- ARGV[11]: trace_id, ARGV[12]: span_id, ARGV[13]: traceparent, ARGV[14]: progress_ttl
 local msg_id = redis.call('XADD', stream_key, 'MAXLEN', '~', ARGV[1],
     '*',
     'job_id', ARGV[2],
@@ -180,6 +188,24 @@ local msg_id = redis.call('XADD', stream_key, 'MAXLEN', '~', ARGV[1],
     'span_id', ARGV[12],
     'traceparent', ARGV[13]
 )
+
+-- job별 Progress Stream에도 저장 (재연결 시 복구용)
+local progress_msg_id = redis.call('XADD', progress_stream, 'MAXLEN', '~', 100, '*',
+    'stage', ARGV[3],
+    'status', ARGV[4],
+    'seq', ARGV[5],
+    'ts', ARGV[6],
+    'progress', ARGV[7],
+    'result', ARGV[8],
+    'message', ARGV[9],
+    'stream_id', msg_id
+)
+
+-- Progress Stream TTL 설정 (첫 메시지일 때만)
+local stream_len = redis.call('XLEN', progress_stream)
+if stream_len == 1 then
+    redis.call('EXPIRE', progress_stream, tonumber(ARGV[14]))
+end
 
 -- 발행 마킹 (TTL: 2시간)
 redis.call('SETEX', publish_key, ARGV[10], msg_id)
@@ -370,6 +396,7 @@ class RedisProgressNotifier(ProgressNotifierPort):
 
         stream_key = _get_stream_key(task_id, self._shard_count)
         shard = _get_shard_for_job(task_id, self._shard_count)
+        progress_stream_key = f"{PROGRESS_STREAM_PREFIX}:{task_id}"
 
         # 단조증가 seq 계산
         base_seq = STAGE_ORDER.get(stage, 99) * 10
@@ -390,7 +417,7 @@ class RedisProgressNotifier(ProgressNotifierPort):
         # Lua Script 실행
         try:
             result_tuple = await self._stage_script(
-                keys=[publish_key, stream_key],
+                keys=[publish_key, stream_key, progress_stream_key],
                 args=[
                     str(self._maxlen),  # ARGV[1]
                     task_id,  # ARGV[2] - job_id
@@ -405,6 +432,7 @@ class RedisProgressNotifier(ProgressNotifierPort):
                     trace_id,  # ARGV[11]
                     span_id,  # ARGV[12]
                     traceparent,  # ARGV[13]
+                    str(PROGRESS_STREAM_TTL),  # ARGV[14]
                 ],
             )
         except Exception as e:

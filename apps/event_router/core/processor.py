@@ -2,11 +2,16 @@
 
 Redis 역할 분리:
 - Streams Redis: State KV 갱신 ({domain}:state:{job_id}) - 내구성
-- Pub/Sub Redis: 실시간 브로드캐스트 (sse:events:{job_id})
+- Pub/Sub Redis: 실시간 브로드캐스트 (sse:events:{shard}) - Shard 기반
 
 멀티 도메인 지원:
 - scan:events → scan:state
 - chat:events → chat:state
+
+Shard 기반 Pub/Sub (연결 최적화):
+- 기존: sse:events:{job_id} (N개 채널, N개 연결)
+- 현재: sse:events:{shard} (4개 채널, 4개 연결)
+- SSE Gateway에서 job_id로 필터링하여 라우팅
 
 분산 트레이싱 통합:
 - Redis Streams 메시지에서 trace context 추출 (trace_id, span_id, traceparent)
@@ -17,12 +22,13 @@ Redis 역할 분리:
 Lua Script는 Streams Redis에서만 실행 (State + 발행 마킹)
 Pub/Sub는 별도 Redis로 PUBLISH
 
-참조: docs/blogs/async/34-sse-HA-architecture.md
+참조: docs/blogs/async/53-sse-pubsub-connection-optimization.md
 """
 
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -121,12 +127,14 @@ class EventProcessor:
         pubsub_channel_prefix: str = "sse:events",
         state_ttl: int = 3600,
         published_ttl: int = 7200,
+        shard_count: int | None = None,
     ) -> None:
         """초기화.
 
         Args:
             streams_client: Streams Redis (State KV + 발행 마킹)
             pubsub_client: Pub/Sub Redis (PUBLISH only)
+            shard_count: Pub/Sub 샤드 수 (기본: 환경변수 SHARD_COUNT 또는 4)
         """
         self._streams_redis = streams_client
         self._pubsub_redis = pubsub_client
@@ -135,6 +143,24 @@ class EventProcessor:
         self._state_ttl = state_ttl
         self._published_ttl = published_ttl
         self._script: Any = None
+        # Shard 설정 (SSE Gateway와 동일해야 함)
+        self._shard_count = shard_count or int(os.getenv("SHARD_COUNT", "4"))
+
+    def _get_shard_for_job(self, job_id: str) -> int:
+        """job_id에서 shard 계산.
+
+        MD5 해시를 사용하여 job_id를 shard로 매핑.
+        Worker, SSE Gateway와 동일한 해시 함수 사용.
+
+        Args:
+            job_id: 작업 ID
+
+        Returns:
+            shard 번호 (0 ~ shard_count-1)
+        """
+        hash_bytes = hashlib.md5(job_id.encode()).digest()[:8]
+        hash_int = int.from_bytes(hash_bytes, byteorder="big")
+        return hash_int % self._shard_count
 
     def _get_state_prefix(self, stream_name: str) -> str:
         """스트림 이름에서 state prefix 유도.
@@ -267,7 +293,9 @@ class EventProcessor:
         # Redis 키
         state_key = f"{state_prefix}:{job_id}"
         publish_key = f"{self._published_key_prefix}:{job_id}:{seq}"
-        channel = f"{self._pubsub_channel_prefix}:{job_id}"
+        # Shard 기반 Pub/Sub 채널 (연결 최적화)
+        shard = self._get_shard_for_job(job_id)
+        channel = f"{self._pubsub_channel_prefix}:{shard}"
 
         # 이벤트 JSON
         event_data = json.dumps(event, ensure_ascii=False)
