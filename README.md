@@ -2,7 +2,7 @@
 
 > **Version**: v1.1.1 | [Changelog](CHANGELOG.md)
 
-[![Eco² Demo Video](https://img.youtube.com/vi/aFtb-oPv2Bo/maxresdefault.jpg)](https://youtu.be/aFtb-oPv2Bo)
+[![Eco² 서비스 동작 영상](https://img.youtube.com/vi/aFtb-oPv2Bo/maxresdefault.jpg)](https://youtu.be/aFtb-oPv2Bo)
 
 ▶️ **[Just Do it](https://youtu.be/aFtb-oPv2Bo)**
 
