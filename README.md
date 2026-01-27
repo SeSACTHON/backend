@@ -2,7 +2,7 @@
 
 > **Version**: v1.1.1 | [Changelog](CHANGELOG.md)
 
-<img width="3840" height="2160" alt="515829337-6a4f523a-fa37-49de-b8e1-0a5befe26605" src="https://github.com/user-attachments/assets/e6c7d948-aa06-4bbb-b2fc-237aa7f01223" />
+[![Eco² Demo Video](https://img.youtube.com/vi/aFtb-oPv2Bo/maxresdefault.jpg)](https://youtu.be/aFtb-oPv2Bo)
 
 
 **Production-level AI Assistant** - LangGraph Multi-Agent + GPT Vision 기반, 9개 Intent 분류·**OpenAI Agents SDK Function Calling**·이미지 생성·폐기물 분류·챗봇 기능 제공
