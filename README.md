@@ -5,8 +5,10 @@
 <img width="3840" height="2160" alt="515829337-6a4f523a-fa37-49de-b8e1-0a5befe26605" src="https://github.com/user-attachments/assets/e6c7d948-aa06-4bbb-b2fc-237aa7f01223" />
 
 
-- **LangGraph Multi-Agent + GPT Vision** 기반 AI 어시스턴트로, 9개 Intent 분류·**OpenAI Agents SDK Function Calling**·이미지 생성·폐기물 분류·챗봇 기능을 제공합니다.
+**Production-level AI Assistant** - LangGraph Multi-Agent + GPT Vision 기반, 9개 Intent 분류·**OpenAI Agents SDK Function Calling**·이미지 생성·폐기물 분류·챗봇 기능 제공
+
 - Self-managed Kubernetes **24-Nodes** 클러스터에서 **Istio Service Mesh**(mTLS, Auth Offloading)와 **ArgoCD GitOps**로 운영합니다.
+- **Scan API (LLM x2)**: VU 1000 부하 테스트 완료 — **97.8% 성공률**, **373.4 req/m** throughput, E2E P95 173.3s
 - **Redis Streams + Pub/Sub + State KV** 기반 Event Bus Layer로 실시간 SSE 이벤트를 처리하고, **KEDA**로 이벤트 드리븐 오토스케일링을 수행합니다.
 - **RabbitMQ + TaskIQ/Celery** 비동기 Task Queue로 AI 파이프라인을 처리하고, **EFK + Jaeger + LangSmith**로 로깅·트레이싱을 수집합니다.
 - 8개 도메인 마이크로서비스(auth, users, scan, chat, character, location, info, images)를 모노레포로 관리합니다.
