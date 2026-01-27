@@ -328,7 +328,7 @@ class LangChainLLMAdapter(LLMClientPort):
         """Agents SDK로 도구 사용 스트리밍 생성 (Primary)."""
         from agents import Agent, Runner, RunConfig, WebSearchTool
         from agents.models.openai_responses import OpenAIResponsesModel
-        from openai.types.responses import ResponseTextDeltaEvent
+        from openai.types.responses import ResponseCompletedEvent, ResponseTextDeltaEvent
 
         agent_tools = []
         for tool in tools:
@@ -351,6 +351,10 @@ class LangChainLLMAdapter(LLMClientPort):
             run_config=RunConfig(tracing_disabled=True),
         )
 
+        # 토큰 사용량 누적 (여러 response가 있을 수 있음)
+        total_input_tokens = 0
+        total_output_tokens = 0
+
         async for event in result.stream_events():
             if (
                 event.type == "raw_response_event"
@@ -358,6 +362,40 @@ class LangChainLLMAdapter(LLMClientPort):
                 and event.data.delta
             ):
                 yield event.data.delta
+            # response.completed 이벤트에서 토큰 사용량 캡처
+            elif (
+                event.type == "raw_response_event"
+                and isinstance(event.data, ResponseCompletedEvent)
+                and event.data.response.usage
+            ):
+                usage = event.data.response.usage
+                total_input_tokens += usage.input_tokens
+                total_output_tokens += usage.output_tokens
+
+        # 스트리밍 완료 후 LangSmith에 토큰 사용량 보고
+        if total_input_tokens > 0 or total_output_tokens > 0:
+            if is_langsmith_enabled():
+                try:
+                    from langsmith.run_helpers import get_current_run_tree
+
+                    run_tree = get_current_run_tree()
+                    if run_tree:
+                        track_token_usage(
+                            run_tree=run_tree,
+                            model=model_name,
+                            input_tokens=total_input_tokens,
+                            output_tokens=total_output_tokens,
+                        )
+                        logger.debug(
+                            "Agents SDK token usage tracked",
+                            extra={
+                                "model": model_name,
+                                "input_tokens": total_input_tokens,
+                                "output_tokens": total_output_tokens,
+                            },
+                        )
+                except ImportError:
+                    pass
 
     async def _generate_with_responses_api(
         self,
@@ -368,6 +406,8 @@ class LangChainLLMAdapter(LLMClientPort):
         system_prompt: str | None = None,
     ) -> AsyncIterator[str]:
         """Responses API로 도구 사용 스트리밍 생성 (Fallback)."""
+        from openai.types.responses import ResponseCompletedEvent
+
         input_messages: list[dict[str, str]] = []
         if system_prompt:
             input_messages.append({"role": "developer", "content": system_prompt})
@@ -391,10 +431,49 @@ class LangChainLLMAdapter(LLMClientPort):
                 stream=True,
             )
 
+            # 토큰 사용량 캡처용
+            total_input_tokens = 0
+            total_output_tokens = 0
+
             async for event in response:
                 if hasattr(event, "type") and event.type == "response.output_text.delta":
                     if hasattr(event, "delta") and event.delta:
                         yield event.delta
+                # response.completed 이벤트에서 토큰 사용량 캡처
+                elif (
+                    hasattr(event, "type")
+                    and event.type == "response.completed"
+                    and isinstance(event, ResponseCompletedEvent)
+                    and event.response.usage
+                ):
+                    usage = event.response.usage
+                    total_input_tokens += usage.input_tokens
+                    total_output_tokens += usage.output_tokens
+
+            # 스트리밍 완료 후 LangSmith에 토큰 사용량 보고
+            if total_input_tokens > 0 or total_output_tokens > 0:
+                if is_langsmith_enabled():
+                    try:
+                        from langsmith.run_helpers import get_current_run_tree
+
+                        run_tree = get_current_run_tree()
+                        if run_tree:
+                            track_token_usage(
+                                run_tree=run_tree,
+                                model=model_name,
+                                input_tokens=total_input_tokens,
+                                output_tokens=total_output_tokens,
+                            )
+                            logger.debug(
+                                "Responses API token usage tracked",
+                                extra={
+                                    "model": model_name,
+                                    "input_tokens": total_input_tokens,
+                                    "output_tokens": total_output_tokens,
+                                },
+                            )
+                    except ImportError:
+                        pass
 
         except Exception as e:
             logger.error(
