@@ -54,6 +54,14 @@ class SqlaCharacterStore:
         if not events:
             return 0
 
+        # 중복 제거: (user_id, character_code) 기준, 마지막 이벤트 우선
+        # PostgreSQL ON CONFLICT는 단일 INSERT 내 동일 키 중복을 허용하지 않음
+        deduplicated: dict[tuple, "CharacterEvent"] = {}
+        for event in events:
+            key = (event.user_id, event.character_code)
+            deduplicated[key] = event
+        events = list(deduplicated.values())
+
         # Bulk UPSERT (character_code 기준)
         values = []
         params: dict = {}
