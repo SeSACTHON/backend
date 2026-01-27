@@ -618,7 +618,7 @@ ArgoCD App-of-Apps 패턴 기반 GitOps. 모든 리소스는 `sync-wave`로 의�
   - **user_id 해시 기반 채널 샤딩**: `sse:events:{user_id}` → `sse:events:{hash(user_id) % 8}` Hot Key 분산
   - **KEDA ScaledObject 최적화**: minReplicas 1→2 (Cold Start 방지), maxReplicas 3→5
   - **VU 500-1000 부하 테스트 완료**: VU 900까지 99.7% 성공률, VU 1000에서 97.8% 달성
-  - **병목 분석**: Celery Probe I/O-bound 취약점 식별, OpenAI Tier 4 TPM 61% 사용 (여유)
+  - **병목 분석**: Celery Probe I/O-bound(LLM API) 취약점 식별, OpenAI Tier 4 TPM 61% 사용 (여유)
 
 - **OpenAI Agents SDK Migration** ✅
   - **Primary + Fallback 구조**: Agents SDK 실패 시 Responses API로 자동 전환
