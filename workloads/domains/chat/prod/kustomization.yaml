@@ -4,7 +4,7 @@ resources:
 - ../base
 images:
 - name: docker.io/mng990/eco2
-  newTag: chat-api-1.1.0-pre-f0bcf9
+  newTag: chat-api-1.1.0-pre-34de49
 labels:
 - includeSelectors: true
   pairs:
