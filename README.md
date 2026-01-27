@@ -1,6 +1,6 @@
 # Eco² Backend
 
-> **Version**: v1.1.0 | [Changelog](CHANGELOG.md)
+> **Version**: v1.1.1 | [Changelog](CHANGELOG.md)
 
 <img width="3840" height="2160" alt="515829337-6a4f523a-fa37-49de-b8e1-0a5befe26605" src="https://github.com/user-attachments/assets/e6c7d948-aa06-4bbb-b2fc-237aa7f01223" />
 
@@ -263,7 +263,7 @@ flowchart LR
 | **Event Router** | Streams → Pub/Sub Fan-out, State 갱신, 멱등성 보장 | KEDA (Pending 메시지) |
 | **SSE Gateway** | Pub/Sub → Client, State 복구, Streams Catch-up | KEDA (연결 수) |
 | **Redis Streams** | 이벤트 로그 (내구성), Consumer Group 지원 | 샤딩 (4 shards) |
-| **Redis Pub/Sub** | 실시간 Fan-out (fire-and-forget) | 전용 인스턴스 |
+| **Redis Pub/Sub** | 실시간 Fan-out, **user_id 해시 기반 채널 샤딩** | 전용 인스턴스 |
 | **State KV** | 최신 상태 스냅샷, 재접속 복구 | Streams Redis 공유 |
 
 ### Intent Classification
@@ -612,9 +612,15 @@ ArgoCD App-of-Apps 패턴 기반 GitOps. 모든 리소스는 `sync-wave`로 의�
 
 ---
 
-## Release Summary (v1.0.8 - v1.1.0)
+## Release Summary (v1.0.8 - v1.1.1)
 
-- **OpenAI Agents SDK Migration** ✅ **(New!)**
+- **Redis Pub/Sub 채널 샤딩 & 부하 테스트 VU 1000** ✅ **(New!)**
+  - **user_id 해시 기반 채널 샤딩**: `sse:events:{user_id}` → `sse:events:{hash(user_id) % 8}` Hot Key 분산
+  - **KEDA ScaledObject 최적화**: minReplicas 1→2 (Cold Start 방지), maxReplicas 3→5
+  - **VU 500-1000 부하 테스트 완료**: VU 900까지 99.7% 성공률, VU 1000에서 97.8% 달성
+  - **병목 분석**: Celery Probe I/O-bound 취약점 식별, OpenAI Tier 4 TPM 61% 사용 (여유)
+
+- **OpenAI Agents SDK Migration** ✅
   - **Primary + Fallback 구조**: Agents SDK 실패 시 Responses API로 자동 전환
   - **6개 Function Calling 노드**: web_search, bulk_waste, weather, recyclable_price, location, collection_point
   - **Streaming Safety**: `_yielded` 플래그로 부분 데이터 전송 시 fallback 방지
@@ -655,21 +661,26 @@ ArgoCD App-of-Apps 패턴 기반 GitOps. 모든 리소스는 `sync-wave`로 의�
   - **Celery Chain**(Vision→Rule→Answer→Reward): **GPT-5.2 Vision** + **GPT-5.2-mini** 조합
 
 <details>
-<summary>📊 부하 테스트 결과 (Scan Pipeline)</summary>
+<summary>📊 부하 테스트 결과 (Scan Pipeline) - OpenAI Tier 4, KEDA min=2/max=5</summary>
 
-| VU | 요청 수 | 완료율 | Throughput | E2E p95 | Scan p95 | 상태 |
-|----|---------|--------|------------|---------|----------|------|
-| 50 | 685 | 99.7% | 198 req/m | 17.7초 | 93ms | ✅ 여유 |
-| 200 | 1,649 | 99.8% | 367 req/m | 33.2초 | 83ms | ✅ 안정 |
-| 250 | 1,754 | 99.9% | 418 req/m | 40.5초 | 78ms | ✅ 여유 |
-| **300** | **1,732** | **99.9%** | **402 req/m** | **48.5초** | **83ms** | ⭐ **SLA 기준** |
-| 400 | 1,901 | 98.9% | 422 req/m | 62.2초 | 207ms | ⚠️ 한계 근접 |
-| 500 | 1,990 | 94.0% | 438 req/m | 76.4초 | 154ms | ❌ 단일 노드 한계 |
+| VU | 요청 수 | 성공률 | Throughput | E2E P95 | 실패 | 상태 |
+|----|---------|--------|------------|---------|------|------|
+| 500 | 1,408 | 99.7% | 351.9 req/m | 108.3s | 4 | ✅ 안정 |
+| 600 | 1,408 | 99.7% | 351.9 req/m | 108.3s | 4 | ✅ 안정 |
+| 700 | 1,496 | 99.2% | 329.1 req/m | 122.3s | 11 | ✅ 안정 |
+| 800 | 1,386 | 99.7% | 367.3 req/m | 144.6s | 4 | ✅ 안정 |
+| **900** | **1,540** | **99.7%** | **405.5 req/m** | **149.6s** | **4** | ⭐ **권장 한계** |
+| 1000 | 1,518 | 97.8% | 373.4 req/m | 173.3s | 33 | ⚠️ Probe Timeout |
+
+**개선 사항 (v1.1.1)**:
+- Redis Pub/Sub 채널 샤딩 (`user_id` 해시 기반) → Hot Key 분산
+- KEDA ScaledObject 조정: minReplicas 1→2, maxReplicas 3→5
+- Cold Start 방지로 실패율 37.7% 감소 (VU 1000 기준 53건→33건)
 
 </details>
 
 - **KEDA 이벤트 드리븐 오토스케일링** ✅
-  - **scan-worker**: RabbitMQ 큐 길이 기반 자동 스케일링 (1-3 replicas)
+  - **scan-worker**: RabbitMQ 큐 길이 기반 자동 스케일링 (2-5 replicas, Cold Start 방지)
   - **chat-worker**: RabbitMQ chat.process 큐 기반 스케일링
   - **event-router**: Redis Streams pending 메시지 기반 스케일링
   - Prometheus Adapter 연동으로 커스텀 메트릭 기반 HPA 구현
@@ -686,6 +697,7 @@ ArgoCD App-of-Apps 패턴 기반 GitOps. 모든 리소스는 `sync-wave`로 의�
 📝 [이코에코(Eco²) 백엔드/인프라 개발 블로그](https://rooftopsnow.tistory.com/category/%EC%9D%B4%EC%BD%94%EC%97%90%EC%BD%94%28Eco%C2%B2%29)
 
 **주요 기술 문서**:
+- [VU 1000 부하 테스트 (Tier 4)](https://rooftopsnow.tistory.com/255) - KEDA 최적화, Celery Probe 분석
 - [OpenAI Agents SDK Migration](https://rooftopsnow.tistory.com/246) - Primary + Fallback 이중 구조
 - [Redis Primary + PG Async Sync Checkpoint](https://rooftopsnow.tistory.com/242) - Connection Pool 고갈 해결
 - [Event Router & SSE Gateway 안정성 개선](https://rooftopsnow.tistory.com/237) - ACK Policy, Reclaimer
@@ -696,7 +708,14 @@ ArgoCD App-of-Apps 패턴 기반 GitOps. 모든 리소스는 `sync-wave`로 의�
 
 ## Status
 
-### v1.1.0 - Chat Agent & Agents SDK ⭐ Latest
+### v1.1.1 - Redis Pub/Sub Sharding & VU 1000 Load Test ⭐ Latest
+- ✅ **Redis Pub/Sub 채널 샤딩**: user_id 해시 기반 Hot Key 분산
+- ✅ **KEDA ScaledObject 최적화**: minReplicas 2, maxReplicas 5 (Cold Start 방지)
+- ✅ **VU 500-1000 부하 테스트 완료**: VU 900까지 99.7% 성공률
+- ✅ **병목 분석 완료**: Celery Probe I/O-bound 취약점 식별
+- ✅ **OpenAI Tier 4 검증**: TPM 61% 사용, Rate Limit 0건
+
+### v1.1.0 - Chat Agent & Agents SDK
 - ✅ **LangGraph Multi-Agent 아키텍처 완료** (9개 Intent 분류)
 - ✅ **OpenAI Agents SDK Migration**: Primary + Responses API Fallback 이중 구조
 - ✅ **6개 Function Calling 노드**: web_search, bulk_waste, weather, recyclable_price, location, collection_point
@@ -723,7 +742,6 @@ ArgoCD App-of-Apps 패턴 기반 GitOps. 모든 리소스는 `sync-wave`로 의�
 - ✅ Event Router, SSE Gateway 컴포넌트 개발 완료
 - ✅ KEDA 이벤트 드리븐 오토스케일링 적용 (scan-worker, event-router, character-match-worker)
 - ✅ Celery 비동기 AI 파이프라인 완료 (Vision→Rule→Answer→Reward)
-- ✅ 부하 테스트 완료: **300 VU SLA**, **500 VU 한계점**
 
 ### v1.0.6 - Observability
 - ✅ EFK 로깅 파이프라인 (Fluent Bit → Elasticsearch → Kibana)
