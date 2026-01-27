@@ -6,7 +6,7 @@
 
 ▶️ **[Just Do it](https://youtu.be/aFtb-oPv2Bo)**
 
-**Production-level AI Assistant** - LangGraph Multi-Agent + GPT Vision 기반, 9개 Intent 분류·**OpenAI Agents SDK Function Calling**(위치 기반 장소 검색, 날씨, 웹 검색)·이미지 생성·폐기물 분류·챗봇 기능 제공
+**Production-level AI Agent** - Tool Calling 기반 장소 / 날씨 / 재활용 가격 검색, 웹 검색, 이미지 생성, 폐기물 이미지 분리배출 인식 및 분류, 챗봇 기능 제공
 
 - Self-managed Kubernetes **24-Nodes** 클러스터에서 **Istio Service Mesh**(mTLS, Auth Offloading)와 **ArgoCD GitOps**로 운영합니다.
 - **Scan API (LLM x2)**: VU 1000 부하 테스트 완료 — **97.8% 성공률**, **373.4 req/m** throughput, E2E P95 173.3s
