@@ -6,7 +6,7 @@
 
 
 - **LangGraph Multi-Agent + GPT Vision** 기반 AI 어시스턴트로, 9개 Intent 분류·**OpenAI Agents SDK Function Calling**·이미지 생성·폐기물 분류·챗봇 기능을 제공합니다.
-- Self-managed Kubernetes **25-Nodes** 클러스터에서 **Istio Service Mesh**(mTLS, Auth Offloading)와 **ArgoCD GitOps**로 운영합니다.
+- Self-managed Kubernetes **24-Nodes** 클러스터에서 **Istio Service Mesh**(mTLS, Auth Offloading)와 **ArgoCD GitOps**로 운영합니다.
 - **Redis Streams + Pub/Sub + State KV** 기반 Event Bus Layer로 실시간 SSE 이벤트를 처리하고, **KEDA**로 이벤트 드리븐 오토스케일링을 수행합니다.
 - **RabbitMQ + TaskIQ/Celery** 비동기 Task Queue로 AI 파이프라인을 처리하고, **EFK + Jaeger + LangSmith**로 로깅·트레이싱을 수집합니다.
 - 8개 도메인 마이크로서비스(auth, users, scan, chat, character, location, info, images)를 모노레포로 관리합니다.
@@ -685,10 +685,10 @@ ArgoCD App-of-Apps 패턴 기반 GitOps. 모든 리소스는 `sync-wave`로 의�
   - **event-router**: Redis Streams pending 메시지 기반 스케일링
   - Prometheus Adapter 연동으로 커스텀 메트릭 기반 HPA 구현
 
-- **25-Node 클러스터 확장** ✅
+- **24-node 클러스터 확장** ✅
   - **신규 노드**: chat-worker, info, info-worker, chat-persistence-consumer 전용 노드 추가
   - **Redis 인스턴스 분리**: Streams(내구성) / Pub/Sub(실시간) / Cache(LRU)
-  - **Grafana 대시보드**: 25-Node 전체 모니터링 대시보드
+  - **Grafana 대시보드**: 24-node 전체 모니터링 대시보드
 
 ---
 
@@ -722,7 +722,7 @@ ArgoCD App-of-Apps 패턴 기반 GitOps. 모든 리소스는 `sync-wave`로 의�
 - ✅ **Redis Primary Checkpoint**: Worker PG 연결 96% 감소 (192 → 8)
 - ✅ **Gemini 이미지 생성 파이프라인** + gRPC CDN Upload
 - ✅ **Event Bus 안정성**: ACK Policy 수정, 멀티도메인 Reclaimer
-- ✅ **25-Node 클러스터 확장**: Grafana 대시보드 추가
+- ✅ **24-node 클러스터 확장**: Grafana 대시보드 추가
 - ✅ **분산 트레이싱**: LangSmith + OpenTelemetry E2E
 
 ### v1.0.9 - Info 서비스 & Context 마이그레이션
